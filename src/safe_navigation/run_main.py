@@ -172,7 +172,14 @@ def main():
         camera_info = client.simGetCameraInfo("0")
         print(f"✓ 摄像头信息: {camera_info}")
 
-
+        img, img_width, img_height = get_camera_image(client)
+        if img is not None:
+            has_obstacles, obstacles = detect_obstacles(img)
+            print(f"✓ 摄像头图像获取成功: {img_width}x{img_height}")
+            if has_obstacles:
+                print(f"检测到障碍物: {obstacles}")
+            cv2.imshow('AirSim Camera - 障碍物检测', img)
+            cv2.waitKey(1)
         else:
             print("⚠ 无法获取摄像头图像，将使用模拟数据进行演示")
             # 创建一个空白图像用于显示
@@ -191,8 +198,6 @@ def main():
         controls.steering = 0.0
         client.setCarControls(controls)
         print("直行前往路口...")
-
-<
 
         # 到达路口，完全停车
         controls.throttle = 0.0

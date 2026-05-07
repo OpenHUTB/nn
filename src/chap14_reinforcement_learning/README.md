@@ -113,3 +113,38 @@ action = agent.place(state, enables)
 * 增加模型评估与训练数据生成模块
 * 可视化 Q 值输出（便于分析）
 
+
+---
+
+## Engineering Update (2026-05-05)
+
+This commit keeps the original Reversi RL workflow but adds lightweight engineering improvements:
+
+1. Configurable training parameters via environment variables:
+   - `REVERSI_SEED`
+   - `REVERSI_MAX_EPOCHS`
+   - `REVERSI_RENDER_INTERVAL`
+   - `REVERSI_MAX_STEPS`
+   - `REVERSI_REPORT_OUT`
+2. JSON report export after run:
+   - default: `outputs/reversi_train_report.json`
+3. Dry-run mode for quick verification without running Gym training:
+   - `REVERSI_DRY_RUN=1`
+
+### PowerShell examples
+
+```powershell
+# 1) Dry run (no Gym training loop)
+$env:REVERSI_DRY_RUN=1
+$env:REVERSI_REPORT_OUT="outputs/reversi_train_report.json"
+python .\reversi_main.py
+
+# 2) Normal run with custom parameters
+$env:REVERSI_DRY_RUN=0
+$env:REVERSI_SEED=42
+$env:REVERSI_MAX_EPOCHS=20
+$env:REVERSI_RENDER_INTERVAL=5
+$env:REVERSI_MAX_STEPS=60
+$env:REVERSI_REPORT_OUT="outputs/reversi_train_report.json"
+python .\reversi_main.py
+```

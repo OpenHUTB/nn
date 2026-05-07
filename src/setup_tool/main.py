@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 
 class ProgressDemo:
-    """进度显示演示类"""
+    """用于演示 setup 过程中的进度显示、状态输出和汇总信息"""
 
     def __init__(self, total_steps=11):
         self.total_steps = total_steps
@@ -26,8 +26,9 @@ class ProgressDemo:
         self.step_times = []
 
     def show_progress(self, description):
-        """显示进度条"""
+        """更新当前步骤并打印带百分比和 ETA 的进度信息"""
         self.current_step += 1
+        # 根据当前步骤计算进度百分比
         percent = int(self.current_step * 100 / self.total_steps)
 
         # 计算已用时间
@@ -36,6 +37,7 @@ class ProgressDemo:
 
         # 估算剩余时间
         if self.current_step > 1:
+            # 基于已执行步骤的平均耗时估算剩余时间
             avg_time = elapsed / (self.current_step - 1)
             remaining = avg_time * (self.total_steps - self.current_step + 1)
             remain_m, remain_s = divmod(int(remaining), 60)
@@ -44,6 +46,7 @@ class ProgressDemo:
 
         # 构建进度条
         bar_size = percent // 2
+        # 生成固定宽度的文本进度条
         progress_bar = "#" * bar_size + " " * (50 - bar_size)
 
         # 显示进度
@@ -58,7 +61,7 @@ class ProgressDemo:
         sys.stdout.flush()
 
     def step_result(self, status, message):
-        """显示步骤结果"""
+        """显示单个步骤的执行结果，并统计不同状态的数量"""
         if status == "skip":
             self.skipped += 1
             print(f"  [SKIP] {message}")
@@ -74,7 +77,8 @@ class ProgressDemo:
         sys.stdout.flush()
 
     def show_summary(self):
-        """显示汇总信息"""
+        """输出整个演示流程的最终汇总信息"""
+        # 统计总耗时并输出最终汇总
         total_time = int(time.time() - self.start_time)
         tm, ts = divmod(total_time, 60)
 
@@ -92,7 +96,7 @@ class ProgressDemo:
 
 
 def main():
-    """主函数：演示进度显示功能"""
+    """按顺序执行 setup 进度显示演示"""
     print()
     print("=" * 80)
     print("              Setup.bat Progress Display - DEMO VERSION")
