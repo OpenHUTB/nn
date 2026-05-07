@@ -27,7 +27,7 @@ def draw_bounding_boxes(image, boxes, labels, class_names, ids):
         cv2.putText(image, label,
                     (int(box[0]+20), int(box[1]+40)),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    1,  # font scale
+                    0.5,  # font scale
                     tuple([int(c) for c in draw_bounding_boxes.colours[int(ids[i]) % 32, :]]),
                     2)  # line type
     return image

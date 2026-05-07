@@ -18,14 +18,17 @@
 ## 项目结构
 ```
 drone_flight_sim/
-├── main.py                  # 主程序入口（支持两种飞行模式）
-├── drone_controller.py     # 无人机核心控制模块（含相机控制和键盘控制）
-├── collision_handler.py     # 碰撞检测与处理模块
-├── flight_path.py           # 航点规划模块
-├── keyboard_control.py      # 键盘控制模块（新增）
-├── config.py                # 配置文件（含相机和键盘配置）
-├── utils.py                 # 工具函数
-└── drone_images/            # 拍摄照片保存目录（自动创建）
+├── main.py                      # 主程序入口（支持两种飞行模式）
+├── drone_controller.py          # 无人机核心控制模块
+├── collision_handler.py         # 碰撞检测与处理模块
+├── flight_path.py               # 航点规划模块
+├── keyboard_control.py          # 键盘控制模块
+├── collision_data_collector.py  # 手动碰撞数据采集模块
+├── auto_collision_collector.py  # 自动碰撞数据采集模块（新）
+├── config.py                    # 配置文件
+├── utils.py                     # 工具函数
+├── drone_images/                # 拍摄照片保存目录（自动创建）
+└── collision_dataset/           # 碰撞数据采集保存目录（自动创建）
 ```
 
 ## 飞行模式
@@ -253,3 +256,134 @@ waypoints = [(5, 0, -3), (5, -5, -3), (0, -5, -3), (0, 0, -3)]
 - 分割图像：`seg_YYYYMMDD_HHMMSS_X_Y.png`
 
 其中 `X`、`Y` 为拍照时的无人机坐标，`序号` 为该次运行的第 N 张照片。
+
+## 机器学习碰撞检测
+
+### 数据采集模块
+
+项目提供两种数据采集方式：
+
+#### 方式一：自动采集（推荐）
+
+使用 `auto_collision_collector.py` 自动采集数据，无需手动操作，短时间可采集大量样本。
+
+**运行方式：**
+```bash
+python auto_collision_collector.py
+```
+
+**交互式选择：**
+1. 选择飞行模式（1-4）
+2. 输入采集时长（秒）
+3. 输入每类目标样本数
+
+**飞行模式：**
+
+| 模式 | 说明 | 碰撞率 |
+|------|------|--------|
+| 1. 螺旋飞行 | 螺旋向外扩大飞行 | 中 |
+| 2. 随机飞行 | 飞向随机目标点 | 中 |
+| 3. 折线飞行 | 高速直线折返 | 高 |
+| 4. 撞墙模式 | 专门朝障碍物飞行 | 最高 |
+
+**采集原理：**
+- 安全样本(label=0)：飞行过程中定期自动采集
+- 危险样本(label=1)：碰撞事件发生时自动采集并标注
+- 碰撞后自动恢复，继续飞行采集
+
+**特点：**
+- 全自动运行，无需人工干预
+- 利用仿真器碰撞检测自动标注
+- 几分钟内可采集数百个样本
+- 使用速度控制保持固定高度
+
+#### 方式二：手动采集
+
+使用 `collision_data_collector.py` 手动控制无人机并采集数据。
+
+**运行方式：**
+```bash
+python collision_data_collector.py
+```
+
+**控制说明：**
+
+| 按键 | 功能 |
+|------|------|
+| W/S/A/D | 飞行控制（前进/后退/左移/右移） |
+| Q/E | 上升/下降 |
+| 空格 | 悬停 |
+| L | 降落 |
+| 0 | 设置为安全标签（前方无障碍物） |
+| 1 | 设置为危险标签（前方有障碍物） |
+| C | 采集当前样本 |
+| P | 自动采集10个样本 |
+| ESC | 退出 |
+
+**数据采集建议：**
+- 安全样本：在开阔地带、低空飞行时采集（按 0 设置标签）
+- 危险样本：靠近建筑物、树木时采集（按 1 设置标签）
+- 每种类型至少采集 20-30 个样本
+
+**数据保存位置：**
+- `collision_dataset/depth/` - 深度图像
+- `collision_dataset/labels.csv` - 标签记录
+
+**CSV 数据格式：**
+```
+filename,label,risk,min_depth,mean_depth,pos_x,pos_y
+collision_20260430_220825_0.0_0.0,0,safe,0.41,11811.93,0.0,0.0
+collision_20260430_221730_9.1_-10.1,1,danger,0.14,6190.47,9.1,-10.1
+```
+
+**下一步计划：**
+- ~~训练碰撞预测模型~~ ✅ 已完成
+- 实时推理与避障控制
+- 强化学习智能体训练
+
+---
+
+## 机器学习碰撞预测模型
+
+### 模型训练
+
+使用 CNN 对深度图像进行二分类（安全 vs 危险碰撞风险）：
+
+```bash
+python train_collision_model.py
+```
+
+### 模型评估
+
+```bash
+python train_collision_model.py --eval
+```
+
+### 模型文件
+
+训练好的模型保存在：`collision_model.pth`
+
+### 模型架构
+
+```
+输入: 深度图像 (64x64 灰度)
+    ↓
+Conv2D(1→16) + BN + ReLU + MaxPool
+    ↓
+Conv2D(16→32) + BN + ReLU + MaxPool
+    ↓
+Conv2D(32→64) + BN + ReLU + MaxPool
+    ↓
+Conv2D(64→128) + BN + ReLU + MaxPool
+    ↓
+Flatten → Dense(256) → Dropout → Dense(64) → Dense(1)
+    ↓
+输出: 碰撞风险概率 [0~1]
+```
+
+### 训练数据
+
+- 数据集：`collision_dataset/`
+- 样本数：301（安全: 278, 危险: 23）
+- 数据增强：过采样平衡类别
+- 测试准确率：91.80%

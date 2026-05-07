@@ -1,0 +1,7 @@
+<!-- -->
+<launch>
+  <include file="$(find carla_ros_bridge)/launch/carla_ros_bridge.launch" />
+  <include file="$(find carla_spawn_objects)/launch/carla_spawn_objects.launch" />
+  <include file="$(find carla_manual_control)/launch/carla_manual_control.launch" />
+</launch>
+
