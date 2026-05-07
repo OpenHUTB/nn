@@ -82,8 +82,6 @@ def softmax_ce(logits, label):
     # 参数label: one-hot格式的标签
     # 定义一个极小值epsilon（1e-8），用于数值稳定性，防止log(0)的情况
     epsilon = 1e-8
-    logits = tf.cast(logits, tf.float32)
-    label = tf.cast(label, tf.float32)
     # 数值稳定处理：减去最大值
     logits_max = tf.stop_gradient(tf.reduce_max(logits, axis = -1, keepdims = True))
     stable_logits = logits - logits_max

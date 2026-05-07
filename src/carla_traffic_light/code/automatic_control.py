@@ -7,7 +7,7 @@
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
 """Example of automatic vehicle control from client side."""
-
+# -*- coding: utf-8 -*-
 from __future__ import print_function
 
 import argparse
@@ -701,12 +701,12 @@ def game_loop(args):
             spawn_points = world.map.get_spawn_points()
             random.shuffle(spawn_points)
 
-            if spawn_points[0].location != agent.vehicle.get_location():
+            if spawn_points[0].location != world.player.get_location():
                 destination = spawn_points[0].location
             else:
                 destination = spawn_points[1].location
 
-            agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
+            agent.set_destination(world.player.get_location(), destination)
 
         clock = pygame.time.Clock()
 
@@ -733,27 +733,28 @@ def game_loop(args):
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
             else:
-                agent.update_information()
+                #agent.update_information()
 
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
 
                 # Set new destination when target has been reached
-                if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
-                    agent.reroute(spawn_points)
-                    tot_target_reached += 1
-                    world.hud.notification("The target has been reached " +
-                                           str(tot_target_reached) + " times.", seconds=4.0)
+                #if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
+                #    agent.reroute(spawn_points)
+                #    tot_target_reached += 1
+                #    world.hud.notification("The target has been reached " +
+                #                           str(tot_target_reached) + " times.", seconds=4.0)
 
-                elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
-                    print("Target reached, mission accomplished...")
-                    break
+                #elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
+                #    print("Target reached, mission accomplished...")
+                #    break
 
                 speed_limit = world.player.get_speed_limit()
                 agent.get_local_planner().set_speed(speed_limit)
 
                 control = agent.run_step()
+                print(f"Throttle: {control.throttle}, Steer: {control.steer}, Brake: {control.brake}")  # 添加这行
                 world.player.apply_control(control)
 
     finally:

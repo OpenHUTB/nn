@@ -34,85 +34,109 @@ def eval_acc(label, pred):
     return np.sum(label == pred) / len(pred)  # 正确预测的样本比例
 
 class SVM:
-    """SVM模型：基于最大间隔分类的监督学习算法。"""
-#支持向量机（Support Vector Machine, SVM） 是一种经典的监督学习算法，主要用于分类（也可用于回归和异常检测）。
-    def __init__(self, learning_rate=0.1, reg_lambda=0.0, max_iter=20000):
-        # 超参数设置
+    """SVM模型：基于最大间隔分类的监督学习算法。
+
+    改进点：
+    1. 修复 predict() 中 y_train_unique 未初始化的 bug
+    2. 添加学习率指数衰减，兼顾快速收敛和精细调优
+    3. 添加训练损失计算与进度打印，便于监控收敛
+    4. 添加早停机制，收敛后自动停止避免浪费计算
+    5. 默认开启 L2 正则化，防止过拟合
+    """
+
+    def __init__(self, learning_rate=0.1, reg_lambda=0.001, max_iter=20000,
+                 lr_decay=0.9995, print_interval=2000, patience=2000):
         self.learning_rate = learning_rate
         self.reg_lambda = reg_lambda
         self.max_iter = max_iter
-        self.w = None              # 权重向量，决定分类超平面的方向
-        self.b = None              # 偏置项，决定分类超平面的位置
-        self.scaler = StandardScaler() # 添加标准化器
+        self.lr_decay = lr_decay          # 学习率衰减系数
+        self.print_interval = print_interval  # 打印间隔
+        self.patience = patience          # 早停耐心值（连续无改善的轮数）
+        self.w = None
+        self.b = None
+        self.scaler = StandardScaler()
+
+    def _compute_hinge_loss(self, X, y):
+        """计算 hinge loss + L2 正则化损失"""
+        score = np.dot(X, self.w) + self.b
+        hinge = np.maximum(0, 1 - y * score)
+        return np.mean(hinge) + self.reg_lambda * np.dot(self.w, self.w)
 
     def train(self, data_train):
         """训练SVM模型（基于hinge loss + L2正则化）
-        
-        算法核心：
-        1. 寻找能最大化间隔的超平面 wx + b = 0
-        2. 间隔定义为：样本到超平面的最小距离
-        3. 使用hinge loss处理分类错误和边界样本
-        4. 添加L2正则化防止过拟合
-        """
-        X_raw = data_train[:, :2]     # 提取原始特征矩阵
-        y_raw = data_train[:, 2]      # 提取原始标签
-        
-        # 标准化特征 (SVM 对特征缩放非常敏感)
-        X = self.scaler.fit_transform(X_raw)
-        
-        # 修正标签转换逻辑：确保映射到 {-1, 1}
-        # 如果原始标签是 {-1, 1}，y <= 0 保持 -1 为 -1
-        # 如果原始标签是 {0, 1}，y <= 0 将 0 映射为 -1
-        y = np.where(y_raw <= 0, -1, 1)
-        
-        m, n = X.shape                # m:样本数，n:特征数
 
-        # 初始化模型参数 (使用随机小值可能有助于打破对称性，但这里全零也可以)
+        改进：
+        - 学习率指数衰减：lr = lr_0 * decay^epoch
+        - 每个 epoch 计算损失并打印进度
+        - 早停：连续 patience 轮损失不再下降则停止
+        """
+        X_raw = data_train[:, :2]
+        y_raw = data_train[:, 2]
+
+        # 记录原始标签空间，供 predict() 使用（修复原 bug）
+        self.label_set = np.unique(y_raw)
+
+        X = self.scaler.fit_transform(X_raw)
+        y = np.where(y_raw <= 0, -1, 1)
+
+        m, n = X.shape
         self.w = np.zeros(n)
         self.b = 0
 
+        lr = self.learning_rate
+        best_loss = float('inf')
+        no_improve_count = 0
+
         for epoch in range(self.max_iter):
-            # 计算决策得分: score = wx + b
             score = np.dot(X, self.w) + self.b
-            
-            # 计算函数间隔：y * score
             margin = y * score
-            
-            # 找出违反间隔条件的样本 (hinge loss 区域: y*f(x) < 1)
             idx = np.where(margin < 1)[0]
-            
-            # 计算梯度
-            # 损失函数: L = (1/m) * sum(max(0, 1 - y*f(x))) + lambda * ||w||^2
+
             if len(idx) > 0:
-                # dw = d/dw [lambda * ||w||^2 + (1/m) * sum(1 - y*(wx+b))]
-                # dw = 2 * lambda * w - (1/m) * sum(y*x)
                 dw = (2 * self.reg_lambda * self.w) - np.sum(y[idx, None] * X[idx], axis=0) / m
                 db = -np.mean(y[idx])
             else:
-                # 只有正则化项的梯度
                 dw = 2 * self.reg_lambda * self.w
                 db = 0
 
-            # 梯度下降更新参数
-            self.w -= self.learning_rate * dw
-            self.b -= self.learning_rate * db
+            self.w -= lr * dw
+            self.b -= lr * db
+
+            # 学习率衰减
+            lr = self.learning_rate * (self.lr_decay ** epoch)
+
+            # 定期打印训练进度
+            if (epoch + 1) % self.print_interval == 0 or epoch == 0:
+                loss = self._compute_hinge_loss(X, y)
+                pred = np.where(np.dot(X, self.w) + self.b >= 0, 1, -1)
+                acc = np.mean(pred == y)
+                print(f"  epoch {epoch+1:>6d} | loss: {loss:.4f} | acc: {acc*100:.1f}% | lr: {lr:.6f}")
+
+            # 早停检查：每 print_interval 轮检查一次损失
+            if (epoch + 1) % self.print_interval == 0:
+                loss = self._compute_hinge_loss(X, y)
+                if loss < best_loss - 1e-6:
+                    best_loss = loss
+                    no_improve_count = 0
+                else:
+                    no_improve_count += self.print_interval
+                    if no_improve_count >= self.patience:
+                        print(f"  早停触发于 epoch {epoch+1}，最佳损失: {best_loss:.4f}")
+                        break
 
     def predict(self, x_raw):
-        """预测标签。"""
-        # 使用训练时的标准化参数处理新数据
-        x = self.scaler.transform(x_raw)
-        score = np.dot(x, self.w) + self.b     # 计算决策函数值
-        
-        # 返回原始标签空间 (这里假设原始正类是 1, 负类是 0 或 -1)
-        # 如果 load_data 将标签读为 0/1，则应返回 0/1
-        # 如果是 -1/1，则应返回 -1/1
-        # 这里为了兼容 eval_acc，我们返回与输入数据一致的标签
-        return np.where(score >= 0, 1, -1) if -1 in self.y_train_unique else np.where(score >= 0, 1, 0)
+        """预测标签。
 
-    def train_with_label_tracking(self, data_train):
-        """带有标签信息记录的训练方法"""
-        self.y_train_unique = np.unique(data_train[:, 2])
-        self.train(data_train)
+        修复：使用 train() 中记录的 self.label_set 自动判断返回格式，
+        不再依赖 train_with_label_tracking()。
+        """
+        x = self.scaler.transform(x_raw)
+        score = np.dot(x, self.w) + self.b
+        # 根据训练数据的标签空间决定输出格式
+        if -1 in self.label_set:
+            return np.where(score >= 0, 1, -1)
+        else:
+            return np.where(score >= 0, 1, 0)
 
 
 if __name__ == '__main__':
@@ -125,8 +149,10 @@ if __name__ == '__main__':
     parser.add_argument('--train-file', type=str, default=default_train, help='训练集文件路径')
     parser.add_argument('--test-file', type=str, default=default_test, help='测试集文件路径')
     parser.add_argument('--learning-rate', type=float, default=0.1, help='学习率')
-    parser.add_argument('--reg-lambda', type=float, default=0.0, help='L2正则化系数')
+    parser.add_argument('--reg-lambda', type=float, default=0.001, help='L2正则化系数')
     parser.add_argument('--max-iter', type=int, default=20000, help='最大迭代次数')
+    parser.add_argument('--lr-decay', type=float, default=0.9995, help='学习率衰减系数')
+    parser.add_argument('--patience', type=int, default=2000, help='早停耐心值')
     parser.add_argument('--out-dir', type=str, default='outputs', help='结果输出目录')
     args = parser.parse_args()
 
@@ -143,8 +169,10 @@ if __name__ == '__main__':
         learning_rate=args.learning_rate,
         reg_lambda=args.reg_lambda,
         max_iter=args.max_iter,
+        lr_decay=args.lr_decay,
+        patience=args.patience,
     )
-    svm.train_with_label_tracking(data_train)  # 训练模型寻找最优超平面
+    svm.train(data_train)  # 训练模型寻找最优超平面
 
     # 训练集评估
     x_train = data_train[:, :2]  # 训练特征
@@ -173,6 +201,8 @@ if __name__ == '__main__':
         'learning_rate': float(args.learning_rate),
         'reg_lambda': float(args.reg_lambda),
         'max_iter': int(args.max_iter),
+        'lr_decay': float(args.lr_decay),
+        'patience': int(args.patience),
         'train_file': str(train_file),
         'test_file': str(test_file),
     }
