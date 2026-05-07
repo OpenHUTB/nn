@@ -70,13 +70,13 @@ $$L_{Grad-CAM}^c = ReLU \left( \sum_k \alpha_k^c A^k \right)$$
 
 * **AlexNet（高度发散与弱置信）：** * 模型的 Top-1 预测与强制过滤目标（Filtered）一致，均为 `breakwater... (防波堤/海堤)`，但置信度仅为 **11.37%**。
   * 这表明面对 OOD (Out-of-Distribution) 的虚拟场景，AlexNet 的 Softmax 输出极其平缓，网络在多个类别间犹豫不决，“防波堤”仅仅是微弱胜出。  
-  ![plane1](plane1.png)  
-  ![plane1_re](plane1_re.png)
+  ![plane1](images/plan1.png)
+  ![plane1](images/plan1_re.png)
 * **ResNet（高度确信的语义误判）：**
   * 模型以 **61.66%** 的高置信度认为画面是一列 `bullet train (高铁)`，完全偏离了我们关注的 `passenger car`（仅剩 **3.56%** 概率）。
   * 深层网络强制对画面中的局部特征进行了高层次的语义拟合，展现出了极强的“过度自信”。
-![plane2](plane2.png)  
-![plane2_re](plane2_re.png)
+![plan2](images/plan2.png)  
+![plan2_re](/images/plan2_re.png)
 #### 3. 从“结构性偏置”视角的深度解释
 
 这两个方案直观地展示了不同网络架构在面对虚拟渲染图像时，其**归纳偏置（Inductive Bias）**的失效方式。
