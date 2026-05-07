@@ -23,7 +23,8 @@ drone_flight_sim/
 ├── collision_handler.py         # 碰撞检测与处理模块
 ├── flight_path.py               # 航点规划模块
 ├── keyboard_control.py          # 键盘控制模块
-├── collision_data_collector.py  # 碰撞检测数据采集模块（机器学习）
+├── collision_data_collector.py  # 手动碰撞数据采集模块
+├── auto_collision_collector.py  # 自动碰撞数据采集模块（新）
 ├── config.py                    # 配置文件
 ├── utils.py                     # 工具函数
 ├── drone_images/                # 拍摄照片保存目录（自动创建）
@@ -256,11 +257,49 @@ waypoints = [(5, 0, -3), (5, -5, -3), (0, -5, -3), (0, 0, -3)]
 
 其中 `X`、`Y` 为拍照时的无人机坐标，`序号` 为该次运行的第 N 张照片。
 
-## 机器学习碰撞检测（开发中）
+## 机器学习碰撞检测
 
-### 碰撞数据采集
+### 数据采集模块
 
-使用 `collision_data_collector.py` 采集前视深度图像，用于训练碰撞预测模型。
+项目提供两种数据采集方式：
+
+#### 方式一：自动采集（推荐）
+
+使用 `auto_collision_collector.py` 自动采集数据，无需手动操作，短时间可采集大量样本。
+
+**运行方式：**
+```bash
+python auto_collision_collector.py
+```
+
+**交互式选择：**
+1. 选择飞行模式（1-4）
+2. 输入采集时长（秒）
+3. 输入每类目标样本数
+
+**飞行模式：**
+
+| 模式 | 说明 | 碰撞率 |
+|------|------|--------|
+| 1. 螺旋飞行 | 螺旋向外扩大飞行 | 中 |
+| 2. 随机飞行 | 飞向随机目标点 | 中 |
+| 3. 折线飞行 | 高速直线折返 | 高 |
+| 4. 撞墙模式 | 专门朝障碍物飞行 | 最高 |
+
+**采集原理：**
+- 安全样本(label=0)：飞行过程中定期自动采集
+- 危险样本(label=1)：碰撞事件发生时自动采集并标注
+- 碰撞后自动恢复，继续飞行采集
+
+**特点：**
+- 全自动运行，无需人工干预
+- 利用仿真器碰撞检测自动标注
+- 几分钟内可采集数百个样本
+- 使用速度控制保持固定高度
+
+#### 方式二：手动采集
+
+使用 `collision_data_collector.py` 手动控制无人机并采集数据。
 
 **运行方式：**
 ```bash
@@ -289,3 +328,15 @@ python collision_data_collector.py
 **数据保存位置：**
 - `collision_dataset/depth/` - 深度图像
 - `collision_dataset/labels.csv` - 标签记录
+
+**CSV 数据格式：**
+```
+filename,label,risk,min_depth,mean_depth,pos_x,pos_y
+collision_20260430_220825_0.0_0.0,0,safe,0.41,11811.93,0.0,0.0
+collision_20260430_221730_9.1_-10.1,1,danger,0.14,6190.47,9.1,-10.1
+```
+
+**下一步计划：**
+- 训练碰撞预测模型
+- 实时推理与避障控制
+- 强化学习智能体训练

@@ -30,7 +30,7 @@ extra_javascript:
 plugins:
 #  - mkdocs-video
   - search:
-      lang: ja
+      lang: zh
       separator: '[\s\-\.]+'
       min_search_length: 3
 
@@ -45,6 +45,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 
 
 # - mdx_math 用于行内公式显示

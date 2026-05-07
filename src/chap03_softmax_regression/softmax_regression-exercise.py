@@ -13,8 +13,7 @@
 # 导入运行所需模块
 import tensorflow as tf # TensorFlow深度学习框架
 import matplotlib.pyplot as plt # 数据可视化库
-from matplotlib import animation, rc # 动画功能
-import matplotlib.cm as cm # 颜色映射
+from matplotlib import animation # 动画功能
 import numpy as np # 数值计算库
 import os # 读取环境变量参数
 import json # 保存实验指标
