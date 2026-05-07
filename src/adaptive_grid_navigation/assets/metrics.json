@@ -1,0 +1,46 @@
+{
+  "map": "demo",
+  "start": [
+    25,
+    2
+  ],
+  "goal": [
+    2,
+    33
+  ],
+  "planners": [
+    {
+      "name": "Dijkstra",
+      "success": true,
+      "path_length": 54,
+      "expanded_nodes": 899
+    },
+    {
+      "name": "A*",
+      "success": true,
+      "path_length": 54,
+      "expanded_nodes": 648
+    },
+    {
+      "name": "Greedy best-first",
+      "success": true,
+      "path_length": 56,
+      "expanded_nodes": 58
+    }
+  ],
+  "dynamic_replanning": {
+    "reached_goal": true,
+    "replans": 2,
+    "travelled": 54,
+    "frames": 55,
+    "final_position": [
+      2,
+      33
+    ]
+  },
+  "outputs": {
+    "route_image": "assets\\astar_route.png",
+    "comparison_chart": "assets\\planner_comparison.png",
+    "animation": "assets\\dynamic_replanning.gif"
+  }
+}

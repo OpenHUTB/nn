@@ -1,4 +1,4 @@
-title: 主页
+﻿title: 主页
 
 # [神经网络](https://github.com/OpenHUTB/nn)
 
@@ -45,6 +45,8 @@ title: 主页
 ## 规划 <span id="planning"></span>
 
 [__导航__](#navigation)
+
+[__自适应栅格导航__](./adaptive_grid_navigation/README.md) - 二维栅格路径规划、动态障碍物与在线重规划演示
 
 ## 控制  <span id="control"></span>
 

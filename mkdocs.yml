@@ -45,6 +45,9 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- 项目汇报:
+  - 自适应栅格导航: 'adaptive_grid_navigation/README.md'
+  - 演讲提纲: 'adaptive_grid_navigation/speech.md'
 - 入门:
   - 线性回归: 'linear_regression.md'
 

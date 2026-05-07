@@ -1,0 +1,4 @@
+name,success,path_length,expanded_nodes
+Dijkstra,True,54,899
+A*,True,54,648
+Greedy best-first,True,56,58
