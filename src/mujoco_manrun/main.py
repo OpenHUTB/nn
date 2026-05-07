@@ -320,25 +320,30 @@ class HumanoidStabilizer:
             self._qvel_adr[joint_idx] = int(self.model.jnt_dofadr[joint_id])
 
         # PD控制增益（原有逻辑保留，新增动态增益系数）
-        self.kp_roll = 120.0
-        self.kd_roll = 40.0
-        self.kp_pitch = 100.0
-        self.kd_pitch = 35.0
-        self.kp_yaw = 30.0
-        self.kd_yaw = 15.0
-        self.base_kp_hip = 250.0  # 基础KP（新增）
-        self.base_kd_hip = 45.0  # 基础KD（新增）
-        self.base_kp_knee = 280.0
-        self.base_kd_knee = 50.0
-        self.base_kp_ankle = 200.0
-        self.base_kd_ankle = 60.0
-        self.kp_waist = 40.0
-        self.kd_waist = 20.0
+        # 关节控制增益（根据生物学原理调整，提升步态自然性和稳定性）
+        self.kp_roll = 350.0
+        self.kd_roll = 90.0
+        self.kp_pitch = 300.0
+        self.kd_pitch = 80.0
+        self.kp_yaw = 60.0
+        self.kd_yaw = 30.0
+
+        # 髋、膝盖、脚踝大幅加固
+        self.base_kp_hip = 320.0
+        self.base_kd_hip = 65.0
+        self.base_kp_knee = 300.0
+        self.base_kd_knee = 60.0
+        # 脚踝拉满，专治左右摇晃
+        self.base_kp_ankle = 400.0
+        self.base_kd_ankle = 100.0
+
+        self.kp_waist = 60.0
+        self.kd_waist = 30.0
         self.kp_arm = 20.0
         self.kd_arm = 20.0
 
         # 重心目标（原有逻辑保留，新增重心保护参数）
-        self.com_target = np.array([0.05, 0.0, 0.78])
+        self.com_target = np.array([0.08, 0.0, 0.78])
         self.kp_com = 50.0
         self.total_mass = float(np.sum(self.model.body_mass))
         self.weight = float(self.total_mass * abs(float(self.model.opt.gravity[2])))
@@ -368,7 +373,7 @@ class HumanoidStabilizer:
         self.integral_roll = 0.0
         self.integral_pitch = 0.0
         self.integral_limit = 0.15
-        self.filter_alpha = 0.1  # 低通滤波系数（新增，0.1=更平滑）
+        self.filter_alpha = 0.06  # 低通滤波系数（新增，0.1=更平滑）
         self.enable_robust_optim = True  # 鲁棒优化开关（新增，默认启用）
 
         # ===================== 新增：多步态模式配置 =====================
@@ -525,11 +530,11 @@ class HumanoidStabilizer:
         self.left_leg_cpg.reset()
 
     def _init_stable_pose(self):
-        """初始化稳定姿态（原有逻辑完全保留）"""
+        # """初始化稳定姿态（原有逻辑完全保留）"""
         keep_time = float(self.data.time)
         mujoco.mj_resetData(self.model, self.data)
         self.data.time = keep_time
-        self.data.qpos[2] = 1.282
+        self.data.qpos[2] = 0.72
         self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
         self.data.qvel[:] = 0.0
         self.data.xfrc_applied[:] = 0.0
@@ -549,17 +554,17 @@ class HumanoidStabilizer:
         # 右腿关节
         self.joint_targets[self.joint_name_to_idx["hip_x_right"]] = 0.0
         self.joint_targets[self.joint_name_to_idx["hip_z_right"]] = 0.0
-        self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.1
-        self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.4
-        self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.0
+        self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.05
+        self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.70
+        self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.10
         self.joint_targets[self.joint_name_to_idx["ankle_x_right"]] = 0.0
 
         # 左腿关节
         self.joint_targets[self.joint_name_to_idx["hip_x_left"]] = 0.0
         self.joint_targets[self.joint_name_to_idx["hip_z_left"]] = 0.0
-        self.joint_targets[self.joint_name_to_idx["hip_y_left"]] = 0.1
-        self.joint_targets[self.joint_name_to_idx["knee_left"]] = -0.4
-        self.joint_targets[self.joint_name_to_idx["ankle_y_left"]] = 0.0
+        self.joint_targets[self.joint_name_to_idx["hip_y_left"]] = 0.05
+        self.joint_targets[self.joint_name_to_idx["knee_left"]] = -0.70
+        self.joint_targets[self.joint_name_to_idx["ankle_y_left"]] = 0.10
         self.joint_targets[self.joint_name_to_idx["ankle_x_left"]] = 0.0
 
         # 手臂关节
@@ -720,13 +725,51 @@ class HumanoidStabilizer:
         print("==================\n")
 
     # 状态机方法（WALK状态适配多步态模式）
+    # ===================== 站立状态：维持初始稳定姿态，CPG重置 =====================
+        #  【修正版】标准直立站立状态   躯干完全挺直，不弯腰不后仰；双腿对称伸直，脚掌放平贴地。
     def _state_stand(self):
-        """站立状态：维持初始稳定姿态，CPG重置"""
+        # 站立状态：完全固定姿态，只允许身体转向
         self.right_leg_cpg.reset()
         self.left_leg_cpg.reset()
+        self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = self.turn_angle * 0.8
+        # self.right_leg_cpg.reset()
+        # self.left_leg_cpg.reset()
+
+        # # 1. 躯干/腰部：强制挺直，不弯腰、不后仰
+        # self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["abdomen_y"]] = 0.0  # 关键：设为0，不弯腰
+        # self.joint_targets[self.joint_name_to_idx["abdomen_x"]] = 0.0
+
+        # # 2. 右腿：标准直立站姿（膝盖微屈、脚踝放平）
+        # self.joint_targets[self.joint_name_to_idx["hip_x_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_z_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.70
+        # self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.0 # 关键：设为0，脚掌放平，不上翘不下勾
+        # self.joint_targets[self.joint_name_to_idx["ankle_x_right"]] = 0.0
+
+        # # 3. 左腿：和右腿完全对称
+        # self.joint_targets[self.joint_name_to_idx["hip_x_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_z_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_y_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["knee_left"]] = -0.70
+        # self.joint_targets[self.joint_name_to_idx["ankle_y_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["ankle_x_left"]] = 0.0
+
+        # # 4. 手臂：自然下垂，不影响平衡
+        # self.joint_targets[self.joint_name_to_idx["shoulder1_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["shoulder2_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["elbow_right"]] = 1.2
+        # self.joint_targets[self.joint_name_to_idx["shoulder1_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["shoulder2_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["elbow_left"]] = 1.2
+
+        # # 5. 低通滤波，消除抖动
+        # self.joint_targets = (1 - self.filter_alpha) * self.prev_joint_targets + self.filter_alpha * self.joint_targets
+        # self.prev_joint_targets = self.joint_targets.copy()
 
     def _state_walk(self):
-        """行走状态：根据当前步态模式调整CPG参数 + 原有鲁棒优化"""
+        # """行走状态：根据当前步态模式调整CPG参数 + 原有鲁棒优化"""
         if self.walk_start_time is None:
             self.walk_start_time = self.data.time
 
@@ -937,12 +980,12 @@ class HumanoidStabilizer:
         torso_torque = np.clip(torso_torque, -30.0, 30.0)
 
         self.data.xfrc_applied[self._support_body_id, :] = 0.0
-        now_t = float(self.data.time)
-        if now_t < float(self._support_until):
-            scale = float(np.clip((float(self._support_until) - now_t) / 3.0, 0.0, 1.0))
-            self.data.xfrc_applied[self._support_body_id, 2] = self.weight * 0.9 * scale
-            self.data.xfrc_applied[self._support_body_id, 3] = (-80.0 * self._imu_euler_filt[0] - 20.0 * self._imu_angvel_filt[0]) * scale
-            self.data.xfrc_applied[self._support_body_id, 4] = (-80.0 * self._imu_euler_filt[1] - 20.0 * self._imu_angvel_filt[1]) * scale
+        # now_t = float(self.data.time)
+        # if now_t < float(self._support_until):
+        #     scale = float(np.clip((float(self._support_until) - now_t) / 3.0, 0.0, 1.0))
+        #     self.data.xfrc_applied[self._support_body_id, 2] = self.weight * 0.9 * scale
+        #     self.data.xfrc_applied[self._support_body_id, 3] = (-80.0 * self._imu_euler_filt[0] - 20.0 * self._imu_angvel_filt[0]) * scale
+        #     self.data.xfrc_applied[self._support_body_id, 4] = (-80.0 * self._imu_euler_filt[1] - 20.0 * self._imu_angvel_filt[1]) * scale
 
         # 重心补偿（原有逻辑完全保留）
         com = self.data.subtree_com[0].astype(np.float64).copy()

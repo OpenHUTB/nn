@@ -12,7 +12,8 @@ weather = carla.WeatherParameters(
     precipitation=90.0,
     precipitation_deposits=90.0,
     wind_intensity=20.0,
-    wetness=90.0
+    wetness=90.0,
+    rain_intensity=100.0 
 )
 world.set_weather(weather)
 

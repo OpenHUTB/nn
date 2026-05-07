@@ -16,6 +16,7 @@ if project_root not in sys.path:
 
 from config import config
 from utils.deep_sort import DeepSORTTracker
+from utils.planner import PurePursuitPlanner
 
 
 class CarlaClient:
@@ -67,6 +68,17 @@ class CarlaClient:
         # 新增：碰撞后恢复
         self.post_collision_recovery = False
         self.collision_recovery_start = 0
+        
+        # 新增：Pure Pursuit轨迹规划器
+        self.pure_pursuit = PurePursuitPlanner(
+            wheelbase=2.9,           # 车辆轴距
+            lookahead_distance=5.0,  # 基础前视距离
+            lookahead_gain=0.5,      # 前视距离系数
+            min_lookahead=3.0,      # 最小前视距离
+            max_lookahead=15.0,     # 最大前视距离
+            steering_limit=0.8       # 最大转向角 (rad)
+        )
+        self.use_pure_pursuit = False  # 是否启用Pure Pursuit控制
         
         # DeepSORT 目标跟踪
         self.deep_sort = DeepSORTTracker(max_age=30, min_hits=3, iou_threshold=0.3)
@@ -261,7 +273,9 @@ class CarlaClient:
             # 安装障碍物传感器
             self.setup_obstacle_sensor()
             
-
+            # 【Pure Pursuit】初始化轨迹路径
+            self._init_pure_pursuit_path(spawn_point)
+            
             return self.vehicle
         except Exception as e:
             print(f"[ERROR] 车辆生成失败: {e}")
@@ -398,6 +412,87 @@ class CarlaClient:
             
         except Exception as e:
             print(f"[WARNING] 障碍物传感器安装失败: {e}")
+    
+    def _init_pure_pursuit_path(self, spawn_point):
+        """
+        【Pure Pursuit】根据车辆初始位置和朝向初始化轨迹路径
+        
+        Args:
+            spawn_point: 车辆生成位置 (carla.Transform)
+        """
+        # 获取道路信息
+        waypoint = self.world.get_map().get_waypoint(
+            spawn_point.location, 
+            project_to_road=True,
+            lane_type=carla.LaneType.Driving
+        )
+        
+        # 生成沿着道路的路径点
+        path_points = []
+        current_waypoint = waypoint
+        
+        # 生成前方100米的路径
+        for i in range(100):
+            # 获取前方10米处的下一个waypoint
+            next_waypoints = current_waypoint.next(10.0)
+            if not next_waypoints:
+                break
+            current_waypoint = next_waypoints[0]
+            
+            # 添加路径点 [x, y]
+            path_points.append([
+                current_waypoint.transform.location.x,
+                current_waypoint.transform.location.y
+            ])
+        
+        if len(path_points) > 2:
+            path_array = np.array(path_points)
+            self.pure_pursuit.set_path(path_array)
+            print(f"[PURE PURSUIT] 轨迹路径初始化完成 | 路径点数:{len(path_points)} | 起点:({path_points[0][0]:.1f}, {path_points[0][1]:.1f})")
+        else:
+            # 如果无法获取道路路径，使用默认直线路径
+            print("[PURE PURSUIT] 无法获取道路路径，使用默认直线路径")
+            self.pure_pursuit.set_curve_path(length=100, curve_radius=1000)
+    
+    def update_pure_pursuit_path(self):
+        """
+        【Pure Pursuit】实时更新路径（如果需要动态重规划）
+        """
+        if not self.vehicle:
+            return
+        
+        # 检查当前进度，如果接近终点就延伸路径
+        current_pos = (
+            self.vehicle.get_location().x,
+            self.vehicle.get_location().y
+        )
+        progress = self.pure_pursuit.get_progress(current_pos)
+        
+        if progress > 0.9:  # 90%进度，延伸路径
+            # 继续延伸100米
+            current_waypoint = self.world.get_map().get_waypoint(
+                self.vehicle.get_location(),
+                project_to_road=True
+            )
+            
+            new_points = []
+            for _ in range(10):
+                next_waypoints = current_waypoint.next(10.0)
+                if next_waypoints:
+                    current_waypoint = next_waypoints[0]
+                    new_points.append([
+                        current_waypoint.transform.location.x,
+                        current_waypoint.transform.location.y
+                    ])
+                else:
+                    break
+            
+            if new_points:
+                # 追加新路径点
+                old_path = self.pure_pursuit.global_path
+                new_path = np.vstack([old_path, np.array(new_points)])
+                self.pure_pursuit.set_path(new_path)
+                print(f"[PURE PURSUIT] 路径已延伸 | 新点数:{len(new_points)} | 总点数:{len(new_path)}")
     
     def setup_collision_sensor(self):
         """安装碰撞传感器（检测实际碰撞）"""
@@ -756,46 +851,68 @@ class CarlaClient:
                                     print(f"[LANE CHANGE] 开始{self.lane_change_direction}侧变道 | 距离:{distance:.1f}m | TTC:{ttc:.2f}s | 风险:{risk_level}")
         
         elif self.avoidance_state == 'changing_lane':
-            # 变道中：使用渐进式转向
+            # 变道中：使用Pure Pursuit轨迹跟踪
+            vehicle_transform = self.vehicle.get_transform()
             elapsed = current_time - self.lane_change_start_time
             progress = elapsed / self.lane_change_duration
             
-            # 渐进式转向：开始时转向最大，后期逐渐回正
-            if self.lane_change_direction == 'left':
-                base_steer = -0.5  # 更激进的转向
-            else:
-                base_steer = 0.5
+            # 获取车辆当前状态
+            velocity = self.vehicle.get_velocity()
+            speed_ms = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+            speed_kmh = speed_ms * 3.6
+            current_pos = (vehicle_transform.location.x, vehicle_transform.location.y)
+            current_yaw = np.radians(vehicle_transform.rotation.yaw)
             
-            # 根据进度调整转向（开始大，后期小）
-            if progress < 0.6:
-                steer_value = base_steer
-            elif progress < 0.8:
-                steer_value = base_steer * 0.5
+            # 【Pure Pursuit控制】计算转向角
+            if self.use_pure_pursuit:
+                # 使用Pure Pursuit算法计算精确转向
+                steer_rad = self.pure_pursuit.compute_steering(current_pos, current_yaw, speed_ms)
+                
+                # 根据变道方向调整Pure Pursuit目标
+                if self.lane_change_direction == 'left':
+                    steer_value = -abs(steer_rad) * 1.5 if steer_rad > 0 else steer_rad * 0.5
+                else:
+                    steer_value = abs(steer_rad) * 1.5 if steer_rad < 0 else steer_rad * 0.5
+                
+                # 限制转向范围
+                steer_value = np.clip(steer_value, -0.8, 0.8)
+                
+                if self.frame_count % 30 == 0:
+                    print(f"[PURE PURSUIT] 转向角:{steer_value:.3f} | 速度:{speed_kmh:.1f}km/h | 进度:{progress:.1%}")
             else:
-                steer_value = base_steer * 0.2  # 接近完成时小幅度调整
+                # 传统渐进式转向（备用方案）
+                if self.lane_change_direction == 'left':
+                    base_steer = -0.5
+                else:
+                    base_steer = 0.5
+                
+                if progress < 0.6:
+                    steer_value = base_steer
+                elif progress < 0.8:
+                    steer_value = base_steer * 0.5
+                else:
+                    steer_value = base_steer * 0.2
             
-            # 变道进行中，【关键修复】完全松开油门并适度刹车
+            # 变道进行中，完全松开油门
             brake_value = 0.0
             
             # 持续监控障碍物距离
-            if self.obstacle_distance < 15.0:  # 15米内就开始减速
-                # 根据距离调整刹车力度
+            if self.obstacle_distance < 15.0:
                 if self.obstacle_distance < 5.0:
-                    brake_value = 0.9  # 5米内全力刹车
+                    brake_value = 0.9
                 elif self.obstacle_distance < 10.0:
-                    brake_value = 0.6  # 10米内强刹车
+                    brake_value = 0.6
                 else:
-                    brake_value = 0.3  # 15米内适度刹车
+                    brake_value = 0.3
             
             self.vehicle.apply_control(carla.VehicleControl(
-                throttle=0.0,  # 变道时完全松开油门
+                throttle=0.0,
                 brake=brake_value,
                 steer=steer_value,
                 hand_brake=False
             ))
             
             # 检查变道是否完成（基于时间和横向位移反馈）
-            vehicle_transform = self.vehicle.get_transform()
             lateral_change = abs(vehicle_transform.location.y - self.lane_change_start_lateral)
             
             # 计算变道中的TTC（使用实际障碍物速度）
