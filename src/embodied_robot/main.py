@@ -5,6 +5,8 @@ import os
 import sys
 import subprocess
 import platform
+import threading
+import re
 from pathlib import Path
 
 
@@ -92,39 +94,88 @@ def get_python_executable():
 
 def check_dependencies():
     """
-    Check required packages installation
+    Check required packages installation by reading requirements.txt
     """
-    required_packages = [
-        "mujoco",
-        "numpy"
-    ]
+    project_root = Path(__file__).resolve().parent
+    req_file = project_root / "requirements.txt"
 
+    # 如果没有找到 requirements.txt，给出提示并跳过检查
+    if not req_file.exists():
+        print(f"⚠️ 未找到依赖配置文件: {req_file.name}")
+        print("💡 建议在项目根目录创建 requirements.txt 并写入依赖包名称。")
+        return
+
+    # 解析 requirements.txt 提取包名
     missing_packages = []
-    for pkg in required_packages:
-        try:
-            __import__(pkg)
-            print(f"✅ Package {pkg} is installed")
-        except ImportError:
-            missing_packages.append(pkg)
+    print(f"📄 正在读取依赖配置: {req_file.name}")
 
+    with open(req_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            # 忽略空行和注释
+            if not line or line.startswith('#'):
+                continue
+
+            # 使用正则截取基础包名 (例如 "mujoco>=3.0.0" -> "mujoco")
+            pkg_name = re.split(r'[=><~]', line)[0].strip()
+
+            # 处理部分包名在 import 时名字不同的特例（如 opencv-python -> cv2）
+            import_name = pkg_name.replace('-', '_')
+            if pkg_name.lower() in ['opencv-python', 'opencv_python']:
+                import_name = 'cv2'
+
+            try:
+                __import__(import_name)
+                print(f"✅ Package {pkg_name} is installed")
+            except ImportError:
+                missing_packages.append(line)
+
+    # 触发安装逻辑
     if missing_packages:
-        print("\n❌ Missing required packages:")
+        print("\n❌ Missing required packages (or version mismatch):")
         for pkg in missing_packages:
             print(f"   - {pkg}")
         print("\n📦 Install missing packages with:")
-        print(f"   {sys.executable} -m pip install {' '.join(missing_packages)}")
+        print(f"   {sys.executable} -m pip install -r {req_file.name}")
 
-        # Ask for auto-install
-        if input("\n📥 Auto-install missing packages? (y/n): ").lower() == 'y':
+        def get_user_input_with_timeout(timeout=5):
+            print(f"\n📥 Auto-install missing packages? (y/n) [将在 {timeout} 秒后默认选择 'y']: ", end='', flush=True)
+            user_response = [None]
+
+            def wait_for_input():
+                try:
+                    user_response[0] = input()
+                except EOFError:
+                    pass
+
+            input_thread = threading.Thread(target=wait_for_input, daemon=True)
+            input_thread.start()
+            input_thread.join(timeout)
+
+            if input_thread.is_alive():
+                print("\n⏳ 倒计时结束，默认执行自动安装...")
+                return 'y'
+            else:
+                return user_response[0].strip().lower() if user_response[0] else 'y'
+
+        ans = get_user_input_with_timeout(5)
+
+        if ans == 'y':
             try:
+                print(f"⚙️ 正在根据 {req_file.name} 批量安装依赖...")
+                # 核心改动：直接使用 -r requirements.txt 进行批量安装
                 subprocess.run(
-                    [sys.executable, "-m", "pip", "install"] + missing_packages,
+                    [sys.executable, "-m", "pip", "install", "-r", str(req_file)],
+                    stdin=subprocess.DEVNULL,  # 彻底切断输入流，防止进度条卡死
                     check=True
                 )
                 print("✅ Packages installed successfully")
             except subprocess.CalledProcessError as e:
                 print(f"❌ Package installation failed: {e}")
                 sys.exit(1)
+        else:
+            print("⚠️ 用户取消了自动安装，依赖不足，程序退出。")
+            sys.exit(1)
 
 
 def run_robot_simulation(python_exe, robot_walk_dir, script_file,extra_args):
@@ -148,6 +199,7 @@ def run_robot_simulation(python_exe, robot_walk_dir, script_file,extra_args):
             cmd,  # 使用拼接好的命令
             cwd=str(robot_walk_dir),
             env=env,
+            stdin=subprocess.DEVNULL,  # <--- ✨ 加上这一行！彻底切断与僵尸 input 线程的纠葛
             stdout=sys.stdout,
             stderr=sys.stderr,
             check=True
