@@ -108,7 +108,7 @@ screenshots/
 *.png
 *.jpg
 *.jpeg
-!docs/images/
+!docs/images/*.png
 
 # ========================================
 # Jupyter Notebook
