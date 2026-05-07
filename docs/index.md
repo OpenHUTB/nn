@@ -13,12 +13,14 @@ title: 主页
 
 ## 入门 <span id="primary"></span>
 
-[__11__](carla_traffic_sign_recognition\carla_traffic_sign_recognition.md) — 入门热身示例  
+[__11__](carla_traffic_sign_recognition/carla_traffic_sign_recognition.md) — 入门热身示例  
 [__热身__](warmup.md) — 入门热身示例
 
 [__线性回归__](linear_regression.md)
 
 [__线性回归改进__](linear_regression_improved.md)
+
+[__线性回归修复__](linear_regression_fix.md) - 修复偏置未更新bug
 
 [__softmax回归__](softmax_regression.md)
 
@@ -26,11 +28,17 @@ title: 主页
 
 [__支持向量机__](svm.md)
 
+[__支持向量机改进__](svm_improved.md)
+
 [__简单神经网络__](simple_nn.md)
 
 [__卷积神经网络__](CNN.md)
 
+[__卷积神经网络改进__](cnn_keras_sequential_improved.md)
+
 [__循环神经网络__](RNN.md)
+
+[__循环神经网络改进__](poem_generation_rnn_improved.md)
 
 [__注意力机制__](attention.md)
 

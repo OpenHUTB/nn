@@ -1,17 +1,8 @@
 """
-Welcome to CARLA manual control.
-
-Use ARROWS or WASD keys for control.
-
-    W            : throttle
-    S            : brake
-    A/D          : steer left/right
-    Q            : toggle reverse
-    Space        : hand-brake / 切换中英文
-    P            : toggle autopilot
-    M            : toggle manual transmission
-    ,/.          : gear up/down
-    ESC          : quit
+CARLA IMU 采集 + 中英文界面 + 车辆状态实时显示
+空格键：切换中英文
+ESC：退出
+鼠标拖拽：旋转视角
 """
 
 from __future__ import print_function
@@ -32,7 +23,6 @@ import carla
 import argparse
 import math
 import random
-import weakref
 
 try:
     import pygame
@@ -56,7 +46,15 @@ TEXTS = {
         "speed": "Speed",
         "autopilot": "AUTOPILOT ENABLED",
         "fps": "FPS",
-        "kmh": "km/h"
+        "kmh": "km/h",
+        "status": "Status",
+        "straight": "Straight",
+        "accelerate": "Accelerate",
+        "brake": "Brake",
+        "left": "Turn Left",
+        "right": "Turn Right",
+        "reverse": "Reverse",
+        "handbrake": "Handbrake"
     },
     "cn": {
         "server": "服务器",
@@ -66,7 +64,15 @@ TEXTS = {
         "speed": "速度",
         "autopilot": "自动驾驶已启用",
         "fps": "帧率",
-        "kmh": "千米/小时"
+        "kmh": "千米/小时",
+        "status": "车辆状态",
+        "straight": "直行",
+        "accelerate": "加速",
+        "brake": "刹车",
+        "left": "左转",
+        "right": "右转",
+        "reverse": "倒车",
+        "handbrake": "手刹"
     }
 }
 
@@ -85,7 +91,6 @@ class World(object):
         self.map = self.world.get_map()
         self.hud = hud
         self.player = None
-        self.collision_sensor = None
         self.gnss_sensor = None
         self.imu_sensor = None
         self.camera_manager = None
@@ -99,7 +104,7 @@ class World(object):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
 
-        if self.player is not None:
+        if self.player:
             self.player.destroy()
 
         spawn_points = self.map.get_spawn_points()
@@ -107,8 +112,6 @@ class World(object):
         self.player = self.world.spawn_actor(blueprint, spawn_point)
         self.player.set_autopilot(True)
 
-        self.collision_sensor = CollisionSensor(self.player)
-        self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
         self.camera_manager = CameraManager(self.player)
         self.hud.notification(t("autopilot"))
@@ -121,16 +124,10 @@ class World(object):
         self.hud.render(display)
 
     def destroy(self):
-        if self.player:
-            self.player.destroy()
-        if self.collision_sensor.sensor:
-            self.collision_sensor.sensor.destroy()
-        if self.gnss_sensor.sensor:
-            self.gnss_sensor.sensor.destroy()
-        if self.imu_sensor.sensor:
-            self.imu_sensor.sensor.destroy()
-        if self.camera_manager.sensor:
-            self.camera_manager.sensor.destroy()
+        actors = [self.player, self.imu_sensor.sensor, self.camera_manager.sensor]
+        for a in actors:
+            if a:
+                a.destroy()
 
 # ====================== 按键控制 ======================
 class KeyboardControl(object):
@@ -142,31 +139,27 @@ class KeyboardControl(object):
             if event.type == pygame.KEYUP:
                 if event.key == K_ESCAPE:
                     return True
-                # 空格键切换中英文
                 if event.key == K_SPACE:
                     LANG = "cn" if LANG == "en" else "en"
                     tip = "已切换为中文" if LANG=="cn" else "Switched to English"
                     world.hud.notification(tip)
-            # 鼠标拖拽旋转视角
             if event.type == MOUSEMOTION and pygame.mouse.get_pressed()[0]:
                 dx, dy = event.rel
                 world.camera_manager.yaw += dx * 0.2
                 world.camera_manager.pitch = max(-60, min(60, world.camera_manager.pitch - dy * 0.2))
         return False
 
-# ====================== HUD界面（已修复中文字体） ======================
+# ====================== HUD界面（带车辆状态） ======================
 class HUD(object):
     def __init__(self, width, height):
         self.dim = (width, height)
-        # 方法1：强制加载Windows微软雅黑，完美支持中文
         font_path = r"C:\Windows\Fonts\msyh.ttc"
         self._font = pygame.font.Font(font_path, 14)
         self.server_fps = 0
-        self.frame = 0
-        self._info_text = []
         self._clock = pygame.time.Clock()
         self.notice_text = ""
         self.notice_time = 0
+        self.vehicle_status = t("straight")
 
     def notification(self, text, dur=2.0):
         self.notice_text = text
@@ -178,48 +171,61 @@ class HUD(object):
         if self.notice_time > 0:
             self.notice_time -= 0.016
 
+        # --- 车辆状态识别 ---
         v = world.player.get_velocity()
-        # 修复：Python3.7 hypot 只支持2个参数
         speed = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
+        control = world.player.get_control()
+        handbrake = control.hand_brake
+        reverse = control.reverse
+        throttle = control.throttle
+        brake = control.brake
+        steer = control.steer
+
+        status = t("straight")
+
+        if handbrake:
+            status = t("handbrake")
+        elif reverse:
+            status = t("reverse")
+        elif brake > 0.1:
+            status = t("brake")
+        elif throttle > 0.1:
+            status = t("accelerate")
+        elif steer < -0.1:
+            status = t("right")
+        elif steer > 0.1:
+            status = t("left")
+
+        self.vehicle_status = status
+
+        # --- 界面信息 ---
         self._info_text = [
             f"{t('server')}: {self.server_fps:.1f} {t('fps')}",
             f"{t('client')}: {clock.get_fps():.1f} {t('fps')}",
             "",
             f"{t('vehicle')}: {get_actor_display_name(world.player,20)}",
             f"{t('map')}: {world.map.name}",
-            f"{t('speed')}: {speed:.1f} {t('kmh')}"
+            f"{t('speed')}: {speed:.1f} {t('kmh')}",
+            "",
+            f"{t('status')}: {self.vehicle_status}",  # 这里显示车辆状态
         ]
 
     def render(self, display):
-        # 半透明黑底
-        bg = pygame.Surface((260, self.dim[1]))
-        bg.set_alpha(80)
+        bg = pygame.Surface((280, self.dim[1]))
+        bg.set_alpha(90)
         display.blit(bg, (0,0))
 
-        y = 5
+        y = 8
         for line in self._info_text:
-            render = self._font.render(line, True, (255,255,255))
-            display.blit(render, (10, y))
-            y += 20
+            surf = self._font.render(line, True, (255,255,255))
+            display.blit(surf, (12, y))
+            y += 22
 
-        # 提示文字
         if self.notice_time > 0:
             tip = self._font.render(self.notice_text, True, (255,255,0))
-            display.blit(tip, (self.dim[0]//2 - 100, 80))
+            display.blit(tip, (self.dim[0]//2 - 110, 80))
 
-# ====================== 传感器 ======================
-class CollisionSensor:
-    def __init__(self, parent):
-        self.sensor = parent.get_world().spawn_actor(
-            parent.get_world().get_blueprint_library().find("sensor.other.collision"),
-            carla.Transform(), attach_to=parent)
-
-class GnssSensor:
-    def __init__(self, parent):
-        self.sensor = parent.get_world().spawn_actor(
-            parent.get_world().get_blueprint_library().find("sensor.other.gnss"),
-            carla.Transform(carla.Location(x=1.0, z=2.8)), attach_to=parent)
-
+# ====================== IMU传感器 ======================
 class IMUSensor:
     def __init__(self, parent):
         self.sensor = parent.get_world().spawn_actor(
