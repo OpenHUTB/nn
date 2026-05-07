@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
 import datetime
 from utils.logger import logger
 
@@ -61,26 +62,87 @@ class PilotNet():
         logger.info('PilotNet model built successfully')
         return model
 
-    def train(self, name: 'Filename for saving model', data: 'Training data as an instance of pilotnet.src.Data()', epochs: 'Number of epochs to run' = 30, steps: 'Number of steps per epoch' = 10, steps_val: 'Number of steps to validate' = 10, batch_size: 'Batch size to be used for training' = 64):
+    def train(self, name: 'Filename for saving model', data: 'Training data as an instance of pilotnet.src.Data()', epochs: 'Number of epochs to run' = 50, steps: 'Number of steps per epoch' = None, steps_val: 'Number of steps to validate' = None, batch_size: 'Batch size to be used for training' = 64):
         # x_train & y_train are np.array() objects with data extracted directly from the PilotData object instances
+        training_frames = data.training_data()
+        testing_frames = data.testing_data()
+        
+        # Calculate steps automatically based on data size
+        num_train_samples = len(training_frames)
+        num_val_samples = int(num_train_samples * 0.2)
+        
+        if steps is None:
+            steps = max(1, num_train_samples // batch_size)
+        if steps_val is None:
+            steps_val = max(1, num_val_samples // batch_size)
+        
         logger.info(f'Starting model training - epochs: {epochs}, steps: {steps}, batch_size: {batch_size}')
-
+        logger.info(f'Training samples: {num_train_samples}, Validation samples: {num_val_samples}')
+        
+        # Prepare data
+        x_train = np.array([frame.image for frame in training_frames])
+        y_train = np.array([(frame.steering, frame.throttle, frame.brake) for frame in training_frames])
+        
+        # Learning rate scheduler - reduce learning rate when stuck
+        def lr_scheduler(epoch, lr):
+            if epoch % 10 == 0 and epoch > 0:
+                new_lr = lr * 0.8
+                logger.info(f'Reducing learning rate from {lr:.6f} to {new_lr:.6f}')
+                return new_lr
+            return lr
+        
+        # Callbacks
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            patience=5,
+            restore_best_weights=True,
+            verbose=1
+        )
+        
+        model_checkpoint = ModelCheckpoint(
+            f'models/{name}_best.h5',
+            monitor='val_loss',
+            save_best_only=True,
+            verbose=1
+        )
+        
+        lr_schedule = LearningRateScheduler(lr_scheduler)
+        
+        callbacks = [early_stopping, model_checkpoint, lr_schedule]
+        
         # fit data to model for training
-        self.model.fit(np.array([frame.image for frame in data.training_data()]), np.array([(frame.steering, frame.throttle, frame.brake) for frame in data.training_data()]), batch_size=batch_size, epochs=epochs, steps_per_epoch=steps, validation_split=0.2, validation_steps=steps_val)
+        history = self.model.fit(
+            x_train, y_train,
+            batch_size=batch_size,
+            epochs=epochs,
+            steps_per_epoch=steps,
+            validation_split=0.2,
+            validation_steps=steps_val,
+            callbacks=callbacks,
+            shuffle=True
+        )
         
         # test the model by fitting the test data
         logger.info('Evaluating model on test data')
-        stats = self.model.evaluate(np.array([frame.image for frame in data.testing_data()]), np.array([(frame.steering, frame.throttle, frame.brake) for frame in data.testing_data()]), verbose=2)
+        x_test = np.array([frame.image for frame in testing_frames])
+        y_test = np.array([(frame.steering, frame.throttle, frame.brake) for frame in testing_frames])
+        stats = self.model.evaluate(x_test, y_test, verbose=2)
         
         # print the stats
-        print(f'Model accuracy: {stats[1]}\nModel loss: {stats[0]}')
-        logger.info(f'Training completed - accuracy: {stats[1]}, loss: {stats[0]}')
+        print(f'\nModel Evaluation Results:')
+        print(f'  - Total Loss: {stats[0]:.6f}')
+        print(f'  - Steering Angle Loss: {stats[1]:.6f}')
+        print(f'  - Throttle Pressure Loss: {stats[2]:.6f}')
+        print(f'  - Brake Pressure Loss: {stats[3]:.6f}')
+        logger.info(f'Training completed - loss: {stats[0]}, steering_loss: {stats[1]}, throttle_loss: {stats[2]}, brake_loss: {stats[3]}')
         
         input('\nPress [ENTER] to continue...')
         
         # save the trained model
         self.model.save(f"models/{name}.h5")
         logger.info(f'Model saved to: models/{name}.h5')
+        
+        return history
     
     # this method can be used for enabling the feature mentioned in app.py but needs more work
     def predict(self, data, given_model = 'default'):

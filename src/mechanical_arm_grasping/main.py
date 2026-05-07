@@ -1,4 +1,4 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加成功率阈值检查）
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加夹爪力度控制）
 import sys
 import mujoco
 import mujoco.viewer
@@ -15,6 +15,13 @@ SPEED_CONFIG = {
     "slow":   {"joint": 3.0, "grip": 1.5, "pause": 0.02},
     "medium": {"joint": 2.0, "grip": 1.0, "pause": 0.001},
     "fast":   {"joint": 1.0, "grip": 0.5, "pause": 0.0005}
+}
+
+# 夹爪力度配置（控制闭合速度，数值越大力度越大）
+GRIP_CONFIG = {
+    "light":  0.15,   # 轻力度
+    "medium": 0.25,   # 中力度（原默认值）
+    "heavy":  0.35    # 重力度
 }
 
 
@@ -124,7 +131,7 @@ def robot_arm_auto_reset_demo():
 
     # ---------------------- 模块化功能函数 ----------------------
     def joint_move(joint_name, target_val, duration, viewer, step_desc):
-        """单关节精准移动，带进度条显示"""
+        """单关节精准移动，带进度条和力矩显示"""
         print(f"\n🔧 {step_desc}")
         idx = joint_idxs[joint_name]
         start_val = data.ctrl[idx]
@@ -136,10 +143,13 @@ def robot_arm_auto_reset_demo():
             current_val = start_val + progress * (target_val - start_val)
             data.ctrl[idx] = current_val
 
+            # 获取力矩
+            torque = data.qfrc_actuator[idx]
+
             # 进度条显示
             filled = int(progress * bar_length)
             bar = '█' * filled + '░' * (bar_length - filled)
-            print(f"\r{joint_name} 进度：|{bar}| {progress * 100:.1f}% | 当前值：{current_val:.2f}", end="")
+            print(f"\r{joint_name} 进度：|{bar}| {progress * 100:.1f}% | 力矩：{torque:8.2f} | 当前值：{current_val:6.2f}", end="")
             
             mujoco.mj_step(model, data)
             viewer.sync()
@@ -147,10 +157,11 @@ def robot_arm_auto_reset_demo():
         print()
         return True
 
-    def gripper_close(viewer, desc="目标"):
-        """软接触闭合夹爪，带进度条显示"""
-        print(f"\n🔧 闭合夹爪抓取{desc}")
-        grip_speed = -0.25
+    def gripper_close(viewer, desc="目标", force="medium"):
+        """软接触闭合夹爪，带进度条显示，支持力度调节"""
+        # 根据力度配置获取闭合速度
+        grip_speed = -GRIP_CONFIG[force]
+        print(f"\n🔧 闭合夹爪抓取{desc} (力度: {force}, 速度: {grip_speed})")
         close_duration = 1.0
         start_time = time.time()
         bar_length = 20
@@ -160,10 +171,14 @@ def robot_arm_auto_reset_demo():
             data.ctrl[left_grip_idx] = grip_speed
             data.ctrl[right_grip_idx] = -grip_speed
 
+            # 获取力矩（夹爪关节）
+            torque_left = data.qfrc_actuator[left_grip_idx] if left_grip_idx >= 0 else 0
+            torque_right = data.qfrc_actuator[right_grip_idx] if right_grip_idx >= 0 else 0
+
             # 进度条显示
             filled = int(progress * bar_length)
             bar = '█' * filled + '░' * (bar_length - filled)
-            print(f"\r夹爪闭合进度：|{bar}| {progress * 100:.1f}%", end="")
+            print(f"\r夹爪闭合进度：|{bar}| {progress * 100:.1f}% | 力矩 L:{torque_left:6.2f} R:{torque_right:6.2f}", end="")
             
             mujoco.mj_step(model, data)
             viewer.sync()
@@ -211,8 +226,8 @@ def robot_arm_auto_reset_demo():
         mujoco.mj_step(model, data)
         print("✅ 目标物体已重置到原位")
 
-    def grab_and_place(viewer, retry_max=2, speed="medium"):
-        """完整取放流程（含自动重试、连续失败提醒、速度控制）"""
+    def grab_and_place(viewer, retry_max=2, speed="medium", grip_force="medium"):
+        """完整取放流程（含自动重试、连续失败提醒、速度控制、力度控制）"""
         retry_count = 0
         success = False
         consecutive_fails = 0
@@ -230,8 +245,8 @@ def robot_arm_auto_reset_demo():
                 joint_move("joint2", -0.7, joint_duration, viewer, "步骤2：俯仰大臂接近目标")
                 joint_move("joint3", 0.35, joint_duration, viewer, "步骤3：伸缩小臂对准目标")
 
-                # 阶段2：抓取目标
-                gripper_close(viewer, "蓝色球体")
+                # 阶段2：抓取目标（传入力度参数）
+                gripper_close(viewer, "蓝色球体", force=grip_force)
 
                 # 阶段3：抬升并转移目标
                 joint_move("joint2", 0.0, joint_duration, viewer, "步骤4：抬升目标脱离平台")
@@ -298,6 +313,16 @@ def robot_arm_auto_reset_demo():
             except ValueError:
                 print(f"⚠️ 成功率参数 '{sys.argv[3]}' 无效，使用默认 0%（不检查）")
         
+        # 夹爪力度，默认 medium
+        grip_force = "medium"
+        if len(sys.argv) > 4:
+            force_arg = sys.argv[4].lower()
+            if force_arg in GRIP_CONFIG:
+                grip_force = force_arg
+                print(f"📌 夹爪力度: {grip_force} (light/medium/heavy)")
+            else:
+                print(f"⚠️ 力度参数 '{force_arg}' 无效，使用默认 'medium'")
+        
         success_count = 0
 
         for round_num in range(1, total_rounds + 1):
@@ -305,7 +330,7 @@ def robot_arm_auto_reset_demo():
             print(f"🔄 第 {round_num}/{total_rounds} 次抓取")
             print(f"{'='*40}")
 
-            grab_success = grab_and_place(viewer, speed=speed)
+            grab_success = grab_and_place(viewer, speed=speed, grip_force=grip_force)
 
             if grab_success:
                 success_count += 1
@@ -352,7 +377,7 @@ def robot_arm_auto_reset_demo():
     # 保存日志到文件
     try:
         with open("grasp_log.txt", "a", encoding="gbk") as f:
-            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{actual_rate:.1f}%, 速度:{speed}\n")
+            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{actual_rate:.1f}%, 速度:{speed}, 力度:{grip_force}\n")
         print("📝 日志已保存到 grasp_log.txt")
     except Exception as e:
         print(f"⚠️ 日志保存失败：{e}")

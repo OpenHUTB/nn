@@ -78,6 +78,7 @@ data/
 
 dataset/
 datasets/
+mnist_data/
 
 # ========================================
 # 日志与缓存
@@ -109,7 +110,10 @@ screenshots/
 *.jpg
 *.jpeg
 !docs/images/
-
+!docs/
+!docs/carla_CAM/
+!docs/carla_CAM/images/
+!docs/carla_CAM/images/*.png
 # ========================================
 # Jupyter Notebook
 # ========================================
@@ -141,29 +145,7 @@ desktop.ini
 site/
 .claude/
 # =========================================
-# Added by contributor: development tools
+# 环境变量文件
 # =========================================
-
-# Pytest
-.pytest_cache/
-
-# Coverage
-.coverage
-htmlcov/
-
-# VSCode
-.vscode/
-
-# JetBrains IDE
-.idea/
-
-# Temporary files
-*.tmp
-*.temp
-
-# Environment files
 .env.local
 .env.*.local
-
-# Jupyter
-.ipynb_checkpoints/
