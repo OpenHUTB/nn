@@ -1,4 +1,4 @@
-site_name: 神经网络
+﻿site_name: 神经网络
 # 参考链接：https://blog.csdn.net/m0_63203517/article/details/129765689
 
 #repo_url: https://github.com/carla-simulator/carla
@@ -45,6 +45,8 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- 入门:
+  - 线性回归: 'linear_regression.md'
 
 
 # - mdx_math 用于行内公式显示
