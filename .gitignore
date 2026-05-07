@@ -109,8 +109,9 @@ screenshots/
 *.jpg
 *.jpeg
 !docs/
-!docs/images/
-!docs/images/*.png
+!docs/carla_CAM/
+!docs/carla_CAM/images/
+!docs/carla_CAM/images/*.png
 
 # ========================================
 # Jupyter Notebook
