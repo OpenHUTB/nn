@@ -141,6 +141,8 @@ class GaussianMixtureModel:
         self.init = init                  # 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
         self.log_likelihoods = []         # 存储每轮迭代的对数似然值
         self.n_iters_ = 0                 # 实际收敛所用的迭代次数
+        self.aic_ = None                  # AIC 值（训练后计算）
+        self.bic_ = None                  # BIC 值（训练后计算）
 
         # 初始化随机数生成器（使用 numpy 新式 Generator，线程安全且可重复）
         self.rng = np.random.default_rng(random_state)
@@ -244,8 +246,53 @@ class GaussianMixtureModel:
         self.n_iters_ = iter + 1
         # 最终聚类结果：每个样本分配到概率最大的高斯成分
         self.labels_ = np.argmax(gamma, axis=1)
+        
+        # 计算 AIC 和 BIC 准则
+        self._compute_aic_bic(X)
+        
         # 基于软聚类结果确定最终的硬聚类标签
         return self
+
+    def _compute_aic_bic(self, X):
+        """计算 AIC（Akaike Information Criterion）和 BIC（Bayesian Information Criterion）
+        
+        AIC = 2k - 2ln(L)
+        BIC = k * ln(n) - 2ln(L)
+        
+        其中：
+            k: 模型参数数量（每个成分有 d 个均值 + d*(d+1)/2 个协方差参数 + 权重参数）
+            n: 样本数量
+            L: 模型似然值
+        """
+        n_samples, n_features = X.shape
+        n_components = self.n_components
+        
+        # 计算模型参数数量
+        # 每个成分: n_features(均值) + n_features*(n_features+1)/2(协方差矩阵下三角)
+        # 权重参数: n_components - 1（权重和为1，最后一个由前n-1个决定）
+        params_per_component = n_features + n_features * (n_features + 1) // 2
+        total_params = n_components * params_per_component + (n_components - 1)
+        
+        # 最终对数似然值
+        log_likelihood = self.log_likelihoods[-1]
+        
+        # AIC = 2k - 2ln(L)
+        self.aic_ = 2 * total_params - 2 * log_likelihood
+        
+        # BIC = k * ln(n) - 2ln(L)
+        self.bic_ = total_params * np.log(n_samples) - 2 * log_likelihood
+
+    def bic(self):
+        """返回 BIC 值（需先调用 fit 训练）"""
+        if self.bic_ is None:
+            raise ValueError("请先调用 fit 方法训练模型")
+        return self.bic_
+
+    def aic(self):
+        """返回 AIC 值（需先调用 fit 训练）"""
+        if self.aic_ is None:
+            raise ValueError("请先调用 fit 方法训练模型")
+        return self.aic_
 
     def _kmeans_plus_plus_init(self, X):
         """k-means++ 初始化：以平方距离为权重的概率采样，使初始中心点尽量分散
@@ -380,7 +427,56 @@ def _cluster_accuracy(y_true, y_pred, n_classes):
 
 
 # ============================================================
-# 主程序：随机初始化 vs k-means++ 初始化 对比实验
+# 模型选择工具：基于 BIC 自动选择最佳成分数量
+# ============================================================
+def select_best_components(X, min_components=2, max_components=10, random_state=42):
+    """基于 BIC 准则自动选择 GMM 的最佳高斯成分数量
+    
+    参数:
+        X: 数据集，形状为(n_samples, n_features)
+        min_components: 最小成分数量（默认=2）
+        max_components: 最大成分数量（默认=10）
+        random_state: 随机种子
+    
+    返回:
+        best_gmm: 最佳成分数量的 GMM 模型
+        results: 各成分数量对应的 BIC 值列表
+    """
+    results = []
+    best_bic = np.inf
+    best_gmm = None
+    
+    print(f"基于 BIC 选择最佳成分数量 [{min_components}~{max_components}]...")
+    
+    for n_components in range(min_components, max_components + 1):
+        gmm = GaussianMixtureModel(
+            n_components=n_components,
+            max_iter=100,
+            tol=1e-6,
+            random_state=random_state,
+            init='kmeans++'
+        )
+        gmm.fit(X)
+        bic = gmm.bic()
+        results.append({
+            'n_components': n_components,
+            'bic': bic,
+            'aic': gmm.aic(),
+            'n_iters': gmm.n_iters_
+        })
+        
+        print(f"  成分数={n_components}: BIC={bic:.2f}, AIC={gmm.aic():.2f}, 迭代={gmm.n_iters_}")
+        
+        if bic < best_bic:
+            best_bic = bic
+            best_gmm = gmm
+    
+    print(f"\n最佳成分数量: {best_gmm.n_components} (BIC={best_bic:.2f})")
+    return best_gmm, results
+
+
+# ============================================================
+# 主程序：随机初始化 vs k-means++ 初始化 对比实验 + BIC 模型选择
 # ============================================================
 if __name__ == "__main__":
     # 设置中文字体（Windows 优先 Microsoft YaHei，Linux/Mac 回退 SimHei）
@@ -587,6 +683,48 @@ if __name__ == "__main__":
             writer.writerow(["random", i, ll])
         for i, ll in enumerate(gmm_kpp.log_likelihoods, start=1):
             writer.writerow(["kmeans++", i, ll])
+
+    # ============================================================
+    # 图4：BIC/AIC 模型选择曲线
+    # ============================================================
+    print("\n--- 基于 BIC 的模型选择 ---")
+    best_gmm, bic_results = select_best_components(X, min_components=2, max_components=8, random_state=42)
+
+    n_components_list = [r['n_components'] for r in bic_results]
+    bic_values = [r['bic'] for r in bic_results]
+    aic_values = [r['aic'] for r in bic_results]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(n_components_list, bic_values, '-o', color='#E74C3C', label='BIC', linewidth=2, markersize=6)
+    ax.plot(n_components_list, aic_values, '-s', color='#3498DB', label='AIC', linewidth=2, markersize=6)
+    
+    # 标记最佳成分数
+    best_n = best_gmm.n_components
+    best_bic = best_gmm.bic()
+    ax.scatter(best_n, best_bic, color='#E74C3C', s=150, zorder=5, edgecolors='black', label=f'最佳 k={best_n}')
+    
+    ax.set_xlabel('高斯成分数量 k')
+    ax.set_ylabel('准则值（越小越好）')
+    ax.set_title('BIC/AIC 模型选择曲线（自动确定最佳聚类数）', fontsize=12, fontweight='bold')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    bic_path = out_dir / "bic_model_selection.png"
+    plt.savefig(bic_path, dpi=140, bbox_inches='tight')
+    print(f"[已保存] BIC模型选择图: {bic_path}")
+    if not args.no_show:
+        plt.show()
+    else:
+        plt.close()
+
+    # ---------- 保存 BIC/AIC 结果日志 ----------
+    bic_log_path = out_dir / "bic_aic_log.csv"
+    with bic_log_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["n_components", "BIC", "AIC", "iterations"])
+        for r in bic_results:
+            writer.writerow([r['n_components'], r['bic'], r['aic'], r['n_iters']])
 
     print(f"\n所有输出已保存至: {out_dir.resolve()}")
 
