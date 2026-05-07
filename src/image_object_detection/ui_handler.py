@@ -22,8 +22,8 @@ import traceback
 
 from detection_engine import DetectionEngine, ModelLoadError
 from camera_detector import CameraOpenError
-from model_manager import ModelManager  # ← 新增导入
-
+from model_manager import ModelManager
+from video_detector import VideoDetector
 
 def parse_args():
     """
@@ -50,6 +50,7 @@ class UIHandler:
         若初始模型加载失败，打印错误并退出。
         """
         self.config = config
+        self.video_detector = VideoDetector()
         try:
             # 使用 ModelManager 管理检测引擎，支持后续热切换
             self.model_manager = ModelManager(
@@ -94,9 +95,10 @@ class UIHandler:
             print("1. Static Image Detection")
             print("2. Live Camera Detection")
             print("3. Batch Image Detection")
-            print("4. Switch Detection Model")  # ← 新增选项
-            print("5. Exit")
-            choice = input("Please select an option (1-5): ").strip()
+            print("4. Video File Detection")      # 新增视频检测选项
+            print("5. Switch Detection Model")
+            print("6. Exit")
+            choice = input("Please select an option (1-6): ").strip()
         except KeyboardInterrupt:
             print("\nUser cancelled. Exiting...")
             return
@@ -107,12 +109,14 @@ class UIHandler:
             self._run_camera_detection()
         elif choice == "3":
             self._run_batch_detection_interactive()
-        elif choice == "4":
-            self._switch_model_interactive()  # ← 新增方法
+        elif choice == "4":                        # 视频检测分支
+            self.video_file_detection()
         elif choice == "5":
+            self._switch_model_interactive()
+        elif choice == "6":
             print("Goodbye!")
         else:
-            print("Invalid option. Please enter 1, 2, 3, 4, or 5.")
+            print("Invalid option. Please enter 1, 2, 3, 4, 5, or 6.")
             self._interactive_menu()
 
     def _choose_image_source(self):
@@ -156,13 +160,35 @@ class UIHandler:
         else:
             print("Invalid choice. Returning to main menu.")
 
+    def video_file_detection(self):
+        """视频文件检测交互"""
+        print("\n=== 视频文件检测 ===")
+        video_path = input("请输入视频文件路径: ").strip()
+        
+        if not os.path.exists(video_path):
+            print(f"错误：文件不存在 - {video_path}")
+            return
+
+        save_choice = input("是否保存检测结果视频？(y/n): ").lower()
+        output_path = None
+        if save_choice == 'y':
+            output_path = input("请输入输出视频路径（例如 output.mp4）: ").strip()
+
+        print("\n正在处理视频，按 'q' 键可提前终止...\n")
+        self.video_detector.process_video_file(video_path, output_path)
+
+        if output_path:
+            print(f"\n检测完成！结果已保存到: {output_path}")
+        else:
+            print("\n检测完成！")
+
     def _run_static_detection(self, image_path):
         """
         执行单张图像检测：
-          - 使用 cv2.imread 读取
-          - 若失败，分级诊断原因（路径？权限？格式？）
-          - 显示结果窗口，等待按键关闭
-          - 自动保存结果图（原文件名 + "_detected" + 原扩展名）
+        - 使用 cv2.imread 读取
+        - 若失败，分级诊断原因（路径？权限？格式？）
+        - 显示结果窗口，等待按键关闭
+        - 自动保存结果图（原文件名 + "_detected" + 原扩展名）
         """
         print(f"🔍 Detecting objects in: {image_path}")
         frame = cv2.imread(image_path)
@@ -207,7 +233,7 @@ class UIHandler:
         try:
             from camera_detector import CameraDetector
             detector = CameraDetector(
-                detection_engine=self.model_manager.get_current_engine(),  # ← 使用当前模型
+                detection_engine=self.model_manager.get_current_engine(),
                 output_interval=self.config.output_interval
             )
             detector.start_detection(camera_index=self.config.camera_index)
@@ -250,7 +276,7 @@ class UIHandler:
         try:
             from batch_detector import BatchDetector
             detector = BatchDetector(
-                detection_engine=self.model_manager.get_current_engine(),  # ← 使用当前模型
+                detection_engine=self.model_manager.get_current_engine(),
                 input_dir=input_dir,
                 output_dir=output_dir
             )

@@ -1,0 +1,7 @@
+algorithm,train_accuracy,test_accuracy,train_time,infer_time_per_sample
+svm,1.0,1.0,0.0325,0.0
+random_forest,1.0,1.0,0.1838,0.000163
+mlp,1.0,1.0,0.4197,0.0
+knn,1.0,1.0,1.9513,5.1e-05
+decision_tree,1.0,0.9583,0.0115,0.0
+ada_boost,0.5,0.475,0.1443,2.6e-05

@@ -1,0 +1,30 @@
+{
+  "max_image_size": [
+    1200,
+    800
+  ],
+  "cache_size": 8,
+  "batch_size": 30,
+  "adaptive_clip_limit": 3.0,
+  "adaptive_grid_size": [
+    16,
+    16
+  ],
+  "canny_threshold1": 30,
+  "canny_threshold2": 90,
+  "hough_threshold": 20,
+  "confidence_threshold": 0.4,
+  "prediction_steps": 10,
+  "prediction_distance": 0.7,
+  "video_frame_skip": 1,
+  "video_fps": 8,
+  "camera_id": 0,
+  "enable_frame_buffer": true,
+  "frame_buffer_size": 5,
+  "adaptive_skip_frames": true,
+  "max_processing_time": 0.15,
+  "min_fps": 5,
+  "max_error_count": 5,
+  "recovery_timeout": 10,
+  "auto_recovery": true
+}

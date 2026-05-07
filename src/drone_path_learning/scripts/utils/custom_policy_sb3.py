@@ -1,0 +1,493 @@
+from tracemalloc import start
+import gym
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+import torch.nn as nn
+import torch as th
+from torch.nn.modules.linear import Linear
+
+import torchvision.models as pre_models
+import numpy as np
+import torch.nn.functional as F
+
+"""
+这里提供5种特征提取网络
+
+1. No_CNN
+    不使用CNN层
+    仅用最大池化层生成25个特征
+
+2. CNN_GAP
+    3层CNN
+    以AvgPool2d结束
+    1*8 -> 8*16 -> 16*25
+
+3. CNN_GAP_BN
+    3层CNN，并在每层CNN后使用BN
+    以AvgPool2d结束
+
+4. CNN_FC
+    3层CNN
+    以Flatten结束
+    通过FC得到CNN特征 (960 100 25)
+
+5. CNN_MobileNet
+    使用预训练MobileNet作为特征生成器
+    以Flatten结束 (576 -> 25)
+"""
+
+
+class No_CNN(BaseFeaturesExtractor):
+    """
+    :param observation_space: (gym.Space)
+    :param features_dim: (int) 提取后的特征维度。
+        对应最后一层的单元数。
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        features_dim: int = 256,
+        state_feature_dim=4,
+    ):
+        super(No_CNN, self).__init__(observation_space, features_dim)
+        # 假设输入图像为CxHxW（通道在前）
+        # 若需重排通道顺序，可在预处理或wrapper中完成
+        # 可用 model.actor.features_extractor.feature_all 打印全部特征
+
+        # 设置CNN特征数和状态特征数
+        assert state_feature_dim > 0
+        self.feature_num_state = state_feature_dim
+        self.feature_all = None
+
+        # 输入尺寸 80*100
+        # 缩小5倍
+        self.cnn = nn.Sequential(
+            nn.MaxPool2d(kernel_size=(16, 20)),
+            # nn.MaxPool2d(kernel_size=(26, 33)),
+            nn.Flatten(),
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        depth_img = observations[:, 0:1, :, :]
+
+        cnn_feature = self.cnn(depth_img)  # [1, 25, 1, 1]
+        # print(cnn_feature)
+        # print(self.feature_num_state)
+
+        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
+        # 将状态特征从0~1映射到-1~1
+        # state_feature = state_feature*2 - 1
+        # print(state_feature.size(), cnn_feature.size())
+        x = th.cat((cnn_feature, state_feature), dim=1)
+        # print(x)
+        self.feature_all = x  # use  to update feature before FC
+
+        return x
+
+
+class CNN_GAP(BaseFeaturesExtractor):
+    """
+    :param observation_space: (gym.Space)
+    :param features_dim: (int) 提取后的特征维度。
+        对应最后一层的单元数。
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        features_dim: int = 256,
+        state_feature_dim=0,
+    ):
+        super(CNN_GAP, self).__init__(observation_space, features_dim)
+        # 可用 model.actor.features_extractor.feature_all 打印全部特征
+        # 设置CNN特征数和状态特征数
+        assert state_feature_dim > 0
+        self.feature_num_state = state_feature_dim
+        self.feature_num_cnn = features_dim - state_feature_dim
+        self.feature_all = None
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding="same"),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 40, 48]
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding="same"),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 20, 24]
+            # nn.BatchNorm2d(8, affine=False)
+        )
+
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(
+                16, self.feature_num_cnn, kernel_size=3, stride=1, padding="same"
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 10, 12]
+        )
+        self.gap_layer = nn.AvgPool2d(kernel_size=(10, 12), stride=1)
+
+        self.batch_layer = nn.BatchNorm1d(self.feature_num_cnn)
+
+        # nn.init.kaiming_normal_(self.conv1[0].weight, a=0, mode='fan_in')
+        # nn.init.kaiming_normal_(self.conv2[0].weight, a=0, mode='fan_in')
+        # nn.init.kaiming_normal_(self.conv3[0].weight, a=0, mode='fan_in')
+        # nn.init.constant(self.conv1[0].bias, 0.0)
+        # nn.init.constant(self.conv2[0].bias, 0.0)
+        # nn.init.constant(self.conv3[0].bias, 0.0)
+
+        # nn.init.xavier_uniform(self.conv1[0].weight)
+        # nn.init.xavier_uniform(self.conv2[0].weight)
+        # nn.init.xavier_uniform(self.conv3[0].weight)
+        # self.conv1[0].bias.data.fill_(0)
+        # self.conv2[0].bias.data.fill_(0)
+        # self.conv3[0].bias.data.fill_(0)
+        # self.soft_max_layer = nn.Softmax(dim=1)
+        # self.batch_norm_layer = nn.BatchNorm1d(16, affine=False)
+
+        # self.linear = self.cnn
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        depth_img = observations[:, 0:1, :, :]
+
+        self.layer_1_out = self.conv1(depth_img)
+        self.layer_2_out = self.conv2(self.layer_1_out)
+        self.layer_3_out = self.conv3(self.layer_2_out)
+        self.gap_layer_out = self.gap_layer(self.layer_3_out)
+
+        cnn_feature = self.gap_layer_out  # [1, 8, 1, 1]
+        cnn_feature = cnn_feature.squeeze(dim=3)  # [1, 8, 1]
+        cnn_feature = cnn_feature.squeeze(dim=2)  # [1, 8]
+        # cnn_feature = th.clamp(cnn_feature,-1,2)
+        # cnn_feature = self.batch_layer(cnn_feature)
+
+        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
+        # 将状态特征从0~1映射到-1~1
+        # state_feature = state_feature*2 - 1
+
+        x = th.cat((cnn_feature, state_feature), dim=1)
+        self.feature_all = x  # use  to update feature before FC
+
+        return x
+
+
+class CNN_GAP_BN(BaseFeaturesExtractor):
+    """
+    :param observation_space: (gym.Space)
+    :param features_dim: (int) 提取后的特征维度。
+        对应最后一层的单元数。
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        features_dim: int = 256,
+        state_feature_dim=0,
+    ):
+        super(CNN_GAP_BN, self).__init__(observation_space, features_dim)
+        # 可用 model.actor.features_extractor.feature_all 打印全部特征
+        # 设置CNN特征数和状态特征数
+        assert state_feature_dim > 0
+        self.feature_num_state = state_feature_dim
+        self.feature_num_cnn = features_dim - state_feature_dim
+        self.feature_all = None
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 40, 48]
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding="same"),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 20, 24]
+            # nn.BatchNorm2d(8, affine=False)
+        )
+
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(
+                16, self.feature_num_cnn, kernel_size=3, stride=1, padding="same"
+            ),
+            nn.BatchNorm2d(self.feature_num_cnn),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 10, 12]
+        )
+        self.gap_layer = nn.AvgPool2d(kernel_size=(10, 12), stride=1)
+
+        self.batch_layer = nn.BatchNorm1d(self.feature_num_cnn)
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        depth_img = observations[:, 0:1, :, :]
+
+        self.layer_1_out = self.conv1(depth_img)
+        self.layer_2_out = self.conv2(self.layer_1_out)
+        self.layer_3_out = self.conv3(self.layer_2_out)
+        self.gap_layer_out = self.gap_layer(self.layer_3_out)
+
+        cnn_feature = self.gap_layer_out  # [1, 8, 1, 1]
+        cnn_feature = cnn_feature.squeeze(dim=3)  # [1, 8, 1]
+        cnn_feature = cnn_feature.squeeze(dim=2)  # [1, 8]
+        # cnn_feature = th.clamp(cnn_feature,-1,2)
+        # cnn_feature = self.batch_layer(cnn_feature)
+
+        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
+        # 将状态特征从0~1映射到-1~1
+        # state_feature = state_feature*2 - 1
+
+        x = th.cat((cnn_feature, state_feature), dim=1)
+        self.feature_all = x  # use  to update feature before FC
+
+        return x
+
+
+class CustomNoCNN(BaseFeaturesExtractor):
+    """
+    :param observation_space: (gym.Space)
+    :param features_dim: (int) 提取后的特征维度。
+        对应最后一层的单元数。
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        features_dim: int = 256,
+        state_feature_dim=4,
+    ):
+        super(CustomNoCNN, self).__init__(observation_space, features_dim)
+        # 假设输入图像为CxHxW（通道在前）
+        # 若需重排通道顺序，可在预处理或wrapper中完成
+        # 可用 model.actor.features_extractor.feature_all 打印全部特征
+
+        # 设置CNN特征数和状态特征数
+        assert state_feature_dim > 0
+        self.feature_num_state = state_feature_dim
+        self.feature_all = None
+
+        # 输入尺寸 80*100
+        # 缩小5倍
+        self.cnn = nn.Sequential(nn.MaxPool2d(kernel_size=(16, 20)), nn.Flatten())
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        depth_img = observations[:, 0:1, :, :]
+
+        cnn_feature = self.cnn(depth_img)  # [1, 25, 1, 1]
+
+        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
+        # 将状态特征从0~1映射到-1~1
+        # state_feature = state_feature*2 - 1
+        # print(state_feature.size(), cnn_feature.size())
+        x = th.cat((cnn_feature, state_feature), dim=1)
+        # print(x)
+        self.feature_all = x  # use  to update feature before FC
+
+        return x
+
+
+class CNN_FC(BaseFeaturesExtractor):
+    """
+    :param observation_space: (gym.Space)
+    :param features_dim: (int) 提取后的特征维度。
+        对应最后一层的单元数。
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        features_dim: int = 256,
+        state_feature_dim=0,
+    ):
+        super(CNN_FC, self).__init__(observation_space, features_dim)
+        # 可用 model.actor.features_extractor.feature_all 打印全部特征
+        # 设置CNN特征数和状态特征数
+        assert state_feature_dim > 0
+        self.feature_num_state = state_feature_dim
+        self.feature_num_cnn = features_dim - state_feature_dim
+        self.feature_all = None
+
+        # 输入图像: 80*100
+        # 输出: 16维CNN特征 + n维状态特征
+        self.cnn = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=1),
+            # nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 40, 48]
+            nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=1),
+            # nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 20, 24]
+            nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=1),
+            # nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # [1, 8, 10, 12]
+            # nn.BatchNorm2d(8),
+            nn.Flatten(),  # 960
+            # nn.AvgPool2d(kernel_size=(10, 12), stride=1)
+        )
+
+        # 通过一次前向传播计算形状
+        with th.no_grad():
+            n_flatten = self.cnn(
+                th.as_tensor(observation_space.sample()[None][:, 0:1, :, :]).float()
+            ).shape[1]
+
+        self.linear = nn.Sequential(
+            nn.Linear(n_flatten, 100),
+            nn.ReLU(),
+            nn.Linear(100, self.feature_num_cnn),
+            # nn.BatchNorm1d(32),
+            nn.ReLU(),
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        depth_img = observations[:, 0:1, :, :]
+
+        cnn_feature = self.linear(self.cnn(depth_img))
+        # cnn_feature = cnn_feature.squeeze(dim=3) # [1, 8, 1]
+        # cnn_feature = cnn_feature.squeeze(dim=2) # [1, 8]
+
+        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
+        # 将状态特征从0~1映射到-1~1
+        # state_feature = state_feature*2 - 1
+
+        x = th.cat((cnn_feature, state_feature), dim=1)
+        self.feature_all = x  # use  to update feature before FC
+        # print(x)
+
+        return x
+
+
+class CNN_MobileNet(BaseFeaturesExtractor):
+    """
+    使用 mobile_net_v3_small 的部分层从深度图中提取特征
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        features_dim: int = 256,
+        state_feature_dim=0,
+    ):
+        super(CNN_MobileNet, self).__init__(observation_space, features_dim)
+
+        assert state_feature_dim > 0
+        self.feature_num_state = state_feature_dim
+        self.feature_num_cnn = features_dim - state_feature_dim
+        self.feature_all = None
+
+        self.mobilenet_v3_small = pre_models.mobilenet_v3_small(pretrained=True)
+
+        self.part = self.mobilenet_v3_small.features
+
+        # 冻结部分参数
+        for param in self.part.parameters():
+            param.requires_grad = False
+
+        self.gap_layer = nn.AdaptiveAvgPool2d(output_size=1)
+        self.linear = nn.Sequential(
+            nn.Linear(576, 256),
+            # nn.BatchNorm1d(256),
+            nn.ReLU(),
+            # nn.Dropout(0.25),
+            nn.Linear(256, self.feature_num_cnn),
+            # nn.BatchNorm1d(32),
+            nn.ReLU(),
+            # nn.Dropout(0.25)
+        )
+        self.linear_small = nn.Sequential(
+            nn.Linear(576, self.feature_num_cnn),
+            nn.Tanh(),
+            # nn.BatchNorm1d(32),
+            # nn.Dropout(0.25)
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        depth_img = observations[:, 0:1, :, :]
+
+        # 将输入图像扩展为 (None, 3, 100, 80)
+        # 注意: 这里repeat用于张量扩展  # (1, 3, 80 ,100)
+        depth_img_stack = depth_img.repeat(1, 3, 1, 1)
+
+        self.last_cnn_output = self.part(depth_img_stack)  # [1, 576, 3, 4]
+        self.gap_layer_out = cnn_feature = self.gap_layer(
+            self.last_cnn_output
+        )  # [1, 576, 1, 1]
+
+        cnn_feature = cnn_feature.squeeze(dim=3)  # [1, 576, 1]
+        cnn_feature = cnn_feature.squeeze(dim=2)  # [1, 576]
+        cnn_feature = self.linear_small(cnn_feature)  # [1, 32]
+
+        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]  # [1, 2]
+        # 将状态特征从0~1映射到-1~1
+        # state_feature = state_feature*2 - 1
+
+        x = th.cat((cnn_feature, state_feature), dim=1)
+        self.feature_all = x  # use  to update feature before FC
+        # print(x)
+
+        return x
+
+
+class CNN_GAP_new(BaseFeaturesExtractor):
+    """
+    :param observation_space: (gym.Space)
+    :param features_dim: (int) 提取后的特征维度。
+        对应最后一层的单元数。
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Box,
+        features_dim: int = 256,
+        state_feature_dim=0,
+    ):
+        super(CNN_GAP_new, self).__init__(observation_space, features_dim)
+        # 可用 model.actor.features_extractor.feature_all 打印全部特征
+        # 设置CNN特征数和状态特征数
+        assert state_feature_dim > 0
+        self.feature_num_state = state_feature_dim
+        self.feature_num_cnn = features_dim - state_feature_dim
+        self.feature_all = None
+
+        # 输入尺寸 (100, 80)
+        # 输入尺寸 80 60
+        self.conv1 = nn.Conv2d(1, 8, 5, 2)  # 28,38
+        self.conv2 = nn.Conv2d(8, 8, 5, 2)  # 12,17
+        self.conv3 = nn.Conv2d(8, 8, 3, 2)  # 5, 8
+        self.pool = nn.MaxPool2d(2, 3)
+        self.gap_layer = nn.AvgPool2d(kernel_size=(8, 10), stride=1)
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        depth_img = observations[:, 0:1, :, :]  # 0-1 0->20m 1->0m
+        # print(th.min(depth_img), th.max(depth_img))
+        # 将图像归一化到(-1, 1)
+        depth_img_norm = (depth_img - 0.5) * 2
+        # print(th.min(depth_img_norm), th.max(depth_img_norm))
+
+        # 1, 8, 38, 48  1,8,28,38
+        self.layer_1_out = F.relu(self.conv1(depth_img_norm))
+        # 1, 8, 18, 23  1,8,12,17
+        self.layer_2_out = F.relu(self.conv2(self.layer_1_out))
+        self.layer_3_out = F.relu(self.conv3(self.layer_2_out))  # 1, 16, 8, 10  1,8,5,8
+        self.layer_small = self.pool(self.layer_3_out)  # 1,8,2,3
+        # self.gap_layer_out = self.gap_layer(self.layer_3_out)               # 1, 16, 1, 1
+        self.flatten = th.flatten(self.layer_small, start_dim=1)
+        # self.flatten = self.flatten.unsqueeze(0)
+
+        # cnn_feature = self.gap_layer_out  # [1, 16, 1, 1]
+        # cnn_feature = cnn_feature.squeeze(dim=3)  # [1, 16, 1]
+        # cnn_feature = cnn_feature.squeeze(dim=2)  # [1, 16]
+        # cnn_feature = th.clamp(cnn_feature, -1, 2)
+        # cnn_feature = self.batch_layer(cnn_feature)
+
+        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
+        # 将状态特征从0~1映射到-1~1
+        # state_feature = state_feature*2 - 1
+
+        x = th.cat((self.flatten, state_feature), dim=1)
+        self.feature_all = x  # use  to update feature before FC
+
+        return x

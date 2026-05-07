@@ -2,9 +2,6 @@ name: compute involvement degree
 
 # 修正后的触发器：支持手动输入时间、自动推送到 main、以及远程触发
 on:
-  push:
-    branches:
-      - main
   repository_dispatch:
     types: [opened, deleted, custom-event]
   workflow_dispatch:
