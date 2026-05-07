@@ -108,6 +108,8 @@ screenshots/
 *.png
 *.jpg
 *.jpeg
+!docs/
+!docs/images/
 !docs/images/*.png
 
 # ========================================
