@@ -8,6 +8,7 @@ Usage:
     python main.py
 """
 
+import argparse
 import time
 import sys
 
@@ -93,20 +94,43 @@ class ProgressDemo:
         print("=" * 80)
         print()
 
+def parse_args():
+    """解析命令行参数。"""
+    parser = argparse.ArgumentParser(
+        description="Setup tool progress display demo"
+    )
+    parser.add_argument(
+        "--speed",
+        choices=["fast", "normal", "slow"],
+        default="normal",
+        help="Set demo speed: fast, normal, or slow",
+    )
+    return parser.parse_args()
+
 
 def main():
-    """按顺序执行 setup 进度显示演示。"""
-    print()
-    print("=" * 80)
-    print("              Setup.bat Progress Display - DEMO VERSION")
-    print("=" * 80)
-    print("  This is a demonstration of the progress display features.")
-    print("  No actual downloads or installations will be performed.")
-    print("=" * 80)
-    print()
+   """按顺序执行 setup 进度显示演示。"""
+   args = parse_args()
+
+   speed_map = {
+        "fast": 0.3,
+        "normal": 1.0,
+        "slow": 1.5,
+    }
+   speed_factor = speed_map[args.speed]
+
+   print()
+   print("=" * 80)
+   print("              Setup.bat Progress Display - DEMO VERSION")
+   print("=" * 80)
+   print("  This is a demonstration of the progress display features.")
+   print("  No actual downloads or installations will be performed.")
+   print(f"  Demo speed: {args.speed}")
+   print("=" * 80)
+   print()
 
 
-    steps = [
+   steps = [
         {
             "description": "Checking hutb_downloader.exe",
             "actions": [
@@ -194,38 +218,38 @@ def main():
         },
     ]
 
-    demo = ProgressDemo(total_steps=len(steps))
+   demo = ProgressDemo(total_steps=len(steps))
 
     # 使用统一的数据结构描述步骤，减少 main() 中的重复逻辑
-    for step in steps:
+   for step in steps:
         demo.show_progress(step["description"])
 
         for action in step["actions"]:
             if action["type"] == "sleep":
-                time.sleep(action["seconds"])
+                time.sleep(action["seconds"] * speed_factor)
             elif action["type"] == "print":
                 print(action["message"])
             elif action["type"] == "result":
                 demo.step_result(action["status"], action["message"])
 
-    demo.show_summary()
+   demo.show_summary()
 
-    print()
-    print("=" * 80)
-    print("                         DEMO COMPLETE")
-    print("=" * 80)
-    print()
-    print("The progress display features demonstrated:")
-    print("  - Real-time progress bar with percentage")
-    print("  - Step numbering (1/11, 2/11, etc.)")
-    print("  - Elapsed time tracking")
-    print("  - Estimated time remaining (ETA)")
-    print("  - Standardized status output ([OK], [SKIP], [DOWNLOAD], [ERROR])")
-    print("  - Final summary with statistics")
-    print()
-    print("To use the actual setup script, run: setup.bat")
-    print("=" * 80)
-    print()
+   print()
+   print("=" * 80)
+   print("                         DEMO COMPLETE")
+   print("=" * 80)
+   print()
+   print("The progress display features demonstrated:")
+   print("  - Real-time progress bar with percentage")
+   print("  - Step numbering (1/11, 2/11, etc.)")
+   print("  - Elapsed time tracking")
+   print("  - Estimated time remaining (ETA)")
+   print("  - Standardized status output ([OK], [SKIP], [DOWNLOAD], [ERROR])")
+   print("  - Final summary with statistics")
+   print()
+   print("To use the actual setup script, run: setup.bat")
+   print("=" * 80)
+   print()
 
 
 if __name__ == "__main__":

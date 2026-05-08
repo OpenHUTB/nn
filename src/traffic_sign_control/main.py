@@ -4,6 +4,7 @@ import time
 import pygame
 import numpy as np
 import math
+import os
 import threading
 from ultralytics import YOLO
 import torch
@@ -364,9 +365,18 @@ def main():
     try:
         client = carla.Client("localhost", 2000)
         client.set_timeout(10.0)
-        # 加载Town03地图，该地图拥有最多的交通标志、限速牌和红绿灯
-        print("正在加载Town05地图...")
-        world = client.load_world('Town05')
+        
+        # 读取地图配置（由 switch_map.py 保存）
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "map_config.txt")
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                target_map = f.read().strip()
+            print(f"正在加载地图: {target_map} ...")
+            world = client.load_world(target_map)
+        else:
+            print("未找到地图配置，使用默认地图 Town03 ...")
+            world = client.load_world('Town03')
+        
         world.set_weather(carla.WeatherParameters.ClearNoon)
         map = world.get_map()
         blueprint_library = world.get_blueprint_library()

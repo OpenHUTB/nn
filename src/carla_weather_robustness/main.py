@@ -13,6 +13,7 @@ import numpy as np
 import cv2
 import json
 import logging
+import time
 from sklearn.cluster import DBSCAN
 from config.settings import (
     CARLA_HOST, CARLA_PORT, CARLA_TIMEOUT, CARLA_MAP,
@@ -484,6 +485,10 @@ class WeatherRobustnessSystem:
         label = WEATHER_LABELS.get(weather_name, weather_name)
         iq = fusion["image_quality"]
 
+        # ===== 雨天视觉效果 =====
+        if weather_name in ("light_rain", "heavy_rain", "night_rain"):
+            display = self._add_rain_effect(display, weather_name)
+
         overlay = display.copy()
         cv2.rectangle(overlay, (0, 0), (w, 165), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.6, display, 0.4, 0, display)
@@ -510,6 +515,46 @@ class WeatherRobustnessSystem:
 
         cv2.imshow("Weather Robustness", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
         cv2.waitKey(1)
+
+    def _add_rain_effect(self, frame, weather_name):
+        """添加雨天视觉效果：雨滴条纹 + 模糊"""
+        h, w = frame.shape[:2]
+
+        # 根据雨量强度设置效果强度
+        if weather_name == "light_rain":
+            intensity = 0.3
+            drop_count = 80
+        elif weather_name == "heavy_rain":
+            intensity = 0.6
+            drop_count = 200
+        else:  # night_rain
+            intensity = 0.5
+            drop_count = 150
+
+        # 添加镜头雨滴条纹效果
+        rain_overlay = np.zeros_like(frame)
+        np.random.seed(int(time.time() * 1000) % 1000)  # 随时间变化的随机种子
+
+        for _ in range(drop_count):
+            # 随机位置
+            x = np.random.randint(0, w)
+            y = np.random.randint(0, h)
+            # 雨滴条纹（斜线）
+            length = np.random.randint(5, 20)
+            thickness = np.random.randint(1, 3)
+            # 稍微倾斜的雨滴
+            angle = np.random.uniform(-0.3, 0.3)
+            dx = int(length * angle)
+            cv2.line(rain_overlay, (x, y), (x + dx, y + length), (200, 200, 200), thickness)
+
+        # 添加到画面
+        frame = cv2.addWeighted(frame, 1 - intensity * 0.5, rain_overlay, intensity * 0.5, 0)
+
+        # 轻度模糊模拟雨雾
+        if weather_name in ("heavy_rain", "night_rain"):
+            frame = cv2.GaussianBlur(frame, (5, 5), 0)
+
+        return frame
 
     def run(self):
         try:
