@@ -18,7 +18,7 @@ from config.settings import (
     CARLA_HOST, CARLA_PORT, CARLA_TIMEOUT, CARLA_MAP,
     CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_FOV,
     LIDAR_CHANNELS, LIDAR_RANGE,
-    WEATHER_PROFILES, STEPS_PER_WEATHER,
+    WEATHER_PROFILES, STEPS_PER_WEATHER, WEATHER_TRANSITION_STEPS,
     VISIBILITY_THRESHOLD_LOW, VISIBILITY_THRESHOLD_HIGH,
     LIDAR_CLUSTER_DISTANCE, LIDAR_MIN_CLUSTER_POINTS,
     IMAGE_BRIGHTNESS_LOW, IMAGE_BRIGHTNESS_HIGH,
@@ -290,6 +290,12 @@ class WeatherRobustnessSystem:
         self.pid = PIDController()
         self.road_controller = None  # 道路循迹控制器
         self._spawn_point = None
+        self._current_weather_params = None  # 当前天气参数（用于渐变过渡）
+        self._target_weather_params = None  # 目标天气参数
+        self._transition_step = 0  # 过渡步数计数器
+        self._is_transitioning = False  # 是否正在过渡
+        self._is_stable = True  # 是否处于稳定期
+        self._stable_steps = 0  # 稳定期步数计数
 
     def connect(self):
         self.world = self.client.load_world(CARLA_MAP)
@@ -331,19 +337,79 @@ class WeatherRobustnessSystem:
         self._lidar_data = np.frombuffer(point_cloud.raw_data, dtype=np.float32).reshape(-1, 4)
 
     def apply_weather(self, name):
+        """设置目标天气"""
         profile = WEATHER_PROFILES[name]
-        weather = carla.WeatherParameters()
-        weather.cloudiness = profile["cloudiness"]
-        weather.precipitation = profile["precipitation"]
-        weather.precipitation_deposits = profile["precipitation_deposits"]
-        weather.wind_intensity = profile["wind_intensity"]
-        weather.fog_density = profile["fog_density"]
-        weather.fog_distance = profile["fog_distance"]
-        weather.wetness = profile["wetness"]
-        weather.sun_altitude_angle = profile["sun_altitude_angle"]
-        self.world.set_weather(weather)
+
+        # 初始化当前天气参数
+        if self._current_weather_params is None:
+            self._current_weather_params = self._get_current_weather_params()
+
+        # 设置目标天气参数
+        self._target_weather_params = profile.copy()
+        self._transition_step = 0
+        self._is_transitioning = False  # 先不开始过渡
+        self._is_stable = True  # 进入稳定期
+        self._stable_steps = 0
+
         self.scorer.start_weather(name)
-        logger.info(f"天气已切换: {WEATHER_LABELS.get(name, name)} [{name}]")
+        logger.info(f"天气稳定期开始: {WEATHER_LABELS.get(name, name)} [{name}]，将持续{STEPS_PER_WEATHER - WEATHER_TRANSITION_STEPS}步后渐变过渡")
+
+    def _get_current_weather_params(self):
+        """获取当前天气参数"""
+        wp = self.world.get_weather()
+        return {
+            "cloudiness": wp.cloudiness,
+            "precipitation": wp.precipitation,
+            "precipitation_deposits": wp.precipitation_deposits,
+            "wind_intensity": wp.wind_intensity,
+            "fog_density": wp.fog_density,
+            "fog_distance": wp.fog_distance,
+            "wetness": wp.wetness,
+            "sun_altitude_angle": wp.sun_altitude_angle,
+        }
+
+    def _update_weather_transition(self):
+        """更新天气渐变过渡"""
+        if self._target_weather_params is None:
+            return
+
+        # 稳定期：先稳定WEATHER_TRANSITION_STEPS步后再开始过渡
+        if self._is_stable:
+            self._stable_steps += 1
+            if self._stable_steps >= (STEPS_PER_WEATHER - WEATHER_TRANSITION_STEPS):
+                self._is_stable = False
+                self._is_transitioning = True
+                logger.info(f"稳定期结束，天气渐变开始...")
+            return
+
+        # 渐变过渡
+        if not self._is_transitioning:
+            return
+
+        self._transition_step += 1
+        alpha = min(self._transition_step / WEATHER_TRANSITION_STEPS, 1.0)
+
+        # 线性插值
+        current = self._current_weather_params
+        target = self._target_weather_params
+
+        weather = carla.WeatherParameters()
+        weather.cloudiness = current["cloudiness"] + (target["cloudiness"] - current["cloudiness"]) * alpha
+        weather.precipitation = current["precipitation"] + (target["precipitation"] - current["precipitation"]) * alpha
+        weather.precipitation_deposits = current["precipitation_deposits"] + (target["precipitation_deposits"] - current["precipitation_deposits"]) * alpha
+        weather.wind_intensity = current["wind_intensity"] + (target["wind_intensity"] - current["wind_intensity"]) * alpha
+        weather.fog_density = current["fog_density"] + (target["fog_density"] - current["fog_density"]) * alpha
+        weather.fog_distance = current["fog_distance"] + (target["fog_distance"] - current["fog_distance"]) * alpha
+        weather.wetness = current["wetness"] + (target["wetness"] - current["wetness"]) * alpha
+        weather.sun_altitude_angle = current["sun_altitude_angle"] + (target["sun_altitude_angle"] - current["sun_altitude_angle"]) * alpha
+
+        self.world.set_weather(weather)
+
+        # 过渡完成
+        if self._transition_step >= WEATHER_TRANSITION_STEPS:
+            self._current_weather_params = target.copy()
+            self._is_transitioning = False
+            logger.info(f"天气渐变完成: {self._target_weather_params}")
 
     def get_severity(self):
         wp = self.world.get_weather()
@@ -372,6 +438,10 @@ class WeatherRobustnessSystem:
 
     def run_step(self, weather_name, step):
         self.world.tick()
+
+        # 更新天气渐变过渡
+        self._update_weather_transition()
+
         if self._camera_image is None or self._lidar_data is None:
             return
 
@@ -393,8 +463,14 @@ class WeatherRobustnessSystem:
 
         # 每20步输出一次日志（每种天气约10行）
         if (step + 1) % 20 == 0:
+            if self._is_stable:
+                status_info = f"[稳定期: {self._stable_steps}/{STEPS_PER_WEATHER - WEATHER_TRANSITION_STEPS}]"
+            elif self._is_transitioning:
+                status_info = f"[过渡中: {int(self._transition_step/WEATHER_TRANSITION_STEPS*100)}%]"
+            else:
+                status_info = "[稳定期结束]"
             logger.info(
-                f"[{weather_name}] step={step+1}/{STEPS_PER_WEATHER}, "
+                f"[{weather_name}] step={step+1}/{STEPS_PER_WEATHER} {status_info}, "
                 f"融合={fusion['fusion_mode']}, 图像质量={fusion['image_quality']['overall']:.2f}, "
                 f"速度={speed:.1f}km/h, 转向={steer:.2f}"
             )
@@ -413,7 +489,15 @@ class WeatherRobustnessSystem:
         cv2.addWeighted(overlay, 0.6, display, 0.4, 0, display)
 
         y = 28
-        cv2.putText(display, f"Weather: {label} [{weather_name}]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        # 天气名称 + 状态
+        if self._is_stable:
+            remaining = STEPS_PER_WEATHER - WEATHER_TRANSITION_STEPS - self._stable_steps
+            cv2.putText(display, f"Weather: {label} [{weather_name}] [稳定期-{remaining}步]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+        elif self._is_transitioning:
+            transition_pct = int(self._transition_step / WEATHER_TRANSITION_STEPS * 100)
+            cv2.putText(display, f"Weather: {label} [{weather_name}] -> {transition_pct}%", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 200, 0), 2)
+        else:
+            cv2.putText(display, f"Weather: {label} [{weather_name}]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
         y += 28
         cv2.putText(display, f"Speed: {speed:.1f} km/h  |  Steer: {steer:+.2f}  |  Obstacles: {fusion['num_obstacles']}  |  Nearest: {fusion['nearest_distance']:.1f}m", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         y += 25

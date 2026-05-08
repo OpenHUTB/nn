@@ -2,9 +2,7 @@ import cv2 as cv
 from ultralytics import YOLO
 import numpy as np
 import supervision as sv
-import json
-from datetime import datetime
-import keyboard_handler  # 导入键盘处理模块
+from keyboard_handler import handle_keyboard_events
 
 # ==================== 配置路径 ====================
 import os
@@ -482,7 +480,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
 
         # 键盘事件处理
         key = cv.waitKey(1) & 0xff
-        if not keyboard_handler.handle_keyboard_events(key, frame, frame_count, cap, out, "YOLO11n Vehicle Counter - CARLA"):
+        if not handle_keyboard_events(key, frame, frame_count, cap, out, "YOLO11n Vehicle Counter - CARLA"):
             break
 
     # 释放资源

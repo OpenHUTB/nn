@@ -24,13 +24,13 @@ class AppConfig:
     adaptive_clip_limit: float = 2.5
     adaptive_grid_size: Tuple[int, int] = (8, 8)
     gaussian_kernel: Tuple[int, int] = (5, 5)
-    
+
     # 检测参数
     canny_threshold1: int = 50
     canny_threshold2: int = 150
-    hough_threshold: int = 30
-    hough_min_length: int = 25
-    hough_max_gap: int = 40
+    hough_threshold: int = 40
+    hough_min_length: int = 35
+    hough_max_gap: int = 25
     min_contour_area: float = 0.005
     
     # 方向分析参数
