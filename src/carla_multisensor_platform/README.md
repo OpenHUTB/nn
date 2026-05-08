@@ -218,7 +218,6 @@ INFO:  Found the required file in cache!  Carla/Maps/Nav/Town10HD_Opt.bin
 INFO:  Found the required file in cache!  Carla/Maps/TM/Town10HD.bin
 Initializing sensor: RGBCamera
 
-============================================================
 AUTONOMOUS DRIVING DATA RECORDING SYSTEM
 ============================================================
 Controls:
