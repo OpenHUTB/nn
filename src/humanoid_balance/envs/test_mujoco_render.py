@@ -27,18 +27,18 @@ model_xml = """
             <geom name="torso_geom" type="capsule" fromto="0 -.07 0 0 .07 0" size="0.07" material="mat_torso"/>
             <geom name="head" type="sphere" pos="0 0 0.22" size="0.09" material="mat_skin"/> 
             <body name="l_leg" pos="0 0.1 0">
-                <joint name="l_hip" type="hinge" axis="0 1 0" range="-30 30"/>
+                <joint name="l_hip" type="hinge" axis="1 0 0" range="-30 30"/>
                 <geom name="l_thigh" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.05" material="mat_skin"/>
                 <body name="l_shin" pos="0 0 -0.35">
-                    <joint name="l_knee" type="hinge" axis="0 1 0" range="0 60"/>
+                    <joint name="l_knee" type="hinge" axis="1 0 0" range="0 60"/>
                     <geom name="l_shin_geom" type="capsule" fromto="0 0 0 0 0 -0.3" size="0.04" material="mat_skin"/>
                 </body>
             </body>
             <body name="r_leg" pos="0 -0.1 0">
-                <joint name="r_hip" type="hinge" axis="0 1 0" range="-30 30"/>
+                <joint name="r_hip" type="hinge" axis="1 0 0" range="-30 30"/>
                 <geom name="r_thigh" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.05" material="mat_skin"/>
                 <body name="r_shin" pos="0 0 -0.35">
-                    <joint name="r_knee" type="hinge" axis="0 1 0" range="0 60"/>
+                    <joint name="r_knee" type="hinge" axis="1 0 0" range="0 60"/>
                     <geom name="r_shin_geom" type="capsule" fromto="0 0 0 0 0 -0.3" size="0.04" material="mat_skin"/>
                 </body>
             </body>

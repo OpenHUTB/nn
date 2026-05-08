@@ -13,5 +13,9 @@ matplotlib==3.8.3
 seaborn==0.13.2
 joblib==1.3.2
 
+# deep learning
+torch==2.2.2
+torchvision==0.17.2
+
 # other
 pillow==10.2.0
