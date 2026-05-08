@@ -41,6 +41,10 @@
   "outputs": {
     "route_image": "assets\\astar_route.png",
     "comparison_chart": "assets\\planner_comparison.png",
+    "route_overlay": "assets\\planner_route_overlay.png",
+    "expansion_heatmap": "assets\\astar_expansion_heatmap.png",
+    "robot_trace": "assets\\robot_trace.png",
+    "replanning_timeline": "assets\\replanning_timeline.png",
     "animation": "assets\\dynamic_replanning.gif"
   }
 }

@@ -23,6 +23,12 @@ DYNAMIC = (143, 75, 180)
 ROBOT = (24, 99, 160)
 GRID = (215, 215, 210)
 
+PLANNER_COLORS = {
+    "Dijkstra": "#6c757d",
+    "A*": "#1f77b4",
+    "Greedy best-first": "#d95f02",
+}
+
 
 def ensure_parent(path: str | Path) -> Path:
     output = Path(path)
@@ -70,6 +76,22 @@ def _draw_cell(draw: ImageDraw.ImageDraw, cell: Cell, cell_size: int, color: tup
     draw.rectangle([x0, y0, x1, y1], fill=color)
 
 
+def _cell_centers(path: Iterable[Cell]) -> tuple[list[float], list[float]]:
+    cols = [cell[1] + 0.5 for cell in path]
+    rows = [cell[0] + 0.5 for cell in path]
+    return cols, rows
+
+
+def _draw_map_background(ax, grid_map: GridMap) -> None:
+    ax.imshow(grid_map.occupancy, cmap="Greys", origin="upper", vmin=0, vmax=1, alpha=0.9)
+    ax.set_xticks(np.arange(-0.5, grid_map.width, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, grid_map.height, 1), minor=True)
+    ax.grid(which="minor", color="#d6d6d0", linewidth=0.35)
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    ax.scatter(grid_map.start[1], grid_map.start[0], marker="o", s=90, c="#2a8046", label="start", zorder=5)
+    ax.scatter(grid_map.goal[1], grid_map.goal[0], marker="*", s=160, c="#c63737", label="goal", zorder=5)
+
+
 def save_plan_image(grid_map: GridMap, result: PlanResult, output_path: str | Path) -> Path:
     output = ensure_parent(output_path)
     image = draw_grid(grid_map, path=result.path, expanded=result.expanded)
@@ -99,6 +121,102 @@ def save_comparison_chart(results: list[PlanResult], output_path: str | Path) ->
 
     labels = [bars1, bars2]
     ax1.legend(labels, [bar.get_label() for bar in labels], loc="upper right")
+    fig.tight_layout()
+    fig.savefig(output)
+    plt.close(fig)
+    return output
+
+
+def save_path_overlay(grid_map: GridMap, results: list[PlanResult], output_path: str | Path) -> Path:
+    """Draw all planner paths on the same map for visual comparison."""
+    output = ensure_parent(output_path)
+    fig, ax = plt.subplots(figsize=(9, 6.2), dpi=150)
+    _draw_map_background(ax, grid_map)
+
+    for result in results:
+        if not result.success:
+            continue
+        xs, ys = _cell_centers(result.path)
+        ax.plot(
+            xs,
+            ys,
+            color=PLANNER_COLORS.get(result.planner, "#333333"),
+            linewidth=2.4,
+            label=f"{result.planner} ({result.path_length})",
+            alpha=0.9,
+        )
+
+    ax.set_title("Planner route overlay: shortest path vs fast search")
+    ax.legend(loc="lower right", framealpha=0.95)
+    fig.tight_layout()
+    fig.savefig(output)
+    plt.close(fig)
+    return output
+
+
+def save_expansion_heatmap(grid_map: GridMap, result: PlanResult, output_path: str | Path) -> Path:
+    """Visualize how quickly a planner expands cells before reaching the goal."""
+    output = ensure_parent(output_path)
+    heat = np.full((grid_map.height, grid_map.width), np.nan)
+    for order, cell in enumerate(result.expanded, start=1):
+        heat[cell] = order
+
+    fig, ax = plt.subplots(figsize=(9, 6.2), dpi=150)
+    _draw_map_background(ax, grid_map)
+    masked = np.ma.masked_invalid(heat)
+    im = ax.imshow(masked, cmap="YlOrRd", origin="upper", alpha=0.78)
+    if result.path:
+        xs, ys = _cell_centers(result.path)
+        ax.plot(xs, ys, color="#0f4c81", linewidth=2.4, label="final path")
+    ax.set_title(f"{result.planner} search expansion heatmap")
+    ax.legend(loc="lower right", framealpha=0.95)
+    cbar = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.02)
+    cbar.set_label("Expansion order")
+    fig.tight_layout()
+    fig.savefig(output)
+    plt.close(fig)
+    return output
+
+
+def save_robot_trace(grid_map: GridMap, simulation: SimulationResult, output_path: str | Path) -> Path:
+    """Draw the actually travelled robot trajectory after dynamic replanning."""
+    output = ensure_parent(output_path)
+    trace = [frame.robot for frame in simulation.frames]
+
+    fig, ax = plt.subplots(figsize=(9, 6.2), dpi=150)
+    _draw_map_background(ax, grid_map)
+    if trace:
+        xs, ys = _cell_centers(trace)
+        ax.plot(xs, ys, color="#1b6ca8", linewidth=2.7, label="travelled trace")
+        replan_cells = [frame.robot for frame in simulation.frames if frame.replanned]
+        if replan_cells:
+            rx, ry = _cell_centers(replan_cells)
+            ax.scatter(rx, ry, marker="D", s=75, c="#8f4bb4", label="replan point", zorder=6)
+    ax.set_title("Executed trajectory under moving obstacles")
+    ax.legend(loc="lower right", framealpha=0.95)
+    fig.tight_layout()
+    fig.savefig(output)
+    plt.close(fig)
+    return output
+
+
+def save_replanning_timeline(simulation: SimulationResult, output_path: str | Path) -> Path:
+    """Plot replanning events and distance-to-goal trend over time."""
+    output = ensure_parent(output_path)
+    steps = [frame.step for frame in simulation.frames]
+    goal = simulation.frames[0].goal if simulation.frames else (0, 0)
+    distances = [abs(frame.robot[0] - goal[0]) + abs(frame.robot[1] - goal[1]) for frame in simulation.frames]
+    replan_steps = [frame.step for frame in simulation.frames if frame.replanned]
+
+    fig, ax = plt.subplots(figsize=(8.6, 4.8), dpi=150)
+    ax.plot(steps, distances, color="#1f77b4", linewidth=2.5, label="Manhattan distance to goal")
+    for index, step in enumerate(replan_steps):
+        ax.axvline(step, color="#8f4bb4", linestyle="--", linewidth=1.6, alpha=0.8, label="replan" if index == 0 else None)
+    ax.set_xlabel("Simulation step")
+    ax.set_ylabel("Distance to goal")
+    ax.set_title("Dynamic replanning timeline")
+    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.legend(loc="upper right")
     fig.tight_layout()
     fig.savefig(output)
     plt.close(fig)

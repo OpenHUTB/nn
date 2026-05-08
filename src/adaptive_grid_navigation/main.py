@@ -10,7 +10,15 @@ from pathlib import Path
 from grid_map import make_demo_map, make_random_map
 from planners import default_planners
 from simulator import run_dynamic_replanning
-from visualization import save_animation, save_comparison_chart, save_plan_image
+from visualization import (
+    save_animation,
+    save_comparison_chart,
+    save_expansion_heatmap,
+    save_path_overlay,
+    save_plan_image,
+    save_replanning_timeline,
+    save_robot_trace,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,8 +41,12 @@ def run(output_dir: str | Path = "assets", map_type: str = "demo", seed: int = 7
     best_result = next(result for result in results if result.planner == "A*")
     plan_image = save_plan_image(grid_map, best_result, output_dir / "astar_route.png")
     chart_image = save_comparison_chart(results, output_dir / "planner_comparison.png")
+    overlay_image = save_path_overlay(grid_map, results, output_dir / "planner_route_overlay.png")
+    heatmap_image = save_expansion_heatmap(grid_map, best_result, output_dir / "astar_expansion_heatmap.png")
 
     simulation = run_dynamic_replanning(grid_map, max_steps=max_steps)
+    trace_image = save_robot_trace(grid_map, simulation, output_dir / "robot_trace.png")
+    timeline_image = save_replanning_timeline(simulation, output_dir / "replanning_timeline.png")
     gif_path = save_animation(grid_map, simulation, output_dir / "dynamic_replanning.gif")
 
     metrics = {
@@ -60,6 +72,10 @@ def run(output_dir: str | Path = "assets", map_type: str = "demo", seed: int = 7
         "outputs": {
             "route_image": str(plan_image),
             "comparison_chart": str(chart_image),
+            "route_overlay": str(overlay_image),
+            "expansion_heatmap": str(heatmap_image),
+            "robot_trace": str(trace_image),
+            "replanning_timeline": str(timeline_image),
             "animation": str(gif_path),
         },
     }
@@ -93,6 +109,9 @@ def print_summary(metrics: dict) -> None:
         f"reached_goal={dynamic['reached_goal']} replans={dynamic['replans']} "
         f"travelled={dynamic['travelled']} frames={dynamic['frames']}"
     )
+    print("Generated outputs:")
+    for name, path in metrics["outputs"].items():
+        print(f"- {name}: {path}")
 
 
 def main() -> None:
