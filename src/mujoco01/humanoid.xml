@@ -104,14 +104,16 @@
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <light name="top" pos="0 0 2" mode="trackcom"/>
     <body name="torso" pos="0 0 1.282" childclass="body">
-      <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
-      <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
+      <site name="torso_site" pos="0 0 0" size="0.01"/> <!-- 传感器用 -->
+      <!-- ✅ 已调整相机视角，更远、更清晰 -->
+      <camera name="back" pos="-5 0 1.5" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
+      <camera name="side" pos="0 -5 1.8" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
       <freejoint name="root"/>
       <geom name="torso" fromto="0 -.07 0 0 .07 0" size=".07"/>
       <geom name="waist_upper" fromto="-.01 -.06 -.12 -.01 .06 -.12" size=".06"/>
       <body name="head" pos="0 0 .19">
         <geom name="head" type="sphere" size=".09"/>
-        <camera name="egocentric" pos=".09 0 0" xyaxes="0 -1 0 .1 0 1" fovy="80"/>
+        <camera name="egocentric" pos=".12 0 0" xyaxes="0 -1 0 .1 0 1" fovy="80"/>
       </body>
       <body name="waist_lower" pos="-.01 0 -.26">
         <geom name="waist_lower" fromto="0 -.06 0 0 .06 0" size=".06"/>
@@ -133,6 +135,7 @@
                 <joint name="ankle_x_right" class="ankle_x" axis="1 0 .5"/>
                 <geom name="foot1_right" class="foot1"/>
                 <geom name="foot2_right" class="foot2"/>
+                <site name="foot_site" pos="0 0 0" size="0.01"/>
               </body>
             </body>
           </body>
@@ -169,7 +172,7 @@
 
             <!-- 新增：机器人手持刚体部件 -->
             <body name="hold_obj" pos="0.05 0 0">
-              <geom type="box" size="0.05 0.05 0.05" rgba="1 0 0 1"/>
+              <geom type="box" size="0.05 0.05 0.05" rgba="1 0 1 1"/>
             </body>
 
           </body>
@@ -233,13 +236,20 @@
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
   </actuator>
 
+  <!-- ✅ 正确传感器写法 -->
+  <sensor>
+    <accelerometer name="torso_acc" site="torso_site"/>
+    <velocimeter name="torso_vel" site="torso_site"/>
+    <force name="foot_force" site="foot_site"/>
+  </sensor>
+
   <keyframe>
-    <key name="squat"
-        qpos="0 0 0.596
-              0.988015 0 0.154359 0
-              0 0.4 0
-              -0.25 -0.5 -2.5 -2.65 -0.8 0.56
-              -0.25 -0.5 -2.5 -2.65 -0.8 0.56
+    <key name="home"
+        qpos="0 0 1.282
+              1 0 0 0
+              0 0 0
+              0 0 0 0 0 0
+              0 0 0 0 0 0
               0 0 0 0 0 0"/>
   </keyframe>
 </mujoco>

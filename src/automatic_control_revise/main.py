@@ -109,6 +109,7 @@ class World(object):
         self._weather_index = 0
         self._actor_filter = args.filter
         self._gamma = args.gamma
+        self.agent = None
         self.restart(args)
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False
@@ -202,6 +203,7 @@ class KeyboardControl(object):
     def __init__(self, world):
         self.world = world
         self.manual_mode = False
+        self.reroute_requested = False
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self):
@@ -213,6 +215,9 @@ class KeyboardControl(object):
                     self.manual_mode = not self.manual_mode
                     mode_str = "Manual" if self.manual_mode else "Auto"
                     self.world.hud.notification("Switched to {} mode".format(mode_str), seconds=2.0)
+                if event.key == pygame.K_r:      # 新增
+                    self.reroute_requested = True
+                    self.world.hud.notification("Reroute requested", seconds=1.5)
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
@@ -247,6 +252,7 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
+        self.last_waypoint = None
 
     def on_world_tick(self, timestamp):
         """Gets informations from the world at every tick"""
@@ -286,6 +292,7 @@ class HUD(object):
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % transform.location.z,
+            'Speed limit: % 10.0f km/h' % world.player.get_speed_limit(),
             '']
         if isinstance(control, carla.VehicleControl):
             self._info_text += [
@@ -320,6 +327,39 @@ class HUD(object):
                 break
             vehicle_type = get_actor_display_name(vehicle, truncate=22)
             self._info_text.append('% 4dm %s' % (dist, vehicle_type))
+
+        # 新增：显示下一个路径点的距离，并在到达新路径点时提示
+        if hasattr(world, 'agent') and world.agent is not None:
+            try:
+                # 尝试获取局部规划器
+                if hasattr(world.agent, '_local_planner'):
+                    planner = world.agent._local_planner
+                elif hasattr(world.agent, 'get_local_planner'):
+                    planner = world.agent.get_local_planner()
+                else:
+                    planner = None
+
+                if planner is not None and hasattr(planner, 'waypoints_queue') and len(planner.waypoints_queue) > 0:
+                    next_wp = planner.waypoints_queue[0][0]
+                    dist = next_wp.transform.location.distance(world.player.get_location())
+                    self._info_text.append('Next WP: % 5.1f m' % dist)
+
+                    # 到达路径点检测：与上一次记录的路径点位置比较
+                    current_wp_loc = next_wp.transform.location
+                    if self.last_waypoint is None:
+                        self.last_waypoint = current_wp_loc
+                    else:
+                        # 如果当前路径点与上次记录的距离大于 1 米（说明切换到了新路径点）
+                        if self.last_waypoint.distance(current_wp_loc) > 1.0:
+                            # 发送通知（底部淡入淡出文字）
+                            world.hud.notification("Waypoint reached", seconds=1.5)
+                            self.last_waypoint = current_wp_loc
+                else:
+                    # 队列为空时重置记录
+                    self.last_waypoint = None
+            except Exception as e:
+                # 仅调试用，运行正常后可注释或删除
+                print("Next WP error:", e)
 
     def toggle_info(self):
         """Toggle info on or off"""
@@ -695,17 +735,20 @@ def game_loop(args):
 
         if args.agent == "Roaming":
             agent = RoamingAgent(world.player)
+            world.agent = agent
         elif args.agent == "Basic":
             agent = BasicAgent(world.player)
+            world.agent = agent
             spawn_point = world.map.get_spawn_points()[0]
             agent.set_destination((spawn_point.location.x,
                                    spawn_point.location.y,
                                    spawn_point.location.z))
         else:
             agent = BehaviorAgent(world.player, behavior=args.behavior)
-
+            world.agent = agent
             spawn_points = world.map.get_spawn_points()
             random.shuffle(spawn_points)
+            world.spawn_points = spawn_points
 
             if spawn_points[0].location != agent.vehicle.get_location():
                 destination = spawn_points[0].location
@@ -749,6 +792,17 @@ def game_loop(args):
 
                 world.player.apply_control(control)
             else:
+                # 重规划请求处理
+                if controller.reroute_requested:
+                    controller.reroute_requested = False
+                    if hasattr(world, 'spawn_points') and world.spawn_points:
+                        agent.reroute(world.spawn_points)
+                        world.hud.notification("Rerouting...", seconds=1.5)
+                    else:
+                        temp_spawn = world.map.get_spawn_points()
+                        if temp_spawn:
+                            agent.reroute(temp_spawn)
+                            world.hud.notification("Rerouting...", seconds=1.5)
                 agent.update_information()
 
                 world.tick(clock)
@@ -774,6 +828,7 @@ def game_loop(args):
                     # 手动控制：读取键盘输入生成 control
                     keys = pygame.key.get_pressed()
                     control = carla.VehicleControl()
+
                     control.throttle = 1.0 if (keys[pygame.K_UP] or keys[pygame.K_w]) else 0.0
                     control.brake = 1.0 if (keys[pygame.K_DOWN] or keys[pygame.K_s]) else 0.0
                     # 转向：左负右正，范围 -1.0 到 1.0
@@ -788,14 +843,23 @@ def game_loop(args):
                     control.manual_gear_shift = False
                 else:
                     control = agent.run_step()
-                    # 限速功能（新增）
-                    if args.max_speed > 0:
-                        vel = world.player.get_velocity()
-                        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-                        if current_speed > args.max_speed:
-                            control.throttle = 0.0
-                            overshoot = (current_speed - args.max_speed) / args.max_speed
-                            control.brake = min(1.0, overshoot)
+                    # ✅ 第四次修改：速度闭环控制（P控制）
+                    vel = world.player.get_velocity()
+                    current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+
+                    target_speed = args.max_speed
+                    error = target_speed - current_speed
+
+                    Kp = 0.05
+                    base_throttle = 0.25
+
+                    if error >= 0:
+                        throttle = base_throttle + Kp * error
+                        control.throttle = max(0.0, min(throttle, 1.0))
+                        control.brake = 0.0
+                    else:
+                        control.throttle = 0.0
+                        control.brake = max(0.0, min(-Kp * error, 1.0))
 
                 world.player.apply_control(control)
 

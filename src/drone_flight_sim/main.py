@@ -159,6 +159,10 @@ def keyboard_control_mode(drone):
     # 创建键盘控制器
     keyboard_controller = KeyboardController(drone)
 
+    # 设置返航点（起飞位置）
+    keyboard_controller.home_position = drone.get_position()
+    print(f"🏠 返航点已设置: ({keyboard_controller.home_position.x_val:.1f}, {keyboard_controller.home_position.y_val:.1f}, {-keyboard_controller.home_position.z_val:.1f}m)")
+
     # 启动键盘监听
     print("🕹️ 键盘控制已启动，开始控制无人机吧！")
     print("📌 按 ESC 或 L 键退出键盘控制模式\n")

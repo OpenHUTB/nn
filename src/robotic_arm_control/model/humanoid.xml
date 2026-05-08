@@ -9,7 +9,7 @@
 
   <worldbody>
     <light pos="0 0 4"/>
-    <camera name="cam" pos="0 -4 2"/>
+    <camera name="cam" pos="0 -3.5 1.2" xyaxes="1 0 0 0 0.6 1"/>
     <geom name="ground" type="plane" size="4 4 0.1" material="floor" friction="2.5 1 1"/>
 
     <body name="body" pos="0 0 1.0">
@@ -21,44 +21,44 @@
       </body>
 
       <body pos="-0.15 0 0.1">
-        <joint name="l_shoulder" type="hinge" axis="0 1 0" range="-1.2 1.2" damping="2"/>
+        <joint name="l_shoulder" type="hinge" axis="0 1 0" range="-1.2 1.2" damping="2" ref="0"/>
         <geom type="capsule" fromto="0 0 0 -0.22 0 0" size="0.05 0.05" mass="1" material="body"/>
         <body pos="-0.22 0 0">
-          <joint name="l_elbow" type="hinge" axis="0 1 0" range="0 1.6" damping="1.5"/>
+          <joint name="l_elbow" type="hinge" axis="0 1 0" range="0 1.6" damping="1.5" ref="0"/>
           <geom type="capsule" fromto="0 0 0 -0.2 0 0" size="0.04 0.04" mass="0.8" material="body"/>
         </body>
       </body>
 
       <body pos="0.15 0 0.1">
-        <joint name="r_shoulder" type="hinge" axis="0 1 0" range="-1.2 1.2" damping="2"/>
+        <joint name="r_shoulder" type="hinge" axis="0 1 0" range="-1.2 1.2" damping="2" ref="0"/>
         <geom type="capsule" fromto="0 0 0 0.22 0 0" size="0.05 0.05" mass="1" material="body"/>
         <body pos="0.22 0 0">
-          <joint name="r_elbow" type="hinge" axis="0 1 0" range="0 1.6" damping="1.5"/>
+          <joint name="r_elbow" type="hinge" axis="0 1 0" range="0 1.6" damping="1.5" ref="0"/>
           <geom type="capsule" fromto="0 0 0 0.2 0 0" size="0.04 0.04" mass="0.8" material="body"/>
         </body>
       </body>
 
       <body pos="-0.1 0 -0.2">
-        <joint name="l_hip" type="hinge" axis="0 1 0" range="-0.8 0.8" damping="3"/>
+        <joint name="l_hip" type="hinge" axis="0 1 0" range="-0.8 0.8" damping="3" ref="0"/>
         <geom type="capsule" fromto="0 0 0 0 0 -0.28" size="0.07 0.07" mass="2.2" material="body"/>
         <body pos="0 0 -0.28">
-          <joint name="l_knee" type="hinge" axis="0 1 0" range="0 1.2" damping="3.5"/>
+          <joint name="l_knee" type="hinge" axis="0 1 0" range="0 1.2" damping="3.5" ref="0"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.26" size="0.06 0.06" mass="2" material="body"/>
           <body pos="0 0 -0.26">
-            <joint name="l_ankle" type="hinge" axis="0 1 0" range="-0.6 0.6" damping="2.5"/>
+            <joint name="l_ankle" type="hinge" axis="0 1 0" range="-0.6 0.6" damping="2.5" ref="0"/>
             <geom type="box" size="0.1 0.07 0.03" mass="0.6" friction="3" material="body"/>
           </body>
         </body>
       </body>
 
       <body pos="0.1 0 -0.2">
-        <joint name="r_hip" type="hinge" axis="0 1 0" range="-0.8 0.8" damping="3"/>
+        <joint name="r_hip" type="hinge" axis="0 1 0" range="-0.8 0.8" damping="3" ref="0"/>
         <geom type="capsule" fromto="0 0 0 0 0 -0.28" size="0.07 0.07" mass="2.2" material="body"/>
         <body pos="0 0 -0.28">
-          <joint name="r_knee" type="hinge" axis="0 1 0" range="0 1.2" damping="3.5"/>
+          <joint name="r_knee" type="hinge" axis="0 1 0" range="0 1.2" damping="3.5" ref="0"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.26" size="0.06 0.06" mass="2" material="body"/>
           <body pos="0 0 -0.26">
-            <joint name="r_ankle" type="hinge" axis="0 1 0" range="-0.6 0.6" damping="2.5"/>
+            <joint name="r_ankle" type="hinge" axis="0 1 0" range="-0.6 0.6" damping="2.5" ref="0"/>
             <geom type="box" size="0.1 0.07 0.03" mass="0.6" friction="3" material="body"/>
           </body>
         </body>
