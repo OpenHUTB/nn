@@ -11,6 +11,15 @@ _left_finger_name = "left_finger"
 _grasp_target_num = 6
 
 class GraspRobot(MujocoPhyEnv):
+    def __init__(self, model_path="worlds/grasp.xml", frame_skip=40, render_mode=None):
+        self.fullpath = model_path
+        super().__init__(model_path, frame_skip=frame_skip)
+        self.render_mode = render_mode
+        self.IMAGE_WIDTH, self.IMAGE_HEIGHT = 64, 64
+        self._set_observation_space()
+        self._set_action_space()
+        self.tolerance = 0.005
+        self.drop_area = [0.6, 0.0, 1.15]
     def __init__(self, model_path="worlds/grasp.xml", frame_skip=50, render_mode=None):
         self.fullpath = model_path
         super().__init__(model_path, frame_skip=frame_skip)
@@ -41,12 +50,44 @@ class GraspRobot(MujocoPhyEnv):
         self.grasp_step = 0
 
     def _sanitize_physics_data(self):
+        for attr in ['qpos', 'qvel', 'ctrl', 'qacc']:
+            arr = getattr(self.physics.data, attr)
+            setattr(self.physics.data, attr, np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0))
         for attr in ['qpos','qvel','ctrl','qacc']:
             setattr(self.physics.data, attr, np.nan_to_num(getattr(self.physics.data, attr), nan=0.0, posinf=0.0, neginf=0.0))
 
     def get_ee_pos(self):
         return self.physics.bind(self.eef_site).xpos.copy()
 
+    def get_body_com(self, body_name):
+        body_id = self.physics.model.name2id(body_name, 'body')
+        return self.physics.data.xpos[body_id].copy()
+
+    def set_body_pos(self, body_name, pos):
+        body_id = self.physics.model.name2id(body_name, 'body')
+        self.physics.model.body_pos[body_id] = pos
+
+    def world2pixel(self, cam_id, x, y, z):
+        fx = fy = 500
+        cx = self.IMAGE_WIDTH / 2
+        cy = self.IMAGE_HEIGHT / 2
+        px = int((x * fx / z) + cx)
+        py = int((y * fy / z) + cy)
+        return px, py
+
+    def pixel2world(self, cam_id, px, py, depth):
+        x = (px / self.IMAGE_WIDTH - 0.5) * 0.48
+        y = (py / self.IMAGE_HEIGHT - 0.5) * 0.48
+        z = depth
+        return np.array([x, y, z], dtype=np.float32)
+
+    def _set_action_space(self):
+        self.action_space = spaces.Box(low=-0.25, high=0.25, shape=[3], dtype=np.float32)
+
+    def _set_observation_space(self):
+        self.observation = defaultdict()
+        self.observation["rgb"] = np.zeros((self.IMAGE_WIDTH, self.IMAGE_HEIGHT, 3), dtype=np.float32)
+        self.observation["depth"] = np.zeros((self.IMAGE_WIDTH, self.IMAGE_HEIGHT), dtype=np.float32)
     def _set_action_space(self):
         self.action_space = spaces.Box(low=-0.25, high=0.25, shape=[3], dtype=np.float32)
 
@@ -58,6 +99,7 @@ class GraspRobot(MujocoPhyEnv):
     def move_eef(self, target):
         if hasattr(target, "tolist"):
             target = target.tolist()
+        target_pose = target + [0, 0, 1, 1]
         target_pose = target + [0,0,1,1] 
         current_frame_skip = self.frame_skip if np.linalg.norm(np.array(self.get_ee_pos()) - np.array(target)) > 0.1 else 20
         for _ in range(current_frame_skip):
@@ -68,6 +110,10 @@ class GraspRobot(MujocoPhyEnv):
                 return True
         return False
 
+
+    def down_and_grasp(self, target):
+        down_pose = target.copy()
+        down_pose[2] -= 0.04
     def down_and_grasp(self, target):
         down_pose = target.copy()
         down_pose[2] -= 0.05
@@ -80,6 +126,7 @@ class GraspRobot(MujocoPhyEnv):
 
     def move_up_drop(self):
         up_pose = list(self.get_ee_pos())
+        up_pose[2] += 0.12
         up_pose[2] += 0.1
         drop_pose = self.drop_area + [0,0,1,1]
         self.move_eef(up_pose)
@@ -93,6 +140,10 @@ class GraspRobot(MujocoPhyEnv):
         return grasp_success
 
     def check_grasp_success(self):
+        right = self.get_body_com(_right_finger_name)
+        left = self.get_body_com(_left_finger_name)
+        dist = np.linalg.norm(right - left)
+        return dist < 0.16
         dist = np.linalg.norm(self.get_body_com(_right_finger_name) - self.get_body_com(_left_finger_name))
         return dist < 0.12
 
@@ -114,6 +165,23 @@ class GraspRobot(MujocoPhyEnv):
         moved = self.move_eef(action)
         grasped = self.down_and_grasp(action) if moved else False
         success = self.move_up_drop() if grasped else False
+
+        ee_pos = self.get_ee_pos()
+        obj_pos = self.get_body_com(self.target_objects[0])
+        dist = np.linalg.norm(ee_pos - obj_pos)
+        reward = 0.5 - dist * 2.0
+
+        if success:
+            reward += 15.0
+            self.info["grasp"] = "Success"
+        else:
+            self.info["grasp"] = "Failed"
+
+        if not moved:
+            reward -= 0.2
+
+        self.grasp_step += 1
+        done = self.grasped_num == _grasp_target_num or self.grasp_step >= 18
 
         dist = np.linalg.norm(self.get_ee_pos() - self.get_body_com(self.target_objects[0]))
         reward = 1.0 - np.tanh(3 * dist)

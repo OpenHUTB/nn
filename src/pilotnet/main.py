@@ -72,6 +72,174 @@ class Menu():
                 logger.error(f'Failed to connect to CARLA server: {e}')
                 raise PilotError('Connection to CARLA simulator failed. Check your CARLA installation, confirm simulator is running on port 2000.\nIf in WSL, refer to the troubleshooting guide for tips.')
 
+        # Map selection
+        available_maps = [
+            'Town01',
+            'Town02',
+            'Town03',
+            'Town04',
+            'Town05',
+            'Town06',
+            'Town07',
+            'Town10HD'
+        ]
+        
+        message('\nChoose a map for data collection:')
+        for i, map_name in enumerate(available_maps, 1):
+            message(f'{i}. {map_name}')
+        
+        map_choice = int(input('Enter your choice (1-8, default 1) >> ') or 1)
+        selected_map = available_maps[map_choice - 1]
+        logger.info(f'Selected map: {selected_map}')
+        
+        # Load the selected map
+        message(f'Loading map: {selected_map}...')
+        # Increase timeout for map loading (maps can take time to load)
+        client.set_timeout(30.0)  # 30 seconds timeout for map loading
+        max_retries = 3
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                world = client.load_world(selected_map)
+                message(f'Map {selected_map} loaded successfully')
+                logger.info(f'Map {selected_map} loaded successfully')
+                break
+            except RuntimeError as e:
+                retry_count += 1
+                if retry_count < max_retries:
+                    warn(f'Map loading timed out, retrying ({retry_count}/{max_retries})...')
+                    logger.warning(f'Map loading timed out, retrying ({retry_count}/{max_retries})')
+                else:
+                    logger.error(f'Failed to load map {selected_map} after {max_retries} attempts')
+                    raise PilotError(f'Failed to load map {selected_map}. Please ensure CARLA simulator is running and try again.')
+
+        # Weather selection
+        available_weather = [
+            ('ClearNoon', '晴朗正午'),
+            ('CloudyNoon', '多云正午'),
+            ('WetNoon', '雨天正午'),
+            ('WetCloudyNoon', '阴雨正午'),
+            ('MidRainyNoon', '中雨正午'),
+            ('HardRainNoon', '大雨正午'),
+            ('SoftRainNoon', '小雨正午'),
+            ('ClearSunset', '晴朗日落'),
+            ('CloudySunset', '多云日落'),
+            ('WetSunset', '雨天日落'),
+            ('WetCloudySunset', '阴雨日落'),
+            ('MidRainSunset', '中雨日落'),
+            ('HardRainSunset', '大雨日落'),
+            ('SoftRainSunset', '小雨日落'),
+            ('ClearNight', '晴朗夜晚'),
+            ('CloudyNight', '多云夜晚'),
+            ('WetNight', '雨天夜晚'),
+            ('WetCloudyNight', '阴雨夜晚'),
+            ('MidRainNight', '中雨夜晚'),
+            ('HardRainNight', '大雨夜晚'),
+            ('SoftRainNight', '小雨夜晚')
+        ]
+        
+        message('\nChoose weather condition:')
+        for i, (weather_id, weather_name) in enumerate(available_weather, 1):
+            message(f'{i}. {weather_name} ({weather_id})')
+        
+        weather_choice = int(input('Enter your choice (1-21, default 1) >> ') or 1)
+        selected_weather_id = available_weather[weather_choice - 1][0]
+        selected_weather_name = available_weather[weather_choice - 1][1]
+        logger.info(f'Selected weather: {selected_weather_id}')
+        
+        # Set weather using WeatherParameters constructor
+        weather_params = {
+            'ClearNoon': carla.WeatherParameters(
+                cloudiness=0.0, precipitation=0.0, precipitation_deposits=0.0,
+                wind_intensity=0.0, sun_altitude_angle=90.0
+            ),
+            'CloudyNoon': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=0.0, precipitation_deposits=0.0,
+                wind_intensity=20.0, sun_altitude_angle=90.0
+            ),
+            'WetNoon': carla.WeatherParameters(
+                cloudiness=30.0, precipitation=50.0, precipitation_deposits=30.0,
+                wind_intensity=30.0, sun_altitude_angle=90.0
+            ),
+            'WetCloudyNoon': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=60.0, precipitation_deposits=40.0,
+                wind_intensity=40.0, sun_altitude_angle=90.0
+            ),
+            'MidRainyNoon': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=80.0, precipitation_deposits=60.0,
+                wind_intensity=50.0, sun_altitude_angle=90.0
+            ),
+            'HardRainNoon': carla.WeatherParameters(
+                cloudiness=100.0, precipitation=100.0, precipitation_deposits=80.0,
+                wind_intensity=70.0, sun_altitude_angle=90.0
+            ),
+            'SoftRainNoon': carla.WeatherParameters(
+                cloudiness=60.0, precipitation=30.0, precipitation_deposits=20.0,
+                wind_intensity=20.0, sun_altitude_angle=90.0
+            ),
+            'ClearSunset': carla.WeatherParameters(
+                cloudiness=0.0, precipitation=0.0, precipitation_deposits=0.0,
+                wind_intensity=0.0, sun_altitude_angle=20.0
+            ),
+            'CloudySunset': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=0.0, precipitation_deposits=0.0,
+                wind_intensity=20.0, sun_altitude_angle=20.0
+            ),
+            'WetSunset': carla.WeatherParameters(
+                cloudiness=30.0, precipitation=50.0, precipitation_deposits=30.0,
+                wind_intensity=30.0, sun_altitude_angle=20.0
+            ),
+            'WetCloudySunset': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=60.0, precipitation_deposits=40.0,
+                wind_intensity=40.0, sun_altitude_angle=20.0
+            ),
+            'MidRainSunset': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=80.0, precipitation_deposits=60.0,
+                wind_intensity=50.0, sun_altitude_angle=20.0
+            ),
+            'HardRainSunset': carla.WeatherParameters(
+                cloudiness=100.0, precipitation=100.0, precipitation_deposits=80.0,
+                wind_intensity=70.0, sun_altitude_angle=20.0
+            ),
+            'SoftRainSunset': carla.WeatherParameters(
+                cloudiness=60.0, precipitation=30.0, precipitation_deposits=20.0,
+                wind_intensity=20.0, sun_altitude_angle=20.0
+            ),
+            'ClearNight': carla.WeatherParameters(
+                cloudiness=0.0, precipitation=0.0, precipitation_deposits=0.0,
+                wind_intensity=0.0, sun_altitude_angle=-90.0
+            ),
+            'CloudyNight': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=0.0, precipitation_deposits=0.0,
+                wind_intensity=20.0, sun_altitude_angle=-90.0
+            ),
+            'WetNight': carla.WeatherParameters(
+                cloudiness=30.0, precipitation=50.0, precipitation_deposits=30.0,
+                wind_intensity=30.0, sun_altitude_angle=-90.0
+            ),
+            'WetCloudyNight': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=60.0, precipitation_deposits=40.0,
+                wind_intensity=40.0, sun_altitude_angle=-90.0
+            ),
+            'MidRainNight': carla.WeatherParameters(
+                cloudiness=80.0, precipitation=80.0, precipitation_deposits=60.0,
+                wind_intensity=50.0, sun_altitude_angle=-90.0
+            ),
+            'HardRainNight': carla.WeatherParameters(
+                cloudiness=100.0, precipitation=100.0, precipitation_deposits=80.0,
+                wind_intensity=70.0, sun_altitude_angle=-90.0
+            ),
+            'SoftRainNight': carla.WeatherParameters(
+                cloudiness=60.0, precipitation=30.0, precipitation_deposits=20.0,
+                wind_intensity=20.0, sun_altitude_angle=-90.0
+            )
+        }
+        
+        weather = weather_params.get(selected_weather_id, weather_params['ClearNoon'])
+        world.set_weather(weather)
+        message(f'Weather set to: {selected_weather_name}')
+        logger.info(f'Weather set to: {selected_weather_id}')
+
         time = int(input('Enter the time you need the generator to run for (in minutes) >> '))
         logger.info(f'Data generation time: {time} minutes')
 

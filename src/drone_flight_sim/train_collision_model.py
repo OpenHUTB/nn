@@ -216,7 +216,7 @@ def train_model():
             optimizer.step()
 
             train_loss += loss.item()
-            predicted = (torch.sigmoid(outputs) > 0.5).float()
+            predicted = (outputs > 0.5).float()
             train_correct += (predicted == labels).sum().item()
             train_total += labels.size(0)
 
@@ -235,7 +235,7 @@ def train_model():
                 loss = criterion(outputs, labels)
 
                 test_loss += loss.item()
-                predicted = (torch.sigmoid(outputs) > 0.5).float()
+                predicted = (outputs > 0.5).float()
                 test_correct += (predicted == labels).sum().item()
                 test_total += labels.size(0)
 
@@ -294,8 +294,8 @@ def evaluate_model():
         for images, labels in test_loader:
             images = images.to(device)
             outputs = model(images).squeeze()
-            # 使用较低阈值，更容易检测危险样本
-            predicted = (torch.sigmoid(outputs) > 0.3).float().cpu().numpy()
+            # 使用 sigmoid 将 logits 转为概率，再用阈值判断
+            predicted = (torch.sigmoid(outputs) > 0.5).float().cpu().numpy()
             all_preds.extend(predicted)
             all_labels.extend(labels.numpy())
 
