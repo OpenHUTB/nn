@@ -1,60 +1,54 @@
-<h1 align='center'>Autonomous Vehicle(AV) Self Driving System</h1>
+# Robotix AI Suite
 
-<div align='center'>
+利用神经网络/ROS 实现 Carla（车辆、行人的感知、规划、控制）、AirSim、Mujoco 中人和载具的代理。
 
-![Nix Flake Check](https://github.com/DivitMittal/CARLA-Autonomous-Driving/actions/workflows/flake-check.yml/badge.svg)
-![Nix Flake Lock Update](https://github.com/DivitMittal/CARLA-Autonomous-Driving/actions/workflows/flake-lock-update.yml/badge.svg)
+## 环境配置
 
-</div>
+* 平台：Windows 10/11，Ubuntu 20.04/22.04
+* 软件：Python 3.7-3.12（需支持3.7）、Pytorch（尽量不使用Tensorflow）
+* 相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
 
-<div align='center'>
-    <img src='./assets/simulation_preview.png' alt='Preview of the autonomous-driving simulation' title='Simulation'/>
-</div>
+## 功能模块表
+| 模块类别                | 模块名 | 链接                                                                            | 其他                                                                  |
+|-------------------|------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| 感知             | 车辆检测以及跟踪 | [Yolov4_Vehicle_inspection](https://github.com/OpenHUTB/nn/tree/main/src/Yolov4_Vehicle_inspection)                                                                          | -                                          |
+| 规划             | 车辆全局路径规划 | [carla_slam_gmapping](https://github.com/OpenHUTB/nn/tree/main/src/carla_slam_gmapping)                                                                          | -                                          |
+| 控制             | 手势控制无人机 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | -                                          |
+| 控制             | 倒车入库 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | [效果](https://github.com/OpenHUTB/nn/pull/4399)                                          |
 
----
 
-- **Enhance Perception Systems**: Utilize deep learning techniques for semantic segmentation to improve the vehicle's understanding of its surroundings.
-- **Integrate Multi-Modal Sensors**: Combine data from RGBA cameras and LiDAR sensors to achieve comprehensive environmental awareness.
-- **Facilitate Research and Development**: Provide a modular and extensible codebase that supports the development of novel autonomous driving algorithms.
-- **Ensure Realism and Accuracy**: Leverage the high-fidelity simulation capabilities of CARLA to mimic real-world driving conditions and challenges.
+## 贡献指南
 
-## Features
+准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
+代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/zh/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
 
-- **Realistic Simulation**: Leverage the high-fidelity CARLA simulator to create diverse driving scenarios.
-- **Autonomous Driving Algorithms**: Implemented state-of-the-art algorithms for perception, planning, and control.
-- **Sensor Integration**: Support for various sensors including cameras, LiDAR, radar, and GPS.
-- **Modular Architecture**: Easily extend and customize components to fit your research or development needs.
-- **Data Collection**: Tools for collecting and analyzing simulation data for training and evaluation.
-- **Visualization**: Real-time visualization of vehicle dynamics, sensor data, and decision-making processes.
+### 约定
 
-## Deep Learning for Semantic Segmentation
+* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
+* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
+* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
+* 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
 
-This project leverages advanced deep learning methodologies to perform semantic segmentation, enhancing the vehicle's perception capabilities by accurately identifying and classifying various elements within the driving environment. The integration of RGBA sensor data and LiDAR ensures a robust and precise understanding of the surroundings.
 
-### Core Components:
+### 文档生成
 
-- **RGBA Sensors**: Capture rich color and texture information, aiding in the distinction of objects, lane markings, and environmental features.
-- **LiDAR Integration**: Provides detailed depth and distance information, complementing RGBA data to achieve a comprehensive 3D perception of the environment.
-- **Neural Network Architecture**: Utilizes CNNs tailored for real-time semantic segmentation, ensuring efficient and accurate processing of sensor data.
-- **Training Pipeline**: Includes scripts and tools for training models on simulated data, allowing for extensive experimentation and optimization.
-- **Evaluation Metrics**: Implements robust evaluation frameworks to assess the performance and reliability of the semantic segmentation models under various scenarios.
+测试生成的文档：
+1. 安装python 3.11，并使用以下命令安装`mkdocs`和相关依赖：
+```shell
+pip install mkdocs -i http://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
+pip install -r requirements.txt
+```
+（可选）安装完成后使用`mkdocs --version`查看是否安装成功。
 
-### Benefits:
+2. 在命令行中进入`nn`目录下，运行：
+```shell
+mkdocs build
+mkdocs serve
+```
+然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
 
-- **Enhanced Accuracy**: Combining RGBA and LiDAR data improves the precision of object detection and classification.
-- **Real-Time Processing**: Optimized neural network architectures ensure that semantic segmentation can be performed in real-time, essential for autonomous driving applications.
-- **Scalability**: The modular design allows for easy integration of additional sensors or alternative deep learning models as needed.
+## 参考
 
-### Technologies/Software/Non-Standard libraries used:
-
-| Technology | Application                            |
-| ---------- | -------------------------------------- |
-| CARLA      | Vehicle Simulator                      |
-| OpenCV     | For data visualization from RGB Camera |
-| Keras      | For deep-learning CNN model            |
-| Tensorflow | Optimizing the model weights           |
-| Pygame     | Manual Control                         |
-
----
-
-### TL;DR [Video Presentation](https://drive.google.com/drive/folders/1te0HDyyQaOI47RANxhuFZEUii8KMuGsd?usp=share_link)
+* [代理模拟器文档](https://openhutb.github.io)
+* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
+* [神经网络原理](https://github.com/OpenHUTB/neuro)
