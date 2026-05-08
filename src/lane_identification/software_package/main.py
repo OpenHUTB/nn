@@ -198,25 +198,25 @@ class LaneDetectionApp:
         # 主容器
         main_container = ttk.Frame(self.root)
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
-        
+
         # 标题栏
         self._create_title_bar(main_container)
-        
+
         # 内容区域
         content_frame = ttk.Frame(main_container)
         content_frame.pack(fill="both", expand=True, pady=(10, 0))
-        
+
         # 左侧控制面板
         control_frame = self._create_control_panel(content_frame)
         control_frame.pack(side="left", fill="y", padx=(0, 10))
-        
+
         # 右侧图像显示区域
         display_frame = self._create_display_panel(content_frame)
         display_frame.pack(side="right", fill="both", expand=True)
-        
+
         # 状态栏
         self._create_status_bar(main_container)
-        
+
         # 性能监控按钮
         self._create_performance_button(main_container)
     
@@ -251,26 +251,54 @@ class LaneDetectionApp:
             foreground="#27ae60"
         )
         self.config_status_label.pack(side="right", padx=(0, 10))
-    
+
     def _create_control_panel(self, parent):
         """创建控制面板"""
+        # 创建外部容器
+        control_container = ttk.Frame(parent)
+        control_container.pack_propagate(False)
+        control_container.config(width=350)
+
+        # 创建Canvas用于滚动
+        canvas = tk.Canvas(control_container, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(control_container, orient="vertical", command=canvas.yview)
+
+        # 创建内部框架（控制面板）
         control_frame = ttk.LabelFrame(
-            parent,
+            canvas,
             text="控制面板",
             padding="15",
             relief="groove"
         )
-        control_frame.pack_propagate(False)
-        control_frame.config(width=350)
-        
+
+        # 配置滚动
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas_window = canvas.create_window((0, 0), window=control_frame, anchor="nw")
+
+        # 绑定事件以更新滚动区域
+        def _configure_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        control_frame.bind("<Configure>", _configure_scroll_region)
+
+        # 布局Canvas和滚动条
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # 鼠标滚轮支持
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
         # 输入模式选择
         mode_frame = ttk.LabelFrame(control_frame, text="输入模式", padding="10")
         mode_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 模式选择按钮
         mode_buttons_frame = ttk.Frame(mode_frame)
         mode_buttons_frame.pack()
-        
+
         self.image_mode_btn = ttk.Button(
             mode_buttons_frame,
             text="图像模式",
@@ -278,7 +306,7 @@ class LaneDetectionApp:
             width=12
         )
         self.image_mode_btn.pack(side="left", padx=(0, 5))
-        
+
         self.video_mode_btn = ttk.Button(
             mode_buttons_frame,
             text="视频模式",
@@ -286,7 +314,7 @@ class LaneDetectionApp:
             width=12
         )
         self.video_mode_btn.pack(side="left", padx=(0, 5))
-        
+
         self.camera_mode_btn = ttk.Button(
             mode_buttons_frame,
             text="摄像头模式",
@@ -294,11 +322,11 @@ class LaneDetectionApp:
             width=12
         )
         self.camera_mode_btn.pack(side="left")
-        
+
         # 文件操作区域
         self.file_frame = ttk.LabelFrame(control_frame, text="文件操作", padding="10")
         self.file_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 选择图片按钮
         self.select_image_btn = ttk.Button(
             self.file_frame,
@@ -307,7 +335,7 @@ class LaneDetectionApp:
             width=20
         )
         self.select_image_btn.pack(pady=(0, 10))
-        
+
         # 重新检测按钮
         self.redetect_btn = ttk.Button(
             self.file_frame,
@@ -317,7 +345,7 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.redetect_btn.pack(pady=(0, 10))
-        
+
         # 文件信息显示
         self.file_info_label = ttk.Label(
             self.file_frame,
@@ -326,10 +354,10 @@ class LaneDetectionApp:
             foreground="#3498db"
         )
         self.file_info_label.pack()
-        
+
         # 视频控制区域（初始隐藏）
         self.video_frame = ttk.LabelFrame(control_frame, text="视频控制", padding="10")
-        
+
         # 选择视频按钮
         self.select_video_btn = ttk.Button(
             self.video_frame,
@@ -338,11 +366,11 @@ class LaneDetectionApp:
             width=20
         )
         self.select_video_btn.pack(pady=(0, 10))
-        
+
         # 摄像头索引选择
         camera_frame = ttk.Frame(self.video_frame)
         camera_frame.pack(fill="x", pady=(0, 10))
-        
+
         ttk.Label(camera_frame, text="摄像头索引:").pack(side="left")
         self.camera_index_var = tk.StringVar(value=str(self.config.camera_id))
         self.camera_index_combo = ttk.Combobox(
@@ -353,7 +381,7 @@ class LaneDetectionApp:
             width=8
         )
         self.camera_index_combo.pack(side="left", padx=(5, 0))
-        
+
         # 摄像头测试按钮
         self.camera_test_btn = ttk.Button(
             self.video_frame,
@@ -362,11 +390,11 @@ class LaneDetectionApp:
             width=20
         )
         self.camera_test_btn.pack(pady=(0, 10))
-        
+
         # 视频控制按钮
         self.video_control_frame = ttk.Frame(self.video_frame)
         self.video_control_frame.pack()
-        
+
         self.play_btn = ttk.Button(
             self.video_control_frame,
             text="开始",
@@ -375,7 +403,7 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.play_btn.pack(side="left", padx=(0, 5))
-        
+
         self.pause_btn = ttk.Button(
             self.video_control_frame,
             text="暂停",
@@ -384,7 +412,7 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.pause_btn.pack(side="left", padx=(0, 5))
-        
+
         self.stop_btn = ttk.Button(
             self.video_control_frame,
             text="停止",
@@ -393,11 +421,11 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.stop_btn.pack(side="left")
-        
+
         # 高级设置区域
         advanced_frame = ttk.LabelFrame(control_frame, text="高级设置", padding="10")
         advanced_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 性能优化选项
         self.enable_buffer_var = tk.BooleanVar(value=self.config.enable_frame_buffer)
         buffer_check = ttk.Checkbutton(
@@ -407,7 +435,7 @@ class LaneDetectionApp:
             command=self._on_advanced_option_change
         )
         buffer_check.pack(anchor="w", pady=(0, 5))
-        
+
         self.adaptive_skip_var = tk.BooleanVar(value=self.config.adaptive_skip_frames)
         skip_check = ttk.Checkbutton(
             advanced_frame,
@@ -416,11 +444,11 @@ class LaneDetectionApp:
             command=self._on_advanced_option_change
         )
         skip_check.pack(anchor="w", pady=(0, 10))
-        
+
         # 参数调节区域
         param_frame = ttk.LabelFrame(control_frame, text="参数调节", padding="10")
         param_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 敏感度调节
         ttk.Label(param_frame, text="检测敏感度:").pack(anchor="w", pady=(0, 5))
         self.sensitivity_var = tk.DoubleVar(value=0.5)
@@ -434,7 +462,7 @@ class LaneDetectionApp:
             length=300
         )
         sensitivity_scale.pack(fill="x", pady=(0, 10))
-        
+
         # 场景选择
         ttk.Label(param_frame, text="场景模式:").pack(anchor="w", pady=(0, 5))
         self.scene_var = tk.StringVar(value="auto")
@@ -491,11 +519,11 @@ class LaneDetectionApp:
             width=20
         )
         self.batch_export_btn.pack(pady=(5, 0))
-        
+
         # 结果显示区域
         result_frame = ttk.LabelFrame(control_frame, text="检测结果", padding="10")
         result_frame.pack(fill="x")
-        
+
         # 方向显示
         self.direction_label = ttk.Label(
             result_frame,
@@ -504,7 +532,7 @@ class LaneDetectionApp:
             foreground="#2c3e50"
         )
         self.direction_label.pack(anchor="w", pady=(0, 5))
-        
+
         # 置信度显示
         self.confidence_label = ttk.Label(
             result_frame,
@@ -512,7 +540,7 @@ class LaneDetectionApp:
             font=("微软雅黑", 11)
         )
         self.confidence_label.pack(anchor="w", pady=(0, 5))
-        
+
         # 检测质量显示
         self.quality_label = ttk.Label(
             result_frame,
@@ -521,7 +549,7 @@ class LaneDetectionApp:
             foreground="#7f8c8d"
         )
         self.quality_label.pack(anchor="w", pady=(0, 5))
-        
+
         # 处理时间/FPS显示
         self.time_label = ttk.Label(
             result_frame,
@@ -530,7 +558,7 @@ class LaneDetectionApp:
             foreground="#95a5a6"
         )
         self.time_label.pack(anchor="w")
-        
+
         # 性能信息显示
         self.performance_label = ttk.Label(
             result_frame,
@@ -539,9 +567,9 @@ class LaneDetectionApp:
             foreground="#bdc3c7"
         )
         self.performance_label.pack(anchor="w", pady=(5, 0))
-        
-        return control_frame
-    
+
+        return control_container
+
     def _create_display_panel(self, parent):
         """创建显示面板"""
         display_frame = ttk.Frame(parent)

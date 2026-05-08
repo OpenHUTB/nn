@@ -8,6 +8,7 @@ import csv
 import pickle
 import math
 import json
+import argparse
 from datetime import datetime
 
 import gym
@@ -50,9 +51,6 @@ SAVE_TRAJECTORY_CSV = True
 DEBUG_DRAW_EVERY = 5
 NUM_EPISODES = 5
 
-# 运行批次编号
-RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
-
 # 手动驾驶相关参数
 MANUAL_STEER_CACHE = 0.0
 MANUAL_QUIT = False
@@ -63,12 +61,120 @@ MANUAL_STEER_STEP = 0.04
 MANUAL_STEER_DECAY = 0.85
 
 
-# 创建环境
-env = gym.make('carla-v0', params=params)
+def parse_args():
+    """
+    解析命令行参数。
+    """
+    parser = argparse.ArgumentParser(description="EasyCarla-RL demo script")
+
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default=CONTROL_MODE,
+        choices=["autopilot", "random", "safe_random", "manual"],
+        help="控制模式"
+    )
+
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        default=NUM_EPISODES,
+        help="运行 episode 数量"
+    )
+
+    parser.add_argument(
+        "--town",
+        type=str,
+        default=params["town"],
+        help="CARLA 地图名称"
+    )
+
+    parser.add_argument(
+        "--vehicles",
+        type=int,
+        default=params["number_of_vehicles"],
+        help="周围车辆数量"
+    )
+
+    parser.add_argument(
+        "--walkers",
+        type=int,
+        default=params["number_of_walkers"],
+        help="行人数量"
+    )
+
+    parser.add_argument(
+        "--traffic",
+        type=str,
+        default=params["traffic"],
+        choices=["on", "off"],
+        help="交通灯设置"
+    )
+
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=params["port"],
+        help="CARLA 连接端口"
+    )
+
+    parser.add_argument(
+        "--save-root",
+        type=str,
+        default="collected_episodes",
+        help="数据保存根目录"
+    )
+
+    parser.add_argument(
+        "--debug-draw-every",
+        type=int,
+        default=DEBUG_DRAW_EVERY,
+        help="CARLA 画面调试信息绘制间隔"
+    )
+
+    parser.add_argument(
+        "--no-save-episodes",
+        action="store_true",
+        help="不保存 episode pkl 数据"
+    )
+
+    parser.add_argument(
+        "--no-save-summary",
+        action="store_true",
+        help="不保存 summary.csv"
+    )
+
+    parser.add_argument(
+        "--no-save-trajectory",
+        action="store_true",
+        help="不保存 trajectory csv 数据"
+    )
+
+    return parser.parse_args()
+
+
+# 读取命令行参数
+args = parse_args()
+
+CONTROL_MODE = args.mode
+NUM_EPISODES = args.episodes
+DEBUG_DRAW_EVERY = args.debug_draw_every
+SAVE_EPISODES = not args.no_save_episodes
+SAVE_SUMMARY_CSV = not args.no_save_summary
+SAVE_TRAJECTORY_CSV = not args.no_save_trajectory
+
+params["town"] = args.town
+params["number_of_vehicles"] = args.vehicles
+params["number_of_walkers"] = args.walkers
+params["traffic"] = args.traffic
+params["port"] = args.port
+
+# 运行批次编号
+RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
 
 
 # 数据保存目录
-save_root_dir = "collected_episodes"
+save_root_dir = args.save_root
 save_dir = os.path.join(save_root_dir, CONTROL_MODE, RUN_ID)
 os.makedirs(save_dir, exist_ok=True)
 
@@ -84,7 +190,9 @@ if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
             "control_mode",
             "steps",
             "total_reward",
+            "avg_reward",
             "total_cost",
+            "avg_cost",
             "end_reason",
             "collision",
             "off_road",
@@ -114,6 +222,20 @@ def save_config_json(save_path):
             "manual_brake_value": MANUAL_BRAKE_VALUE,
             "manual_steer_step": MANUAL_STEER_STEP,
             "manual_steer_decay": MANUAL_STEER_DECAY
+        },
+        "command_args": {
+            "mode": args.mode,
+            "episodes": args.episodes,
+            "town": args.town,
+            "vehicles": args.vehicles,
+            "walkers": args.walkers,
+            "traffic": args.traffic,
+            "port": args.port,
+            "save_root": args.save_root,
+            "debug_draw_every": args.debug_draw_every,
+            "no_save_episodes": args.no_save_episodes,
+            "no_save_summary": args.no_save_summary,
+            "no_save_trajectory": args.no_save_trajectory
         },
         "params": params
     }
@@ -414,6 +536,10 @@ print(f"Save directory: {save_dir}")
 print(f"Config saved to: {config_json_path}")
 
 
+# 创建环境
+env = gym.make('carla-v0', params=params)
+
+
 # 初始化手动驾驶窗口
 init_manual_control()
 
@@ -565,6 +691,13 @@ try:
             max_speed = 0.0
             min_speed = 0.0
 
+        if len(episode_data) > 0:
+            avg_reward = float(total_reward / len(episode_data))
+            avg_cost = float(total_cost / len(episode_data))
+        else:
+            avg_reward = 0.0
+            avg_cost = 0.0
+
         if SAVE_EPISODES:
             episode_record = {
                 "episode_id": episode,
@@ -572,7 +705,9 @@ try:
                 "run_id": RUN_ID,
                 "params": params,
                 "total_reward": float(total_reward),
+                "avg_reward": avg_reward,
                 "total_cost": float(total_cost),
+                "avg_cost": avg_cost,
                 "num_steps": len(episode_data),
                 "end_reason": end_reason,
                 "collision": bool(episode_collision),
@@ -603,7 +738,9 @@ try:
                     CONTROL_MODE,
                     len(episode_data),
                     float(total_reward),
+                    avg_reward,
                     float(total_cost),
+                    avg_cost,
                     end_reason,
                     bool(episode_collision),
                     bool(episode_off_road),
@@ -617,7 +754,9 @@ try:
             f"Episode {episode} finished. "
             f"Steps: {len(episode_data)} | "
             f"Total reward: {total_reward:.2f} | "
+            f"Avg reward: {avg_reward:.2f} | "
             f"Total cost: {total_cost:.2f} | "
+            f"Avg cost: {avg_cost:.2f} | "
             f"End reason: {end_reason} | "
             f"Avg speed: {avg_speed:.2f} m/s | "
             f"Max speed: {max_speed:.2f} m/s | "

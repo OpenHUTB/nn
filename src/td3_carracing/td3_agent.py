@@ -73,22 +73,36 @@ class TD3Agent:
 
         # 动作平滑相关
         self.last_action = None
-        self.smooth_alpha = 0.8
-        self.max_steer = 0.6
+        self.smooth_alpha = 0.85
+        self.max_steer = 0.8
 
     def select_action(self, state, smooth=True, deterministic=False):
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
         action = self.actor(state).cpu().data.numpy().flatten()
 
         if smooth and self.last_action is not None:
-            action = self.smooth_alpha * action + (1 - self.smooth_alpha) * self.last_action
-            action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
+            # 调整平滑系数，允许更灵活的转向（减少平滑）
+            smooth_factor = 0.6 if abs(action[0]) > 0.2 else 0.85
+            action = smooth_factor * action + (1 - smooth_factor) * self.last_action
+            # 允许更大的转向变化幅度
+            max_steer_change = 0.3  # 增加最大转向变化
+            action[0] = np.clip(action[0],
+                                self.last_action[0] - max_steer_change,
+                                self.last_action[0] + max_steer_change)
         else:
             action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
 
-        # 死区：微小转向直接置0
-        if abs(action[0]) < 0.05:
+        # 调整死区：只在非常小的转向时才置0
+        if abs(action[0]) < 0.03:
             action[0] = 0.0
+
+        # 确保油门和刹车在有效范围
+        action[1] = np.clip(action[1], 0.0, 1.0)
+        action[2] = np.clip(action[2], 0.0, 1.0)
+
+        # 刹车优化：只在必要时刹车
+        if action[2] < 0.1:
+            action[2] = 0.0
 
         self.last_action = action.copy()
         return action
@@ -107,9 +121,13 @@ class TD3Agent:
         done = done.to(self.device)
 
         noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
-        # 对转向动作单独降低噪声
-        noise[:, 0] = noise[:, 0] * 0.6
-        next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
+        # 对转向动作单独调整噪声（降低噪声但允许探索）
+        noise[:, 0] = noise[:, 0] * 0.8
+        next_action = (self.actor_target(next_state) + noise)
+        # 分别限制每个动作的范围
+        next_action[:, 0] = next_action[:, 0].clamp(-self.max_action, self.max_action)
+        next_action[:, 1] = next_action[:, 1].clamp(0.0, self.max_action)
+        next_action[:, 2] = next_action[:, 2].clamp(0.0, self.max_action)
 
         # 计算目标 Q 值
         target_q1 = self.critic1_target(next_state, next_action)

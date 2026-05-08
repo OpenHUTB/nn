@@ -29,15 +29,17 @@ def train():
         use_cnn=True
     )
 
-    max_episodes = 2000
-    max_timesteps = 1000
-    warmup_episodes = 50
+    max_episodes = 2500
+    max_timesteps = 1200
+    warmup_episodes = 80  # 增加预热回合数，让策略更好地收敛
 
-    # 探索噪声设置
-    expl_noise_steer = 0.08
-    expl_noise_throttle = 0.15
-    min_noise_steer = 0.005
+    # 探索噪声设置 - 优化转向探索
+    expl_noise_steer = 0.12  # 稍微增加转向探索
+    expl_noise_throttle = 0.12  # 降低油门探索
+    expl_noise_brake = 0.05
+    min_noise_steer = 0.01
     min_noise_throttle = 0.02
+    min_noise_brake = 0.005
 
     best_reward = -float('inf')
     reward_history = []
@@ -62,18 +64,19 @@ def train():
         on_track_counter = 0
 
         for t in range(max_timesteps):
-            # 预热期：使用更保守的策略
+            # 预热期：增加转向探索，让智能体学习转弯
             if episode < warmup_episodes:
-                # 预热阶段：降低探索，更多利用
                 action = agent.select_action(state, smooth=True)
                 noise = np.zeros_like(action)
-                noise[0] = np.random.normal(0, expl_noise_steer * 0.3)
-                noise[1:] = np.random.normal(0, expl_noise_throttle * 0.5, size=2)
+                noise[0] = np.random.normal(0, expl_noise_steer * 0.6)
+                noise[1] = np.random.normal(0, expl_noise_throttle * 0.5)
+                noise[2] = np.random.normal(0, expl_noise_brake * 0.3)
             else:
                 action = agent.select_action(state, smooth=True)
                 noise = np.zeros_like(action)
                 noise[0] = np.random.normal(0, expl_noise_steer)
-                noise[1:] = np.random.normal(0, expl_noise_throttle, size=2)
+                noise[1] = np.random.normal(0, expl_noise_throttle)
+                noise[2] = np.random.normal(0, expl_noise_brake)
 
             # 如果刚出赛道，降低转向探索
             if off_track_counter > 0 and off_track_counter < 5:
@@ -124,8 +127,9 @@ def train():
 
         # 动态噪声衰减
         if episode > warmup_episodes:
-            expl_noise_steer = max(min_noise_steer, expl_noise_steer * 0.998)
-            expl_noise_throttle = max(min_noise_throttle, expl_noise_throttle * 0.999)
+            expl_noise_steer = max(min_noise_steer, expl_noise_steer * 0.999)
+            expl_noise_throttle = max(min_noise_throttle, expl_noise_throttle * 0.9995)
+            expl_noise_brake = max(min_noise_brake, expl_noise_brake * 0.9995)
 
         avg_reward = np.mean(reward_history[-10:]) if len(reward_history) >= 10 else episode_reward
 
