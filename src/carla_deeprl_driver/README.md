@@ -1,92 +1,176 @@
-# README
-This repo is the final project of reinforcement learning course. Training a model for autonomous vehicle control in [`CARLA (version0.9.13)`](https://carla.org/). The structure of the code may be confusing and some implementations are inelegant(such as `agent.py retreive_data()`), may refactor code in the near future.      
+# CARLA Deep Reinforcement Learning Driver
 
-## environment
-1. carla 0.9.13 release
-2. python 3.6
-3. dependencies in requirements.txt
+This repository implements a reinforcement learning-based autonomous vehicle control system using the [`CARLA Simulator (version 0.9.13)`](https://carla.org/). The project aims to train an intelligent agent that can navigate through complex urban environments using deep reinforcement learning algorithms.
 
-## set up env and test
-Use precompiled Carla [link](https://mirrors.sustech.edu.cn/carla/carla/0.9.13/) 
+## 📋 Project Overview
+
+The goal of this project is to develop a robust autonomous driving agent that can:
+- Navigate through CARLA's urban environments
+- Avoid collisions with other vehicles and obstacles
+- Make intelligent driving decisions based on visual input
+- Learn optimal driving policies through reinforcement learning
+
+## 🛠️ Environment Setup
+
+### Prerequisites
+1. **CARLA Simulator 0.9.13** - Download from official or mirror sources
+2. **Python 3.6+** - Required for CARLA Python API compatibility
+3. **conda** - Recommended for environment management
+
+### Installation Steps
+
+#### Step 1: Download CARLA Simulator
 ```bash
-# download carla from sustech mirror, you can also follow the official instruction
+# Option 1: Download from SUSTech mirror (recommended for China)
 wget https://mirrors.sustech.edu.cn/carla/carla/0.9.13/CARLA_0.9.13.tar.gz
 tar -zxvf CARLA_0.9.13.tar.gz
-./CarlaUE4.sh -RenderOffScreen
-# set up python environment
-conda env create -f environment.yml
-# test
-python3 run.py or
-python3 run_sac.py
+
+# Option 2: Download from official website
+# https://github.com/carla-simulator/carla/releases/tag/0.9.13
 ```
 
+#### Step 2: Set Up Python Environment
+```bash
+# Create conda environment
+conda env create -f environment.yml
+conda activate carla-rl
 
-## design details
-> help to modify the algorithm  
+# Install dependencies manually (if needed)
+pip install -r requirements.txt
+```
 
-**carla world settings:**   
-using default world. Deploy and destroy the vehicles when resetting the world instead of reloading the whole world by `reload_world()`. Retrieve the rgb camera frame in synchronous mode, convert it to tensor and then store to replaybuffer.
+#### Step 3: Launch CARLA Server
+```bash
+# Navigate to CARLA directory
+cd CARLA_0.9.13
 
-**agent settings:**   
-The agent car is always spawning  the agent at the first spawn_point with `sensor.camera.rgb` and `sensor.other.collision`.
+# Start CARLA server in off-screen mode (recommended for training)
+./CarlaUE4.sh -RenderOffScreen
 
-**reward and action:**  
-actions(`utility.py map2action()`):   
-| action index |                  action                  |
-| :----------: | :--------------------------------------: |
-|      0       | go straight on(vehicle.control(1, 0, 0)) |
-|      1       |   turn left(vehicle.control(1, -1, 0))   |
-|      2       |   turn right(vehicle.control(1, 1, 0))   |
-|      3       |     brake(vehicle.control(0, 0, 1))      |
+# Or start with visualization (for testing/demonstration)
+# ./CarlaUE4.sh
+```
 
-rewards(`carlaenv.py get_reward()`)(A2C):  
-| rewards |              event              |
-| :-----: | :-----------------------------: |
-|  -200   | collision sensor retrieve event |
-|  -100   |       take action 3 brake       |
-|    2    |  take action 0(go straight on)  |
-|    1    |         take action 1,2         |
+## 🚀 Quick Start
 
-reward(`carlaenv.py reward_sac()`)(SAC):  
-| reward |              event              |
-| :----: | :-----------------------------: |
-|  -200  | collision sensor retrieve event |
-|   1    |             others              |
+### Run A2C Algorithm
+```bash
+python run.py
+```
 
+### Run SAC Algorithm
+```bash
+python run_sac.py
+```
 
-**RL algorithms:**   
-currently implement A2C and SAC.
+## 📐 Design Details
 
+### CARLA World Settings
+- Uses default CARLA town environment
+- Deploys and destroys vehicles on reset instead of reloading the entire world
+- Retrieves RGB camera frames in synchronous mode
+- Converts frames to tensors for efficient storage in replay buffer
 
-## done
-- [x] wrap the environment of carla following the paradigm of OpenAI gym
-  - [x] env() init the world
-  - [x] step() return info
-  - [x] reset() reset the world to the init status
-  - [x] agent(actor)
+### Agent Configuration
+- Spawns agent at the first spawn point
+- Equipped with `sensor.camera.rgb` and `sensor.other.collision`
+- Observes visual input and collision events
 
-> need to fix problem of reset environment. May using destroy() for all actors
+### Action Space
 
-> solution:
-> use collision to indicate the episode ends.
+| Action Index | Action Description | Vehicle Control |
+| :----------: | :----------------: | :-------------: |
+|      0       |     Go Straight    | `(1, 0, 0)`     |
+|      1       |      Turn Left     | `(1, -1, 0)`    |
+|      2       |     Turn Right     | `(1, 1, 0)`     |
+|      3       |       Brake        | `(0, 0, 1)`     |
 
-> receive warning when destroy sensors: you should firstly sensor.stop()
-> don't use reload_world(), it causes some problems(high memory usage and finally core dumped)
+*Note: SAC uses continuous action space for steering control*
 
-- [x] sample trajectories
-- [x] replaybuffer
-- [x] rl algorithm(actor-critic)
-  - [x] generate action
-  - [x] pay attention to tensor numpy conversion and detach
-  - [x] need test
-- [x] add SAC algorithm
-- [ ] refactor code 
+### Reward Function
 
+**A2C Reward Scheme:**
 
-## notice
-To run the code on my limited computation resource machine(1 rtx3060), I setting it to sample one episode and then update(online A2C). Moreover, I also directly resize and crop the frames once receiving it and store it in the replaybuffer in Tensor type to save memory. Due to the limited hardware, I just tested under a small episode length but it exactly improves.  
-The reward settings can be further improved. The settings above is compared with serveral different settings. Taking brake frequently is too bad while driving. And if setting it to positive reward, the policy may learn to always brake no matter what it sees.   
+| Reward | Event |
+| :----: | :---- |
+|  -200  | Collision detected |
+|  -100  | Brake action taken |
+|   +2   | Go straight action |
+|   +1   | Turn left/right action |
 
-**SAC**   
-For SAC, the action space change to be continuous(controling steer[-1, 1]) instead of the discrete settings in A2C. Action is always in the format of carla.VehicleControl(1, steer, 0) where steer is given by the policy.
+**SAC Reward Scheme:**
 
+| Reward | Event |
+| :----: | :---- |
+|  -200  | Collision detected |
+|   +1   | All other actions |
+
+### Implemented RL Algorithms
+- **A2C (Advantage Actor-Critic)** - Discrete action space
+- **SAC (Soft Actor-Critic)** - Continuous action space
+
+## ✅ Progress Tracking
+
+### Core Implementation
+- [x] CARLA environment wrapper (OpenAI Gym compatible)
+  - [x] `env()` - Initialize CARLA world
+  - [x] `step()` - Execute action and return observation
+  - [x] `reset()` - Reset environment to initial state
+  - [x] Agent (actor) management
+
+### Technical Solutions
+- [x] Sensor management (stop sensors before destruction)
+- [x] Efficient world reset using actor destruction instead of `reload_world()`
+- [x] Collision-based episode termination
+
+### RL Components
+- [x] Trajectory sampling
+- [x] Replay buffer implementation
+- [x] A2C algorithm
+- [x] SAC algorithm
+
+### Future Work
+- [ ] Code refactoring and optimization
+- [ ] Performance improvement
+- [ ] Advanced reward engineering
+- [ ] Multi-agent scenarios
+
+## 💡 Notes
+
+### Hardware Considerations
+To run on limited computational resources (e.g., 1 RTX 3060):
+- Implemented online A2C (sample one episode then update)
+- Directly resize and crop frames upon reception
+- Store data in Tensor type to save memory
+- Tested with small episode lengths
+
+### Reward Design Insights
+- Braking frequently is penalized to encourage smooth driving
+- Positive reward for braking leads to undesirable behavior
+- Current reward scheme balances exploration and exploitation
+
+### SAC Specifics
+SAC uses continuous action space for steering control:
+- Steering range: `[-1, 1]`
+- Action format: `carla.VehicleControl(1, steer, 0)`
+- Policy outputs continuous steering value
+
+## 📁 Project Structure
+```
+.
+├── agent.py          # RL agent implementation
+├── carlaenv.py       # CARLA environment wrapper
+├── utility.py        # Utility functions (action mapping)
+├── run.py            # A2C training script
+├── run_sac.py        # SAC training script
+├── requirements.txt  # Python dependencies
+├── environment.yml   # Conda environment configuration
+└── README.md         # Project documentation
+```
+
+## 📝 License
+This project is for educational purposes as part of the reinforcement learning course.
+
+## 🤝 Acknowledgments
+- [CARLA Simulator](https://carla.org/) for providing the simulation environment
+- OpenAI Gym for the environment interface standard
