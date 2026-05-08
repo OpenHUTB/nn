@@ -1,6 +1,0 @@
-<launch>
-  <!-- 搬砖 -->
-  <node pkg="plumbing_pub_sub" type="Carry_bricks_client" name="doer" output="screen"/>
-  <node pkg="plumbing_pub_sub" type="Carry_bricks_server" name="speaker" output="screen" respawn="true" />
- 
-</launch>

@@ -1,8 +1,0 @@
-grad-cam
-pygame
-numpy
-opencv-python
-pandas
-Pillow
-scipy
-matplotlib

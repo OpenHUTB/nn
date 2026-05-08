@@ -1,5 +1,0 @@
-carla
-pygame
-numpy
-torch
-ultralytics
