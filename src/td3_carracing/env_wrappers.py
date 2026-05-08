@@ -57,7 +57,7 @@ class StackFrames(gym.ObservationWrapper):
         return state
 
 class SmoothActionWrapper(gym.Wrapper):
-    def __init__(self, env, alpha=0.85, max_steer_change=0.15):
+    def __init__(self, env, alpha=0.75, max_steer_change=0.3):
         super().__init__(env)
         self.alpha = alpha
         self.max_steer_change = max_steer_change
@@ -65,7 +65,14 @@ class SmoothActionWrapper(gym.Wrapper):
 
     def step(self, action):
         if self.last_action is not None:
-            action = self.alpha * action + (1 - self.alpha) * self.last_action
+            # 根据当前转向角度调整平滑强度
+            if abs(action[0]) > 0.2:
+                # 大转向时减少平滑
+                smooth_factor = 0.65
+            else:
+                smooth_factor = self.alpha
+
+            action = smooth_factor * action + (1 - smooth_factor) * self.last_action
             action[0] = np.clip(action[0],
                                 self.last_action[0] - self.max_steer_change,
                                 self.last_action[0] + self.max_steer_change)
@@ -130,11 +137,11 @@ class TrackDetectionWrapper(gym.Wrapper):
 class RewardShapingWrapper(gym.Wrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.max_steer = 0.6
+        self.max_steer = 0.8  # 增加最大转向角度，允许更大的转弯
         self.consecutive_off_track = 0
         self.consecutive_on_grass = 0
-        self.max_off_track_steps = 8
-        self.max_grass_steps = 15
+        self.max_off_track_steps = 10  # 稍微延长出赛道容忍时间
+        self.max_grass_steps = 18  # 稍微延长草地行驶容忍时间
         self.last_on_track_step = 0
         self.total_steps = 0
 
@@ -143,6 +150,10 @@ class RewardShapingWrapper(gym.Wrapper):
         self.consecutive_large_steer = 0
         self.steer_history = []
         self.max_steer_history = 10
+
+        # 跟踪车辆状态
+        self.last_speed = 0.0
+        self.cornering_balance = 0.0
 
     def step(self, action):
         action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
@@ -162,43 +173,64 @@ class RewardShapingWrapper(gym.Wrapper):
 
         # ===== 速度奖励 =====
         if speed > 0.5:
-            speed_reward = min(speed / 10.0, 0.3)
+            # 根据转向角度调整理想速度
+            steer_magnitude = abs(current_steer)
+            # 转弯时应该减速，直线时应该加速
+            ideal_speed = max(2.0 - steer_magnitude * 3.0, 1.0)
+            speed_diff = abs(speed - ideal_speed)
+            speed_reward = max(0.0, 0.5 - speed_diff * 0.2)
             shaped_reward += speed_reward
 
-        # ===== 方向盘转角惩罚 =====
-        # 1. 大转角惩罚（与速度相关）
+            # 基础前进奖励
+            progress_reward = min(speed / 15.0, 0.3)
+            shaped_reward += progress_reward
+
+        # ===== 方向盘转角奖励/惩罚 =====
         steer_magnitude = abs(current_steer)
-        if steer_magnitude > 0.2:
-            # 高速时大转向惩罚更严重
-            speed_factor = min(speed / 3.0, 1.0)
+
+        # 1. 适度转弯奖励（不惩罚正常转弯）
+        if steer_magnitude > 0.1 and steer_magnitude < 0.6:
+            # 有转向但不过度，给予小奖励
+            turn_reward = 0.05 * steer_magnitude
+            shaped_reward += turn_reward
+
+        # 2. 转弯减速配合奖励
+        if steer_magnitude > 0.2 and self.last_speed > speed and speed > 2.0:
+            # 转弯时适当减速是好的
+            cornering_reward = 0.1
+            shaped_reward += cornering_reward
+
+        # 3. 大转角惩罚（只在高速时）
+        if steer_magnitude > 0.6:
+            speed_factor = min(speed / 8.0, 1.0)
             turn_penalty = steer_magnitude * 0.15 * speed_factor
             shaped_reward -= turn_penalty
 
-            # 连续大转角惩罚
             self.consecutive_large_steer += 1
-            if self.consecutive_large_steer > 3:
-                shaped_reward -= 0.05 * (self.consecutive_large_steer - 3)
+            if self.consecutive_large_steer > 5:
+                shaped_reward -= 0.05 * (self.consecutive_large_steer - 5)
         else:
             self.consecutive_large_steer = 0
 
-        # 2. 方向盘抖动惩罚（快速来回转向）
+        # 4. 方向盘抖动惩罚（快速来回转向）
         self.steer_history.append(current_steer)
         if len(self.steer_history) > self.max_steer_history:
             self.steer_history.pop(0)
 
-        if len(self.steer_history) > 3:
+        if len(self.steer_history) > 4:
             steer_changes = np.abs(np.diff(self.steer_history))
             avg_steer_change = np.mean(steer_changes)
-            if avg_steer_change > 0.1 and speed > 0.5:
+            if avg_steer_change > 0.15 and speed > 3.0:
                 jitter_penalty = min(avg_steer_change * 0.2, 0.15)
                 shaped_reward -= jitter_penalty
 
-        # 3. 极端转向惩罚
-        if steer_magnitude > 0.4:
+        # 5. 极端转向惩罚
+        if steer_magnitude > 0.7:
             shaped_reward -= 0.2
 
-        # 更新历史转向
+        # 更新历史转向和速度
         self.last_steer = current_steer
+        self.last_speed = speed
 
         # ===== 基于图像的出赛道检测 =====
         if not on_track or original_reward < -0.5:
@@ -278,5 +310,5 @@ def wrap_env(env):
     env = PreProcessObs(env)
     env = StackFrames(env, stack=4)
     env = RewardShapingWrapper(env)
-    env = SmoothActionWrapper(env, alpha=0.85, max_steer_change=0.15)
+    env = SmoothActionWrapper(env, alpha=0.75, max_steer_change=0.3)
     return env
