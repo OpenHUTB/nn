@@ -6,10 +6,11 @@ class TransformObservation(gym.ObservationWrapper):
     def __init__(self, env):
         super(TransformObservation, self).__init__(env)
         # 显式定义新的观察空间维度 (44 + 332 = 376)
+        self.target_obs_dim = 376  
         self.observation_space = gym.spaces.Box(
             low=-np.inf, 
             high=np.inf, 
-            shape=(376,), 
+            shape=(self.target_obs_dim,), 
             dtype=np.float32
         )
 

@@ -1,14 +1,14 @@
 import carla
 import cv2
 import numpy as np
-from recorder import Recorder
-from player import Player
-from npc_manager import NpcManager
-from sensors import Sensors
-from blackbox import BlackBox
-from map_drawer import MapDrawer
-from ui_dashboard import VirtualDashboard
-from traffic_light_monitor import TrafficLightMonitor
+from core.recorder import Recorder
+from core.player import Player
+from core.npc_manager import NpcManager
+from core.sensors import Sensors
+from core.blackbox import BlackBox
+from core.map_drawer import MapDrawer
+from core.ui_dashboard import VirtualDashboard
+from core.traffic_light_monitor import TrafficLightMonitor
 
 
 def main():
@@ -46,6 +46,35 @@ def main():
             carla.Rotation(pitch=-90, yaw=t.rotation.yaw)
         ))
 
+    # ====================== 天气控制函数 ======================
+    weather = carla.WeatherParameters.ClearNoon
+    is_night = False
+
+    def set_daytime():
+        nonlocal is_night
+        is_night = False
+        world.set_weather(carla.WeatherParameters.ClearNoon)
+
+    def set_nighttime():
+        nonlocal is_night
+        is_night = True
+        world.set_weather(carla.WeatherParameters.ClearNight)
+
+    def set_rain():
+        world.set_weather(carla.WeatherParameters.WetNoon)
+        weather.rain = 100
+        weather.precipitation = 100
+        weather.precipitation_deposits = 100
+        world.set_weather(weather)
+
+    def set_fog():
+        w = carla.WeatherParameters.ClearNoon
+        w.fog_density = 80
+        w.fog_distance = 20
+        world.set_weather(w)
+
+    set_daytime()  # 默认白天
+
     npc_manager = NpcManager(world, bp_lib, spawn_points)
     npc_manager.spawn_all()
 
@@ -75,7 +104,29 @@ def main():
             blackbox.record(vehicle)
             light_monitor.update()
 
+            # ====================== 天气切换按键 ======================
+            if key == ord('n'):
+                if not is_night:
+                    set_nighttime()
+                    print("🌙 已切换：夜间模式")
+                else:
+                    set_daytime()
+                    print("☀️ 已切换：白天模式")
+
             if key == ord('r'):
+                set_rain()
+                print("🌧️ 已切换：雨天")
+
+            if key == ord('f'):
+                set_fog()
+                print("🌫️ 已切换：雾天")
+
+            if key == ord('c'):
+                set_daytime()
+                print("☀️ 已清空天气：晴天")
+
+            # 录制 / 回放
+            if key == ord('r') and not is_recording:
                 is_recording = True
                 recorder.start()
                 print("🔴 开始录制")
@@ -125,20 +176,19 @@ def main():
 
                 map_drawer.draw_lanes_and_drivable_area(bev)
                 full_view = np.hstack((cam_mosaic, bev))
-                cv2.putText(full_view, "R=Rec S=Save P=Play ESC=Exit", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                            (0, 255, 255), 2)
+
+                # 显示天气提示
+                weather_text = "N=night R=rain F=fog C=clear  "
+                cv2.putText(full_view, weather_text + "R=Rec S=Save P=Play ESC=Exit",
+                            (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
+
                 cv2.imshow("AD Monitor", full_view)
 
-            # ================== 独立仪表盘窗口（红绿灯移到顶部，不遮挡） ==================
+            # 独立仪表盘
             dash_img = dash.render(vehicle)
-
-            # 创建一个顶部条专门放红绿灯
             light_bar = np.zeros((60, 320, 3), dtype=np.uint8)
-            light_monitor.render(light_bar, 100, 10)  # 居中显示
-
-            # 拼接：顶部红绿灯 + 下面仪表盘
+            light_monitor.render(light_bar, 100, 10)
             dashboard_full = np.vstack([light_bar, dash_img])
-
             cv2.imshow("Dashboard", dashboard_full)
 
             if key == 27:
@@ -146,20 +196,14 @@ def main():
 
     finally:
         blackbox.close()
-        try:
-            npc_manager.destroy_all()
-        except:
-            pass
-        try:
-            sensors.destroy()
-        except:
-            pass
+        try: npc_manager.destroy_all()
+        except: pass
+        try: sensors.destroy()
+        except: pass
         try:
             if vehicle.is_alive:
                 vehicle.destroy()
-        except:
-            pass
-
+        except: pass
         cv2.destroyAllWindows()
 
 

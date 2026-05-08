@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import time
 import numpy as np
+import cv2
 from typing import Optional, Dict, Any
 
 from core import BaseDroneController, ConfigManager, Logger
@@ -134,6 +135,44 @@ class AirSimController(BaseDroneController):
         except Exception as e:
             self.logger.warning(f"速度控制失败 - {e}")
 
+    def send_command(self, command: str, intensity: float = 1.0):
+        """
+        发送命令到无人机（适配 AirSim 坐标系）
+        
+        Args:
+            command: 命令名称
+            intensity: 强度 (0-1)
+        """
+        self.logger.info(f"收到命令: {command}, 强度: {intensity}")
+
+        if command == "takeoff":
+            self.takeoff()
+        elif command == "land":
+            self.land()
+        elif command == "hover":
+            self.hover()
+        elif command == "forward":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(speed, 0, 0)
+        elif command == "backward":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(-speed, 0, 0)
+        elif command == "left":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, -speed, 0)
+        elif command == "right":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, speed, 0)
+        elif command == "up":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, 0, -speed)
+        elif command == "down":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, 0, speed)
+        elif command == "stop":
+            self.move_by_velocity(0, 0, 0)
+            self.hover()
+
     def get_state(self) -> Dict[str, Any]:
         if not self.connected:
             return self.state
@@ -154,6 +193,57 @@ class AirSimController(BaseDroneController):
         except Exception as e:
             self.logger.warning(f"获取状态失败 - {e}")
             return self.state
+
+    def get_camera_image(self, camera_name: str = "front_center", 
+                        image_type: int = 0) -> Optional[np.ndarray]:
+        """
+        获取摄像头画面
+        
+        Args:
+            camera_name: 摄像头名称 (front_center, front_right, front_left, bottom_center, back_center)
+            image_type: 图像类型 (0=Scene, 1=DepthPlanar, 2=DepthPerspective, 3=DepthVis, 5=Segmentation)
+        
+        Returns:
+            OpenCV 格式的图像 (BGR)，失败返回 None
+        """
+        if not self.connected:
+            self.logger.warning("未连接到 AirSim，无法获取摄像头画面")
+            return None
+
+        try:
+            import airsim
+
+            # 请求图像
+            responses = self.client.simGetImages([
+                airsim.ImageRequest(camera_name, image_type, False, False)
+            ])
+
+            if not responses:
+                self.logger.warning("未获取到图像响应")
+                return None
+
+            response = responses[0]
+
+            # 将图像数据转换为 NumPy 数组
+            img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
+
+            # 重塑为 H x W x 3 (RGB)
+            img_rgb = img1d.reshape(response.height, response.width, 3)
+
+            # 原始图像是垂直翻转的，需要翻转回来
+            img_rgb = np.flipud(img_rgb)
+
+            # 转换为 BGR 格式 (OpenCV 使用 BGR)
+            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+
+            return img_bgr
+
+        except ImportError:
+            self.logger.error("未找到 cv2 或 numpy 模块")
+            return None
+        except Exception as e:
+            self.logger.warning(f"获取摄像头画面失败 - {e}")
+            return None
 
 
 def test_airsim_connection():

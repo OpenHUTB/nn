@@ -13,12 +13,14 @@ title: 主页
 
 ## 入门 <span id="primary"></span>
 
-[__11__](carla_traffic_sign_recognition\carla_traffic_sign_recognition.md) — 入门热身示例  
+[__11__](carla_traffic_sign_recognition/carla_traffic_sign_recognition.md) — 入门热身示例  
 [__热身__](warmup.md) — 入门热身示例
 
 [__线性回归__](linear_regression.md)
 
 [__线性回归改进__](linear_regression_improved.md)
+
+[__线性回归修复__](linear_regression_fix.md) - 修复偏置未更新bug
 
 [__softmax回归__](softmax_regression.md)
 
@@ -26,11 +28,17 @@ title: 主页
 
 [__支持向量机__](svm.md)
 
+[__支持向量机改进__](svm_improved.md)
+
 [__简单神经网络__](simple_nn.md)
 
 [__卷积神经网络__](CNN.md)
 
+[__卷积神经网络改进__](cnn_keras_sequential_improved.md)
+
 [__循环神经网络__](RNN.md)
+
+[__循环神经网络改进__](poem_generation_rnn_improved.md)
 
 [__注意力机制__](attention.md)
 
@@ -51,6 +59,12 @@ title: 主页
 
 [__跟踪__](#tracking) 
 [__路径追踪__](./test.md)
+
+[__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
+
+[__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
+[__无人机飞行控制__](./UVA_flight_control_system.md) - 基于AirSim的无人机飞行控制系统
+[__人形机器人平衡控制__](./humanoid_balance/Humanoid_Balance.md) - 基于强化学习的人形机器人平衡控制仿真
 
 ## 规划 <span id="planning"></span>
 
