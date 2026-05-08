@@ -84,7 +84,43 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     # 速度估算参数
     PIXELS_TO_METERS = 0.05  # 像素到米的转换系数（每像素=0.05米）
     track_speeds = {}  # 记录每个轨迹的速度
+    smoothed_speeds = {}  # 平滑后的速度
+    speed_buffer = {}  # 速度缓冲用于移动平均平滑
 
+    class KalmanFilter2D:
+        def __init__(self, dt=1.0, process_noise=0.1, measurement_noise=10.0):
+            self.dt = dt
+            self.x = np.zeros((4, 1))
+            F = np.array([[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]])
+            H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+            self.F = F
+            self.H = H
+            self.Q = np.eye(4) * process_noise
+            self.R = np.eye(2) * measurement_noise
+            self.P = np.eye(4) * 100.0
+            self.initialized = False
+
+        def predict(self):
+            self.x = self.F @ self.x
+            self.P = self.F @ self.P @ self.F.T + self.Q
+            return self.x[:2].flatten()
+
+        def update(self, measurement):
+            z = np.array(measurement).reshape(2, 1)
+            if not self.initialized:
+                self.x[:2] = z
+                self.initialized = True
+                return self.x[:2].flatten()
+            S = self.H @ self.P @ self.H.T + self.R
+            K = self.P @ self.H.T @ np.linalg.inv(S)
+            self.x = self.x + K @ (z - self.H @ self.x)
+            self.P = (np.eye(4) - K @ self.H) @ self.P
+            return self.x[:2].flatten()
+
+        def get_velocity(self):
+            return self.x[2:4].flatten()
+
+    kalman_filters = {}  # {track_id: KalmanFilter2D}
 
     def draw_overlay(frame, pt1, pt2, alpha=0.25, color=(51, 68, 255), filled=True):
         """绘制半透明覆盖矩形
@@ -203,7 +239,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         # 为每个检测框生成标签（包含速度信息和轨迹长度）
         labels = []
         for track_id, cls_id in zip(detections.tracker_id, detections.class_id):
-            speed = track_speeds.get(track_id, 0)
+            speed = smoothed_speeds.get(track_id, 0)
             track_len = len(track_history.get(track_id, []))
             labels.append(f"#{track_id} {class_names[cls_id]} {speed:.1f}m/s L:{track_len}")
 
@@ -230,17 +266,38 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
             if len(track_history[track_id]) > 30:
                 track_history[track_id] = track_history[track_id][-30:]
             
-            # 速度估算：基于最近的位移计算
-            if len(track_history[track_id]) >= 2:
+            # 速度估算：使用卡尔曼滤波平滑位置，再用位移计算速度
+            if track_id not in kalman_filters:
+                kalman_filters[track_id] = KalmanFilter2D(dt=1.0/fps if fps > 0 else 1.0)
+
+            kf = kalman_filters[track_id]
+            kf.update([cx, cy])
+
+            # 使用卡尔曼滤波平滑历史轨迹
+            if track_id not in track_history or len(track_history[track_id]) < 2:
+                # 轨迹过短，使用原始计算
+                if len(track_history.get(track_id, [])) >= 2:
+                    prev_x, prev_y_pos = track_history[track_id][-2]
+                    curr_x, curr_y_pos = track_history[track_id][-1]
+                    pixel_displacement = np.sqrt((curr_x - prev_x)**2 + (curr_y_pos - prev_y_pos)**2)
+                    speed = pixel_displacement * PIXELS_TO_METERS * fps if fps > 0 else 0
+                else:
+                    speed = 0
+            else:
+                # 使用卡尔曼滤波平滑位置计算速度
                 prev_x, prev_y_pos = track_history[track_id][-2]
                 curr_x, curr_y_pos = track_history[track_id][-1]
-                # 计算像素位移
                 pixel_displacement = np.sqrt((curr_x - prev_x)**2 + (curr_y_pos - prev_y_pos)**2)
-                # 转换为米/秒
-                speed = pixel_displacement * PIXELS_TO_METERS * fps
-                track_speeds[track_id] = speed
-            else:
-                track_speeds[track_id] = 0
+                raw_speed = pixel_displacement * PIXELS_TO_METERS * fps if fps > 0 else 0
+
+                # 卡尔曼滤波平滑速度（保留原来的计算方式）
+                if track_id not in smoothed_speeds:
+                    smoothed_speeds[track_id] = raw_speed
+                else:
+                    smoothed_speeds[track_id] = 0.7 * smoothed_speeds[track_id] + 0.3 * raw_speed
+                speed = smoothed_speeds[track_id]
+
+            track_speeds[track_id] = speed
 
             # 简化判断：只要y变小就算穿越（不管方向、不限x范围）
             if track_id not in crossed_ids:
@@ -288,7 +345,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         sv.draw_text(frame, "[Strategy]", sv.Point(x=50, y=y_offset), sv.Color.GREEN, 0.5,
                      1, background_color=sv.Color.from_hex("#404040"))
         y_offset += 25
-        sv.draw_text(frame, f"conf:{CONFIDENCE_THRESHOLD:.2f} | speed:on | track:on | dist:on", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+        sv.draw_text(frame, f"conf:{CONFIDENCE_THRESHOLD:.2f} | speed:on | smooth:on | track:on | dist:on", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
                      1, background_color=sv.Color.from_hex("#404040"))
         
         # 显示速度估算面板

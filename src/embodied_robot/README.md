@@ -1,17 +1,58 @@
-Embodied Robot:
+# DeepMind 人形机器人仿真系统 (DeepMind Humanoid Robot Simulation)
 
-Walking:
-Core Libraries (Mandatory Installation)
-mujoco==3.3.6
-numpy==2.2.6
-python==3.12
+这是一个基于 Python 和 MuJoCo 物理引擎的机器人仿真项目。该项目旨在提供一个健壮的启动环境，用于模拟人形机器人的运动控制，特别是针对**多目标巡逻**与**动态避障**任务。
 
-Indirect Dependencies (Typically Installed Automatically; Install Manually if Missing)
-absl-py==2.3.1
-glfw==2.10.0
-PyOpenGL==3.1.10
-etils==1.13.0
-importlib_resources==6.5.2
-typing_extensions==4.15.0
-zipp==3.23.0
-fsspec==2025.9.0
+## 核心功能
+
+本项目主要包含以下核心功能模块：
+
+1.  **环境自检系统 (Environment Check)**
+    *   自动检测项目目录结构，确保 `robot_walk` 子目录及其中的脚本和模型文件存在。
+    *   检测 Python 解释器版本（推荐 3.8+）。
+2.  **依赖管理 (Dependency Management)**
+    *   自动检查 `mujoco` 和 `numpy` 等关键库是否安装。
+    *   提供交互式自动安装功能，若缺少依赖，可一键安装。
+3.  **仿真任务调度**
+    *   **多目标巡逻 (Multi-target patrol)**：控制机器人在场景中按设定路径移动。
+    *   **动态障碍物规避 (Dynamic obstacle avoidance)**：机器人能感知并避开移动的障碍物。
+4.  **跨平台兼容性**
+    *   针对 Windows 系统自动修复编码问题（`chcp 65001`），确保日志输出正常。
+
+---
+
+##  技术栈
+
+| 类别         | 技术/库     | 说明                             |
+| :----------- | :---------- | :------------------------------- |
+| **编程语言** | Python 3.8+ | 核心开发语言                     |
+| **物理引擎** | MuJoCo      | 用于高保真机器人物理仿真         |
+| **科学计算** | NumPy       | 用于处理矩阵运算和机器人状态数据 |
+| **核心模块** | Subprocess  | 用于在子进程中调用控制脚本       |
+| **路径处理** | pathlib     | 跨平台路径操作                   |
+
+---
+
+##  运行流程
+
+运行 `main.py` 后，程序将按以下流程执行：
+
+1.  **初始化与检测**
+    *   打印项目根目录。
+    *   检查 `robot_walk` 目录及 `move_straight.py`、`Robot_move_straight.xml` 文件是否存在。
+    *   **若文件缺失**：打印错误信息并终止程序。
+
+2.  **环境检查**
+    *   获取当前 Python 解释器路径。
+    *   检查 Python 版本是否符合要求。
+
+3.  **依赖检查与安装**
+    *   检查 `mujoco` 和 `numpy` 是否已安装。
+    *   **若缺失**：提示用户并询问是否自动安装 (`pip install`)。
+
+4.  **启动仿真 (关键步骤)**
+    *   设置环境变量（如 `MUJOCO_QUIET` 静默模式）。
+    *   使用 `subprocess` 在 `robot_walk` 目录下运行 `move_straight.py`。
+    *   此时，MuJoCo 窗口将弹出，展示机器人执行巡逻和避障的过程。
+
+5.  **结束处理**
+    *   仿真结束后，主程序捕获返回码并退出，确保资源释放。

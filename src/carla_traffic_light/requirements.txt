@@ -1,11 +1,9 @@
 requirements file:
 
 
-carla==0.9.11
+carla==0.9.15
 pygame==2.1.0
-numpy==1.23.5
+numpy==1.21.6
 opencv-python==4.8.0.76
-matplotlib==3.7.1
-torch==2.0.0       # Only if you're using PyTorch for detection
-torchvision==0.15.1
+matplotlib==3.5.3
 Pillow==9.4.0
