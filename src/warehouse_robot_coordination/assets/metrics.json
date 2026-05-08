@@ -1,0 +1,40 @@
+{
+  "robots": 4,
+  "tasks": 6,
+  "total_planned_distance": 176,
+  "scheduled_makespan": 64,
+  "single_robot_baseline_distance": 261,
+  "inserted_waits": 3,
+  "conflicts_before": 1,
+  "conflicts_after": 0,
+  "robot_loads": {
+    "R1": 63,
+    "R2": 40,
+    "R3": 64,
+    "R4": 12
+  },
+  "assignments": {
+    "R1": [
+      "T1",
+      "T2"
+    ],
+    "R2": [
+      "T3"
+    ],
+    "R3": [
+      "T4",
+      "T6"
+    ],
+    "R4": [
+      "T5"
+    ]
+  },
+  "outputs": {
+    "task_map": "assets\\warehouse_task_map.png",
+    "assigned_routes": "assets\\assigned_routes.png",
+    "workload_balance": "assets\\workload_balance.png",
+    "conflict_reduction": "assets\\conflict_reduction.png",
+    "robot_timeline": "assets\\robot_timeline.png",
+    "animation": "assets\\warehouse_coordination.gif"
+  }
+}
