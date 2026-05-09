@@ -3,9 +3,9 @@ CARLA IMU 采集 + 中英文界面 + 车辆状态实时显示 + 打开输出文�
 空格键：切换中英文
 ESC：退出
 鼠标拖拽：旋转视角
-点击左侧【打开输出文件】按钮：直接打开CSV保存目录
-点击【手动/自动驾驶】按钮：切换驾驶模式
-手动模式：↑加速 ↓刹车 ←左转 →右转 底部按钮倒车
+点击【切换模式】：自动/人工驾驶
+点击【打开输出文件】：打开CSV保存目录
+人工模式：圆盘轮盘控制 前进/倒车/转向 + 独立手刹按钮
 """
 
 from __future__ import print_function
@@ -62,7 +62,7 @@ TEXTS = {
         "handbrake": "Handbrake",
         "open_file": "Open Output Folder",
         "switch": "Switch Mode",
-        "rev_btn": "REV"
+        "hb_btn": "HANDBRAKE"
     },
     "cn": {
         "server": "服务器",
@@ -84,7 +84,7 @@ TEXTS = {
         "handbrake": "手刹",
         "open_file": "打开输出文件",
         "switch": "切换模式",
-        "rev_btn": "倒车"
+        "hb_btn": "手刹"
     }
 }
 
@@ -146,10 +146,22 @@ class World(object):
             if a:
                 a.destroy()
 
-# ====================== 按键控制 ======================
+# ====================== 按键+轮盘控制 ======================
 class KeyboardControl(object):
     def __init__(self):
         self.control = carla.VehicleControl()
+        # 轮盘参数
+        self.joy_active = False
+        self.joy_center_x = 160
+        self.joy_center_y = 580
+        self.joy_x = self.joy_center_x
+        self.joy_y = self.joy_center_y
+        self.max_radius = 65
+
+    def reset_joy(self):
+        self.joy_x = self.joy_center_x
+        self.joy_y = self.joy_center_y
+        self.joy_active = False
 
     def parse_events(self, world):
         global LANG
@@ -164,48 +176,83 @@ class KeyboardControl(object):
                     tip = "已切换为中文" if LANG=="cn" else "Switched to English"
                     world.hud.notification(tip)
 
+            # 鼠标按下
             if event.type == pygame.MOUSEBUTTONDOWN:
+                # 模式切换按钮
                 if world.hud.mode_btn.collidepoint(event.pos):
                     world.toggle_mode()
+                # 打开文件夹按钮
                 if world.hud.open_btn.collidepoint(event.pos):
                     path = os.path.abspath(".")
                     try:
-                        if os.name == "nt": os.startfile(path)
-                        else: subprocess.Popen(["open", path])
+                        if os.name == "nt":
+                            os.startfile(path)
+                        else:
+                            subprocess.Popen(["open", path])
                         world.hud.notification("文件夹已打开")
                     except:
                         world.hud.notification("打开失败")
+                # 手刹按钮
+                if world.hud.handbrake_btn.collidepoint(event.pos) and not world.autopilot:
+                    self.control.hand_brake = not self.control.hand_brake
 
+                # 激活轮盘
                 if not world.autopilot:
-                    self.control.hand_brake = False
-                    self.control.throttle = 0.0
-                    self.control.brake = 0.0
-                    self.control.steer = 0.0
-                    self.control.reverse = False
+                    dx = event.pos[0] - self.joy_center_x
+                    dy = event.pos[1] - self.joy_center_y
+                    if math.hypot(dx, dy) < self.max_radius + 20:
+                        self.joy_active = True
 
-                    if world.hud.btn_up.collidepoint(event.pos):
-                        self.control.throttle = 0.8
-                    elif world.hud.btn_down.collidepoint(event.pos):
-                        self.control.brake = 1.0
-                    elif world.hud.btn_left.collidepoint(event.pos):
-                        self.control.steer = 0.4
-                    elif world.hud.btn_right.collidepoint(event.pos):
-                        self.control.steer = -0.4
-                    # 倒车按钮
-                    elif world.hud.btn_rev.collidepoint(event.pos):
-                        self.control.reverse = True
-                        self.control.throttle = 0.6
-
+            # 鼠标松开
             if event.type == pygame.MOUSEBUTTONUP:
+                self.reset_joy()
                 self.control.throttle = 0.0
                 self.control.brake = 0.0
                 self.control.steer = 0.0
-                self.control.reverse = False
 
-            if event.type == MOUSEMOTION and pygame.mouse.get_pressed()[0]:
+            # 拖动轮盘
+            if event.type == pygame.MOUSEMOTION:
+                if self.joy_active and not world.autopilot:
+                    mx, my = event.pos
+                    dx = mx - self.joy_center_x
+                    dy = my - self.joy_center_y
+                    dist = math.hypot(dx, dy)
+                    if dist > self.max_radius:
+                        dx = dx * self.max_radius / dist
+                        dy = dy * self.max_radius / dist
+                    self.joy_x = self.joy_center_x + dx
+                    self.joy_y = self.joy_center_y + dy
+
+            # 视角拖拽
+            if event.type == MOUSEMOTION and pygame.mouse.get_pressed()[0] and not self.joy_active:
                 dx, dy = event.rel
                 world.camera_manager.yaw += dx * 0.2
                 world.camera_manager.pitch = max(-60, min(60, world.camera_manager.pitch - dy * 0.2))
+
+        # 轮盘逻辑：转向 / 前进 / 倒车 / 刹车
+        if not world.autopilot and self.joy_active:
+            dx = self.joy_x - self.joy_center_x
+            dy = self.joy_y - self.joy_center_y
+
+            # 左右转向
+            steer = np.clip(dx / self.max_radius, -0.8, 0.8)
+            self.control.steer = steer
+
+            # 上下：上前进 下倒车
+            if dy < -15:
+                # 前进
+                self.control.reverse = False
+                self.control.throttle = np.clip(-dy / self.max_radius, 0.2, 0.8)
+                self.control.brake = 0.0
+            elif dy > 15:
+                # 倒车
+                self.control.reverse = True
+                self.control.throttle = np.clip(dy / self.max_radius, 0.2, 0.7)
+                self.control.brake = 0.0
+            else:
+                # 中间刹车
+                self.control.throttle = 0.0
+                self.control.brake = 0.6
 
         if not world.autopilot:
             world.player.apply_control(self.control)
@@ -223,19 +270,10 @@ class HUD(object):
         self.notice_time = 0
         self.vehicle_status = t("straight")
 
+        # 功能按钮
         self.open_btn = pygame.Rect(10, height - 50, 200, 35)
         self.mode_btn = pygame.Rect(10, height - 100, 200, 35)
-
-        btn_size = 70
-        cx = width // 2
-        by = height - 130
-
-        self.btn_up    = pygame.Rect(cx-btn_size//2, by-90, btn_size, btn_size)
-        self.btn_left  = pygame.Rect(cx-btn_size-20, by, btn_size, btn_size)
-        self.btn_right = pygame.Rect(cx+20, by, btn_size, btn_size)
-        self.btn_down  = pygame.Rect(cx-btn_size//2, by, btn_size, btn_size)
-        # 倒车按钮
-        self.btn_rev   = pygame.Rect(cx-btn_size//2, by+90, btn_size+20, btn_size)
+        self.handbrake_btn = pygame.Rect(220, height - 100, 120, 35)
 
     def notification(self, text, dur=2.0):
         self.notice_text = text
@@ -281,47 +319,48 @@ class HUD(object):
         ]
 
     def render(self, display, world):
+        # 半透明背景
         bg = pygame.Surface((280, self.dim[1]))
         bg.set_alpha(90)
         display.blit(bg, (0,0))
 
+        # 文字信息
         y = 8
         for line in self._info_text:
             surf = self._font.render(line, True, (255,255,255))
             display.blit(surf, (12, y))
             y += 22
 
+        # 模式按钮
         pygame.draw.rect(display, (0,160,90), self.mode_btn)
         pygame.draw.rect(display, (255,255,255), self.mode_btn, 2)
         txt = self._font.render(t("switch"), True, (255,255,255))
         display.blit(txt, txt.get_rect(center=self.mode_btn.center))
 
+        # 打开文件夹按钮
         pygame.draw.rect(display, (0,120,210), self.open_btn)
         pygame.draw.rect(display, (255,255,255), self.open_btn, 2)
         btn_text = self._font.render(t("open_file"), True, (255,255,255))
         display.blit(btn_text, btn_text.get_rect(center=self.open_btn.center))
 
+        # 手刹按钮
+        hb_color = (200, 0, 0) if controller.control.hand_brake else (80,80,80)
+        pygame.draw.rect(display, hb_color, self.handbrake_btn)
+        pygame.draw.rect(display, (255,255,255), self.handbrake_btn, 2)
+        hb_txt = self._font.render(t("hb_btn"), True, (255,255,255))
+        display.blit(hb_txt, hb_txt.get_rect(center=self.handbrake_btn.center))
+
+        # 绘制轮盘（仅手动模式）
         if not world.autopilot:
-            c = (200,200,200)
-            bw = 2
-            pygame.draw.rect(display, c, self.btn_up, bw)
-            pygame.draw.rect(display, c, self.btn_left, bw)
-            pygame.draw.rect(display, c, self.btn_right, bw)
-            pygame.draw.rect(display, c, self.btn_down, bw)
-            pygame.draw.rect(display, (255,80,80), self.btn_rev, bw)
+            # 外圈
+            pygame.draw.circle(display, (180,180,180),
+                               (controller.joy_center_x, controller.joy_center_y),
+                               controller.max_radius, 3)
+            # 内圆点
+            pygame.draw.circle(display, (255,255,255),
+                               (int(controller.joy_x), int(controller.joy_y)), 22)
 
-            up = self._font.render("↑", True, (255,255,255))
-            left = self._font.render("←", True, (255,255,255))
-            right = self._font.render("→", True, (255,255,255))
-            down = self._font.render("↓", True, (255,255,255))
-            rev = self._font.render(t("rev_btn"), True, (255,255,255))
-
-            display.blit(up, up.get_rect(center=self.btn_up.center))
-            display.blit(left, left.get_rect(center=self.btn_left.center))
-            display.blit(right, right.get_rect(center=self.btn_right.center))
-            display.blit(down, down.get_rect(center=self.btn_down.center))
-            display.blit(rev, rev.get_rect(center=self.btn_rev.center))
-
+        # 提示文字
         if self.notice_time > 0:
             tip = self._font.render(self.notice_text, True, (255,255,0))
             display.blit(tip, (self.dim[0]//2 - 110, 80))
@@ -374,6 +413,8 @@ class CameraManager:
 def game_loop(args):
     pygame.init()
     pygame.font.init()
+    global controller
+    controller = KeyboardControl()
     world = None
     data = pd.DataFrame()
 
@@ -383,7 +424,6 @@ def game_loop(args):
         display = pygame.display.set_mode((1280,720), pygame.HWSURFACE|pygame.DOUBLEBUF)
         hud = HUD(1280,720)
         world = World(client.get_world(), hud, args)
-        controller = KeyboardControl()
         clock = pygame.time.Clock()
 
         while True:

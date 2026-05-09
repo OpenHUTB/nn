@@ -216,7 +216,7 @@ OVERTAKE_LANE_CLEAR_DISTANCE = 18.0
 OVERTAKE_RELATIVE_SPEED_THRESHOLD = 2.0
 OVERTAKE_TARGET_MAX_SPEED = 4.0
 OVERTAKE_COOLDOWN = 3.0
-EGO_RESPAWN_INTERVAL_SECONDS = 45.0
+EGO_RESPAWN_INTERVAL_SECONDS = 300.0
 EGO_MIN_RESPAWN_DISTANCE = 120.0
 
 
@@ -264,7 +264,7 @@ traffic_manager.vehicle_percentage_speed_difference(vehicle,-50)
 traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
 # Spawn camera
 CAMERA_IMAGE_SIZE = 1280
-CAMERA_FOV = 55
+CAMERA_FOV = 65
 camera_bp = bp_lib.find('sensor.camera.rgb')
 camera_bp.set_attribute('image_size_x', str(CAMERA_IMAGE_SIZE))
 camera_bp.set_attribute('image_size_y', str(CAMERA_IMAGE_SIZE))
@@ -274,7 +274,7 @@ camera_bp.set_attribute('fov', str(CAMERA_FOV))
 #camera_init_trans = carla.Transform(carla.Location(x=2, z=2), carla.Rotation(pitch=-10))
 #camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
 
-camera_init_trans = carla.Transform(carla.Location(x= 1, z=2), carla.Rotation(pitch=-3))
+camera_init_trans = carla.Transform(carla.Location(x=1, y=0.25, z=2), carla.Rotation(pitch=-3, yaw=3))
 camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
 
 # Create a queue to store and retrieve the sensor data
@@ -368,14 +368,14 @@ K = build_projection_matrix(image_w, image_h, fov)
 
 # Define the distance threshold for a clearly visible sign
 # 扩大检测距离到20米
-DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
-SIGN_FACE_ALIGNMENT_THRESHOLD = 0.2
+DISTANCE_THRESHOLD = 60.0  # Example threshold in meters
+SIGN_FACE_ALIGNMENT_THRESHOLD = 0.05
 SIGN_LOCATION_ROUND_DIGITS = 1
-MIN_CAPTURE_AREA = 1200
-MIN_CAPTURE_WIDTH = 24
-MIN_CAPTURE_HEIGHT = 24
-MAX_CAPTURE_DISTANCE = 24.0
-FRAME_EDGE_MARGIN_RATIO = 0.03
+MIN_CAPTURE_AREA = 650
+MIN_CAPTURE_WIDTH = 16
+MIN_CAPTURE_HEIGHT = 16
+MAX_CAPTURE_DISTANCE = 32.0
+MIN_VISIBLE_BOX_RATIO = 0.55
 
 # Track each physical sign and only capture it once when it is clear enough.
 captured_sign_states = {}
@@ -387,6 +387,11 @@ def get_sign_key(location):
         round(location.y, SIGN_LOCATION_ROUND_DIGITS),
         round(location.z, SIGN_LOCATION_ROUND_DIGITS)
     )
+
+
+def clamp(value, lower, upper):
+    return max(lower, min(value, upper))
+
 
 def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_camera):
     bounding_boxes = []
@@ -429,31 +434,33 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                     # 降低“面积阈值”过滤
                     min_area_threshold = 10  # Adjust this value as needed
 
-                    # Check if the bounding box is fully within the image frame
-                    if xmin >= 0 and ymin >= 0 and xmax < image_w and ymax < image_h:
-                        # Check the size and aspect ratio of the bounding box
-                        box_width = xmax - xmin
-                        box_height = ymax - ymin
-                        aspect_ratio = box_width / float(box_height) if box_height != 0 else 0
-                        edge_margin_x = image_w * FRAME_EDGE_MARGIN_RATIO
-                        edge_margin_y = image_h * FRAME_EDGE_MARGIN_RATIO
-                        inside_safe_region = (
-                            xmin >= edge_margin_x and
-                            ymin >= edge_margin_y and
-                            xmax <= image_w - edge_margin_x and
-                            ymax <= image_h - edge_margin_y
+                    clipped_xmin = clamp(xmin, 0, image_w - 1)
+                    clipped_ymin = clamp(ymin, 0, image_h - 1)
+                    clipped_xmax = clamp(xmax, 0, image_w - 1)
+                    clipped_ymax = clamp(ymax, 0, image_h - 1)
+                    box_width = clipped_xmax - clipped_xmin
+                    box_height = clipped_ymax - clipped_ymin
+                    clipped_area = box_width * box_height
+                    visible_ratio = clipped_area / float(area) if area > 0 else 0.0
+                    aspect_ratio = box_width / float(box_height) if box_height != 0 else 0
+                    is_clear_enough = (
+                        clipped_area >= MIN_CAPTURE_AREA and
+                        box_width >= MIN_CAPTURE_WIDTH and
+                        box_height >= MIN_CAPTURE_HEIGHT and
+                        distance <= MAX_CAPTURE_DISTANCE and
+                        visible_ratio >= MIN_VISIBLE_BOX_RATIO
+                    )
+                    if area > min_area_threshold and 0.5 < aspect_ratio < 2.0 and is_clear_enough:
+                        bounding_boxes.append(
+                            {
+                                'label': 'TrafficSign',
+                                'xmin': clipped_xmin,
+                                'ymin': clipped_ymin,
+                                'xmax': clipped_xmax,
+                                'ymax': clipped_ymax
+                            }
                         )
-                        is_clear_enough = (
-                            area >= MIN_CAPTURE_AREA and
-                            box_width >= MIN_CAPTURE_WIDTH and
-                            box_height >= MIN_CAPTURE_HEIGHT and
-                            distance <= MAX_CAPTURE_DISTANCE and
-                            inside_safe_region
-                        )
-                        if area > min_area_threshold and 0.5 < aspect_ratio < 2.0 and is_clear_enough:
-                            bounding_boxes.append(
-                                {'label': 'TrafficSign', 'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax})
-                            sign_state['captured'] = True
+                        sign_state['captured'] = True
 
     return bounding_boxes
 

@@ -4,6 +4,8 @@ import time
 import pygame
 import numpy as np
 import math
+import os
+import threading
 from ultralytics import YOLO
 import torch
 
@@ -152,20 +154,65 @@ def draw_vehicle_status(surface, vehicle, detected_signs):
     surface.blit(pos_surface, (panel_x + padding, panel_y + y_offset))
 
 # 加载YOLOv8预训练模型用于交通标志检测
-model = YOLO("yolov8n.pt")  # 使用yolov8n.pt进行快速推理
+model = YOLO("yolov8n.pt")
 
-# 在来自CARLA相机的RGB numpy图像上运行检测
-def detect_traffic_signs(image_np):
-    results = model.predict(source=image_np, imgsz=640, conf=0.5, device='cuda' if torch.cuda.is_available() else 'cpu', verbose=False)
-    detections = results[0].boxes.data.cpu().numpy()
-    names = results[0].names
+# COCO数据集中交通相关类别: stop sign(11), traffic light(9)
+TRAFFIC_RELEVANT_CLASSES = {9, 11}
 
-    signs_detected = []
-    for det in detections:
-        x1, y1, x2, y2, conf, cls = det
-        label = names[int(cls)]
-        signs_detected.append((label, conf, (int(x1), int(y1), int(x2), int(y2))))
-    return signs_detected
+# 异步检测器：在独立线程中运行YOLO推理，避免阻塞主循环
+class AsyncDetector:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._latest_signs = []
+        self._image_to_detect = None
+        self._running = True
+        self._thread = threading.Thread(target=self._detect_loop, daemon=True)
+        self._thread.start()
+    
+    def _detect_loop(self):
+        while self._running:
+            img = None
+            with self._lock:
+                if self._image_to_detect is not None:
+                    img = self._image_to_detect.copy()
+                    self._image_to_detect = None
+            
+            if img is not None:
+                results = model.predict(
+                    source=img, imgsz=640, conf=0.25,
+                    iou=0.45,
+                    device='cuda' if torch.cuda.is_available() else 'cpu',
+                    verbose=False,
+                    half=torch.cuda.is_available()
+                )
+                detections = results[0].boxes
+                names = results[0].names
+
+                signs = []
+                for i in range(len(detections)):
+                    cls_id = int(detections.cls[i])
+                    conf = float(detections.conf[i])
+                    if cls_id not in TRAFFIC_RELEVANT_CLASSES:
+                        continue
+                    x1, y1, x2, y2 = detections.xyxy[i].cpu().numpy().astype(int)
+                    label = names[cls_id]
+                    signs.append((label, conf, (int(x1), int(y1), int(x2), int(y2))))
+                
+                with self._lock:
+                    self._latest_signs = signs
+            else:
+                time.sleep(0.001)
+    
+    def submit_image(self, image_np):
+        with self._lock:
+            self._image_to_detect = image_np
+    
+    def get_latest_signs(self):
+        with self._lock:
+            return list(self._latest_signs)
+    
+    def stop(self):
+        self._running = False
 
 # 计算车辆与目标航点之间的转向角度
 def get_steering_angle(vehicle_transform, waypoint_transform):
@@ -251,9 +298,16 @@ def control_vehicle_based_on_sign(vehicle, detected_signs, lights, simulation_ti
 
     traffic_light_state = vehicle.get_traffic_light_state()
     if traffic_light_state == carla.TrafficLightState.Red:
-        print("交通灯: 红色 - 应用制动")
+        print("交通灯: 红色 - 停车等待")
         controller.set_target_speed(0)
         return
+    elif traffic_light_state == carla.TrafficLightState.Yellow:
+        print("交通灯: 黄色 - 减速慢行")
+        controller.set_target_speed(15)
+        return
+    elif traffic_light_state == carla.TrafficLightState.Green:
+        print("交通灯: 绿色 - 正常通行")
+        controller.set_target_speed(30)
 
     # 检查检测到的标志，设置目标速度
     for sign, conf, bbox in detected_signs:
@@ -307,10 +361,23 @@ def spawn_dynamic_elements(world, blueprint_library):
 # 主函数
 def main():
     actor_list = []
+    detector = AsyncDetector()
     try:
         client = carla.Client("localhost", 2000)
         client.set_timeout(10.0)
-        world = client.get_world()
+        
+        # 读取地图配置（由 switch_map.py 保存）
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "map_config.txt")
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                target_map = f.read().strip()
+            print(f"正在加载地图: {target_map} ...")
+            world = client.load_world(target_map)
+        else:
+            print("未找到地图配置，使用默认地图 Town03 ...")
+            world = client.load_world('Town03')
+        
+        world.set_weather(carla.WeatherParameters.ClearNoon)
         map = world.get_map()
         blueprint_library = world.get_blueprint_library()
 
@@ -361,8 +428,12 @@ def main():
 
         clock = pygame.time.Clock()
         start_time = time.time()
+        fps_font = pygame.font.Font(None, 20)
 
         while True:
+            # 推进模拟世界一步，触发传感器回调（相机图像）
+            world.tick()
+
             update_spectator()
 
             for event in pygame.event.get():
@@ -383,7 +454,13 @@ def main():
             vehicle.apply_control(control)
 
             if image_surface[0] is not None:
-                detected_signs = detect_traffic_signs(image_surface[0])
+                # 将图像提交给异步检测器（非阻塞）
+                detector.submit_image(image_surface[0])
+                
+                # 获取最新的检测结果（非阻塞，立即返回）
+                detected_signs = detector.get_latest_signs()
+                
+                # 基于检测结果控制车辆
                 simulation_time = time.time() - start_time
                 control_vehicle_based_on_sign(vehicle, detected_signs, world.get_actors().filter("traffic.traffic_light"), simulation_time, simple_controller)
 
@@ -391,9 +468,19 @@ def main():
                 surface = draw_detections(image_surface[0], detected_signs)
                 # 绘制车辆状态面板
                 draw_vehicle_status(surface, vehicle, detected_signs)
+                # 绘制FPS
+                fps_text = f"FPS: {clock.get_fps():.1f}"
+                fps_surface = fps_font.render(fps_text, True, (255, 255, 0))
+                surface.blit(fps_surface, (10, 10))
                 display.blit(surface, (0, 0))
-                pygame.display.flip()
-
+            else:
+                # 等待相机图像时显示提示
+                display.fill((0, 0, 0))
+                font = pygame.font.Font(None, 36)
+                text = font.render("等待相机图像...", True, (255, 255, 255))
+                display.blit(text, (display.get_width()//2 - 100, display.get_height()//2))
+            
+            pygame.display.flip()
             clock.tick(30)
 
             if time.time() - start_time > 120:
@@ -402,6 +489,7 @@ def main():
                 break
 
     finally:
+        detector.stop()
         print("清理actors...")
         for actor in actor_list:
             actor.destroy()

@@ -116,6 +116,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     # 基础计数区域 [left, top, right, bottom]
     counting_region = [400, 350, 1250, 450]  # 初始计数区域
     total_counts = []  # 总计数
+    type_counts = {'car': [], 'motorbike': [], 'bus': [], 'truck': []}  # 分车型统计
     # 车辆状态跟踪：{track_id: {'in_region': bool, 'entry_time': timestamp}}
     vehicle_states = {}
     # 区域调整参数
@@ -270,7 +271,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
             return speed_mps * 3.6  # 米/秒 -> 公里/小时
         return speed_mps  # 米/秒
 
-    def count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts):
+    def count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts, type_counts, cls_id):
         """基于区域统计车辆 - 改进版：使用轨迹方向判断 + 稳定性检查
 
         Args:
@@ -353,6 +354,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
                 if is_in_region or vehicle_states[track_id]['in_region']:
                     total_counts.append(track_id)
                     vehicle_states[track_id]['counted'] = True
+                    type_counts[class_names[cls_id]].append(track_id)
                     return True
         
         # 更新区域状态
@@ -466,7 +468,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         accuracy = 1.0 - error_rate
         return {'accuracy': accuracy, 'precision': accuracy, 'recall': accuracy, 'f1_score': accuracy}
 
-    def draw_tracks_and_count(frame, detections, total_counts, region, vehicle_states, speed_history, w=1920):
+    def draw_tracks_and_count(frame, detections, total_counts, type_counts, region, vehicle_states, speed_history, w=1920):
         """绘制轨迹并统计车辆
 
         Args:
@@ -512,13 +514,19 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         accuracy_metrics = calculate_accuracy_metrics(ground_truth_total, len(total_counts))
 
         # 处理每个检测到的车辆
-        for track_id, center_point in zip(detections.tracker_id,
-                                          detections.get_anchors_coordinates(anchor=sv.Position.CENTER)):
+        tracker_ids = detections.tracker_id
+        class_ids = detections.class_id
+        center_points = detections.get_anchors_coordinates(anchor=sv.Position.CENTER)
+
+        for i in range(len(tracker_ids)):
+            track_id = tracker_ids[i]
+            center_point = center_points[i]
             cx, cy = map(int, center_point)
+            cls_id = class_ids[i]
 
             cv.circle(frame, (cx, cy), 4, (0, 255, 255), cv.FILLED)  # 绘制车辆中心点
 
-            if count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts):
+            if count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts, type_counts, cls_id):
                 # 计数成功时高亮显示计数区域
                 draw_overlay(frame, (region[0], region[1]), (region[2], region[3]), alpha=0.25, color=(10, 255, 50))
 
@@ -530,6 +538,11 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         # 显示车辆计数和精度信息
         sv.draw_text(frame, f"COUNTS: {len(total_counts)}", sv.Point(x=110, y=30), sv.Color.ROBOFLOW, 1.25,
                      2, background_color=sv.Color.WHITE)
+
+        # 显示分车型统计
+        type_text = f"Car:{len(type_counts['car'])} Motorbike:{len(type_counts['motorbike'])} Bus:{len(type_counts['bus'])} Truck:{len(type_counts['truck'])}"
+        sv.draw_text(frame, type_text, sv.Point(x=110, y=60), sv.Color.YELLOW, 0.7,
+                     1, background_color=sv.Color.BLACK)
 
         # 显示精度指标
         if accuracy_metrics:
@@ -614,7 +627,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
 
         if detections.tracker_id is not None:
             # 处理车辆轨迹和计数
-            draw_tracks_and_count(frame, detections, total_counts, counting_region, vehicle_states, speed_history, w)
+            draw_tracks_and_count(frame, detections, total_counts, type_counts, counting_region, vehicle_states, speed_history, w)
 
         # 计算帧时间和FPS
         frame_end_time = time.time()
@@ -683,6 +696,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     print("="*60)
     print(f"📈 处理总帧数: {frame_count}")
     print(f"🚗 总计数车辆: {len(total_counts)}")
+    print(f"   - Car: {len(type_counts['car'])} | Motorbike: {len(type_counts['motorbike'])} | Bus: {len(type_counts['bus'])} | Truck: {len(type_counts['truck'])}")
     print(f"📊 平均检测精度: {overall_accuracy:.2%}")
     print(f"🎯 检测精确率: {detection_precision:.2%}")
     print(f"📝 总检测框数: {total_detections}")
