@@ -4,3 +4,4 @@ pygame
 numpy
 datetime
 termcolor
+matplotlib
