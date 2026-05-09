@@ -1,4 +1,3 @@
-import threading
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
@@ -18,15 +17,26 @@ class RoboticArmWithGripper:
         self.gripper_opening = 0.2  # 夹爪开口大小
         self.gripper_angle = 0.0  # 夹爪旋转角度
 
-        # 按钮防重入锁
-        self._button_lock = threading.Lock()
-
         # DH参数
         self.update_dh_params()
 
         # 初始化图形
         self.fig = plt.figure(figsize=(14, 8))
+        self._patch_grab_mouse()
         self.setup_plot()
+
+    def _patch_grab_mouse(self):
+        """修补matplotlib的grab_mouse，避免多控件鼠标抢占冲突"""
+        canvas = self.fig.canvas
+        original_grab = canvas.grab_mouse
+
+        def safe_grab(ax):
+            try:
+                original_grab(ax)
+            except RuntimeError:
+                pass
+
+        canvas.grab_mouse = safe_grab
 
     def update_dh_params(self):
         """更新DH参数"""
@@ -242,29 +252,16 @@ class RoboticArmWithGripper:
 
     def reset_all(self, event):
         """重置所有参数"""
-        if not self._button_lock.acquire(blocking=False):
-            return
-        try:
-            # 重置关节角度
-            for i, slider in enumerate(self.sliders):
-                slider.set_val(0.0)
+        # 重置关节角度
+        for i, slider in enumerate(self.sliders):
+            slider.set_val(0.0)
 
-            # 重置夹爪
-            self.slider_gripper_open.set_val(0.2)
-            self.slider_gripper_rotate.set_val(0.0)
-        finally:
-            self._button_lock.release()
+        # 重置夹爪
+        self.slider_gripper_open.set_val(0.2)
+        self.slider_gripper_rotate.set_val(0.0)
 
     def grasp_demo(self, event):
         """抓取演示动画"""
-        if not self._button_lock.acquire(blocking=False):
-            return
-        try:
-            self._grasp_demo_impl(event)
-        finally:
-            self._button_lock.release()
-
-    def _grasp_demo_impl(self, event):
         original_opening = self.gripper_opening
 
         # 闭合夹爪
@@ -285,14 +282,7 @@ class RoboticArmWithGripper:
 
     def animate_movement(self, event):
         """动画演示"""
-        if not self._button_lock.acquire(blocking=False):
-            return
-        try:
-            self._animate_movement_impl(event)
-        finally:
-            self._button_lock.release()
-
-    def _animate_movement_impl(self, event):
+        # 保存原始角度
         original_angles = self.joint_angles.copy()
 
         # 定义动画路径
