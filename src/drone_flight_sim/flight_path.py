@@ -4,6 +4,7 @@
 本模块负责生成各种飞行路径，包括：
 - 正方形路径
 - 矩形路径
+- 三角形路径
 - 自定义路径
 - 路径信息打印
 """
@@ -77,7 +78,17 @@ class FlightPath:
             # 右上角点
             (0, 0, altitude)
         ]
+    
+    @staticmethod
+    def triangle_path(size: float = 10, height: float = -3) -> List[Tuple[float, float, float]]:
+        """生成三角形飞行路径"""
 
+        return [
+            (0, 0, height),
+            (size, 0, height),
+            (size / 2, size, height)
+        ]    
+    
     @staticmethod
     def custom_path(waypoints: List[Tuple[float, float, float]]) -> List[Tuple[float, float, float]]:
         """自定义飞行路径
