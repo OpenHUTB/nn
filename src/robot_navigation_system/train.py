@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import matplotlib
 matplotlib.use('Agg')  # 使用非交互式后端
 import matplotlib.pyplot as plt
@@ -8,29 +9,52 @@ from dqn_agent import DQNAgent
 from visualization import NavigationVisualizer
 from config import Config
 
-def train():
+def train(episodes=None, visualize=None):
     config = Config()
-    
+
+    # 命令行参数覆盖配置
+    if episodes is not None:
+        config.EPISODES = episodes
+    if visualize is not None:
+        config.VISUALIZE = visualize
+
     # 创建结果目录
     os.makedirs(config.RESULT_DIR, exist_ok=True)
-    
+
     env = RobotNavigationEnv()
     agent = DQNAgent(config.STATE_SIZE, config.ACTION_SIZE)
     visualizer = NavigationVisualizer()
-    
+
     all_rewards = []
     all_distances = []
     all_lengths = []
-    
+
+    start_episode = 0
+
+    # 尝试加载checkpoint续训
+    checkpoint_path = os.path.join(config.RESULT_DIR, 'checkpoint.pth')
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path, map_location=agent.device)
+        agent.q_network.load_state_dict(checkpoint['model_state_dict'])
+        agent.target_network.load_state_dict(checkpoint['target_state_dict'])
+        agent.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        agent.epsilon = checkpoint['epsilon']
+        start_episode = checkpoint['episode'] + 1
+        all_rewards = checkpoint.get('rewards', [])
+        all_distances = checkpoint.get('distances', [])
+        all_lengths = checkpoint.get('lengths', [])
+        print(f"从第 {start_episode} 轮恢复训练，epsilon={agent.epsilon:.4f}")
+
     print("=" * 60)
     print("开始训练DQN导航代理...")
     print(f"训练轮数: {config.EPISODES}")
+    print(f"起始轮次: {start_episode}")
     print(f"最大步数: {config.MAX_STEPS}")
     print(f"状态维度: {config.STATE_SIZE}")
     print(f"动作数量: {config.ACTION_SIZE}")
     print("=" * 60)
-    
-    for episode in range(config.EPISODES):
+
+    for episode in range(start_episode, config.EPISODES):
         state = env.reset()
         total_reward = 0
         distance_history = []
@@ -76,14 +100,35 @@ def train():
         if episode % config.PLOT_INTERVAL == 0 and config.VISUALIZE:
             visualizer.save_figure(f'navigation_episode_{episode}.png')
             print(f"  -> 保存导航截图: navigation_episode_{episode}.png")
-    
+
+        # 定期保存checkpoint
+        if (episode + 1) % 50 == 0:
+            checkpoint_path = os.path.join(config.RESULT_DIR, 'checkpoint.pth')
+            torch.save({
+                'episode': episode,
+                'model_state_dict': agent.q_network.state_dict(),
+                'target_state_dict': agent.target_network.state_dict(),
+                'optimizer_state_dict': agent.optimizer.state_dict(),
+                'epsilon': agent.epsilon,
+                'rewards': all_rewards,
+                'distances': all_distances,
+                'lengths': all_lengths,
+            }, checkpoint_path)
+            print(f"  -> Checkpoint已保存: 第 {episode + 1} 轮")
+
     print("=" * 60)
     print("训练完成！")
     print("=" * 60)
-    
-    # 保存模型
+
+    # 保存最终模型
     agent.save_model()
     print(f"模型已保存: dqn_navigation_model.pth")
+
+    # 清理checkpoint
+    checkpoint_path = os.path.join(config.RESULT_DIR, 'checkpoint.pth')
+    if os.path.exists(checkpoint_path):
+        os.remove(checkpoint_path)
+        print("训练完成，checkpoint已清理")
     
     # 绘制训练历史
     visualizer.plot_training_history(all_rewards, all_distances, all_lengths)
