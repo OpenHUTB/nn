@@ -1,3 +1,4 @@
+import threading
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
@@ -16,6 +17,9 @@ class RoboticArmWithGripper:
         self.gripper_width = 0.15  # 夹爪宽度
         self.gripper_opening = 0.2  # 夹爪开口大小
         self.gripper_angle = 0.0  # 夹爪旋转角度
+
+        # 按钮防重入锁
+        self._button_lock = threading.Lock()
 
         # DH参数
         self.update_dh_params()
@@ -238,17 +242,29 @@ class RoboticArmWithGripper:
 
     def reset_all(self, event):
         """重置所有参数"""
-        # 重置关节角度
-        for i, slider in enumerate(self.sliders):
-            slider.set_val(0.0)
+        if not self._button_lock.acquire(blocking=False):
+            return
+        try:
+            # 重置关节角度
+            for i, slider in enumerate(self.sliders):
+                slider.set_val(0.0)
 
-        # 重置夹爪
-        self.slider_gripper_open.set_val(0.2)
-        self.slider_gripper_rotate.set_val(0.0)
+            # 重置夹爪
+            self.slider_gripper_open.set_val(0.2)
+            self.slider_gripper_rotate.set_val(0.0)
+        finally:
+            self._button_lock.release()
 
     def grasp_demo(self, event):
         """抓取演示动画"""
-        # 保存原始开口大小
+        if not self._button_lock.acquire(blocking=False):
+            return
+        try:
+            self._grasp_demo_impl(event)
+        finally:
+            self._button_lock.release()
+
+    def _grasp_demo_impl(self, event):
         original_opening = self.gripper_opening
 
         # 闭合夹爪
@@ -269,7 +285,14 @@ class RoboticArmWithGripper:
 
     def animate_movement(self, event):
         """动画演示"""
-        # 保存原始角度
+        if not self._button_lock.acquire(blocking=False):
+            return
+        try:
+            self._animate_movement_impl(event)
+        finally:
+            self._button_lock.release()
+
+    def _animate_movement_impl(self, event):
         original_angles = self.joint_angles.copy()
 
         # 定义动画路径
