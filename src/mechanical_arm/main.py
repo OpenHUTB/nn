@@ -17,6 +17,9 @@ class RoboticArmWithGripper:
         self.gripper_opening = 0.2  # 夹爪开口大小
         self.gripper_angle = 0.0  # 夹爪旋转角度
 
+        # 动画状态
+        self._animating = False
+
         # DH参数
         self.update_dh_params()
 
@@ -246,30 +249,49 @@ class RoboticArmWithGripper:
         self.slider_gripper_open.set_val(0.2)
         self.slider_gripper_rotate.set_val(0.0)
 
+    def _safe_pause(self, seconds):
+        """带中断检查的暂停，窗口关闭时提前返回"""
+        if not self._animating:
+            return False
+        try:
+            plt.pause(seconds)
+            return True
+        except Exception:
+            self._animating = False
+            return False
+
     def grasp_demo(self, event):
         """抓取演示动画"""
-        # 保存原始开口大小
+        self._animating = True
         original_opening = self.gripper_opening
 
         # 闭合夹爪
         for i in range(20):
+            if not self._animating:
+                break
             self.gripper_opening = original_opening * (1 - i / 20)
             self.slider_gripper_open.set_val(self.gripper_opening)
             self.update_plot()
-            plt.pause(0.05)
+            if not self._safe_pause(0.05):
+                break
 
-        plt.pause(0.5)
+        self._safe_pause(0.5)
 
         # 打开夹爪
         for i in range(20):
+            if not self._animating:
+                break
             self.gripper_opening = original_opening * (i / 20)
             self.slider_gripper_open.set_val(self.gripper_opening)
             self.update_plot()
-            plt.pause(0.05)
+            if not self._safe_pause(0.05):
+                break
+
+        self._animating = False
 
     def animate_movement(self, event):
         """动画演示"""
-        # 保存原始角度
+        self._animating = True
         original_angles = self.joint_angles.copy()
 
         # 定义动画路径
@@ -280,28 +302,39 @@ class RoboticArmWithGripper:
             original_angles
         ]
 
-        for target_angles in path:
-            # 平滑移动到目标角度
+        try:
+            for target_angles in path:
+                if not self._animating:
+                    break
+                for i in range(20):
+                    if not self._animating:
+                        break
+                    for j in range(4):
+                        current = self.joint_angles[j]
+                        target = target_angles[j]
+                        self.joint_angles[j] = current + (target - current) * (i + 1) / 20
+                    self.update_dh_params()
+                    self.update_plot()
+                    if not self._safe_pause(0.03):
+                        break
+
+                if not self._safe_pause(0.5):
+                    break
+
+            # 恢复原始角度
             for i in range(20):
+                if not self._animating:
+                    break
                 for j in range(4):
                     current = self.joint_angles[j]
-                    target = target_angles[j]
+                    target = original_angles[j]
                     self.joint_angles[j] = current + (target - current) * (i + 1) / 20
                 self.update_dh_params()
                 self.update_plot()
-                plt.pause(0.03)
-
-            plt.pause(0.5)
-
-        # 恢复原始角度
-        for i in range(20):
-            for j in range(4):
-                current = self.joint_angles[j]
-                target = original_angles[j]
-                self.joint_angles[j] = current + (target - current) * (i + 1) / 20
-            self.update_dh_params()
-            self.update_plot()
-            plt.pause(0.03)
+                if not self._safe_pause(0.03):
+                    break
+        finally:
+            self._animating = False
 
     def update_plot(self):
         """更新所有图形"""
