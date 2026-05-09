@@ -13,11 +13,10 @@ import matplotlib.pyplot as plt
 # 从 matplotlib 导入 animation 和 rc 模块
 # animation：用于创建动态动画
 # rc：运行时配置(runtime configuration)，用于设置图形默认参数
-from matplotlib import animation, rc
+from matplotlib import animation
 # 导入 IPython 的 HTML 显示功能，用于在 Notebook 中嵌入动画
 # from IPython.display import HTML
 # 导入 matplotlib 的 colormap 模块，用于颜色映射
-import matplotlib.cm as cm
 # 导入 NumPy 数值计算库
 import numpy as np
 
@@ -295,7 +294,7 @@ if __name__ == '__main__':
     for i in range(min(100, len(X_train_scaled))):  # 限制动画帧数
         sample_idx = np.random.randint(0, len(X_train_scaled), 50)
         sample_x, sample_y = X_train_scaled[sample_idx], y_train[sample_idx]
-        loss, accuracy, _, W_opt, b_opt = train_one_step(model, opt, sample_x, sample_y, i)
+        loss, accuracy, _, W_opt, b_opt = train_one_step(model, opt, sample_x, sample_y)
         animation_frames.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy()[0], loss.numpy()))
 
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴

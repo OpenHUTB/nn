@@ -23,6 +23,11 @@ class SimpleController:
         # 限速检测相关属性
         self.speed_limit = 30.0  # 默认限速 30 km/h
         self.speed_limit_detected = False  # 是否检测到限速标志
+        # 车道保持辅助(LKA)相关属性
+        self.lka_enabled = False  # LKA功能开关
+        self.lka_active = False  # LKA是否正在工作
+        self.lane_offset = 0.0  # 车道偏移量（-1到1，负数偏左，正数偏右）
+        self.lka_steer = 0.0  # LKA计算的转向角度
 
     def detect_speed_limits(self, location, transform):
         """检测道路限速标志"""
@@ -43,8 +48,12 @@ class SimpleController:
             self.speed_limit = 30.0  # 默认限速
             self.speed_limit_detected = False
 
-    def get_control(self, speed):
-        """基于路点的简单控制"""
+    def get_control(self, speed, lka_enabled=False, lane_offset=0.0):
+        """基于路点的简单控制，支持车道保持辅助"""
+        # 更新LKA状态
+        self.lka_enabled = lka_enabled
+        self.lane_offset = lane_offset
+
         # 获取车辆状态
         location = self.vehicle.get_location()
         transform = self.vehicle.get_transform()
@@ -70,7 +79,7 @@ class SimpleController:
 
         self.last_waypoint = target_waypoint
 
-        # 计算转向
+        # 计算转向（基于路点）
         vehicle_yaw = math.radians(transform.rotation.yaw)
         target_loc = target_waypoint.transform.location
 
@@ -82,10 +91,26 @@ class SimpleController:
         local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
 
         if abs(local_x) < 0.1:
-            steer = 0.0
+            path_steer = 0.0
         else:
             angle = math.atan2(local_y, local_x)
-            steer = max(-0.5, min(0.5, angle / 1.0))
+            path_steer = max(-0.5, min(0.5, angle / 1.0))
+
+        # 车道保持辅助(LKA)转向修正
+        self.lka_steer = 0.0
+        self.lka_active = False
+        
+        if self.lka_enabled and abs(lane_offset) > 0.05 and speed > 10:
+            # LKA激活条件：功能开启、有明显偏移、车速大于10km/h
+            self.lka_active = True
+            # 根据车道偏移计算修正转向
+            # lane_offset范围是-1到1，转换为转向角度
+            self.lka_steer = -lane_offset * 0.3  # LKA转向系数
+            self.lka_steer = max(-0.2, min(0.2, self.lka_steer))  # 限制最大修正量
+
+        # 合并路径规划转向和LKA转向
+        steer = path_steer + self.lka_steer
+        steer = max(-0.5, min(0.5, steer))  # 限制在合理范围内
 
         # 速度控制
         # 使用检测到的限速作为目标速度
@@ -117,6 +142,21 @@ class SimpleDrivingSystem:
         self.view_mode = 'single'  # 'all' = 全部视角, 'single' = 单一视角
         self.current_view_index = 5  # 当前选中的视角索引（第三人称视角）
         self.view_names = ['front', 'rear', 'left', 'right', 'birdview', 'third']
+        # 车道保持辅助(LKA)相关
+        self.lka_enabled = False  # LKA功能开关
+        self.lane_offset = 0.0  # 车道偏移量（-1到1）
+        self.lane_detected = False  # 是否检测到车道线
+        self.lane_lines = []  # 检测到的车道线
+        # 天气系统相关
+        self.weather_system = {
+            'current_weather': 'sunny',  # 当前天气：sunny, rainy, foggy
+            'weather_intensity': 0.0,  # 天气强度（0.0-1.0）
+            'last_weather_change': 0.0,  # 上次天气变化时间
+            'visibility': 1000.0,  # 能见度（米）
+            'road_conditions': 'dry'  # 道路状况：dry, wet, icy
+        }
+        self.auto_weather_change = True  # 自动天气变化开关
+        self.is_day = True  # 白天/黑夜标志
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -354,31 +394,211 @@ class SimpleDrivingSystem:
             if hasattr(data, 'velocity'):
                 # 专用速度传感器
                 velocity = data.velocity
-                self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
             elif hasattr(data, 'accelerometer'):
                 # IMU传感器，使用车辆速度作为参考
                 if self.vehicle:
                     velocity = self.vehicle.get_velocity()
-                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                    self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
             else:
                 # 其他类型传感器
                 if self.vehicle:
                     velocity = self.vehicle.get_velocity()
-                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                    self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
         except Exception as e:
             print(f"速度传感器回调错误: {e}")
             # 回退到直接获取车辆速度
             if self.vehicle:
                 try:
                     velocity = self.vehicle.get_velocity()
-                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                    self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
                 except:
                     pass
+
+    def detect_lane_lines(self):
+        """使用OpenCV检测车道线并计算车道偏移量"""
+        if 'front' not in self.camera_images or self.camera_images['front'] is None:
+            self.lane_detected = False
+            self.lane_offset = 0.0
+            self.lane_lines = []
+            return
+
+        image = self.camera_images['front'].copy()
+        height, width = image.shape[:2]
+
+        # 感兴趣区域（ROI）- 只处理图像下半部分
+        roi_height = int(height * 0.4)
+        roi_y_start = height - roi_height
+        roi = image[roi_y_start:height, :]
+
+        # 转换为灰度图像
+        gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
+
+        # 高斯模糊
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # Canny边缘检测
+        edges = cv2.Canny(blur, 50, 150)
+
+        # 霍夫变换检测直线
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=100)
+
+        self.lane_lines = []
+        left_lines = []
+        right_lines = []
+
+        if lines is not None:
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                
+                # 计算斜率
+                if x2 - x1 != 0:
+                    slope = (y2 - y1) / (x2 - x1)
+                    
+                    # 根据斜率判断是左车道线还是右车道线
+                    if abs(slope) > 0.3:  # 过滤掉接近水平的线
+                        if slope < 0:
+                            # 左车道线（从右上到左下）
+                            left_lines.append((x1, y1 + roi_y_start, x2, y2 + roi_y_start))
+                        else:
+                            # 右车道线（从左上到右下）
+                            right_lines.append((x1, y1 + roi_y_start, x2, y2 + roi_y_start))
+
+        # 如果检测到车道线
+        if left_lines or right_lines:
+            self.lane_detected = True
+            
+            # 计算车道线的平均位置
+            left_x_avg = 0
+            right_x_avg = width
+            
+            if left_lines:
+                left_x_avg = sum((x1 + x2) / 2 for x1, y1, x2, y2 in left_lines) / len(left_lines)
+            
+            if right_lines:
+                right_x_avg = sum((x1 + x2) / 2 for x1, y1, x2, y2 in right_lines) / len(right_lines)
+            
+            # 计算车道中心和车辆位置
+            lane_center = (left_x_avg + right_x_avg) / 2
+            vehicle_center = width / 2
+            
+            # 计算车道偏移量（-1到1）
+            lane_width = right_x_avg - left_x_avg if (right_x_avg - left_x_avg) > 50 else width
+            self.lane_offset = (vehicle_center - lane_center) / (lane_width / 2)
+            self.lane_offset = max(-1.0, min(1.0, self.lane_offset))
+            
+            # 保存检测到的车道线
+            self.lane_lines = left_lines + right_lines
+        else:
+            self.lane_detected = False
+            self.lane_offset = 0.0
+
+    def draw_lane_lines(self, image):
+        """在图像上绘制车道线"""
+        if self.lane_lines:
+            for x1, y1, x2, y2 in self.lane_lines:
+                cv2.line(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 3)
+        
+        # 如果检测到车道，绘制车道中心和偏移指示
+        if self.lane_detected:
+            height, width = image.shape[:2]
+            # 绘制车道中心虚线
+            lane_center_x = int(width / 2 + self.lane_offset * 50)
+            cv2.line(image, (lane_center_x, height-200), (lane_center_x, height-50), (0, 255, 255), 2, cv2.LINE_AA)
+            
+            # 绘制车辆中心线
+            cv2.line(image, (int(width/2), height-100), (int(width/2), height-50), (255, 0, 0), 2, cv2.LINE_AA)
 
     def setup_controller(self):
         """设置控制器"""
         self.controller = SimpleController(self.world, self.vehicle)
         print("控制器设置完成")
+
+    def set_weather(self, weather_type, intensity=0.5):
+        """手动设置天气"""
+        import time
+        
+        current_time = time.time()
+        
+        # 更新天气信息
+        self.weather_system['current_weather'] = weather_type
+        self.weather_system['weather_intensity'] = intensity
+        self.weather_system['last_weather_change'] = current_time
+        
+        # 更新能见度
+        if weather_type == 'sunny':
+            self.weather_system['visibility'] = 1000.0
+            self.weather_system['road_conditions'] = 'dry'
+        elif weather_type == 'rainy':
+            self.weather_system['visibility'] = 500.0 * (1 - intensity * 0.5)
+            self.weather_system['road_conditions'] = 'wet'
+        elif weather_type == 'foggy':
+            self.weather_system['visibility'] = 50.0
+            self.weather_system['road_conditions'] = 'dry'
+        
+        print(f"天气设置为: {weather_type}，强度: {intensity:.2f}，能见度: {self.weather_system['visibility']:.1f}米，路面: {self.weather_system['road_conditions']}")
+        
+        # 在CARLA中设置天气
+        if self.world:
+            try:
+                weather = carla.WeatherParameters()
+                if weather_type == 'sunny':
+                    weather = carla.WeatherParameters.ClearNoon if self.is_day else carla.WeatherParameters.ClearNight
+                elif weather_type == 'rainy':
+                    weather = carla.WeatherParameters.HardRainNoon if self.is_day else carla.WeatherParameters.HardRainNight
+                elif weather_type == 'foggy':
+                    weather.cloudiness = 70.0
+                    weather.precipitation = 0.0
+                    weather.precipitation_deposits = 0.0
+                    weather.fog_distance = 50.0
+                    weather.fog_density = intensity * 0.95
+                    weather.wetness = 0.0
+                    weather.sun_altitude_angle = 20.0 if self.is_day else -10.0
+                    weather.sun_azimuth_angle = 180.0
+                self.world.set_weather(weather)
+            except Exception as e:
+                print(f"设置天气失败: {e}")
+
+    def toggle_day_night(self):
+        """切换白天/黑夜"""
+        self.is_day = not self.is_day
+        time_of_day = "白天" if self.is_day else "黑夜"
+        print(f"切换到{time_of_day}模式")
+        
+        # 在CARLA中设置光照
+        if self.world:
+            try:
+                weather = carla.WeatherParameters()
+                weather_type = self.weather_system['current_weather']
+                
+                if weather_type == 'sunny':
+                    weather = carla.WeatherParameters.ClearNoon if self.is_day else carla.WeatherParameters.ClearNight
+                elif weather_type == 'rainy':
+                    weather = carla.WeatherParameters.HardRainNoon if self.is_day else carla.WeatherParameters.HardRainNight
+                elif weather_type == 'foggy':
+                    weather.cloudiness = 70.0
+                    weather.precipitation = 0.0
+                    weather.precipitation_deposits = 0.0
+                    weather.fog_distance = 50.0
+                    weather.fog_density = self.weather_system['weather_intensity'] * 0.95
+                    weather.wetness = 0.0
+                    weather.sun_altitude_angle = 20.0 if self.is_day else -10.0
+                    weather.sun_azimuth_angle = 180.0
+                self.world.set_weather(weather)
+            except Exception as e:
+                print(f"切换白天黑夜失败: {e}")
+
+    def update_weather(self):
+        """自动更新天气"""
+        import time
+        current_time = time.time()
+        
+        # 检查是否需要自动切换天气
+        if self.auto_weather_change and current_time - self.weather_system['last_weather_change'] > random.uniform(30, 60):
+            # 随机选择天气
+            weather_types = ['sunny', 'rainy', 'foggy']
+            new_weather = random.choice(weather_types)
+            self.set_weather(new_weather, random.uniform(0.3, 0.8))
 
     def create_multi_view_display(self, speed, throttle, steer):
         """创建多视角显示"""
@@ -387,6 +607,10 @@ class SimpleDrivingSystem:
             view_name = self.view_names[self.current_view_index]
             if view_name in self.camera_images and self.camera_images[view_name] is not None:
                 display_img = self.camera_images[view_name].copy()
+                
+                # 在前视图上绘制车道线
+                if view_name == 'front':
+                    self.draw_lane_lines(display_img)
                 
                 # 添加状态信息
                 cv2.putText(display_img, f"View: {view_name.upper()}",
@@ -411,6 +635,21 @@ class SimpleDrivingSystem:
                 cv2.putText(display_img, f"Speed Sensor: {speed_sensor_status}",
                             (20, 220), cv2.FONT_HERSHEY_SIMPLEX,
                             0.8, (0, 255, 255), 2)
+                # 添加车道保持辅助状态
+                lka_status = "ON" if self.lka_enabled else "OFF"
+                lka_color = (0, 255, 0) if self.lka_enabled else (0, 165, 255)
+                cv2.putText(display_img, f"LKA: {lka_status}",
+                            (20, 260), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8, lka_color, 2)
+                if self.lka_enabled:
+                    lane_status = "Detected" if self.lane_detected else "No Lane"
+                    lane_color = (0, 255, 0) if self.lane_detected else (0, 0, 255)
+                    cv2.putText(display_img, f"Lane: {lane_status}",
+                                (20, 285), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, lane_color, 2)
+                    cv2.putText(display_img, f"Offset: {self.lane_offset:.2f}",
+                                (20, 310), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, (255, 255, 0), 2)
                 
                 return display_img
         else:
@@ -528,10 +767,17 @@ class SimpleDrivingSystem:
         print("  q - 退出程序")
         print("  r - 重置车辆")
         print("  s - 紧急停止")
+        print("  l - 切换车道保持辅助(LKA)")
+        print("  w - 切换自动天气变化")
+        print("  7 - 设置晴天")
+        print("  8 - 设置雨天")
+        print("  9 - 设置雾天")
+        print("  0 - 切换白天/黑夜")
         print("  空格键 - 切换全部/单一视角模式")
         print("  1-6 - 选择视角 (仅在单一视角模式下)")
         print("  t - 切换到下一个视角 (仅在单一视角模式下)")
         print("\n视角: 1-前视 2-后视 3-左视 4-右视 5-鸟瞰 6-第三人称")
+        print("\n天气控制: W-切换自动天气 7-晴天 8-雨天 9-雾天 0-白天/黑夜")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -547,8 +793,18 @@ class SimpleDrivingSystem:
                     velocity = self.vehicle.get_velocity()
                     speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
 
-                # 获取控制指令
-                throttle, brake, steer = self.controller.get_control(speed)
+                # 检测车道线（使用前视摄像头）
+                self.detect_lane_lines()
+
+                # 自动更新天气
+                self.update_weather()
+
+                # 获取控制指令（包含LKA辅助）
+                throttle, brake, steer = self.controller.get_control(
+                    speed, 
+                    lka_enabled=self.lka_enabled, 
+                    lane_offset=self.lane_offset
+                )
 
                 # 应用控制
                 control = carla.VehicleControl(
@@ -577,6 +833,28 @@ class SimpleDrivingSystem:
                         throttle=0.0, brake=1.0, hand_brake=True
                     ))
                     print("紧急停止")
+                elif key == ord('l'):
+                    # 切换车道保持辅助(LKA)
+                    self.lka_enabled = not self.lka_enabled
+                    status = "开启" if self.lka_enabled else "关闭"
+                    print(f"车道保持辅助(LKA)已{status}")
+                elif key == ord('w'):
+                    # 切换自动天气变化
+                    self.auto_weather_change = not self.auto_weather_change
+                    status = "开启" if self.auto_weather_change else "关闭"
+                    print(f"自动天气变化已{status}")
+                elif key == ord('7'):
+                    # 设置晴天
+                    self.set_weather('sunny', 0.5)
+                elif key == ord('8'):
+                    # 设置雨天
+                    self.set_weather('rainy', 0.5)
+                elif key == ord('9'):
+                    # 设置雾天
+                    self.set_weather('foggy', 0.5)
+                elif key == ord('0'):
+                    # 切换白天/黑夜
+                    self.toggle_day_night()
                 elif key == 32:  # 空格键
                     # 切换视角模式
                     if self.view_mode == 'all':

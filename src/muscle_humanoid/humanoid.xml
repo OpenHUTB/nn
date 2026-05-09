@@ -1,0 +1,65 @@
+<mujoco model="SimpleHumanoid">
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+  <visual>
+    <map force="0.1" zfar="30"/>
+  </visual>
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
+    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
+    <material name="body" rgba="0.3 0.6 0.9 1"/>
+    <material name="limb" rgba="0.7 0.7 0.7 1"/>
+  </asset>
+
+  <worldbody>
+    <geom name="floor" type="plane" size="5 5 0.1" material="grid"/>
+    <light pos="0 -5 3" dir="0 5 -3" diffuse="1 1 1"/>
+
+    <body name="torso" pos="0 0 1.3">
+      <freejoint/>
+      <geom type="capsule" size="0.15 0.25" fromto="0 0 -0.1 0 0 0.3" material="body"/>
+
+      <!-- 头部 -->
+      <body name="head" pos="0 0 0.45">
+        <geom type="sphere" size="0.15" material="body"/>
+      </body>
+
+      <!-- 右臂 → 向外展开，像正常人 -->
+      <body name="upper_arm_R" pos="0 -0.25 0.15">
+        <joint axis="0 1 0" range="-1.5 1.5"/>
+        <geom type="capsule" size="0.05 0.22" fromto="0 0 0 -0.2 0 0" material="limb"/>
+        <body name="hand_R" pos="-0.22 0 0">
+          <geom type="sphere" size="0.06" material="limb"/>
+        </body>
+      </body>
+
+      <!-- 左臂 → 向外展开，像正常人 -->
+      <body name="upper_arm_L" pos="0 0.25 0.15">
+        <joint axis="0 1 0" range="-1.5 1.5"/>
+        <geom type="capsule" size="0.05 0.22" fromto="0 0 0 0.2 0 0" material="limb"/>
+        <body name="hand_L" pos="0.22 0 0">
+          <geom type="sphere" size="0.06" material="limb"/>
+        </body>
+      </body>
+
+      <!-- 右腿 → 向外分开，站姿稳定 -->
+      <body name="thigh_R" pos="0 -0.22 -0.1">
+        <joint axis="0 1 0" range="-1.5 1.5"/>
+        <geom type="capsule" size="0.08 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
+        <body name="leg_R" pos="0 0 -0.55">
+          <joint axis="0 1 0" range="-2.5 0"/>
+          <geom type="capsule" size="0.07 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
+        </body>
+      </body>
+
+      <!-- 左腿 → 向外分开，站姿稳定 -->
+      <body name="thigh_L" pos="0 0.22 -0.1">
+        <joint axis="0 1 0" range="-1.5 1.5"/>
+        <geom type="capsule" size="0.08 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
+        <body name="leg_L" pos="0 0 -0.55">
+          <joint axis="0 1 0" range="-2.5 0"/>
+          <geom type="capsule" size="0.07 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

@@ -6,6 +6,10 @@
 import os
 import csv
 import pickle
+import math
+import json
+import argparse
+from datetime import datetime
 
 import gym
 import easycarla
@@ -40,9 +44,10 @@ params = {
 }
 
 
-CONTROL_MODE = "safe_random"   # 可选: "autopilot" / "random" / "safe_random" / "manual"
+CONTROL_MODE = "autopilot"   # 可选: "autopilot" / "random" / "safe_random" / "manual"
 SAVE_EPISODES = True
 SAVE_SUMMARY_CSV = True
+SAVE_TRAJECTORY_CSV = True
 DEBUG_DRAW_EVERY = 5
 NUM_EPISODES = 5
 
@@ -56,16 +61,125 @@ MANUAL_STEER_STEP = 0.04
 MANUAL_STEER_DECAY = 0.85
 
 
-# 创建环境
-env = gym.make('carla-v0', params=params)
+def parse_args():
+    """
+    解析命令行参数。
+    """
+    parser = argparse.ArgumentParser(description="EasyCarla-RL demo script")
+
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default=CONTROL_MODE,
+        choices=["autopilot", "random", "safe_random", "manual"],
+        help="控制模式"
+    )
+
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        default=NUM_EPISODES,
+        help="运行 episode 数量"
+    )
+
+    parser.add_argument(
+        "--town",
+        type=str,
+        default=params["town"],
+        help="CARLA 地图名称"
+    )
+
+    parser.add_argument(
+        "--vehicles",
+        type=int,
+        default=params["number_of_vehicles"],
+        help="周围车辆数量"
+    )
+
+    parser.add_argument(
+        "--walkers",
+        type=int,
+        default=params["number_of_walkers"],
+        help="行人数量"
+    )
+
+    parser.add_argument(
+        "--traffic",
+        type=str,
+        default=params["traffic"],
+        choices=["on", "off"],
+        help="交通灯设置"
+    )
+
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=params["port"],
+        help="CARLA 连接端口"
+    )
+
+    parser.add_argument(
+        "--save-root",
+        type=str,
+        default="collected_episodes",
+        help="数据保存根目录"
+    )
+
+    parser.add_argument(
+        "--debug-draw-every",
+        type=int,
+        default=DEBUG_DRAW_EVERY,
+        help="CARLA 画面调试信息绘制间隔"
+    )
+
+    parser.add_argument(
+        "--no-save-episodes",
+        action="store_true",
+        help="不保存 episode pkl 数据"
+    )
+
+    parser.add_argument(
+        "--no-save-summary",
+        action="store_true",
+        help="不保存 summary.csv"
+    )
+
+    parser.add_argument(
+        "--no-save-trajectory",
+        action="store_true",
+        help="不保存 trajectory csv 数据"
+    )
+
+    return parser.parse_args()
+
+
+# 读取命令行参数
+args = parse_args()
+
+CONTROL_MODE = args.mode
+NUM_EPISODES = args.episodes
+DEBUG_DRAW_EVERY = args.debug_draw_every
+SAVE_EPISODES = not args.no_save_episodes
+SAVE_SUMMARY_CSV = not args.no_save_summary
+SAVE_TRAJECTORY_CSV = not args.no_save_trajectory
+
+params["town"] = args.town
+params["number_of_vehicles"] = args.vehicles
+params["number_of_walkers"] = args.walkers
+params["traffic"] = args.traffic
+params["port"] = args.port
+
+# 运行批次编号
+RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
 
 
 # 数据保存目录
-save_root_dir = "collected_episodes"
-save_dir = os.path.join(save_root_dir, CONTROL_MODE)
+save_root_dir = args.save_root
+save_dir = os.path.join(save_root_dir, CONTROL_MODE, RUN_ID)
 os.makedirs(save_dir, exist_ok=True)
 
 summary_csv_path = os.path.join(save_dir, "summary.csv")
+config_json_path = os.path.join(save_dir, "config.json")
 
 
 if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
@@ -76,14 +190,58 @@ if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
             "control_mode",
             "steps",
             "total_reward",
+            "avg_reward",
             "total_cost",
+            "avg_cost",
             "end_reason",
             "collision",
             "off_road",
             "avg_speed",
             "max_speed",
-            "min_speed"
+            "min_speed",
+            "total_distance"
         ])
+
+
+def save_config_json(save_path):
+    """
+    保存本次运行的实验配置。
+    """
+    config = {
+        "run_id": RUN_ID,
+        "control_mode": CONTROL_MODE,
+        "num_episodes": NUM_EPISODES,
+        "save_episodes": SAVE_EPISODES,
+        "save_summary_csv": SAVE_SUMMARY_CSV,
+        "save_trajectory_csv": SAVE_TRAJECTORY_CSV,
+        "debug_draw_every": DEBUG_DRAW_EVERY,
+        "save_root_dir": save_root_dir,
+        "save_dir": save_dir,
+        "manual_control": {
+            "manual_throttle_value": MANUAL_THROTTLE_VALUE,
+            "manual_brake_value": MANUAL_BRAKE_VALUE,
+            "manual_steer_step": MANUAL_STEER_STEP,
+            "manual_steer_decay": MANUAL_STEER_DECAY
+        },
+        "command_args": {
+            "mode": args.mode,
+            "episodes": args.episodes,
+            "town": args.town,
+            "vehicles": args.vehicles,
+            "walkers": args.walkers,
+            "traffic": args.traffic,
+            "port": args.port,
+            "save_root": args.save_root,
+            "debug_draw_every": args.debug_draw_every,
+            "no_save_episodes": args.no_save_episodes,
+            "no_save_summary": args.no_save_summary,
+            "no_save_trajectory": args.no_save_trajectory
+        },
+        "params": params
+    }
+
+    with open(save_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=4)
 
 
 def handle_reset_result(reset_result):
@@ -163,6 +321,62 @@ def get_ego_pose(env):
     }
 
     return ego_pose
+
+
+def calculate_distance(location_1, location_2):
+    """
+    计算两个位置之间的平面距离。
+    """
+    if location_1 is None or location_2 is None:
+        return 0.0
+
+    dx = location_2["x"] - location_1["x"]
+    dy = location_2["y"] - location_1["y"]
+
+    return float(math.sqrt(dx * dx + dy * dy))
+
+
+def save_trajectory_csv(save_path, trajectory_data):
+    """
+    保存车辆轨迹数据。
+    """
+    with open(save_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+
+        writer.writerow([
+            "step",
+            "x",
+            "y",
+            "z",
+            "pitch",
+            "yaw",
+            "roll",
+            "speed",
+            "reward",
+            "cost",
+            "step_distance",
+            "total_distance",
+            "collision",
+            "off_road"
+        ])
+
+        for row in trajectory_data:
+            writer.writerow([
+                row["step"],
+                row["x"],
+                row["y"],
+                row["z"],
+                row["pitch"],
+                row["yaw"],
+                row["roll"],
+                row["speed"],
+                row["reward"],
+                row["cost"],
+                row["step_distance"],
+                row["total_distance"],
+                row["collision"],
+                row["off_road"]
+            ])
 
 
 def init_manual_control():
@@ -315,6 +529,17 @@ def get_action(env, obs, control_mode="autopilot"):
     return action
 
 
+# 保存本次运行配置
+save_config_json(config_json_path)
+print(f"Run ID: {RUN_ID}")
+print(f"Save directory: {save_dir}")
+print(f"Config saved to: {config_json_path}")
+
+
+# 创建环境
+env = gym.make('carla-v0', params=params)
+
+
 # 初始化手动驾驶窗口
 init_manual_control()
 
@@ -331,11 +556,16 @@ try:
         total_reward = 0.0
         total_cost = 0.0
         episode_data = []
+        trajectory_data = []
         end_reason = "unknown"
 
         speed_list = []
         episode_collision = False
         episode_off_road = False
+
+        total_distance = 0.0
+        previous_pose = get_ego_pose(env)
+        previous_location = previous_pose["location"]
 
         while not done:
             action = get_action(env, obs, CONTROL_MODE)
@@ -362,6 +592,11 @@ try:
             off_road = bool(info.get('is_off_road', False))
             ego_pose = get_ego_pose(env)
 
+            current_location = ego_pose["location"]
+            step_distance = calculate_distance(previous_location, current_location)
+            total_distance += step_distance
+            previous_location = current_location
+
             speed_list.append(speed)
             episode_collision = episode_collision or collision
             episode_off_road = episode_off_road or off_road
@@ -387,9 +622,28 @@ try:
                 "done": bool(done),
                 "info": safe_info_dict(info),
                 "ego_pose": ego_pose,
+                "step_distance": float(step_distance),
+                "total_distance": float(total_distance),
             }
 
             episode_data.append(transition)
+
+            trajectory_data.append({
+                "step": int(env.time_step),
+                "x": ego_pose["location"]["x"],
+                "y": ego_pose["location"]["y"],
+                "z": ego_pose["location"]["z"],
+                "pitch": ego_pose["rotation"]["pitch"],
+                "yaw": ego_pose["rotation"]["yaw"],
+                "roll": ego_pose["rotation"]["roll"],
+                "speed": speed,
+                "reward": reward,
+                "cost": cost,
+                "step_distance": float(step_distance),
+                "total_distance": float(total_distance),
+                "collision": collision,
+                "off_road": off_road,
+            })
 
             if env.time_step % 10 == 0 or done:
                 print(
@@ -397,6 +651,7 @@ try:
                     f"Speed: {speed:6.2f} m/s | "
                     f"Reward: {reward:7.2f} | "
                     f"Cost: {cost:6.2f} | "
+                    f"Distance: {total_distance:7.2f} m | "
                     f"Done: {done}"
                 )
 
@@ -412,6 +667,7 @@ try:
                     text_location,
                     f"Mode: {CONTROL_MODE} | "
                     f"Speed: {speed:.2f} m/s | "
+                    f"Distance: {total_distance:.2f} m | "
                     f"Reward: {reward:.2f} | "
                     f"Cost: {cost:.2f} | "
                     f"Collision: {collision} | "
@@ -435,13 +691,23 @@ try:
             max_speed = 0.0
             min_speed = 0.0
 
+        if len(episode_data) > 0:
+            avg_reward = float(total_reward / len(episode_data))
+            avg_cost = float(total_cost / len(episode_data))
+        else:
+            avg_reward = 0.0
+            avg_cost = 0.0
+
         if SAVE_EPISODES:
             episode_record = {
                 "episode_id": episode,
                 "control_mode": CONTROL_MODE,
+                "run_id": RUN_ID,
                 "params": params,
                 "total_reward": float(total_reward),
+                "avg_reward": avg_reward,
                 "total_cost": float(total_cost),
+                "avg_cost": avg_cost,
                 "num_steps": len(episode_data),
                 "end_reason": end_reason,
                 "collision": bool(episode_collision),
@@ -449,6 +715,7 @@ try:
                 "avg_speed": avg_speed,
                 "max_speed": max_speed,
                 "min_speed": min_speed,
+                "total_distance": float(total_distance),
                 "data": episode_data,
             }
 
@@ -458,6 +725,11 @@ try:
 
             print(f"Episode data saved to: {save_path}")
 
+        if SAVE_TRAJECTORY_CSV:
+            trajectory_csv_path = os.path.join(save_dir, f"trajectory_episode_{episode:03d}.csv")
+            save_trajectory_csv(trajectory_csv_path, trajectory_data)
+            print(f"Trajectory data saved to: {trajectory_csv_path}")
+
         if SAVE_SUMMARY_CSV:
             with open(summary_csv_path, "a", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
@@ -466,23 +738,29 @@ try:
                     CONTROL_MODE,
                     len(episode_data),
                     float(total_reward),
+                    avg_reward,
                     float(total_cost),
+                    avg_cost,
                     end_reason,
                     bool(episode_collision),
                     bool(episode_off_road),
                     avg_speed,
                     max_speed,
-                    min_speed
+                    min_speed,
+                    float(total_distance)
                 ])
 
         print(
             f"Episode {episode} finished. "
             f"Steps: {len(episode_data)} | "
             f"Total reward: {total_reward:.2f} | "
+            f"Avg reward: {avg_reward:.2f} | "
             f"Total cost: {total_cost:.2f} | "
+            f"Avg cost: {avg_cost:.2f} | "
             f"End reason: {end_reason} | "
             f"Avg speed: {avg_speed:.2f} m/s | "
-            f"Max speed: {max_speed:.2f} m/s"
+            f"Max speed: {max_speed:.2f} m/s | "
+            f"Distance: {total_distance:.2f} m"
         )
 
         if CONTROL_MODE == "manual" and MANUAL_QUIT:
