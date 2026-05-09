@@ -1,3 +1,4 @@
+import os
 import json
 import time
 import threading
@@ -238,7 +239,7 @@ class DataRecorder:
             finally:
                 if frame_data is not None:
                     self.data_queue.task_done()
-                 
+                    
     def _save_frame_data(self, frame_data: Dict[str, Any]):
         """Save individual frame data to disk."""
         try:

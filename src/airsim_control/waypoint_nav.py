@@ -93,7 +93,8 @@ def main():
 
     print(f"\n航点列表:")
     for i, wp in enumerate(agent.planner.waypoints):
-        print(f"  {i+1}. ({wp[0]:.1f}, {wp[1]:.1f}, {wp[2]:.1f})")
+        tag = " [降落]" if wp.is_landing else ""
+        print(f"  {i+1}. ({wp.x:.1f}, {wp.y:.1f}, {wp.z:.1f}){tag}")
 
     # 等待用户确认
     input("\n按Enter开始导航，Ctrl+C取消...")
