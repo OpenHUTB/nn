@@ -12,6 +12,23 @@ class SimulationDroneController(BaseDroneController):
         self.simulation_mode: bool = simulation_mode
         self.master = None
 
+    def disconnect(self) -> bool:
+        """断开连接"""
+        if self.master:
+            try:
+                self.master.close()
+            except:
+                pass
+        self.connected = False
+        self.logger.info("仿真无人机: 已断开连接")
+        return True
+
+    def takeoff(self, altitude: float = None) -> bool:
+        """起飞"""
+        if altitude is None:
+            altitude = self.config.get("drone.takeoff_altitude", 2.0) if self.config else 2.0
+        return self._takeoff_simulation(altitude)
+
     def _connect_to_real_drone(self):
         try:
             from pymavlink import mavutil
@@ -250,6 +267,52 @@ class SimulationDroneController(BaseDroneController):
 
     def _send_mavlink_velocity(self, vx: float, vy: float, vz: float):
         pass
+
+    def update_physics(self, dt: float):
+        """更新物理仿真"""
+        if not self.state['armed']:
+            return
+
+        # 更新位置
+        self.state['position'] += self.state['velocity'] * dt
+
+        # 处理起飞高度
+        if self.state['mode'] == 'TAKEOFF':
+            target_height = self.config.get("drone.takeoff_altitude", 2.0) if self.config else 2.0
+            if self.state['position'][1] >= target_height:
+                self.state['velocity'][1] = 0.0
+                self.state['mode'] = 'HOVER'
+                self.logger.info("仿真: 无人机已达到目标高度，开始悬停")
+
+        # 处理降落
+        elif self.state['mode'] == 'LAND' and self.state['position'][1] <= 0.1:
+            self.state['position'][1] = 0.0
+            self.state['velocity'][1] = 0.0
+            self.state['armed'] = False
+            self.state['mode'] = 'LANDED'
+            self.logger.info("仿真: 无人机已降落")
+
+        # 边界检查
+        if self.state['position'][1] < 0:
+            self.state['position'][1] = 0
+            self.state['velocity'][1] = max(self.state['velocity'][1], 0)
+
+        max_altitude = self.config.get("drone.max_altitude", 10.0) if self.config else 10.0
+        if self.state['position'][1] > max_altitude:
+            self.state['position'][1] = max_altitude
+            self.state['velocity'][1] = min(self.state['velocity'][1], 0)
+
+        self._record_trajectory()
+
+        # 电池消耗
+        battery_drain = 0.001 * dt * 60
+        if np.linalg.norm(self.state['velocity']) > 0.1:
+            battery_drain *= 1.5
+        self.state['battery'] -= battery_drain
+
+        if self.state['battery'] < 0:
+            self.state['battery'] = 0
+            self._emergency_land()
 
     def _set_mavlink_mode(self, mode: str):
         try:
