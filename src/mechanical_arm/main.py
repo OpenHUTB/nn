@@ -6,6 +6,16 @@ import matplotlib.animation as animation
 
 
 class RoboticArmWithGripper:
+    # 关节角度范围限制（弧度）
+    JOINT_LIMITS = [
+        (-np.pi, np.pi),        # Joint 1: 底座旋转
+        (-np.pi / 2, np.pi / 2),  # Joint 2: 肩关节
+        (-np.pi / 2, np.pi / 2),  # Joint 3: 肘关节
+        (-np.pi, np.pi),        # Joint 4: 腕关节
+    ]
+    GRIPPER_OPENING_RANGE = (0.0, 0.4)
+    GRIPPER_ANGLE_RANGE = (-np.pi, np.pi)
+
     def __init__(self):
         # 机械臂参数
         self.link_lengths = [2.0, 1.5, 1.0, 0.5]  # 四个连杆长度
@@ -23,6 +33,22 @@ class RoboticArmWithGripper:
         # 初始化图形
         self.fig = plt.figure(figsize=(14, 8))
         self.setup_plot()
+
+    @staticmethod
+    def _clamp(value, lower, upper):
+        """将值限制在指定范围内"""
+        return max(lower, min(upper, value))
+
+    def validate_angles(self, angles):
+        """验证并修正关节角度，确保在合法范围内"""
+        if len(angles) != len(self.JOINT_LIMITS):
+            raise ValueError(
+                f"关节角度数量错误：期望 {len(self.JOINT_LIMITS)} 个，实际 {len(angles)} 个"
+            )
+        return [
+            self._clamp(a, lo, hi)
+            for a, (lo, hi) in zip(angles, self.JOINT_LIMITS)
+        ]
 
     def update_dh_params(self):
         """更新DH参数"""
@@ -226,14 +252,22 @@ class RoboticArmWithGripper:
 
     def update_from_slider(self, val):
         """更新关节角度"""
-        self.joint_angles = [s.val for s in self.sliders]
+        self.joint_angles = self.validate_angles([s.val for s in self.sliders])
         self.update_dh_params()
         self.update_plot()
 
     def update_gripper(self, val):
         """更新夹爪参数"""
-        self.gripper_opening = self.slider_gripper_open.val
-        self.gripper_angle = self.slider_gripper_rotate.val
+        self.gripper_opening = self._clamp(
+            self.slider_gripper_open.val,
+            self.GRIPPER_OPENING_RANGE[0],
+            self.GRIPPER_OPENING_RANGE[1]
+        )
+        self.gripper_angle = self._clamp(
+            self.slider_gripper_rotate.val,
+            self.GRIPPER_ANGLE_RANGE[0],
+            self.GRIPPER_ANGLE_RANGE[1]
+        )
         self.update_plot()
 
     def reset_all(self, event):
@@ -272,13 +306,14 @@ class RoboticArmWithGripper:
         # 保存原始角度
         original_angles = self.joint_angles.copy()
 
-        # 定义动画路径
-        path = [
+        # 定义动画路径（每条路径都经过验证）
+        raw_path = [
             [0.5, 0.3, -0.2, 0.1],
             [-0.3, 0.6, -0.4, 0.2],
             [0.8, -0.2, 0.5, -0.3],
             original_angles
         ]
+        path = [self.validate_angles(p) for p in raw_path]
 
         for target_angles in path:
             # 平滑移动到目标角度
