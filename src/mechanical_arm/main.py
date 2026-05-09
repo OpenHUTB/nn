@@ -1,3 +1,4 @@
+import atexit
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
@@ -22,7 +23,12 @@ class RoboticArmWithGripper:
 
         # 初始化图形
         self.fig = plt.figure(figsize=(14, 8))
+        self.fig.canvas.mpl_connect('close_event', self._on_close)
         self.setup_plot()
+
+    def _on_close(self, event):
+        """窗口关闭时释放资源"""
+        plt.close(self.fig)
 
     def update_dh_params(self):
         """更新DH参数"""
@@ -430,9 +436,14 @@ def main():
     # 创建机械臂实例
     arm = RoboticArmWithGripper()
 
-    # 显示交互式界面
-    plt.show()
+    # 注册清理函数
+    atexit.register(plt.close, 'all')
+
+    try:
+        plt.show()
+    finally:
+        plt.close('all')
 
 
 if __name__ == "__main__":
-    main()#结束过程
+    main()
