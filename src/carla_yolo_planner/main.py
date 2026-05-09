@@ -170,7 +170,7 @@ def main():
                     
                     # 绘制 YOLO 检测结果（如果有）
                     if results:
-                        client.draw_detection_in_carla(results)
+                        client.draw_detection_in_carla(results, detector.classes)
                         if frame_count % 100 == 0:  # 每100帧打印一次
                             print(f"[DEBUG] 检测到 {len(results)} 个目标")
                 
@@ -221,8 +221,8 @@ def main():
         print("[Main] 正在清理资源...")
         client.destroy_actors()
         logger.close()
-        # 只有创建了窗口才需要销毁
-        if not args.no_render:
+        # 只有在非 --in-carla 和非 --no-render 模式下才需要销毁窗口
+        if not args.no_render and not args.in_carla:
             cv2.destroyAllWindows()
         print("[Main] 程序已退出")
 
