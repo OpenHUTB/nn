@@ -5,9 +5,89 @@ import tensorflow as tf
 import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler, Callback
 import datetime
+import matplotlib
+matplotlib.use('TkAgg')  # Use TkAgg backend for real-time plotting
+import matplotlib.pyplot as plt
 from utils.logger import logger
+
+# Custom callback for real-time loss visualization
+class RealTimeLossPlot(Callback):
+    def __init__(self):
+        super().__init__()
+        self.train_losses = []
+        self.val_losses = []
+        self.train_steering_losses = []
+        self.val_steering_losses = []
+        self.train_throttle_losses = []
+        self.val_throttle_losses = []
+        self.train_brake_losses = []
+        self.val_brake_losses = []
+        
+        # Initialize plot
+        plt.ion()  # Turn on interactive mode
+        self.fig, ((self.ax1, self.ax2), (self.ax3, self.ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+        plt.subplots_adjust(hspace=0.3, wspace=0.2)
+        
+    def on_epoch_end(self, epoch, logs=None):
+        # Store losses
+        self.train_losses.append(logs.get('loss'))
+        self.val_losses.append(logs.get('val_loss'))
+        self.train_steering_losses.append(logs.get('steering_angle_loss'))
+        self.val_steering_losses.append(logs.get('val_steering_angle_loss'))
+        self.train_throttle_losses.append(logs.get('throttle_press_loss'))
+        self.val_throttle_losses.append(logs.get('val_throttle_press_loss'))
+        self.train_brake_losses.append(logs.get('brake_pressure_loss'))
+        self.val_brake_losses.append(logs.get('val_brake_pressure_loss'))
+        
+        # Clear and redraw plots
+        self._update_plot()
+        
+    def _update_plot(self):
+        # Total Loss plot
+        self.ax1.clear()
+        self.ax1.plot(self.train_losses, 'b-', label='Training Loss')
+        self.ax1.plot(self.val_losses, 'r-', label='Validation Loss')
+        self.ax1.set_title('Total Loss')
+        self.ax1.set_xlabel('Epoch')
+        self.ax1.set_ylabel('Loss')
+        self.ax1.legend()
+        self.ax1.grid(True)
+        
+        # Steering Angle Loss plot
+        self.ax2.clear()
+        self.ax2.plot(self.train_steering_losses, 'b-', label='Training')
+        self.ax2.plot(self.val_steering_losses, 'r-', label='Validation')
+        self.ax2.set_title('Steering Angle Loss')
+        self.ax2.set_xlabel('Epoch')
+        self.ax2.set_ylabel('Loss')
+        self.ax2.legend()
+        self.ax2.grid(True)
+        
+        # Throttle Loss plot
+        self.ax3.clear()
+        self.ax3.plot(self.train_throttle_losses, 'b-', label='Training')
+        self.ax3.plot(self.val_throttle_losses, 'r-', label='Validation')
+        self.ax3.set_title('Throttle Pressure Loss')
+        self.ax3.set_xlabel('Epoch')
+        self.ax3.set_ylabel('Loss')
+        self.ax3.legend()
+        self.ax3.grid(True)
+        
+        # Brake Loss plot
+        self.ax4.clear()
+        self.ax4.plot(self.train_brake_losses, 'b-', label='Training')
+        self.ax4.plot(self.val_brake_losses, 'r-', label='Validation')
+        self.ax4.set_title('Brake Pressure Loss')
+        self.ax4.set_xlabel('Epoch')
+        self.ax4.set_ylabel('Loss')
+        self.ax4.legend()
+        self.ax4.grid(True)
+        
+        # Refresh the plot
+        plt.draw()
+        plt.pause(0.05)
 
 class PilotNet():
     def __init__(self, width, height, predict=False):
@@ -108,7 +188,10 @@ class PilotNet():
         
         lr_schedule = LearningRateScheduler(lr_scheduler)
         
-        callbacks = [early_stopping, model_checkpoint, lr_schedule]
+        # Real-time loss plot callback
+        real_time_plot = RealTimeLossPlot()
+        
+        callbacks = [early_stopping, model_checkpoint, lr_schedule, real_time_plot]
         
         # fit data to model for training
         history = self.model.fit(

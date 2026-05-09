@@ -132,56 +132,145 @@ class CarlaClient:
         except:
             pass
 
-    def draw_detection_in_carla(self, detections):
+    def draw_detection_in_carla(self, detections, classes):
         """
         在 CARLA 模拟器中绘制检测结果
-        使用 Debug Draw 在 3D 世界中绘制边界框
+        使用 Debug Draw 在 3D 世界中绘制边界框和标签
+        
+        Args:
+            detections: YOLO检测结果列表，格式为 [x, y, w, h, class_id, confidence]
+            classes: 类别名称列表
         """
         if not self.world or not self.vehicle:
             return
         
-        # 获取主车辆位置
+        # 获取主车辆位置和变换
         ego_location = self.vehicle.get_location()
         ego_transform = self.vehicle.get_transform()
+        forward = ego_transform.get_forward_vector()
+        right = ego_transform.get_right_vector()
+        
+        # 绘制安全区域（驾驶走廊）
+        self._draw_safe_corridor(ego_location, ego_transform)
         
         # 遍历检测结果
         for detection in detections:
-            class_name = detection[0]
-            confidence = detection[1]
+            if len(detection) < 6:
+                continue
+                
+            x, y, w, h, class_id, confidence = detection
             
             if confidence < config.conf_thres:
                 continue
             
-            # 只处理车辆类别
-            if 'car' in class_name.lower() or 'vehicle' in class_name.lower() or 'truck' in class_name.lower() or 'bus' in class_name.lower():
-                # 在车辆前方 5-30 米范围内生成检测点
-                forward = ego_transform.get_forward_vector()
-                distance = random.uniform(10, 30)
-                right = ego_transform.get_right_vector()
-                lateral = random.uniform(-5, 5)
-                
-                detection_loc = carla.Location(
-                    x=ego_location.x + forward.x * distance + right.x * lateral,
-                    y=ego_location.y + forward.y * distance + right.y * lateral,
-                    z=ego_location.z + random.uniform(0.5, 1.5)
+            # 获取类别名称
+            class_name = classes[int(class_id)] if (classes and 0 <= int(class_id) < len(classes)) else f"class_{class_id}"
+            
+            # 根据检测框位置估算距离（检测框在图像下方表示距离更近）
+            normalized_y = y / config.CAMERA_HEIGHT
+            distance = 3 + (1 - normalized_y) * 27  # 距离范围 3-30 米
+            
+            # 根据检测框水平位置计算横向偏移
+            img_center_x = config.CAMERA_WIDTH // 2
+            normalized_x = (x + w/2 - img_center_x) / (config.CAMERA_WIDTH / 2)
+            lateral = normalized_x * 7  # 最大偏移7米
+            
+            # 计算检测目标的3D位置
+            detection_loc = carla.Location(
+                x=ego_location.x + forward.x * distance + right.x * lateral,
+                y=ego_location.y + forward.y * distance + right.y * lateral,
+                z=ego_location.z + 0.3
+            )
+            
+            # 根据距离设置颜色（近红远绿）
+            if distance < 8:
+                color = carla.Color(255, 0, 0)      # 红色 - 危险
+                size = 0.5
+            elif distance < 15:
+                color = carla.Color(255, 165, 0)    # 橙色 - 警告
+                size = 0.4
+            else:
+                color = carla.Color(0, 255, 0)      # 绿色 - 安全
+                size = 0.3
+            
+            # 绘制检测点
+            self.debug_helper.draw_point(
+                detection_loc,
+                size=size,
+                color=color,
+                life_time=0.15
+            )
+            
+            # 绘制检测框（立方体）
+            box_extent = carla.Vector3D(1.5, 0.8, 0.5)
+            box_transform = carla.Transform(detection_loc)
+            self.debug_helper.draw_box(
+                box_transform,
+                box_extent,
+                color=color,
+                thickness=0.2,
+                life_time=0.15
+            )
+            
+            # 绘制标签
+            self.debug_helper.draw_string(
+                carla.Location(x=detection_loc.x, y=detection_loc.y, z=detection_loc.z + 1.2),
+                f"{class_name} {confidence:.2f}",
+                draw_shadow=True,
+                color=color,
+                life_time=0.15
+            )
+    
+    def _draw_safe_corridor(self, location, transform):
+        """
+        在 CARLA 中绘制驾驶安全走廊（蓝色区域）
+        """
+        forward = transform.get_forward_vector()
+        right = transform.get_right_vector()
+        
+        # 安全走廊宽度（基于配置）
+        corridor_width = config.SAFE_ZONE_RATIO * 8  # 转换为实际距离
+        
+        # 绘制安全走廊的四个角点
+        points = []
+        for d in [0, 25]:  # 0米和25米处
+            for w in [-corridor_width/2, corridor_width/2]:
+                point = carla.Location(
+                    x=location.x + forward.x * d + right.x * w,
+                    y=location.y + forward.y * d + right.y * w,
+                    z=location.z + 0.1
                 )
-                
-                # 绘制绿色点
-                self.debug_helper.draw_point(
-                    detection_loc,
-                    size=0.5,
-                    color=carla.Color(0, 255, 0),
-                    life_time=-1  # 永久显示，直到下次绘制
-                )
-                
-                # 绘制标签
-                self.debug_helper.draw_string(
-                    carla.Location(x=detection_loc.x, y=detection_loc.y, z=detection_loc.z + 1.5),
-                    f"{class_name} {confidence:.1f}",
-                    draw_shadow=False,
-                    color=carla.Color(0, 255, 0),
-                    life_time=-1
-                )
+                points.append(point)
+        
+        # 绘制安全走廊区域（蓝色透明）
+        # 绘制前后边界线
+        self.debug_helper.draw_line(points[0], points[1], color=carla.Color(0, 128, 255), thickness=0.15, life_time=0.1)
+        self.debug_helper.draw_line(points[2], points[3], color=carla.Color(0, 128, 255), thickness=0.15, life_time=0.1)
+        # 绘制左右边界线
+        self.debug_helper.draw_line(points[0], points[2], color=carla.Color(0, 128, 255), thickness=0.15, life_time=0.1)
+        self.debug_helper.draw_line(points[1], points[3], color=carla.Color(0, 128, 255), thickness=0.15, life_time=0.1)
+        
+        # 绘制中心线
+        center_line_start = carla.Location(
+            x=location.x + forward.x * 0,
+            y=location.y + forward.y * 0,
+            z=location.z + 0.15
+        )
+        center_line_end = carla.Location(
+            x=location.x + forward.x * 25,
+            y=location.y + forward.y * 25,
+            z=location.z + 0.15
+        )
+        self.debug_helper.draw_line(center_line_start, center_line_end, color=carla.Color(255, 255, 0), thickness=0.1, life_time=0.1)
+        
+        # 在起点绘制标签
+        self.debug_helper.draw_string(
+            carla.Location(x=location.x, y=location.y, z=location.z + 1.5),
+            "SAFE ZONE",
+            draw_shadow=True,
+            color=carla.Color(0, 128, 255),
+            life_time=0.1
+        )
 
     def draw_vehicle_boxes(self, debug=False):
         """

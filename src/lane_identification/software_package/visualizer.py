@@ -180,8 +180,8 @@ class Visualizer:
         """绘制车道线 - 支持多车道显示"""
         lane_layer = image.copy()
 
-        # 1. 绘制所有原始检测线段（极淡，避免视觉干扰）
-        if scale_factor > 0.6:  # 只在较大图片上显示原始线段
+        # 1. 绘制所有原始检测线段（降低透明度，减少视觉干扰）
+        if scale_factor > 0.8:
             for side in ['left_lines', 'right_lines']:
                 lines = lane_info.get(side, [])
 
@@ -189,7 +189,7 @@ class Visualizer:
                     points = line.get('points', [])
                     if len(points) == 2:
                         line_thickness = max(1, int(1 * scale_factor))
-                        cv2.line(lane_layer, points[0], points[1], (100, 100, 100), line_thickness, cv2.LINE_AA)
+                        cv2.line(lane_layer, points[0], points[1], (80, 80, 80), line_thickness, cv2.LINE_AA)
 
         # 2. 绘制邻车道线（黄色虚线）
         for side in ['neighbor_left_lines', 'neighbor_right_lines']:
@@ -202,7 +202,7 @@ class Visualizer:
                     cv2.line(lane_layer, points[0], points[1],
                              self.colors['neighbor_lane'][:3], line_thickness, cv2.LINE_AA)
 
-        # 3. 绘制主车道边界线（加粗高亮，增强对比度）
+        # 3. 绘制主车道边界线（加粗高亮）
         primary_left_lines = lane_info.get('primary_left_lines', [])
         primary_right_lines = lane_info.get('primary_right_lines', [])
 
@@ -232,17 +232,15 @@ class Visualizer:
 
                 cv2.line(lane_layer, points[0], points[1], color[:3], thickness, cv2.LINE_AA)
 
-        # 5. 绘制中心线（虚线样式，降低干扰）
+        # 5. 绘制中心线（虚线样式）
         center_line = lane_info.get('center_line')
         if center_line and 'points' in center_line and len(center_line['points']) == 2:
             points = center_line['points']
             color = self.colors['center_line']
             line_thickness = max(1, int(2 * scale_factor))
-            # 绘制虚线效果
             self._draw_dashed_line(lane_layer, points[0], points[1], color[:3],
                                    line_thickness, int(10 * scale_factor))
 
-        # 混合车道线图层
         cv2.addWeighted(lane_layer, 0.8, image, 0.2, 0, image)
 
         return image
@@ -398,79 +396,8 @@ class Visualizer:
                                   direction_info: Dict[str, Any],
                                   scale_factor: float = 1.0,
                                   width: int = 0, height: int = 0) -> np.ndarray:
-        """绘制方向指示器"""
-        if width == 0 or height == 0:
-            height, width = image.shape[:2]
-
-        direction = direction_info.get('direction', '未知')
-        confidence = direction_info.get('confidence', 0.0)
-
-        # 指示器位置 - 根据图片尺寸调整，但限制最小尺寸
-        center_x = width // 2
-        base_indicator_y = 100  # 距离底部的基准距离
-        indicator_y = height - max(80, int(base_indicator_y * max(scale_factor, 0.8)))
-
-        # 根据缩放调整箭头大小，设置更合理的范围
-        arrow_scale = max(0.3, min(scale_factor, 1.5))  # 限制在0.3-1.5之间
-
-        # 创建指示器图层
-        indicator_layer = np.zeros_like(image)
-
-        if direction == "左转":
-            # 左转箭头 - 简化形状
-            points = np.array([
-                [center_x, indicator_y],
-                [center_x - int(60 * arrow_scale), indicator_y],
-                [center_x - int(50 * arrow_scale), indicator_y - int(30 * arrow_scale)],
-                [center_x - int(80 * arrow_scale), indicator_y - int(30 * arrow_scale)],
-                [center_x - int(100 * arrow_scale), indicator_y],
-                [center_x - int(160 * arrow_scale), indicator_y],
-                [center_x - int(80 * arrow_scale), indicator_y + int(60 * arrow_scale)],
-                [center_x, indicator_y + int(60 * arrow_scale)]
-            ], dtype=np.int32)
-            base_color = (0, 165, 255)
-
-        elif direction == "右转":
-            # 右转箭头 - 简化形状
-            points = np.array([
-                [center_x, indicator_y],
-                [center_x + int(60 * arrow_scale), indicator_y],
-                [center_x + int(50 * arrow_scale), indicator_y - int(30 * arrow_scale)],
-                [center_x + int(80 * arrow_scale), indicator_y - int(30 * arrow_scale)],
-                [center_x + int(100 * arrow_scale), indicator_y],
-                [center_x + int(160 * arrow_scale), indicator_y],
-                [center_x + int(80 * arrow_scale), indicator_y + int(60 * arrow_scale)],
-                [center_x, indicator_y + int(60 * arrow_scale)]
-            ], dtype=np.int32)
-            base_color = (0, 165, 255)
-
-        else:  # 直行或未知
-            # 直行箭头 - 简化形状
-            points = np.array([
-                [center_x - int(40 * arrow_scale), indicator_y + int(30 * arrow_scale)],
-                [center_x, indicator_y - int(30 * arrow_scale)],
-                [center_x + int(40 * arrow_scale), indicator_y + int(30 * arrow_scale)],
-                [center_x + int(30 * arrow_scale), indicator_y + int(30 * arrow_scale)],
-                [center_x + int(30 * arrow_scale), indicator_y + int(90 * arrow_scale)],
-                [center_x - int(30 * arrow_scale), indicator_y + int(90 * arrow_scale)],
-                [center_x - int(30 * arrow_scale), indicator_y + int(30 * arrow_scale)]
-            ], dtype=np.int32)
-            base_color = (0, 255, 0)
-
-        # 根据置信度调整颜色亮度
-        brightness_factor = 0.5 + confidence * 0.5
-        color = tuple(int(c * brightness_factor) for c in base_color)
-
-        # 绘制指示器
-        cv2.fillPoly(indicator_layer, [points], color)
-
-        alpha = 0.3 + confidence * 0.5
-        cv2.addWeighted(indicator_layer, alpha, image, 1 - alpha, 0, image)
-
-        # 绘制边框
-        border_thickness = max(1, int(2 * scale_factor))
-        cv2.polylines(image, [points], True, (255, 255, 255), border_thickness, cv2.LINE_AA)
-
+        """绘制方向指示器 - 已禁用"""
+        # 不再绘制箭头指示器
         return image
 
     def _get_confidence_color(self, confidence: float) -> Tuple[int, int, int]:

@@ -1,18 +1,6 @@
 import cv2 as cv
 import os
 
-# 全局变量用于置信度阈值调整
-_confidence_threshold = 0.15  # 默认值
-
-def get_confidence_threshold():
-    """获取当前置信度阈值"""
-    return _confidence_threshold
-
-def set_confidence_threshold(value):
-    """设置置信度阈值"""
-    global _confidence_threshold
-    _confidence_threshold = max(0.01, min(1.0, value))  # 限制在0.01-1.0之间
-
 def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
     """处理键盘事件
     
@@ -62,13 +50,5 @@ def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
         print(f"✅ 截图已保存: {screenshot_path}")
     elif key == ord('q'):  # 按'q'键退出程序
         return False
-    elif key == ord('c') or key == ord('C'):
-        # 按C键增加阈值
-        set_confidence_threshold(_confidence_threshold + 0.05)
-        print(f"置信度阈值: {_confidence_threshold:.2f}")
-    elif key == ord('d') or key == ord('D'):
-        # 按D键减少阈值
-        set_confidence_threshold(_confidence_threshold - 0.05)
-        print(f"置信度阈值: {_confidence_threshold:.2f}")
     
     return True
