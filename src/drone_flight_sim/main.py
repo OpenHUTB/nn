@@ -90,7 +90,8 @@ def auto_flight_mode(drone):
         # 到达航点后拍照
         print(f"\n📷 航点 {i} 拍照...")
         drone.capture_image()
-
+        # 📊 增加状态输出
+        drone.get_telemetry()
         time.sleep(1)
 
     # 降落阶段

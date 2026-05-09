@@ -752,6 +752,7 @@ class DroneController:
         print(f"\n{'─' * 40}")
         print(f"📊 无人机状态:")
         print(f"   位置: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
+        print(f"   距离原点: {(pos.x_val**2 + pos.y_val**2) ** 0.5:.2f}m")
         print(f"   高度: {height:.2f}m")
         print(f"   速度: {speed:.2f} m/s")
         print(f"   朝向: {yaw_deg}°")
