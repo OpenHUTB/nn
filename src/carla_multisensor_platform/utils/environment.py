@@ -1,7 +1,11 @@
+import sys
+import math
+import time
 import carla
 import random
 import pygame
 import logging
+from colorama import Fore, Back, Style, Cursor
 from utils.utils import exit_game
 
 class CarlaEnvironment:

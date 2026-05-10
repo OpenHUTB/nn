@@ -23,3 +23,31 @@
 4. 安装依赖库：通过Python包管理工具安装所需核心依赖库，若需使用强化学习功能，额外安装对应的强化学习相关依赖库。
 
 5. 验证环境：运行简单的Python命令导入mujoco库，无报错则说明环境搭建完成。
+
+## 仿真指标统计与 CSV 报告
+
+本项目新增了无界面运行和仿真指标导出功能，便于在 PyCharm 终端或 CI 环境中复现实验结果。
+
+运行示例：
+
+```bash
+python qwer.py --headless --duration 8 --output-dir output --log-interval 1
+```
+
+参数说明：
+
+- `--headless`：不打开 MuJoCo viewer，直接运行仿真并输出数据。
+- `--duration`：仿真时长，单位为秒。
+- `--output-dir`：CSV 报告输出目录，默认值为 `output`。
+- `--log-interval`：终端状态打印间隔，单位为秒。
+
+运行结束后会生成 `output/simulation_metrics.csv`，包含每一步的车辆位置、速度、油门、转向角、让行状态、急刹状态、避障状态、最近障碍距离和两车距离等指标。终端会同步打印最小车距、平均速度、急刹次数和距离目标点的剩余距离。
+
+## 避障决策优化
+
+车辆避障逻辑在原有道路边界斥力和让行规则基础上，新增动态车辆斥力：
+
+- 当两车距离进入 `avoidance_distance` 范围时，根据距离和相对速度生成连续斥力。
+- 使用 `avoidance_active` 标记当前车辆是否处于主动避障状态。
+- 使用 `min_obstacle_distance` 记录最近动态障碍距离，方便在 CSV 报告中分析避障过程。
+- 急刹阈值拆分为独立的 `emergency_distance`，避免和普通避障距离混用。

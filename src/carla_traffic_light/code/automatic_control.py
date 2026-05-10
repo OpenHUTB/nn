@@ -426,9 +426,23 @@ class HelpText(object):
 
     def __init__(self, font, width, height):
         """Constructor method"""
-        lines = __doc__.split('\n')
+        lines = [
+            "=== CARLA Help ===",
+            "",
+            "C        - Switch Camera View",
+            "H        - Show/Hide Help",
+            "Ctrl+Q   - Quit",
+            "ESC      - Quit",
+            "",
+            "--agent Basic      - Basic Mode",
+            "--agent Behavior   - Behavior Mode (Traffic Light)",
+            "--loop             - Loop Mode",
+            "--behavior normal  - Driving Style (normal/cautious/aggressive)",
+            "",
+            "Traffic Light: Behavior Agent mode only",
+        ]
         self.font = font
-        self.dim = (680, len(lines) * 22 + 12)
+        self.dim = (900, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
         self.seconds_left = 0
         self.surface = pygame.Surface(self.dim)

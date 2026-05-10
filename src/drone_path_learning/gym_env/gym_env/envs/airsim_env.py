@@ -753,139 +753,6 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
 
         return reward
 
-    def compute_reward_final_fixedwing(self, done, action):
-        reward = 0
-        reward_reach = 10
-        reward_crash = -20
-        reward_outside = -10
-
-        if not done:
-            distance_now = self.get_distance_to_goal_3d()
-            reward_distance = (
-                300
-                * (self.previous_distance_from_des_point - distance_now)
-                / self.dynamic_model.goal_distance
-            )
-            self.previous_distance_from_des_point = distance_now
-
-            current_pose = self.dynamic_model.get_position()
-            goal_pose = self.dynamic_model.goal_position
-            x = current_pose[0]
-            y = current_pose[1]
-            x_g = goal_pose[0]
-            y_g = goal_pose[1]
-
-            punishment_xy = np.clip(self.getDis(x, y, 0, 0, x_g, y_g) / 50, 0, 1)
-
-            punishment_pose = punishment_xy
-
-            if self.min_distance_to_obstacles < 20:
-                punishment_obs = 1 - np.clip(
-                    (self.min_distance_to_obstacles - self.crash_distance) / 15, 0, 1
-                )
-            else:
-                punishment_obs = 0
-
-            punishment_action = abs(action[0]) / self.dynamic_model.roll_rate_max
-
-            yaw_error = self.dynamic_model.state_raw[1]
-            yaw_error_cost = abs(yaw_error / 90)
-
-            reward = (
-                reward_distance
-                - 0.1 * punishment_pose
-                - 0.5 * punishment_obs
-                - 0.1 * punishment_action
-                - 0.1 * yaw_error_cost
-            )
-
-        else:
-            if self.is_in_desired_pose():
-                reward = reward_reach
-            if self.is_crashed():
-                reward = reward_crash
-            if self.is_not_inside_workspace():
-                reward = reward_outside
-
-        return reward
-
-    def compute_reward_test(self, done, action):
-        reward = 0
-        reward_reach = 10
-        reward_crash = -100
-        reward_outside = -10
-
-        if not done:
-            distance_now = self.get_distance_to_goal_3d()
-            reward_distance = (
-                (self.previous_distance_from_des_point - distance_now)
-                / self.dynamic_model.goal_distance
-                * 100
-            )  # normalized to 100 according to goal_distance
-            self.previous_distance_from_des_point = distance_now
-
-            reward_obs = 0
-            action_cost = 0
-
-            yaw_speed_cost = 0.1 * abs(action[-1]) / self.dynamic_model.yaw_rate_max_rad
-
-            if self.dynamic_model.navigation_3d:
-                v_z_cost = 0.1 * abs(action[1]) / self.dynamic_model.v_z_max
-                z_err_cost = (
-                    0.05
-                    * abs(self.dynamic_model.state_raw[1])
-                    / self.dynamic_model.max_vertical_difference
-                )
-                action_cost += v_z_cost + z_err_cost
-
-            action_cost += yaw_speed_cost
-
-            yaw_error = self.dynamic_model.state_raw[2]
-            yaw_error_cost = 0.1 * abs(yaw_error / 180)
-
-            reward = reward_distance - reward_obs - action_cost - yaw_error_cost
-        else:
-            if self.is_in_desired_pose():
-                reward = reward_reach
-            if self.is_crashed():
-                reward = reward_crash
-            if self.is_not_inside_workspace():
-                reward = reward_outside
-
-        return reward
-
-    def compute_reward_fixedwing(self, done, action):
-        reward = 0
-        reward_reach = 10
-        reward_crash = -50
-        reward_outside = -10
-
-        if not done:
-            distance_now = self.get_distance_to_goal_3d()
-            reward_distance = (
-                (self.previous_distance_from_des_point - distance_now)
-                / self.dynamic_model.goal_distance
-                * 300
-            )
-            self.previous_distance_from_des_point = distance_now
-
-            action_cost = abs(action[0]) / self.dynamic_model.roll_rate_max
-
-            yaw_error_deg = self.dynamic_model.state_raw[1]
-            yaw_error_cost = 0.1 * abs(yaw_error_deg / 180)
-
-            reward = reward_distance - action_cost - yaw_error_cost
-        else:
-            if self.is_in_desired_pose():
-                yaw_error_deg = self.dynamic_model.state_raw[1]
-                reward = reward_reach * (1 - abs(yaw_error_deg / 180))
-            if self.is_crashed():
-                reward = reward_crash
-            if self.is_not_inside_workspace():
-                reward = reward_outside
-
-        return reward
-
     def compute_reward_multirotor_new(self, done, action):
         reward = 0
         reward_reach = 100
@@ -1009,22 +876,6 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
 
         return reward
 
-    def is_done(self):
-        episode_done = False
-
-        is_not_inside_workspace_now = self.is_not_inside_workspace()
-        has_reached_des_pose = self.is_in_desired_pose()
-        too_close_to_obstable = self.is_crashed()
-
-        episode_done = (
-            is_not_inside_workspace_now
-            or has_reached_des_pose
-            or too_close_to_obstable
-            or self.step_num >= self.max_episode_steps
-        )
-
-        return episode_done
-
     def is_not_inside_workspace(self):
         is_not_inside = False
         current_position = self.dynamic_model.get_position()
@@ -1111,32 +962,6 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
         self.client.simPrintLogMessage(
             "Min_depth: ", str(self.min_distance_to_obstacles)
         )
-
-    def set_pyqt_signal_fixedwing(self, action, reward, done):
-        step = int(self.total_step)
-        action_plot = np.array([10, 0, math.degrees(action[0])])
-
-        state = self.dynamic_model.state_raw  # distance, relative yaw, roll
-
-        state_output = np.array([state[0], 0, state[1], 10, 0, state[2]])
-
-        self.action_signal.emit(step, action_plot)
-        self.state_signal.emit(step, state_output)
-
-        self.attitude_signal.emit(
-            step,
-            np.asarray(self.dynamic_model.get_attitude()),
-            np.asarray(self.dynamic_model.get_attitude_cmd()),
-        )
-        self.reward_signal.emit(step, reward, self.cumulated_episode_reward)
-        self.pose_signal.emit(
-            np.asarray(self.dynamic_model.goal_position),
-            np.asarray(self.dynamic_model.start_position),
-            np.asarray(self.dynamic_model.get_position()),
-            np.asarray(self.trajectory_list),
-        )
-
-        self.lgmd_signal.emit(self.min_distance_to_obstacles, 0, self.feature_all[:-1])
 
     def set_pyqt_signal_multirotor(self, action, reward):
         step = int(self.total_step)

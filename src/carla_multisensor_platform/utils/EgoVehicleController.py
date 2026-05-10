@@ -7,16 +7,16 @@ import logging
 
 class EgoVehicleController:
     def __init__(self) -> None:
-        pass
+        self.controller = None
     
     def setup_ego_vehicle(self, ego_vehicle):
         """Configure ego vehicle for automatic movement"""
         # Set up basic control parameters
-        control = carla.VehicleControl()
-        control.throttle = 0.5  # 50% throttle
-        control.steer = 0.0     # No steering initially
-        ego_vehicle.apply_control(control)
-        return control
+        self.controller = carla.VehicleControl()
+        self.controller.throttle = 0.5  # 50% throttle
+        self.controller.steer = 0.0     # No steering initially
+        ego_vehicle.apply_control(self.controller)
+        return self.controller
 
     def update_ego_vehicle(self, ego_vehicle, control):
         """Update ego vehicle movement with collision avoidance"""

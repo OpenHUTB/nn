@@ -234,6 +234,26 @@ class GestureDetector:
         """
         设置灵敏度级别
         
+        Returns:
+            dict: 包含灵敏度级别、名称、阈值等信息的字典
+        """
+        preset = self.sensitivity_presets[self.sensitivity_level]
+        return {
+            'level': self.sensitivity_level,
+            'name': self.sensitivity_names[self.sensitivity_level],
+            'detection_confidence': preset['min_detection_confidence'],
+            'tracking_confidence': preset['min_tracking_confidence'],
+            'gesture_threshold': preset['gesture_threshold'],
+            'swipe_threshold': preset['swipe_threshold'],
+            'swipe_velocity': preset['swipe_min_velocity'],
+            'contour_area_min': preset['contour_area_min'],
+            'mode': self.mode
+        }
+
+    def detect_gestures(self, image, simulation_mode=False):
+        """
+        检测图像中的手势（支持双手和滑动手势）
+
         Args:
             level: 1=低(严格), 2=中, 3=高(宽松)
             
