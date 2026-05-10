@@ -1,70 +1,79 @@
-"""
-车道与路径检测项目 - 基础预处理模块
-作者：ultra223
-进度：图像预处理 + 边缘检测 + 感兴趣区域提取
-"""
 import cv2
 import numpy as np
+import os
 
-def image_process(img):
-    """
-    图像预处理：灰度化 + 高斯模糊 + Canny边缘检测
-    """
-    # 转为灰度图
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
-    # 高斯模糊降噪
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    
-    # Canny边缘检测
-    canny = cv2.Canny(blur, 50, 150)
-    return canny
-
-def roi_extract(canny_img):
-    """
-    提取车道线感兴趣区域（去除天空、树木等干扰）
-    """
-    height = canny_img.shape[0]
-    width = canny_img.shape[1]
-    
-    # 定义梯形区域（只保留路面）
-    polygons = np.array([
-        [(200, height), (width - 200, height), (width//2, height//2 + 50)]
-    ])
-    
-    mask = np.zeros_like(canny_img)
-    cv2.fillPoly(mask, polygons, 255)
-    masked_img = cv2.bitwise_and(canny_img, mask)
-    return masked_img
-
-def lane_detection(image_path):
-    """
-    主函数：完成功能
-    """
-    # 读取图像
-    img = cv2.imread(image_path)
-    if img is None:
-        print("错误：无法读取图片，请检查路径是否正确")
+def main():
+    # 1. 先检查图片文件是否存在
+    img_path = 'test.jpg'
+    if not os.path.exists(img_path):
+        print(f"错误：找不到文件 {img_path}！请把图片和代码放在同一个文件夹里。")
         return
 
-    # 预处理
-    canny_img = image_process(img)
-    
-    # 提取感兴趣区域
-    roi_img = roi_extract(canny_img)
+    # 2. 读取图片
+    img = cv2.imread(img_path)
+    if img is None:
+        print(f"错误：无法读取 {img_path}，文件可能损坏或格式不支持。")
+        return
 
-    # 显示结果
-    cv2.imshow("Original", img)
-    cv2.imshow("Canny Edge", canny_img)
-    cv2.imshow("ROI Result", roi_img)
-    
+    height, width = img.shape[:2]
+    print(f"图片读取成功，尺寸：{width}x{height}")
+
+    # 3. 灰度化 + 高斯模糊 + Canny边缘检测
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    canny = cv2.Canny(blur, 50, 150)
+
+    # 4. 修复ROI区域（只保留下半部分道路，适配所有图片）
+    roi_vertices = np.array([[
+        (int(width*0.05), height),
+        (int(width*0.45), int(height*0.6)),
+        (int(width*0.55), int(height*0.6)),
+        (int(width*0.95), height)
+    ]], dtype=np.int32)
+
+    mask = np.zeros_like(canny)
+    cv2.fillPoly(mask, roi_vertices, 255)
+    roi_img = cv2.bitwise_and(canny, mask)
+
+    # 5. 霍夫变换检测车道线（降低参数，更容易识别）
+    lines = cv2.HoughLinesP(
+        roi_img,
+        rho=1,
+        theta=np.pi/180,
+        threshold=15,
+        minLineLength=20,
+        maxLineGap=80
+    )
+
+    # 6. 绘制车道线
+    result_img = img.copy()
+    if lines is not None:
+        print(f"检测到 {len(lines)} 条车道线")
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(result_img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+    else:
+        print("未检测到车道线，请检查图片或调整参数")
+
+    # 7. 显示窗口（固定大小，避免显示不全）
+    win_size = (640, 400)
+    cv2.namedWindow("01-原图", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("02-边缘检测", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("03-ROI区域", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("04-车道线检测结果", cv2.WINDOW_NORMAL)
+
+    cv2.resizeWindow("01-原图", *win_size)
+    cv2.resizeWindow("02-边缘检测", *win_size)
+    cv2.resizeWindow("03-ROI区域", *win_size)
+    cv2.resizeWindow("04-车道线检测结果", *win_size)
+
+    cv2.imshow("01-原图", img)
+    cv2.imshow("02-边缘检测", canny)
+    cv2.imshow("03-ROI区域", roi_img)
+    cv2.imshow("04-车道线检测结果", result_img)
+
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("车道与路径检测项目")
-    print("作者：ultra223")
-    print("进度：预处理 + 边缘检测 + ROI提取")
-    print("=" * 50)
-    lane_detection("test.jpg")
+    main()
