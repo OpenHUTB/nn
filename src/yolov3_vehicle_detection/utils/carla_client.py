@@ -80,6 +80,34 @@ class CarlaClient:
         )
         self.use_pure_pursuit = False  # 是否启用Pure Pursuit控制
         
+        # ========== 性能监控 ==========
+        self.fps = 0.0
+        self.fps_counter = 0
+        self.fps_start_time = time.time()
+        self.last_loop_time = time.time()
+        self.loop_times = []  # 存储最近帧的循环时间
+        
+        # ========== 轨迹数据记录 ==========
+        self.trajectory_log = []  # [(timestamp, x, y, speed, yaw), ...]
+        self.ttc_log = []         # [(timestamp, distance, ttc, risk_level), ...]
+        self.lane_change_log = [] # [(timestamp, direction, start_x, end_x), ...]
+        self.log_start_time = time.time()
+        self.max_log_entries = 10000  # 最多记录条数
+        
+        # ========== 可视化开关 ==========
+        self.enable_visualization = True  # 是否启用可视化
+        self.viz_window_name = "Carla Debug View"
+        
+        # 调试信息
+        self.debug_info = {
+            'fps': 0,
+            'obstacle_distance': float('inf'),
+            'obstacle_ttc': float('inf'),
+            'steering': 0,
+            'speed_kmh': 0,
+            'state': 'normal'
+        }
+        
         # DeepSORT 目标跟踪
         self.deep_sort = DeepSORTTracker(max_age=30, min_hits=3, iou_threshold=0.3)
         self.tracked_obstacles = {}  # 跟踪的障碍物 {track_id: info}
@@ -609,6 +637,354 @@ class CarlaClient:
             self.collision_warning = True
             print(f"[WARNING] 障碍物距离过近: {event.distance:.1f}m! (跟踪ID: {tracked_results[0][4] if len(tracked_results) > 0 else 'N/A'})")
 
+    def update_performance_monitor(self):
+        """
+        更新性能监控：计算帧率、记录循环时间
+        """
+        current_time = time.time()
+        
+        # 计算FPS（每30帧更新一次）
+        self.fps_counter += 1
+        if self.fps_counter >= 30:
+            elapsed = current_time - self.fps_start_time
+            self.fps = self.fps_counter / elapsed if elapsed > 0 else 0
+            self.fps_counter = 0
+            self.fps_start_time = current_time
+        
+        # 记录循环时间
+        loop_time = current_time - self.last_loop_time
+        self.loop_times.append(loop_time)
+        if len(self.loop_times) > 60:
+            self.loop_times.pop(0)
+        self.last_loop_time = current_time
+        
+        # 更新debug信息
+        self.debug_info['fps'] = self.fps
+        
+        return self.fps
+
+    def log_trajectory_data(self):
+        """
+        记录轨迹数据：位置、速度、TTC等
+        """
+        if not self.vehicle:
+            return
+        
+        current_time = time.time()
+        transform = self.vehicle.get_transform()
+        velocity = self.vehicle.get_velocity()
+        
+        # 车辆状态
+        pos_x = transform.location.x
+        pos_y = transform.location.y
+        speed_ms = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        speed_kmh = speed_ms * 3.6
+        yaw = transform.rotation.yaw
+        
+        # 记录轨迹
+        if len(self.trajectory_log) < self.max_log_entries:
+            self.trajectory_log.append({
+                'timestamp': current_time - self.log_start_time,
+                'x': pos_x,
+                'y': pos_y,
+                'speed_kmh': speed_kmh,
+                'yaw': yaw,
+                'state': self.avoidance_state
+            })
+        
+        # 记录TTC
+        if self.obstacle_distance < 100:  # 只记录障碍物在100m内的情况
+            if len(self.ttc_log) < self.max_log_entries:
+                ttc = self.compute_ttc(self.obstacle_distance, speed_ms, 0)
+                self.ttc_log.append({
+                    'timestamp': current_time - self.log_start_time,
+                    'distance': self.obstacle_distance,
+                    'ttc': ttc if ttc != float('inf') else -1,
+                    'risk': self.get_risk_level(ttc)
+                })
+        
+        # 更新debug信息
+        self.debug_info['speed_kmh'] = speed_kmh
+        self.debug_info['obstacle_distance'] = self.obstacle_distance
+        self.debug_info['state'] = self.avoidance_state
+
+    def log_lane_change(self, direction, start_x, end_x):
+        """
+        记录变道事件
+        """
+        if len(self.lane_change_log) < 100:
+            self.lane_change_log.append({
+                'timestamp': time.time() - self.log_start_time,
+                'direction': direction,
+                'start_x': start_x,
+                'end_x': end_x
+            })
+            print(f"[LOG] 变道记录: {direction} | 开始位置:{start_x:.1f} | 结束位置:{end_x:.1f}")
+
+    def save_logs_to_file(self, filepath=None):
+        """
+        保存日志到文件
+        """
+        import json
+        import csv
+        
+        if filepath is None:
+            filepath = f"logs/driving_log_{int(time.time())}"
+        
+        os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else 'logs', exist_ok=True)
+        
+        # 保存轨迹JSON
+        traj_path = f"{filepath}_trajectory.json"
+        with open(traj_path, 'w') as f:
+            json.dump(self.trajectory_log, f, indent=2)
+        print(f"[LOG] 轨迹数据已保存: {traj_path}")
+        
+        # 保存TTC CSV
+        ttc_path = f"{filepath}_ttc.csv"
+        if self.ttc_log:
+            with open(ttc_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=['timestamp', 'distance', 'ttc', 'risk'])
+                writer.writeheader()
+                writer.writerows(self.ttc_log)
+            print(f"[LOG] TTC数据已保存: {ttc_path}")
+        
+        # 保存变道记录
+        lane_path = f"{filepath}_lane_change.json"
+        with open(lane_path, 'w') as f:
+            json.dump(self.lane_change_log, f, indent=2)
+        print(f"[LOG] 变道记录已保存: {lane_path}")
+        
+        return filepath
+
+    def create_debug_overlay(self, frame):
+        """
+        在图像上绘制调试信息覆盖层
+        
+        Args:
+            frame: 输入图像 (H, W, 3)
+            
+        Returns:
+            添加了调试信息的图像
+        """
+        if frame is None or not self.enable_visualization:
+            return frame
+        
+        h, w = frame.shape[:2]
+        overlay = frame.copy()
+        
+        # 1. FPS显示（左上角）
+        fps_text = f"FPS: {self.fps:.1f}"
+        cv2.putText(overlay, fps_text, (10, 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
+        # 2. 速度显示
+        speed_text = f"Speed: {self.debug_info['speed_kmh']:.1f} km/h"
+        cv2.putText(overlay, speed_text, (10, 70), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+        
+        # 3. 障碍物信息
+        if self.obstacle_distance < 50:
+            dist_text = f"Obs: {self.obstacle_distance:.1f}m"
+            cv2.putText(overlay, dist_text, (10, 110), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            
+            # TTC信息
+            ttc = self.debug_info.get('obstacle_ttc', float('inf'))
+            if ttc != float('inf') and ttc > 0:
+                ttc_text = f"TTC: {ttc:.2f}s"
+                color = (0, 255, 0) if ttc > 2.0 else (0, 255, 255) if ttc > 1.0 else (0, 0, 255)
+                cv2.putText(overlay, ttc_text, (10, 150), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+        
+        # 4. 状态显示
+        state_text = f"State: {self.debug_info['state']}"
+        state_color = (0, 255, 0) if self.debug_info['state'] == 'normal' else (0, 255, 255)
+        cv2.putText(overlay, state_text, (10, 190), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, state_color, 2)
+        
+        # 5. Pure Pursuit可视化（如果可用）
+        if hasattr(self, 'pure_pursuit') and hasattr(self.pure_pursuit, '_last_debug'):
+            debug = self.pure_pursuit._last_debug
+            
+            # 绘制前视点（在图像下方区域示意）
+            if 'lookahead_point' in debug and self.vehicle:
+                # 估算前视点在图像中的相对位置
+                lookahead_dist = debug.get('lookahead_dist', 5)
+                progress = min(lookahead_dist / 20.0, 1.0)  # 假设最大20m
+                
+                # 在图像底部绘制前视点示意
+                viz_x = int(w * 0.5)
+                viz_y = int(h * 0.8 - progress * h * 0.3)
+                cv2.circle(overlay, (viz_x, viz_y), 8, (255, 0, 255), -1)
+                cv2.putText(overlay, f"LD:{lookahead_dist:.1f}m", (viz_x + 15, viz_y), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+        
+        # 6. 绘制轨迹历史（简化显示）
+        if len(self.trajectory_log) > 10:
+            # 取最近的10个点
+            recent = self.trajectory_log[-10:]
+            for i, point in enumerate(recent[:-1]):
+                alpha = (i + 1) / 10.0
+                # 将世界坐标转换为图像相对位置（简化版）
+                next_point = recent[i + 1]
+                
+                # 相对位置
+                dx = (next_point['x'] - point['x']) * 5
+                dy = (next_point['y'] - point['y']) * 50
+                
+                x1, y1 = int(w * 0.5), int(h * 0.9)
+                x2, y2 = int(x1 + dx), int(y1 - dy)
+                
+                # 限制在图像范围内
+                x1, y1 = max(0, min(w, x1)), max(0, min(h, y1))
+                x2, y2 = max(0, min(w, x2)), max(0, min(h, y2))
+                
+                cv2.line(overlay, (x1, y1), (x2, y2), (0, 255, 255), 2)
+        
+        # 7. 控制信息
+        steer = self.debug_info.get('steering', 0)
+        steer_text = f"Steer: {steer:.2f}"
+        cv2.putText(overlay, steer_text, (w - 150, 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        # 合并原图和覆盖层
+        return overlay
+
+    def draw_debug_info_in_carla(self):
+        """
+        在 CARLA 模拟器 3D 世界中绘制调试信息
+        使用 Carla Debug Draw API 在模拟器视图中显示
+        """
+        if not self.world or not self.debug_helper or not self.vehicle:
+            return
+        
+        try:
+            ego_transform = self.vehicle.get_transform()
+            ego_location = ego_transform.location
+            ego_yaw = np.radians(ego_transform.rotation.yaw)
+            
+            # 计算当前速度和前视点（用于可视化）
+            velocity = self.vehicle.get_velocity()
+            speed_ms = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+            current_pos = (ego_location.x, ego_location.y)
+            
+            # 计算前视距离和前视点（用于绘制）
+            lookahead_dist = self.pure_pursuit._get_lookahead_distance(speed_ms)
+            closest_idx = self.pure_pursuit._find_closest_point(current_pos)
+            
+            # 找到前视点
+            lookahead_point = None
+            for i in range(closest_idx, len(self.pure_pursuit.global_path)):
+                dist = np.linalg.norm(self.pure_pursuit.global_path[i] - np.array(current_pos))
+                if dist >= lookahead_dist:
+                    lookahead_point = self.pure_pursuit.global_path[i]
+                    break
+            if lookahead_point is None:
+                lookahead_point = self.pure_pursuit.global_path[-1]
+            
+            # 在车辆上方绘制信息面板
+            base_height = ego_location.z + 3.5  # 车辆上方 3.5 米
+            
+            # 1. FPS 信息（绿色）
+            fps_text = f"FPS: {self.fps:.1f}"
+            self.debug_helper.draw_string(
+                carla.Location(x=ego_location.x, y=ego_location.y, z=base_height),
+                fps_text,
+                draw_shadow=False,
+                color=carla.Color(0, 255, 0),
+                life_time=0.1
+            )
+            
+            # 2. 速度信息（黄色）
+            speed_text = f"Speed: {self.debug_info.get('speed_kmh', 0):.1f} km/h"
+            self.debug_helper.draw_string(
+                carla.Location(x=ego_location.x, y=ego_location.y + 1, z=base_height),
+                speed_text,
+                draw_shadow=False,
+                color=carla.Color(255, 255, 0),
+                life_time=0.1
+            )
+            
+            # 3. 障碍物信息（红色）
+            if self.obstacle_distance < 50:
+                dist_text = f"Obs: {self.obstacle_distance:.1f}m"
+                self.debug_helper.draw_string(
+                    carla.Location(x=ego_location.x, y=ego_location.y + 2, z=base_height),
+                    dist_text,
+                    draw_shadow=False,
+                    color=carla.Color(255, 0, 0),
+                    life_time=0.1
+                )
+                
+                # TTC 信息
+                ttc = self.debug_info.get('obstacle_ttc', float('inf'))
+                if ttc != float('inf') and ttc > 0:
+                    ttc_text = f"TTC: {ttc:.2f}s"
+                    ttc_color = carla.Color(0, 255, 0) if ttc > 2.0 else carla.Color(255, 255, 0) if ttc > 1.0 else carla.Color(255, 0, 0)
+                    self.debug_helper.draw_string(
+                        carla.Location(x=ego_location.x, y=ego_location.y + 3, z=base_height),
+                        ttc_text,
+                        draw_shadow=False,
+                        color=ttc_color,
+                        life_time=0.1
+                    )
+            
+            # 4. 状态信息
+            state_text = f"State: {self.debug_info.get('state', 'unknown')}"
+            state_color = carla.Color(0, 255, 0) if self.debug_info.get('state') == 'normal' else carla.Color(255, 255, 0)
+            self.debug_helper.draw_string(
+                carla.Location(x=ego_location.x, y=ego_location.y + 4, z=base_height),
+                state_text,
+                draw_shadow=False,
+                color=state_color,
+                life_time=0.1
+            )
+            
+            # 5. 绘制轨迹历史（黄色线）- 确保至少有2个点
+            if len(self.trajectory_log) > 1:
+                # 绘制最近30个点
+                recent = self.trajectory_log[-min(30, len(self.trajectory_log)):]
+                for i in range(len(recent) - 1):
+                    p1 = recent[i]
+                    p2 = recent[i + 1]
+                    self.debug_helper.draw_line(
+                        carla.Location(x=p1['x'], y=p1['y'], z=ego_location.z + 0.1),
+                        carla.Location(x=p2['x'], y=p2['y'], z=ego_location.z + 0.1),
+                        thickness=0.15,
+                        color=carla.Color(255, 255, 0),
+                        life_time=0.1
+                    )
+            
+            # 6. 绘制前视点（紫色大点）
+            if lookahead_point is not None:
+                self.debug_helper.draw_point(
+                    carla.Location(x=lookahead_point[0], y=lookahead_point[1], z=ego_location.z + 0.5),
+                    size=0.8,
+                    color=carla.Color(255, 0, 255),
+                    life_time=0.1
+                )
+                self.debug_helper.draw_string(
+                    carla.Location(x=lookahead_point[0], y=lookahead_point[1], z=ego_location.z + 2.0),
+                    f"LD: {lookahead_dist:.1f}m",
+                    draw_shadow=False,
+                    color=carla.Color(255, 0, 255),
+                    life_time=0.1
+                )
+            
+            # 7. 绘制从车辆到前视点的连线（浅蓝色）
+            if lookahead_point is not None:
+                self.debug_helper.draw_line(
+                    carla.Location(x=ego_location.x, y=ego_location.y, z=ego_location.z + 0.5),
+                    carla.Location(x=lookahead_point[0], y=lookahead_point[1], z=ego_location.z + 0.5),
+                    thickness=0.05,
+                    color=carla.Color(0, 200, 255),
+                    life_time=0.1
+                )
+                    
+        except Exception as e:
+            # 静默处理绘制错误
+            pass
+
     def apply_smart_avoidance(self):
         """
         智能绕行避让：检测到障碍物时执行完整变道
@@ -617,10 +993,16 @@ class CarlaClient:
         if not self.vehicle:
             return
         
+        # ========== 性能监控开始 ==========
+        self.update_performance_monitor()
+        
         current_time = time.time()
         velocity = self.vehicle.get_velocity()
         speed_ms = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
         speed_kmh = speed_ms * 3.6
+        
+        # 记录轨迹数据
+        self.log_trajectory_data()
         
         # ============== 碰撞后恢复逻辑 ==============
         if self.post_collision_recovery:
@@ -848,6 +1230,11 @@ class CarlaClient:
                                         pass
                                             
                                     self.avoidance_state = 'changing_lane'
+                                    
+                                    # 记录变道开始
+                                    start_x = vehicle_transform.location.x
+                                    self.log_lane_change(self.lane_change_direction, start_x, 0)
+                                    
                                     print(f"[LANE CHANGE] 开始{self.lane_change_direction}侧变道 | 距离:{distance:.1f}m | TTC:{ttc:.2f}s | 风险:{risk_level}")
         
         elif self.avoidance_state == 'changing_lane':
