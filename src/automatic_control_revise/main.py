@@ -218,6 +218,10 @@ class KeyboardControl(object):
                 if event.key == pygame.K_r:      # 新增
                     self.reroute_requested = True
                     self.world.hud.notification("Reroute requested", seconds=1.5)
+                if event.key == pygame.K_v:      # 新增截图功能
+                    if self.world.camera_manager is not None:
+                        self.world.camera_manager.request_screenshot = True
+                        self.world.hud.notification("Screenshot requested", seconds=1.0)
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
@@ -637,6 +641,7 @@ class CameraManager(object):
         self._parent = parent_actor
         self.hud = hud
         self.recording = False
+        self.request_screenshot = False   # 新增：截图请求标志
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         attachment = carla.AttachmentType
         self._camera_transforms = [
@@ -741,6 +746,20 @@ class CameraManager(object):
             array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        
+        # 截图请求处理
+        if self.request_screenshot:
+            self.request_screenshot = False
+            # 生成时间戳文件名
+            import datetime
+            import os
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 创建 _screenshots 目录（如果不存在）
+            os.makedirs("_screenshots", exist_ok=True)
+            filename = f"_screenshots/screenshot_{timestamp}.png"
+            pygame.image.save(self.surface, filename)
+            self.hud.notification(f"Screenshot saved: {filename}", seconds=2.0)
+
         if self.recording:
             image.save_to_disk('_out/%08d' % image.frame)
 

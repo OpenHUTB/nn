@@ -12,7 +12,7 @@ except ImportError:
     from utils.ui_train import TrainingUi
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_EVAL_PATH = PROJECT_ROOT / "logs" / "NH_center" / "2026_04_24_00_04_Multirotor_CNN_FC_PPO"
+DEFAULT_EVAL_PATH = PROJECT_ROOT / "logs" / "NH_center" / "2026_05_07_22_43_Multirotor_mlp_PPO"
 
 
 def get_parser() -> argparse.ArgumentParser:
