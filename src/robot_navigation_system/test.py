@@ -10,7 +10,7 @@ from dqn_agent import DQNAgent
 from visualization import NavigationVisualizer
 from config import Config
 
-def test():
+def test(visualize=None):
     config = Config()
     env = RobotNavigationEnv()
     agent = DQNAgent(config.STATE_SIZE, config.ACTION_SIZE)

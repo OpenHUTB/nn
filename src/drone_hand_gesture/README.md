@@ -4,8 +4,11 @@
 
 ## 功能特性
 
-- ✅ 实时手势识别（MediaPipe）
-- ✅ 本地 3D 仿真模式
+- ✅ 实时手势识别（MediaPipe / OpenCV 双模式支持）
+- ✅ 动态灵敏度调节（LOW/MEDIUM/HIGH 三档可调）
+- ✅ 双手控制模式（左手方向 + 右手高度）
+- ✅ 滑动手势控制（支持上下左右滑动）
+- ✅ 本地 3D 仿真模式（OpenGL 渲染）
 - ✅ AirSim 真实模拟器集成
 - ✅ 传统机器学习手势分类（SVM、随机森林、MLP）
 - ✅ **深度学习手势分类（CNN、Transformer、深度MLP）**
@@ -82,7 +85,6 @@ python main_deep_learning.py --model_path dataset/models/gesture_deep_cnn.pth --
 
 ## 深度学习功能
 
-### 支持的模型架构
 
 | 模型类型 | 说明 | 优势 |
 |---------|------|------|
@@ -122,19 +124,3 @@ python train_deep_gesture.py --compare
 | ok_sign | 悬停 | OK手势 |
 | rock | 左转 | 摇滚手势 |
 | peace | 右转 | 和平手势 |
-
-## 参考项目
-
-本项目基于以下开源项目开发：
-
-- [Autonomous Drone Hand Gesture Project](https://github.com/chwee/AutonomusDroneHandGestureProject)
-  - 原始手势控制无人机项目
-  - 提供了基础架构和实现思路
-
-- [MediaPipe Hands](https://github.com/google/mediapipe)
-  - Google开源的手部关键点检测框架
-  - 本项目使用其进行实时手势识别
-
-- [PyTorch](https://pytorch.org/)
-  - Facebook开源的深度学习框架
-  - 本项目使用其实现深度学习模型
