@@ -18,17 +18,15 @@ class SimpleController:
         self.world = world
         self.vehicle = vehicle
         self.map = world.get_map()
+        # self.target_speed = 30.0  # km/h，原速度限制
         self.target_speed = 50.0  # km/h，增加最高速度限制
         self.waypoint_distance = 5.0
         self.last_waypoint = None
+        # self.reverse_mode = False  # 倒车模式标志（未使用）
         self.manual_reverse = False  # 手动倒车标志
-        self.manual_mode = False  # 手动驾驶模式标志
-        self.manual_throttle = 0.0  # 手动油门
-        self.manual_steer = 0.0  # 手动转向
-        self.manual_brake = 0.0  # 手动刹车
 
     def get_control(self):
-        """基于路点的简单控制（支持手动和自动模式）"""
+        """基于路点的简单控制"""
         # 获取车辆状态
         location = self.vehicle.get_location()
         transform = self.vehicle.get_transform()
@@ -36,10 +34,6 @@ class SimpleController:
 
         # 计算速度（考虑倒车方向）
         speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6  # km/h
-
-        # 手动驾驶模式：返回手动控制值
-        if self.manual_mode:
-            return self.manual_throttle, self.manual_brake, self.manual_steer, self.manual_reverse
 
         # 检查是否在倒车模式
         if self.manual_reverse:
@@ -107,12 +101,34 @@ class SimpleDrivingSystem:
         self.client = None
         self.world = None
         self.vehicle = None
-        self.vehicles = []  # 存储所有车辆（包括主车和NPC）
-        self.controllers = []  # 存储每个车辆的控制器
-        self.current_vehicle_index = 0  # 当前关注的车辆索引
         self.cameras = {}  # 存储多个相机
         self.controller = None
         self.camera_image = None
+        self.current_view = 'third_person'  # 当前视角模式：'first_person', 'third_person', 'birdseye'
+        self.current_map = 'Town01'  # 当前地图
+        self.available_maps = ['Town01', 'Town02', 'Town03', 'Town04', 'Town05', 'Town06', 'Town07']  # 可用地图列表
+        self.current_weather = 'clear'  # 当前天气
+        # 简化天气预设，使用肯定存在的天气类型
+        self.weather_presets = {
+            'clear': carla.WeatherParameters.ClearNoon,
+            'rain': carla.WeatherParameters.HardRainNoon,
+            'cloudy': carla.WeatherParameters.CloudyNoon,
+            'wet': carla.WeatherParameters.WetNoon
+        }  # 天气预设
+        self.car_colors = [
+            (255, 0, 0),      # 红色
+            (0, 0, 255),      # 蓝色
+            (0, 255, 0),      # 绿色
+            (255, 255, 0),    # 黄色
+            (255, 0, 255),    # 品红色
+            (0, 255, 255),    # 青色
+            (128, 0, 128),    # 紫色
+            (255, 165, 0),    # 橙色
+            (128, 128, 128),  # 灰色
+            (255, 255, 255)   # 白色
+        ]  # 车辆颜色列表
+        self.current_color_index = 0  # 当前颜色索引
+        self.screenshot_dir = 'screenshots'  # 截图保存目录
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -273,6 +289,224 @@ class SimpleDrivingSystem:
         """更新相机视角"""
         print(f"已切换到{self.get_view_name()}视角")
 
+    def switch_map(self):
+        """切换到下一个地图"""
+        try:
+            # 停止所有相机
+            for view_mode, camera in self.cameras.items():
+                if camera:
+                    try:
+                        camera.stop()
+                        camera.destroy()
+                    except:
+                        pass
+            self.cameras.clear()
+
+            # 销毁车辆
+            if self.vehicle:
+                try:
+                    self.vehicle.destroy()
+                except:
+                    pass
+                self.vehicle = None
+            
+            # 等待清理完成
+            time.sleep(1.0)
+
+            # 切换到下一个地图
+            current_index = self.available_maps.index(self.current_map)
+            next_index = (current_index + 1) % len(self.available_maps)
+            new_map = self.available_maps[next_index]
+
+            print(f"正在加载地图: {new_map}...")
+            
+            # 完全重新连接CARLA客户端
+            self.client = carla.Client('localhost', 2000)
+            self.client.set_timeout(10.0)
+            
+            # 加载新地图
+            self.world = self.client.load_world(new_map)
+            self.current_map = new_map
+            
+            # 等待地图完全加载
+            time.sleep(3.0)
+            
+            # 重新生成车辆
+            if not self.spawn_vehicle():
+                raise Exception("车辆生成失败")
+            
+            # 重新设置相机
+            if not self.setup_camera():
+                raise Exception("相机设置失败")
+            
+            # 重新设置控制器
+            self.setup_controller()
+            
+            # 重新生成NPC车辆
+            self.spawn_npc_vehicles(2)
+            
+            # 应用当前天气
+            self.set_weather(self.current_weather)
+            
+            print(f"地图切换成功: {self.current_map}")
+            
+        except Exception as e:
+            print(f"切换地图时出错: {e}")
+            # 尝试重新加载Town01作为备份
+            try:
+                print("正在恢复到Town01...")
+                self.current_map = 'Town01'
+                time.sleep(1.0)
+                self.client = carla.Client('localhost', 2000)
+                self.client.set_timeout(10.0)
+                self.world = self.client.load_world(self.current_map)
+                time.sleep(3.0)
+                self.spawn_vehicle()
+                self.setup_camera()
+                self.setup_controller()
+                self.set_weather(self.current_weather)
+                print("已恢复到Town01")
+            except Exception as e2:
+                print(f"恢复失败: {e2}")
+
+    def set_weather(self, weather_type):
+        """设置天气"""
+        try:
+            if weather_type in self.weather_presets:
+                weather = self.weather_presets[weather_type]
+                self.world.set_weather(weather)
+                self.current_weather = weather_type
+                print(f"天气设置成功: {weather_type}")
+                return True
+            else:
+                print(f"无效的天气类型: {weather_type}")
+                return False
+        except Exception as e:
+            print(f"设置天气时出错: {e}")
+            return False
+
+    def switch_weather(self):
+        """切换到下一个天气"""
+        try:
+            weather_types = list(self.weather_presets.keys())
+            current_index = weather_types.index(self.current_weather)
+            next_index = (current_index + 1) % len(weather_types)
+            next_weather = weather_types[next_index]
+            self.set_weather(next_weather)
+        except Exception as e:
+            print(f"切换天气时出错: {e}")
+
+    def switch_color(self):
+        """切换车辆颜色"""
+        try:
+            if self.vehicle:
+                # 获取当前车辆位置和方向
+                transform = self.vehicle.get_transform()
+                
+                # 切换到下一个颜色
+                self.current_color_index = (self.current_color_index + 1) % len(self.car_colors)
+                color = self.car_colors[self.current_color_index]
+                
+                # 获取颜色名称
+                color_names = ['Red', 'Blue', 'Green', 'Yellow', 'Magenta', 'Cyan', 'Purple', 'Orange', 'Gray', 'White']
+                color_name = color_names[self.current_color_index]
+                
+                # 停止相机
+                for view_mode, camera in self.cameras.items():
+                    if camera:
+                        try:
+                            camera.stop()
+                            camera.destroy()
+                        except:
+                            pass
+                self.cameras.clear()
+                
+                # 销毁当前车辆
+                self.vehicle.destroy()
+                self.vehicle = None
+                
+                # 创建新车辆蓝图
+                blueprint_library = self.world.get_blueprint_library()
+                vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
+                if not vehicle_bp:
+                    vehicle_bp = blueprint_library.filter('vehicle.*')[0]
+                
+                # 设置新颜色
+                vehicle_bp.set_attribute('color', f'{color[0]},{color[1]},{color[2]}')
+                
+                # 首先尝试在相同位置生成新车辆
+                self.vehicle = self.world.try_spawn_actor(vehicle_bp, transform)
+                
+                # 如果失败，尝试使用出生点
+                if not self.vehicle:
+                    spawn_points = self.world.get_map().get_spawn_points()
+                    for spawn_point in spawn_points[:5]:  # 尝试前5个出生点
+                        self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
+                        if self.vehicle:
+                            print("车辆已移动到新位置")
+                            break
+                
+                if self.vehicle:
+                    # 禁用自动驾驶
+                    self.vehicle.set_autopilot(False)
+                    
+                    # 重新设置相机
+                    self.setup_camera()
+                    
+                    # 重新设置控制器
+                    self.setup_controller()
+                    
+                    print(f"车辆颜色已切换: {color_name}")
+                else:
+                    print("无法生成新车辆，颜色切换失败")
+                    # 重置颜色索引
+                    self.current_color_index = (self.current_color_index - 1) % len(self.car_colors)
+                    # 尝试恢复车辆
+                    self.spawn_vehicle()
+            else:
+                print("车辆不存在，无法切换颜色")
+        except Exception as e:
+            print(f"切换车辆颜色时出错: {e}")
+            # 重置颜色索引
+            self.current_color_index = (self.current_color_index - 1) % len(self.car_colors)
+            # 尝试恢复车辆
+            if not self.vehicle:
+                self.spawn_vehicle()
+
+    def take_screenshot(self, image):
+        """保存当前画面截图"""
+        try:
+            import os
+            import time
+            
+            # 创建截图目录
+            os.makedirs(self.screenshot_dir, exist_ok=True)
+            
+            # 获取当前时间戳
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            
+            # 获取当前地图名称
+            map_name = self.current_map
+            
+            # 获取当前天气
+            weather_name = self.current_weather
+            
+            # 获取当前颜色名称
+            color_names = ['Red', 'Blue', 'Green', 'Yellow', 'Magenta', 'Cyan', 'Purple', 'Orange', 'Gray', 'White']
+            color_name = color_names[self.current_color_index]
+            
+            # 生成文件名
+            filename = f"screenshot_{timestamp}_{map_name}_{weather_name}_{color_name}.png"
+            filepath = os.path.join(self.screenshot_dir, filename)
+            
+            # 保存截图
+            cv2.imwrite(filepath, image)
+            
+            print(f"截图已保存: {filepath}")
+            
+        except Exception as e:
+            print(f"保存截图时出错: {e}")
+
     def get_view_name(self):
         """获取视角名称"""
         view_names = {
@@ -282,80 +516,10 @@ class SimpleDrivingSystem:
         }
         return view_names.get(self.current_view, 'Unknown')
 
-    def setup_all_vehicles_cameras(self):
-        """为所有车辆设置相机系统"""
-        print("正在为所有车辆设置相机...")
-
-        try:
-            blueprint_library = self.world.get_blueprint_library()
-            camera_bp = blueprint_library.find('sensor.camera.rgb')
-
-            # 设置相机属性
-            camera_bp.set_attribute('image_size_x', '640')
-            camera_bp.set_attribute('image_size_y', '480')
-            camera_bp.set_attribute('fov', '90')
-
-            # 为每辆车创建相机
-            for i, vehicle in enumerate(self.vehicles):
-                if vehicle is None:
-                    continue
-
-                print(f"为车辆 {i} 设置相机...")
-
-                # 第三人称相机 - 用于跟随视角
-                third_person_transform = carla.Transform(
-                    carla.Location(x=-8.0, z=6.0),  # 在车辆后方上方
-                    carla.Rotation(pitch=-20.0)  # 向下看
-                )
-                third_person_camera = self.world.spawn_actor(
-                    camera_bp, third_person_transform, attach_to=vehicle
-                )
-                third_person_camera.listen(lambda image, idx=i: self.camera_callback(image, idx, 'third_person'))
-                self.cameras[f'vehicle_{i}_third_person'] = third_person_camera
-
-            print(f"已为 {len(self.vehicles)} 辆车设置相机")
-            return True
-
-        except Exception as e:
-            print(f"设置多车辆相机时出错: {e}")
-            return False
-
-    def camera_callback(self, image, vehicle_index, view_mode=None):
-        """相机数据回调"""
-        try:
-            # 只有当前关注车辆的相机数据才会被使用
-            if vehicle_index == self.current_vehicle_index and view_mode == 'third_person':
-                # 转换图像数据
-                array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-                array = np.reshape(array, (image.height, image.width, 4))
-                self.camera_image = array[:, :, :3]  # RGB通道
-        except:
-            pass
-
-    def update_current_vehicle_view(self):
-        """更新当前关注的车辆视角"""
-        vehicle_label = "主车辆（红色特斯拉）" if self.current_vehicle_index == 0 else f"NPC车辆 {self.current_vehicle_index}"
-        print(f"已切换到: {vehicle_label} 视角")
-
     def setup_controller(self):
         """设置控制器"""
         self.controller = SimpleController(self.world, self.vehicle)
         print("控制器设置完成")
-
-    def setup_all_controllers(self):
-        """为所有车辆设置控制器"""
-        print("正在为所有车辆设置控制器...")
-        self.controllers = []
-
-        for i, vehicle in enumerate(self.vehicles):
-            controller = SimpleController(self.world, vehicle)
-            self.controllers.append(controller)
-            vehicle_name = "主车辆" if i == 0 else f"NPC车辆{i}"
-            print(f"  {vehicle_name} 控制器设置完成")
-
-        # 确保self.controller指向主车辆控制器
-        self.controller = self.controllers[0]
-        print("所有控制器设置完成")
 
     def run(self):
         """主运行循环"""
@@ -370,6 +534,11 @@ class SimpleDrivingSystem:
         # 生成车辆
         if not self.spawn_vehicle():
             return
+
+        # 设置相机
+        if not self.setup_camera():
+            # 即使相机失败也继续运行
+            print("警告：相机设置失败，继续运行...")
 
         # 设置控制器
         self.setup_controller()
@@ -386,112 +555,93 @@ class SimpleDrivingSystem:
         )
         self.world.set_weather(weather)
 
-        # 生成2辆NPC车辆（加上主车辆共3辆特斯拉）
-        npc_vehicles = self.spawn_npc_vehicles(2)
-
-        # 将所有车辆添加到列表中（主车辆在前，NPC在后）
-        self.vehicles = [self.vehicle] + npc_vehicles
-
-        # 为所有车辆设置控制器
-        self.setup_all_controllers()
+        # 生成一些NPC车辆
+        self.spawn_npc_vehicles(2)
 
         print("\n系统准备就绪！")
-        print(f"共 {len(self.vehicles)} 辆车可用")
         print("控制指令:")
         print("  q - 退出程序")
-        print("  r - 重置当前车辆")
+        print("  r - 重置车辆")
         print("  s - 紧急停止")
         print("  x - 切换倒车/前进模式（速度为0时生效）")
-        print("  m - 切换手动/自动驾驶模式")
-        print("  j/k - 手动驾驶控制（仅在手动模式下，前进/倒车）")
-        for i in range(len(self.vehicles)):
-            if i == 0:
-                print(f"  1 - 切换到主车辆视角（红色特斯拉）")
-            else:
-                print(f"  {i+1} - 切换到NPC车辆{i}视角")
+        print("  v - 切换视角（第一人称/第三人称/鸟瞰图）")
+        print("  m - 切换地图（Town01/Town02/Town03等）")
+        print("  w - 切换天气（晴天/雨天/多云/湿滑）")
+        print("  c - 切换车辆颜色")
+        print("  p - 保存当前画面截图")
         print("\n开始自动驾驶...\n")
-
-        # 为所有车辆创建相机
-        self.setup_all_vehicles_cameras()
 
         frame_count = 0
         running = True
-        
-        # 卡住检测变量
-        stuck_frame_count = 0
-        stuck_threshold = 500  # 连续500帧速度低于2km/h认为卡住
 
         try:
             while running:
-                # 获取当前关注车辆的状态
-                current_vehicle = self.vehicles[self.current_vehicle_index]
-                velocity = current_vehicle.get_velocity()
+                # 获取车辆状态
+                velocity = self.vehicle.get_velocity()
                 speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
 
-                # 检测主车辆是否卡住
-                if self.current_vehicle_index == 0:
-                    if speed < 2.0:  # 速度低于2km/h
-                        stuck_frame_count += 1
-                        if stuck_frame_count >= stuck_threshold:
-                            print("检测到主车辆卡住，自动重置...")
-                            self.reset_vehicle()
-                            stuck_frame_count = 0
-                    else:
-                        stuck_frame_count = 0
+                # 获取控制指令（现在返回4个值，原代码返回3个值）
+                # throttle, brake, steer = self.controller.get_control()  # 原代码
+                throttle, brake, steer, reverse = self.controller.get_control()  # 新代码
 
-                # 对所有车辆应用控制器
-                # 主车辆（索引0）使用自定义控制器
-                controller = self.controllers[0]
-                throttle, brake, steer, reverse = controller.get_control()
+                # 应用控制
                 control = carla.VehicleControl(
                     throttle=float(throttle),
                     brake=float(brake),
                     steer=float(steer),
                     hand_brake=False,
-                    reverse=reverse
+                    # reverse=False  # 原代码
+                    reverse=reverse  # 新代码，支持倒车
                 )
                 self.vehicle.apply_control(control)
-
-                # NPC车辆使用内置自动驾驶（自动避开障碍物）
-                for i in range(1, len(self.vehicles)):
-                    self.vehicles[i].set_autopilot(True, 16)  # 16 = ARLA_AUTOPILIT_IGNORE_ALL
 
                 # 更新显示
                 if self.camera_image is not None:
                     display_img = self.camera_image.copy()
 
-                    # 显示当前车辆编号（绿色）
-                    cv2.putText(display_img, f"Vehicle: {self.current_vehicle_index + 1}",
-                                (20, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, (0, 255, 0), 2)
-
-                    # 添加状态信息（显示当前关注车辆的数据）
+                    # 添加状态信息
                     cv2.putText(display_img, f"Speed: {speed:.1f} km/h",
-                                (20, 60), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, (255, 255, 255), 2)
+                                (20, 40), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (255, 255, 255), 2)
                     cv2.putText(display_img, f"Throttle: {throttle:.2f}",
-                                (20, 90), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, (255, 255, 255), 2)
+                                (20, 80), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (255, 255, 255), 2)
                     cv2.putText(display_img, f"Steer: {steer:.2f}",
                                 (20, 120), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, (255, 255, 255), 2)
+                                0.8, (255, 255, 255), 2)
                     cv2.putText(display_img, f"Frame: {frame_count}",
-                                (20, 150), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, (255, 255, 255), 2)
+                                (20, 160), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (255, 255, 255), 2)
+                    
+                    # 显示倒车状态（新功能）
+                    if self.controller.manual_reverse:
+                        cv2.putText(display_img, "REVERSE MODE",
+                                    (20, 200), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8, (0, 0, 255), 2)  # 红色显示
+                    
+                    # 显示当前视角模式
+                    cv2.putText(display_img, f"View: {self.get_view_name()}",
+                                (20, 240), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (0, 255, 0), 2)  # 绿色显示
+                    
+                    # 显示当前地图
+                    cv2.putText(display_img, f"Map: {self.current_map}",
+                                (20, 280), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (255, 255, 0), 2)  # 黄色显示
+                    
+                    # 显示当前天气
+                    cv2.putText(display_img, f"Weather: {self.current_weather}",
+                                (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (255, 0, 255), 2)  # 品红色显示
+                    
+                    # 显示当前车辆颜色
+                    color_names = ['Red', 'Blue', 'Green', 'Yellow', 'Magenta', 'Cyan', 'Purple', 'Orange', 'Gray', 'White']
+                    current_color_name = color_names[self.current_color_index]
+                    cv2.putText(display_img, f"Color: {current_color_name}",
+                                (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (0, 128, 255), 2)  # 橙色显示
 
-                    # 显示手动驾驶模式状态
-                    if self.current_vehicle_index == 0 and self.controller.manual_mode:
-                            cv2.putText(display_img, "MANUAL MODE",
-                                        (20, 210), cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.6, (0, 255, 255), 2)
-
-                    # 显示倒车状态
-                    if self.current_vehicle_index == 0 and self.controller.manual_reverse:
-                            cv2.putText(display_img, "REVERSE MODE",
-                                        (20, 180), cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.6, (0, 0, 255), 2)
-
-                    cv2.imshow('Autonomous Driving - Multi-Vehicle View', display_img)
+                    cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
                 # 处理按键
                 key = cv2.waitKey(1) & 0xFF
@@ -499,59 +649,41 @@ class SimpleDrivingSystem:
                     print("正在退出...")
                     running = False
                 elif key == ord('r'):
-                    self.reset_current_vehicle()
+                    self.reset_vehicle()
                 elif key == ord('s'):
-                    # 紧急停止（只对主车辆生效）
-                    if self.current_vehicle_index == 0:
-                        self.vehicle.apply_control(carla.VehicleControl(
-                            throttle=0.0, brake=1.0, hand_brake=True
-                        ))
+                    # 紧急停止
+                    self.vehicle.apply_control(carla.VehicleControl(
+                        throttle=0.0, brake=1.0, hand_brake=True
+                    ))
                     print("紧急停止")
                 elif key == ord('x'):
                     # 切换倒车模式（只在速度接近0时允许切换）
-                    if self.current_vehicle_index == 0 and speed < 1.0:
+                    if speed < 1.0:  # 速度小于1km/h时允许切换
                         self.controller.toggle_reverse()
-                    elif self.current_vehicle_index != 0:
-                        print("只有主车辆可以切换倒车模式")
                     else:
                         print("请先减速到接近停止（速度<1km/h）再切换倒车模式")
-                elif key == ord('m') or key == ord('M'):
-                    # 切换手动/自动驾驶模式（只对主车辆生效）
-                    if self.current_vehicle_index == 0:
-                        self.controller.manual_mode = not self.controller.manual_mode
-                        if self.controller.manual_mode:
-                            print("已切换到手动驾驶模式 - 使用J前进/K倒车")
-                        else:
-                            print("已切换到自动驾驶模式")
+                elif key == ord('v'):
+                    # 切换视角模式
+                    view_modes = ['third_person', 'first_person', 'birdseye']
+                    current_index = view_modes.index(self.current_view)
+                    next_index = (current_index + 1) % len(view_modes)
+                    self.current_view = view_modes[next_index]
+                    self.update_camera_view()
+                elif key == ord('m'):
+                    # 切换地图
+                    self.switch_map()
+                elif key == ord('w'):
+                    # 切换天气
+                    self.switch_weather()
+                elif key == ord('c'):
+                    # 切换车辆颜色
+                    self.switch_color()
+                elif key == ord('p'):
+                    # 保存截图
+                    if self.camera_image is not None:
+                        self.take_screenshot(self.camera_image)
                     else:
-                        print("只有主车辆可以切换手动/自动驾驶模式")
-                elif key == ord('j') or key == ord('J'):
-                    # 手动前进（只对主车辆生效，且在手动模式下）
-                    if self.current_vehicle_index == 0:
-                        if self.controller.manual_mode:
-                            self.controller.manual_throttle = min(1.0, self.controller.manual_throttle + 0.1)
-                            self.controller.manual_reverse = False  # 前进模式
-                elif key == ord('k') or key == ord('K'):
-                    # 手动倒车（只对主车辆生效，且在手动模式下）
-                    if self.current_vehicle_index == 0:
-                        if self.controller.manual_mode:
-                            self.controller.manual_throttle = min(0.5, self.controller.manual_throttle + 0.1)
-                            self.controller.manual_reverse = True  # 倒车模式
-                elif ord('1') <= key <= ord('9'):
-                    # 动态切换车辆视角（按数字键1-9）
-                    vehicle_index = key - ord('1')
-                    if vehicle_index < len(self.vehicles):
-                        self.current_vehicle_index = vehicle_index
-                        self.update_current_vehicle_view()
-                    else:
-                        print(f"车辆 {vehicle_index + 1} 不存在")
-                else:
-                    # 松开按键时自动减速（只在手动模式下）
-                    if self.current_vehicle_index == 0 and self.controller.manual_mode:
-                        if self.controller.manual_throttle > 0:
-                            self.controller.manual_throttle = max(0.0, self.controller.manual_throttle - 0.05)
-                        elif self.controller.manual_throttle < 0:
-                            self.controller.manual_throttle = min(0.0, self.controller.manual_throttle + 0.05)
+                        print("当前没有图像可保存")
 
                 frame_count += 1
 
@@ -569,65 +701,40 @@ class SimpleDrivingSystem:
             self.cleanup()
 
     def spawn_npc_vehicles(self, count=2):
-        """生成NPC车辆（改进版：确保生成在合适位置）"""
+        """生成NPC车辆（简化）"""
         print(f"正在生成 {count} 辆NPC车辆...")
 
         try:
             blueprint_library = self.world.get_blueprint_library()
             spawn_points = self.world.get_map().get_spawn_points()
 
-            # 获取主车辆当前位置
-            main_location = self.vehicle.get_location()
-
-            # 筛选出距离主车辆较远的出生点（至少80米）
-            far_spawn_points = [
-                sp for sp in spawn_points
-                if sp.location.distance(main_location) > 80.0
-            ]
-
-            if not far_spawn_points:
-                far_spawn_points = spawn_points
-
             npc_vehicles = []
 
-            # 生成指定数量的特斯拉车辆
-            for i in range(count):
-                # 使用不同的出生点
-                spawn_index = i % len(far_spawn_points)
+            for i in range(min(count, len(spawn_points))):
+                # 跳过主车辆的出生点
+                if i == 0:
+                    continue
 
                 try:
-                    # 使用特斯拉Model3蓝图
-                    vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
-                    if not vehicle_bp:
-                        print("未找到特斯拉蓝图，尝试其他车辆...")
-                        vehicle_bp = blueprint_library.filter('vehicle.*')[0]
+                    # 随机选择车辆类型
+                    vehicle_bps = list(blueprint_library.filter('vehicle.*'))
+                    if vehicle_bps:
+                        vehicle_bp = random.choice(vehicle_bps)
 
-                    # 设置不同颜色区分
-                    colors = [[0, 255, 0], [0, 0, 255], [255, 255, 0], [255, 0, 255], [0, 255, 255]]
-                    color = colors[i % len(colors)]
-                    vehicle_bp.set_attribute('color', f'{color[0]},{color[1]},{color[2]}')
+                        # 生成NPC
+                        npc = self.world.try_spawn_actor(vehicle_bp, spawn_points[i])
 
-                    # 生成NPC
-                    npc = self.world.try_spawn_actor(vehicle_bp, far_spawn_points[spawn_index])
-
-                    if npc:
-                        # 立即开启自动驾驶，禁用交通灯检测
-                        npc.set_autopilot(True, 16)
-                        npc_vehicles.append(npc)
-                        print(f"生成NPC车辆 {len(npc_vehicles)} (特斯拉Model3)")
-                        print(f"  位置: {far_spawn_points[spawn_index].location}")
-                    else:
-                        print(f"无法在出生点 {spawn_index} 生成NPC车辆")
-                except Exception as e:
-                    print(f"生成NPC车辆 {i+1} 时出错: {e}")
+                        if npc:
+                            npc.set_autopilot(True)
+                            npc_vehicles.append(npc)
+                            print(f"生成NPC车辆 {len(npc_vehicles)}")
+                except:
                     pass
 
             print(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
-            return npc_vehicles
 
         except Exception as e:
             print(f"生成NPC车辆时出错: {e}")
-            return []
 
     def reset_vehicle(self):
         """重置车辆位置"""
@@ -635,37 +742,9 @@ class SimpleDrivingSystem:
 
         spawn_points = self.world.get_map().get_spawn_points()
         if spawn_points:
-            # 选择一个距离当前车辆较远的出生点，避免重置后立即撞到
-            current_location = self.vehicle.get_location()
-            far_spawn_points = [
-                sp for sp in spawn_points
-                if sp.location.distance(current_location) > 50.0  # 至少50米远
-            ]
-            if far_spawn_points:
-                new_spawn_point = random.choice(far_spawn_points)
-            else:
-                new_spawn_point = random.choice(spawn_points)
-
+            new_spawn_point = random.choice(spawn_points)
             self.vehicle.set_transform(new_spawn_point)
             print(f"车辆已重置到新位置: {new_spawn_point.location}")
-
-            # 重置控制器状态
-            self.controllers[0].last_waypoint = None
-
-            # 等待重置完成
-            time.sleep(0.5)
-
-    def reset_current_vehicle(self):
-        """重置当前关注的车辆位置"""
-        current_vehicle = self.vehicles[self.current_vehicle_index]
-        vehicle_label = "主车辆" if self.current_vehicle_index == 0 else f"NPC车辆 {self.current_vehicle_index}"
-        print(f"重置{vehicle_label}位置...")
-
-        spawn_points = self.world.get_map().get_spawn_points()
-        if spawn_points:
-            new_spawn_point = random.choice(spawn_points)
-            current_vehicle.set_transform(new_spawn_point)
-            print(f"{vehicle_label}已重置到新位置: {new_spawn_point.location}")
 
             # 等待重置完成
             time.sleep(0.5)

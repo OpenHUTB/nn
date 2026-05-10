@@ -217,6 +217,10 @@ def main():
                             break
                     except queue.Empty:
                         pass
+                
+                # --- 在 CARLA 模拟器中绘制调试信息 ---
+                if args.in_carla and not args.no_render:
+                    client.draw_debug_info_in_carla()
 
                 frame_count += 1
                 time.sleep(0.05)

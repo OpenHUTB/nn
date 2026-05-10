@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Lane detection demo with stable Hough lane fitting."""
+"""Lightweight lane detection visualizer for driving videos."""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 import cv2
 import numpy as np
 
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "output"
+PROJECT_DIR = Path(__file__).resolve().parent
+DEFAULT_OUTPUT_DIR = PROJECT_DIR / "output"
+
+CANNY_LOW = 40
+CANNY_HIGH = 120
 WHITE_LOWER = np.array([0, 120, 0], dtype=np.uint8)
 WHITE_UPPER = np.array([180, 255, 170], dtype=np.uint8)
 YELLOW_LOWER = np.array([15, 70, 70], dtype=np.uint8)
@@ -23,42 +27,78 @@ YELLOW_UPPER = np.array([40, 255, 255], dtype=np.uint8)
 
 @dataclass
 class LaneSmoother:
-    max_history: int = 8
+    """Keep fitted lane lines stable across frames."""
+
+    history_len: int = 8
     left_history: list[np.ndarray] = field(default_factory=list)
     right_history: list[np.ndarray] = field(default_factory=list)
 
     def update(self, left_fit: np.ndarray | None, right_fit: np.ndarray | None) -> tuple[np.ndarray | None, np.ndarray | None]:
         if left_fit is not None:
             self.left_history.append(left_fit)
-            self.left_history = self.left_history[-self.max_history :]
+            self.left_history = self.left_history[-self.history_len :]
         if right_fit is not None:
             self.right_history.append(right_fit)
-            self.right_history = self.right_history[-self.max_history :]
+            self.right_history = self.right_history[-self.history_len :]
 
         left = np.mean(self.left_history, axis=0) if self.left_history else None
         right = np.mean(self.right_history, axis=0) if self.right_history else None
         return left, right
 
 
-def build_trapezoid_roi(width: int, height: int) -> np.ndarray:
-    """Return a road-focused trapezoid region of interest."""
-    top_y = int(height * 0.58)
-    bottom_y = height
-    top_half_width = int(width * 0.11)
-    bottom_margin = int(width * 0.05)
-    center_x = width // 2
+class RunReporter:
+    """Write output video, screenshots, and per-frame metrics."""
 
-    return np.array(
-        [
-            [
-                (bottom_margin, bottom_y),
-                (center_x - top_half_width, top_y),
-                (center_x + top_half_width, top_y),
-                (width - bottom_margin, bottom_y),
-            ]
-        ],
-        dtype=np.int32,
-    )
+    def __init__(self, source: Path, output_dir: Path, fps: float, frame_size: tuple[int, int], save_every: int):
+        self.output_dir = output_dir
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.screenshot_dir = output_dir / "screenshots"
+        self.screenshot_dir.mkdir(exist_ok=True)
+
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        self.video_path = output_dir / f"{source.stem}_lane_detection_{timestamp}.mp4"
+        self.report_path = output_dir / f"{source.stem}_lane_metrics_{timestamp}.csv"
+        self.save_every = max(0, int(save_every))
+        self.first_screenshot: Path | None = None
+        self.rows: list[dict[str, str | int]] = []
+        self.writer = cv2.VideoWriter(
+            str(self.video_path),
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            max(float(fps), 1.0),
+            frame_size,
+        )
+
+    def add_frame(self, frame: np.ndarray, frame_idx: int, fps: float, line_count: int, has_left: bool, has_right: bool) -> None:
+        self.writer.write(frame)
+        self.rows.append(
+            {
+                "frame": frame_idx,
+                "fps": f"{fps:.2f}",
+                "hough_lines": line_count,
+                "left_lane": int(has_left),
+                "right_lane": int(has_right),
+            }
+        )
+
+        if self.first_screenshot is None:
+            self.save_screenshot(frame, frame_idx, "preview")
+        if self.save_every and frame_idx % self.save_every == 0:
+            self.save_screenshot(frame, frame_idx, "auto")
+
+    def save_screenshot(self, frame: np.ndarray, frame_idx: int, suffix: str = "manual") -> Path:
+        path = self.screenshot_dir / f"frame_{frame_idx:06d}_{suffix}.jpg"
+        cv2.imwrite(str(path), frame)
+        if self.first_screenshot is None:
+            self.first_screenshot = path
+        return path
+
+    def close(self) -> None:
+        self.writer.release()
+        with open(self.report_path, "w", newline="", encoding="utf-8") as f:
+            fieldnames = ["frame", "fps", "hough_lines", "left_lane", "right_lane"]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(self.rows)
 
 
 def color_filter(frame: np.ndarray) -> np.ndarray:
@@ -67,16 +107,32 @@ def color_filter(frame: np.ndarray) -> np.ndarray:
     white_mask = cv2.inRange(hls, WHITE_LOWER, WHITE_UPPER)
     yellow_mask = cv2.inRange(hls, YELLOW_LOWER, YELLOW_UPPER)
     mask = cv2.bitwise_or(white_mask, yellow_mask)
-
     kernel = np.ones((3, 3), dtype=np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
     return cv2.dilate(mask, kernel, iterations=1)
 
 
-def weighted_lane_fit(lines: Iterable[np.ndarray] | None, width: int, height: int) -> tuple[np.ndarray | None, np.ndarray | None]:
-    """Fit scattered Hough segments into one left and one right lane line."""
+def trapezoid_roi(width: int, height: int) -> np.ndarray:
+    top_y = int(height * 0.58)
+    top_half_width = int(width * 0.12)
+    bottom_margin = int(width * 0.04)
+    center_x = width // 2
+    return np.array(
+        [
+            [
+                (bottom_margin, height),
+                (center_x - top_half_width, top_y),
+                (center_x + top_half_width, top_y),
+                (width - bottom_margin, height),
+            ]
+        ],
+        dtype=np.int32,
+    )
+
+
+def fit_lane_lines(lines: np.ndarray | None, width: int, height: int) -> tuple[np.ndarray | None, np.ndarray | None, int]:
     if lines is None:
-        return None, None
+        return None, None, 0
 
     left_lines: list[tuple[float, float]] = []
     right_lines: list[tuple[float, float]] = []
@@ -96,26 +152,25 @@ def weighted_lane_fit(lines: Iterable[np.ndarray] | None, width: int, height: in
             continue
 
         intercept = y1 - slope * x1
-        length = float(np.hypot(x2 - x1, y2 - y1))
         x_at_top = (y_top - intercept) / slope
         x_at_bottom = (y_bottom - intercept) / slope
+        weight = float(np.hypot(x2 - x1, y2 - y1))
 
-        if slope < 0 and x_at_top < mid_x and x_at_bottom < width * 0.72:
+        if slope < 0 and x_at_top < mid_x and x_at_bottom < width * 0.75:
             left_lines.append((slope, intercept))
-            left_weights.append(length)
+            left_weights.append(weight)
         elif slope > 0 and x_at_top > mid_x and x_at_bottom > width * 0.55:
             right_lines.append((slope, intercept))
-            right_weights.append(length)
+            right_weights.append(weight)
 
-    left_fit = np.average(left_lines, axis=0, weights=left_weights) if left_lines else None
-    right_fit = np.average(right_lines, axis=0, weights=right_weights) if right_lines else None
-    return left_fit, right_fit
+    left = np.average(left_lines, axis=0, weights=left_weights) if left_lines else None
+    right = np.average(right_lines, axis=0, weights=right_weights) if right_lines else None
+    return left, right, len(lines)
 
 
 def line_points(fit: np.ndarray | None, y_top: int, y_bottom: int, width: int) -> tuple[tuple[int, int], tuple[int, int]] | None:
     if fit is None:
         return None
-
     slope, intercept = fit
     if abs(slope) < 1e-3:
         return None
@@ -127,39 +182,29 @@ def line_points(fit: np.ndarray | None, y_top: int, y_bottom: int, width: int) -
     return (x_top, y_top), (x_bottom, y_bottom)
 
 
-def lane_detection(frame: np.ndarray, smoother: LaneSmoother) -> np.ndarray:
+def lane_detection(frame: np.ndarray, smoother: LaneSmoother) -> tuple[np.ndarray, int, bool, bool]:
     h, w = frame.shape[:2]
-    color_mask = color_filter(frame)
-    blur = cv2.GaussianBlur(color_mask, (5, 5), 0)
-    edges = cv2.Canny(blur, 40, 120)
+    mask = color_filter(frame)
+    blur = cv2.GaussianBlur(mask, (5, 5), 0)
+    edges = cv2.Canny(blur, CANNY_LOW, CANNY_HIGH)
 
-    roi_vertices = build_trapezoid_roi(w, h)
+    roi_vertices = trapezoid_roi(w, h)
     roi_mask = np.zeros_like(edges)
     cv2.fillPoly(roi_mask, roi_vertices, 255)
-    masked_edges = cv2.bitwise_and(edges, roi_mask)
+    roi_edges = cv2.bitwise_and(edges, roi_mask)
 
-    lines = cv2.HoughLinesP(
-        masked_edges,
-        rho=1,
-        theta=np.pi / 180,
-        threshold=18,
-        minLineLength=25,
-        maxLineGap=120,
-    )
-
-    left_fit, right_fit = weighted_lane_fit(lines, w, h)
+    lines = cv2.HoughLinesP(roi_edges, 1, np.pi / 180, threshold=18, minLineLength=25, maxLineGap=120)
+    left_fit, right_fit, line_count = fit_lane_lines(lines, w, h)
     left_fit, right_fit = smoother.update(left_fit, right_fit)
 
     detected = frame.copy()
     overlay = np.zeros_like(frame)
     y_top = int(h * 0.62)
     y_bottom = h
-
     left_points = line_points(left_fit, y_top, y_bottom, w)
     right_points = line_points(right_fit, y_top, y_bottom, w)
 
     cv2.polylines(detected, roi_vertices, True, (0, 255, 255), 2)
-
     if left_points is not None:
         cv2.line(overlay, left_points[0], left_points[1], (0, 0, 255), 10)
     if right_points is not None:
@@ -168,131 +213,105 @@ def lane_detection(frame: np.ndarray, smoother: LaneSmoother) -> np.ndarray:
         lane_area = np.array([left_points[1], left_points[0], right_points[0], right_points[1]], dtype=np.int32)
         cv2.fillPoly(overlay, [lane_area], (0, 180, 0))
 
-    return cv2.addWeighted(detected, 1.0, overlay, 0.35, 0)
+    detected = cv2.addWeighted(detected, 1.0, overlay, 0.35, 0)
+    return detected, line_count, left_points is not None, right_points is not None
 
 
-def draw_hud(frame: np.ndarray, frame_idx: int, total_frames: int, fps: float, output_path: Path) -> None:
+def draw_hud(frame: np.ndarray, frame_idx: int, total_frames: int, fps: float, output_path: Path, line_count: int) -> None:
     h, w = frame.shape[:2]
-    progress = (frame_idx / total_frames) if total_frames > 0 else 0.0
-    progress_text = f"{progress * 100:5.1f}%" if total_frames > 0 else "  N/A"
+    progress = frame_idx / total_frames if total_frames > 0 else 0.0
+    frame_text = f"{frame_idx}/{total_frames}" if total_frames > 0 else f"{frame_idx}/?"
+    progress_text = f"{progress * 100:.1f}%" if total_frames > 0 else "N/A"
 
-    cv2.rectangle(frame, (0, 0), (w, 74), (0, 0, 0), -1)
-    cv2.putText(frame, f"FPS: {fps:5.1f}", (18, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (0, 255, 255), 2)
-    cv2.putText(frame, f"Frame: {frame_idx}/{total_frames if total_frames > 0 else '?'}", (180, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (255, 255, 255), 2)
-    cv2.putText(frame, f"Progress: {progress_text}", (18, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.64, (255, 255, 255), 2)
-    cv2.putText(frame, f"Output: {output_path.name}", (330, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (180, 220, 255), 1)
+    cv2.rectangle(frame, (0, 0), (w, 76), (0, 0, 0), -1)
+    cv2.putText(frame, f"FPS: {fps:.1f}", (18, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
+    cv2.putText(frame, f"Frame: {frame_text}", (150, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+    cv2.putText(frame, f"Progress: {progress_text}", (18, 61), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (255, 255, 255), 1)
+    cv2.putText(frame, f"Hough lines: {line_count}", (220, 61), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (200, 220, 255), 1)
+    cv2.putText(frame, output_path.name, (430, 61), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 220, 255), 1)
 
-    bar_x, bar_y, bar_w, bar_h = w - 260, 24, 220, 14
-    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (80, 80, 80), 1)
-    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + int(bar_w * progress), bar_y + bar_h), (0, 200, 0), -1)
+    bar_w = 220
+    bar_x = max(20, w - bar_w - 24)
+    bar_y = 24
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + 12), (80, 80, 80), 1)
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + int(bar_w * progress), bar_y + 12), (0, 190, 0), -1)
 
 
-def process_video(video_path: Path, output_dir: Path, display: bool, save_every: int, max_frames: int) -> tuple[Path, Path | None, int]:
+def process_video(video_path: Path, output_dir: Path, display: bool, save_every: int, max_frames: int) -> tuple[Path, Path, Path | None, int]:
     cap = cv2.VideoCapture(str(video_path), cv2.CAP_FFMPEG)
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video: {video_path}")
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    source_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     progress_total = max_frames if max_frames > 0 else total_frames
-    output_path = output_dir / f"{video_path.stem}_lane_detection.mp4"
-    screenshot_dir = output_dir / "screenshots"
-    screenshot_dir.mkdir(exist_ok=True)
 
-    writer = cv2.VideoWriter(
-        str(output_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        source_fps,
-        (width * 2, height),
-    )
-
+    reporter = RunReporter(video_path, output_dir, fps, (width * 2, height), save_every)
     smoother = LaneSmoother()
     frame_idx = 0
-    last_time = time.perf_counter()
-    first_screenshot: Path | None = None
+    fps_values: list[float] = []
 
     print("=== Lane Detection Split Screen ===")
     print(f"Input: {video_path}")
-    print(f"Size: {width}x{height} | FPS: {source_fps:.2f} | Total frames: {progress_total if progress_total > 0 else 'unknown'}")
-    print(f"Output video: {output_path}")
-    print("Keys: q=quit, p=pause, s=save screenshot")
-
-    paused = False
-    current_frame: np.ndarray | None = None
+    print(f"Size: {width}x{height} | FPS: {fps:.2f} | Total frames: {progress_total if progress_total > 0 else 'unknown'}")
+    print(f"Output video: {reporter.video_path}")
+    print(f"Metrics CSV: {reporter.report_path}")
 
     while True:
-        if not paused:
-            ret, frame = cap.read()
-            if not ret:
-                break
+        start = time.perf_counter()
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-            frame_idx += 1
-            detected_frame = lane_detection(frame, smoother)
-            split_frame = np.hstack((frame, detected_frame))
+        detected, line_count, has_left, has_right = lane_detection(frame, smoother)
+        split_frame = np.hstack((frame, detected))
+        elapsed_fps = 1.0 / max(time.perf_counter() - start, 1e-6)
+        fps_values.append(elapsed_fps)
 
-            now = time.perf_counter()
-            fps = 1.0 / max(now - last_time, 1e-6)
-            last_time = now
+        cv2.putText(split_frame, "Original", (20, 112), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+        cv2.putText(split_frame, "Lane Detection", (width + 20, 112), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
 
-            cv2.putText(split_frame, "Original", (20, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-            cv2.putText(split_frame, "Lane Detection", (width + 20, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-            draw_hud(split_frame, frame_idx, progress_total, fps, output_path)
+        frame_idx += 1
+        draw_hud(split_frame, frame_idx, progress_total, elapsed_fps, reporter.video_path, line_count)
+        reporter.add_frame(split_frame, frame_idx, elapsed_fps, line_count, has_left, has_right)
 
-            writer.write(split_frame)
-            current_frame = split_frame
+        if progress_total > 0 and frame_idx % max(1, int(fps)) == 0:
+            print(f"\rProcessed {frame_idx}/{progress_total} frames ({frame_idx / progress_total * 100:.1f}%)", end="")
 
-            if save_every > 0 and frame_idx % save_every == 0:
-                screenshot_path = screenshot_dir / f"frame_{frame_idx:06d}.jpg"
-                cv2.imwrite(str(screenshot_path), split_frame)
-                first_screenshot = first_screenshot or screenshot_path
-
-            if progress_total > 0 and frame_idx % max(1, int(source_fps)) == 0:
-                print(f"\rProcessed {frame_idx}/{progress_total} frames ({frame_idx / progress_total * 100:.1f}%)", end="")
-
-            if max_frames > 0 and frame_idx >= max_frames:
-                break
-
-        if display and current_frame is not None:
-            cv2.imshow("Lane Detection - Split Screen", current_frame)
+        if display:
+            cv2.imshow("Lane Detection - Split Screen", split_frame)
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
-            if key == ord("p"):
-                paused = not paused
             if key == ord("s"):
-                screenshot_path = screenshot_dir / f"frame_{frame_idx:06d}_manual.jpg"
-                cv2.imwrite(str(screenshot_path), current_frame)
-                first_screenshot = first_screenshot or screenshot_path
-                print(f"\nScreenshot saved: {screenshot_path}")
-        elif not display and current_frame is not None:
-            # Headless mode still writes one representative screenshot for reports.
-            if first_screenshot is None and frame_idx == 1:
-                screenshot_path = screenshot_dir / "frame_000001_auto.jpg"
-                cv2.imwrite(str(screenshot_path), current_frame)
-                first_screenshot = screenshot_path
+                reporter.save_screenshot(split_frame, frame_idx)
+
+        if max_frames > 0 and frame_idx >= max_frames:
+            break
 
     print()
     cap.release()
-    writer.release()
+    reporter.close()
     if display:
         cv2.destroyAllWindows()
 
+    avg_fps = float(np.mean(fps_values)) if fps_values else 0.0
     print(f"Done. Processed frames: {frame_idx}")
-    print(f"Saved video: {output_path}")
-    if first_screenshot is not None:
-        print(f"Saved screenshot: {first_screenshot}")
+    print(f"Average processing FPS: {avg_fps:.1f}")
+    print(f"Saved video: {reporter.video_path}")
+    print(f"Saved metrics: {reporter.report_path}")
+    if reporter.first_screenshot is not None:
+        print(f"Saved screenshot: {reporter.first_screenshot}")
 
-    return output_path, first_screenshot, frame_idx
+    return reporter.video_path, reporter.report_path, reporter.first_screenshot, frame_idx
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Detect lane lines in a driving video.")
     parser.add_argument("video", type=Path, help="Input video path")
-    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR, help="Directory for video and screenshots")
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help="Directory for video, screenshots, and CSV metrics")
     parser.add_argument("--no-display", action="store_true", help="Run without opening an OpenCV window")
     parser.add_argument("--save-every", type=int, default=0, help="Save a screenshot every N frames")
     parser.add_argument("--max-frames", type=int, default=0, help="Stop after N frames; 0 means process the whole video")

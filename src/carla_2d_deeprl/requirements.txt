@@ -1,0 +1,7 @@
+gym==0.17.1
+numpy~=2.4.4
+opencv-python~=4.13.0.92
+torch~=2.11.0
+torchvision~=0.26.0
+pillow~=12.2.0
+imutils~=0.5.4

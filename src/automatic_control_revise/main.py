@@ -327,6 +327,43 @@ class HUD(object):
                 break
             vehicle_type = get_actor_display_name(vehicle, truncate=22)
             self._info_text.append('% 4dm %s' % (dist, vehicle_type))
+                
+        # 新增：基于Actor的最近障碍物距离检测（车辆、行人、交通锥、路灯等）
+        obstacle_distance = None
+        vehicle_location = world.player.get_location()
+        vehicle_transform = world.player.get_transform()
+        forward_vector = vehicle_transform.get_forward_vector()
+
+        all_actors = world.world.get_actors()
+        for actor in all_actors:
+            # 排除玩家车自身
+            if actor.id == world.player.id:
+                continue
+            # 排除所有附着在玩家车上的传感器（安全检查父级）
+            if hasattr(actor, 'get_parent'):
+                if actor.get_parent() is not None and actor.get_parent().id == world.player.id:
+                    continue
+            # 只考虑前方30米内的物体，提高性能
+            if actor.get_location().distance(vehicle_location) > 30.0:
+                continue
+            # 计算相对向量
+            delta = actor.get_location() - vehicle_location
+            # 判断是否在前方：点积 > 0
+            dot = forward_vector.x * delta.x + forward_vector.y * delta.y + forward_vector.z * delta.z
+            if dot < 0:
+                continue
+            # 计算距离
+            dist = math.sqrt(delta.x**2 + delta.y**2 + delta.z**2)
+            # 忽略距离小于 3.5 米的物体（自身传感器）
+            if dist < 3.5:
+                continue
+            if obstacle_distance is None or dist < obstacle_distance:
+                obstacle_distance = dist
+
+        if obstacle_distance is not None:
+            self._info_text.append('Obstacle: % 5.1f m' % obstacle_distance)
+        else:
+            self._info_text.append('Obstacle: None')
 
         # 新增：显示下一个路径点的距离，并在到达新路径点时提示
         if hasattr(world, 'agent') and world.agent is not None:

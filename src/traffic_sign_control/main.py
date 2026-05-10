@@ -46,29 +46,29 @@ def draw_rounded_rect(surface, color, rect, radius, width=0):
     pygame.draw.rect(surface, color, rect, width, border_radius=radius)
 
 # 绘制车辆状态监控面板
-def draw_vehicle_status(surface, vehicle, detected_signs):
+def draw_vehicle_status(surface, vehicle, detected_signs, traffic_light_state=None):
     # 使用默认字体
     font = pygame.font.Font(None, 16)
-    
+
     status_width = 220
-    status_height = 180
+    status_height = 220  # 增加高度以容纳红绿灯状态
     padding = 15
     margin = 10
-    
+
     # 计算面板位置
     panel_x = surface.get_width() - status_width - margin
     panel_y = margin
-    
+
     # 创建状态面板背景（半透明圆角面板）
     draw_rounded_rect(surface, (0, 0, 0, 180), (panel_x, panel_y, status_width, status_height), 10)
-    
+
     # 添加轻微的阴影效果
     shadow_offset = 3
     draw_rounded_rect(surface, (0, 0, 0, 100), (panel_x + shadow_offset, panel_y + shadow_offset, status_width, status_height), 10)
-    
+
     # 绘制面板边框
     draw_rounded_rect(surface, (200, 200, 200), (panel_x, panel_y, status_width, status_height), 10, 1)
-    
+
     # 获取车辆状态
     velocity = vehicle.get_velocity()
     current_speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6  # m/s转换为km/h
@@ -76,12 +76,12 @@ def draw_vehicle_status(surface, vehicle, detected_signs):
     steering_angle = transform.rotation.yaw
     throttle = vehicle.get_control().throttle
     brake = vehicle.get_control().brake
-    
+
     # 确定颜色编码
     speed_color = (255, 255, 255)
     throttle_color = (0, 255, 0) if throttle > 0 else (255, 255, 255)
     brake_color = (255, 0, 0) if brake > 0 else (255, 255, 255)
-    
+
     # 检查是否检测到交通标志
     detected_speed_limit = None
     for sign, conf, bbox in detected_signs:
@@ -90,7 +90,7 @@ def draw_vehicle_status(surface, vehicle, detected_signs):
             if digits:
                 detected_speed_limit = digits[0]
                 break
-    
+
     # 速度颜色特殊处理（如果检测到限速标志）
     if detected_speed_limit:
         if current_speed > detected_speed_limit:
@@ -99,59 +99,97 @@ def draw_vehicle_status(surface, vehicle, detected_signs):
             speed_color = (0, 255, 0)  # 速度过低 - 绿色
         else:
             speed_color = (255, 255, 0)  # 速度合适 - 黄色
-    
+
     # 绘制标题
     title_font = pygame.font.Font(None, 14)
     title_surface = title_font.render("VEHICLE STATUS", True, (200, 200, 200))
     surface.blit(title_surface, (panel_x + (status_width - title_surface.get_width()) // 2, panel_y + 5))
-    
+
     # 绘制分隔线
     pygame.draw.line(surface, (100, 100, 100), (panel_x + padding, panel_y + 25), (panel_x + status_width - padding, panel_y + 25), 1)
-    
+
     # 绘制状态信息 - 动力系统组
     y_offset = 40
     power_font = pygame.font.Font(None, 12)
     power_surface = power_font.render("POWER SYSTEM", True, (150, 150, 150))
     surface.blit(power_surface, (panel_x + padding, panel_y + y_offset))
     y_offset += 20
-    
+
     # 绘制速度
     speed_text = f"SPEED: {current_speed:6.2f} km/h"
     speed_surface = font.render(speed_text, True, speed_color)
     surface.blit(speed_surface, (panel_x + padding, panel_y + y_offset))
     y_offset += 20
-    
+
     # 绘制油门
     throttle_text = f"THROTTLE: {throttle:5.2f}"
     throttle_surface = font.render(throttle_text, True, throttle_color)
     surface.blit(throttle_surface, (panel_x + padding, panel_y + y_offset))
     y_offset += 20
-    
+
     # 绘制刹车
     brake_text = f"BRAKE: {brake:5.2f}"
     brake_surface = font.render(brake_text, True, brake_color)
     surface.blit(brake_surface, (panel_x + padding, panel_y + y_offset))
     y_offset += 25
-    
+
     # 绘制分隔线
     pygame.draw.line(surface, (100, 100, 100), (panel_x + padding, panel_y + y_offset - 5), (panel_x + status_width - padding, panel_y + y_offset - 5), 1)
-    
+
     # 绘制状态信息 - 车辆状态组
     status_font = pygame.font.Font(None, 12)
     status_surface = status_font.render("VEHICLE STATE", True, (150, 150, 150))
     surface.blit(status_surface, (panel_x + padding, panel_y + y_offset))
     y_offset += 20
-    
+
     # 绘制转向角
     steer_text = f"STEER: {steering_angle:6.2f}°"
     steer_surface = font.render(steer_text, True, (255, 255, 255))
     surface.blit(steer_surface, (panel_x + padding, panel_y + y_offset))
     y_offset += 20
-    
+
     # 绘制位置
     pos_text = f"POS: ({transform.location.x:5.1f}, {transform.location.y:5.1f})"
     pos_surface = font.render(pos_text, True, (255, 255, 255))
     surface.blit(pos_surface, (panel_x + padding, panel_y + y_offset))
+    y_offset += 25
+
+    # 绘制分隔线
+    pygame.draw.line(surface, (100, 100, 100), (panel_x + padding, panel_y + y_offset - 5), (panel_x + status_width - padding, panel_y + y_offset - 5), 1)
+
+    # 绘制红绿灯状态 - 清晰可视化
+    light_font = pygame.font.Font(None, 12)
+    light_surface = light_font.render("TRAFFIC LIGHT", True, (150, 150, 150))
+    surface.blit(light_surface, (panel_x + padding, panel_y + y_offset))
+    y_offset += 20
+
+    # 绘制红绿灯状态指示器
+    if traffic_light_state is not None:
+        # 根据状态设置颜色和文本
+        if traffic_light_state == carla.TrafficLightState.Red:
+            light_color = (255, 0, 0)
+            light_text = "RED - STOP"
+        elif traffic_light_state == carla.TrafficLightState.Yellow:
+            light_color = (255, 255, 0)
+            light_text = "YELLOW - SLOW"
+        elif traffic_light_state == carla.TrafficLightState.Green:
+            light_color = (0, 255, 0)
+            light_text = "GREEN - GO"
+        else:
+            light_color = (128, 128, 128)
+            light_text = "UNKNOWN"
+
+        # 绘制圆形指示灯
+        pygame.draw.circle(surface, light_color, (panel_x + padding + 10, panel_y + y_offset + 8), 8)
+        pygame.draw.circle(surface, (255, 255, 255), (panel_x + padding + 10, panel_y + y_offset + 8), 8, 2)
+
+        # 绘制状态文本
+        light_text_surface = font.render(light_text, True, light_color)
+        surface.blit(light_text_surface, (panel_x + padding + 25, panel_y + y_offset))
+    else:
+        # 无红绿灯状态
+        no_light_text = font.render("NO LIGHT DETECTED", True, (128, 128, 128))
+        surface.blit(no_light_text, (panel_x + padding, panel_y + y_offset))
 
 # 加载YOLOv8预训练模型用于交通标志检测
 model = YOLO("yolov8n.pt")
@@ -161,14 +199,16 @@ TRAFFIC_RELEVANT_CLASSES = {9, 11}
 
 # 异步检测器：在独立线程中运行YOLO推理，避免阻塞主循环
 class AsyncDetector:
-    def __init__(self):
+    def __init__(self, detect_interval=3):
         self._lock = threading.Lock()
         self._latest_signs = []
         self._image_to_detect = None
         self._running = True
+        self._detect_interval = detect_interval  # 每N帧检测一次
+        self._frame_count = 0
         self._thread = threading.Thread(target=self._detect_loop, daemon=True)
         self._thread.start()
-    
+
     def _detect_loop(self):
         while self._running:
             img = None
@@ -176,7 +216,7 @@ class AsyncDetector:
                 if self._image_to_detect is not None:
                     img = self._image_to_detect.copy()
                     self._image_to_detect = None
-            
+
             if img is not None:
                 results = model.predict(
                     source=img, imgsz=640, conf=0.25,
@@ -197,20 +237,25 @@ class AsyncDetector:
                     x1, y1, x2, y2 = detections.xyxy[i].cpu().numpy().astype(int)
                     label = names[cls_id]
                     signs.append((label, conf, (int(x1), int(y1), int(x2), int(y2))))
-                
+
                 with self._lock:
                     self._latest_signs = signs
             else:
                 time.sleep(0.001)
-    
+
+    def should_detect(self):
+        """判断当前帧是否应该进行检测（帧跳过逻辑）"""
+        self._frame_count += 1
+        return self._frame_count % self._detect_interval == 0
+
     def submit_image(self, image_np):
         with self._lock:
             self._image_to_detect = image_np
-    
+
     def get_latest_signs(self):
         with self._lock:
             return list(self._latest_signs)
-    
+
     def stop(self):
         self._running = False
 
@@ -442,10 +487,10 @@ def main():
 
             transform = vehicle.get_transform()
             waypoint = map.get_waypoint(transform.location, project_to_road=True, lane_type=carla.LaneType.Driving)
-            
+
             # 使用简单控制器计算控制
             throttle, brake, steer = simple_controller.update_control(vehicle, waypoint)
-            
+
             # 应用控制
             control = carla.VehicleControl()
             control.throttle = throttle
@@ -454,20 +499,24 @@ def main():
             vehicle.apply_control(control)
 
             if image_surface[0] is not None:
-                # 将图像提交给异步检测器（非阻塞）
-                detector.submit_image(image_surface[0])
-                
+                # 帧跳过逻辑：只在需要时提交图像给检测器
+                if detector.should_detect():
+                    detector.submit_image(image_surface[0])
+
                 # 获取最新的检测结果（非阻塞，立即返回）
                 detected_signs = detector.get_latest_signs()
-                
+
+                # 获取红绿灯状态
+                traffic_light_state = vehicle.get_traffic_light_state()
+
                 # 基于检测结果控制车辆
                 simulation_time = time.time() - start_time
                 control_vehicle_based_on_sign(vehicle, detected_signs, world.get_actors().filter("traffic.traffic_light"), simulation_time, simple_controller)
 
                 # 绘制检测结果
                 surface = draw_detections(image_surface[0], detected_signs)
-                # 绘制车辆状态面板
-                draw_vehicle_status(surface, vehicle, detected_signs)
+                # 绘制车辆状态面板（包含红绿灯状态）
+                draw_vehicle_status(surface, vehicle, detected_signs, traffic_light_state)
                 # 绘制FPS
                 fps_text = f"FPS: {clock.get_fps():.1f}"
                 fps_surface = fps_font.render(fps_text, True, (255, 255, 0))
@@ -479,7 +528,7 @@ def main():
                 font = pygame.font.Font(None, 36)
                 text = font.render("等待相机图像...", True, (255, 255, 255))
                 display.blit(text, (display.get_width()//2 - 100, display.get_height()//2))
-            
+
             pygame.display.flip()
             clock.tick(30)
 
