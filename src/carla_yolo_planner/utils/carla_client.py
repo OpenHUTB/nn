@@ -29,11 +29,48 @@ class CarlaClient:
         self.client = None
         self.world = None
         self.vehicle = None
-        self.camera = None
+        self.cameras = {}  # 多摄像头字典: {'front', 'back', 'left', 'right'}
+        self.current_camera = 'front'  # 当前激活的摄像头
         self.blueprint_library = None
         self.image_queue = queue.Queue()
         self.debug_helper = None
         self.spectator = None
+        
+        # 摄像头配置
+        self.camera_configs = {
+            'front': {
+                'location': carla.Location(x=0.3, z=1.3),
+                'rotation': carla.Rotation(pitch=0, yaw=0, roll=0),
+                'name': '前视'
+            },
+            'back': {
+                'location': carla.Location(x=-0.8, z=1.3),
+                'rotation': carla.Rotation(pitch=0, yaw=180, roll=0),
+                'name': '后视'
+            },
+            'left': {
+                'location': carla.Location(x=0, z=1.3, y=0.4),
+                'rotation': carla.Rotation(pitch=0, yaw=-90, roll=0),
+                'name': '左视'
+            },
+            'right': {
+                'location': carla.Location(x=0, z=1.3, y=-0.4),
+                'rotation': carla.Rotation(pitch=0, yaw=90, roll=0),
+                'name': '右视'
+            }
+        }
+        
+        # 碰撞检测相关
+        self.collision_detected = False
+        self.collision_time = 0
+        self.stuck_counter = 0
+        self.last_velocity = 0
+        self.spawn_points = None  # 保存生成点列表用于重置
+        
+        # HUD显示相关
+        self.hud_fps = 0
+        self.hud_detection_count = 0
+        self.hud_brake_status = ""
 
     def connect(self):
         print(f"[INFO] 正在连接 CARLA 服务器 ({self.host}:{self.port})...")
@@ -69,7 +106,10 @@ class CarlaClient:
             
             # 获取交通管理器并启用自动驾驶
             traffic_manager = self.client.get_trafficmanager(8000)
+            traffic_manager.set_global_distance_to_leading_vehicle(2.0)
+            traffic_manager.set_synchronous_mode(True)
             self.vehicle.set_autopilot(True, traffic_manager.get_port())
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.5))
             
             # 生成NPC车辆
             if spawn_npc:
@@ -108,9 +148,10 @@ class CarlaClient:
             print(f"[WARNING] 生成NPC车辆失败: {e}")
 
     def setup_camera(self):
-        """设置摄像头（图像处理仍有问题，主要用于获取帧）"""
+        """设置多摄像头系统"""
         if not self.vehicle:
             return
+            
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', str(config.CAMERA_WIDTH))
         camera_bp.set_attribute('image_size_y', str(config.CAMERA_HEIGHT))
@@ -118,10 +159,53 @@ class CarlaClient:
         camera_bp.set_attribute('sensor_tick', '0.0')
         camera_bp.set_attribute('motion_blur_intensity', '0.0')
         
-        spawn_point = carla.Transform(carla.Location(x=config.CAMERA_POS_X, z=config.CAMERA_POS_Z))
-        self.camera = self.world.spawn_actor(camera_bp, spawn_point, attach_to=self.vehicle)
-        self.camera.listen(lambda image: self._process_image(image))
-        print("[INFO] RGB 摄像头安装成功！")
+        # 创建四个摄像头
+        for cam_name, config_data in self.camera_configs.items():
+            spawn_point = carla.Transform(config_data['location'], config_data['rotation'])
+            camera = self.world.spawn_actor(camera_bp, spawn_point, attach_to=self.vehicle)
+            
+            # 只有当前摄像头才将图像放入队列
+            if cam_name == self.current_camera:
+                camera.listen(lambda image: self._process_image(image))
+            else:
+                camera.listen(lambda image: None)  # 非当前摄像头不处理
+            
+            self.cameras[cam_name] = camera
+        
+        print(f"[INFO] 多摄像头系统安装成功！当前视角: {self.camera_configs[self.current_camera]['name']}")
+        print("[INFO] 按数字键 1-4 切换视角: 1-前视 | 2-后视 | 3-左视 | 4-右视")
+    
+    def switch_camera(self, camera_name):
+        """
+        切换到指定摄像头
+        Args:
+            camera_name: 'front', 'back', 'left', 'right'
+        """
+        if camera_name not in self.camera_configs:
+            print(f"[WARNING] 未知摄像头: {camera_name}")
+            return False
+        
+        if camera_name == self.current_camera:
+            return True  # 已是当前摄像头
+        
+        # 停止当前摄像头的图像监听
+        if self.current_camera in self.cameras:
+            self.cameras[self.current_camera].listen(lambda image: None)
+        
+        # 切换到新摄像头
+        self.current_camera = camera_name
+        
+        # 启动新摄像头的图像监听
+        if self.current_camera in self.cameras:
+            self.cameras[self.current_camera].listen(lambda image: self._process_image(image))
+        
+        cam_name = self.camera_configs[self.current_camera]['name']
+        print(f"[INFO] 已切换到 {cam_name} 视角")
+        return True
+    
+    def get_current_camera_name(self):
+        """获取当前摄像头的中文名称"""
+        return self.camera_configs[self.current_camera]['name']
 
     def _process_image(self, image):
         """处理摄像头图像（临时方案）"""
@@ -202,13 +286,12 @@ class CarlaClient:
             )
             
             # 绘制检测框（立方体）
-            box_extent = carla.Vector3D(1.5, 0.8, 0.5)
-            box_transform = carla.Transform(detection_loc)
+            box = carla.BoundingBox(detection_loc, carla.Vector3D(1.5, 0.8, 0.5))
             self.debug_helper.draw_box(
-                box_transform,
-                box_extent,
-                color=color,
+                box,
+                carla.Rotation(),
                 thickness=0.2,
+                color=color,
                 life_time=0.15
             )
             
@@ -312,9 +395,13 @@ class CarlaClient:
 
     def destroy_actors(self):
         try:
-            if self.camera:
-                self.camera.destroy()
-                self.camera = None
+            # 销毁所有摄像头
+            for cam_name, camera in self.cameras.items():
+                if camera:
+                    camera.destroy()
+            self.cameras.clear()
+            print("[INFO] 所有摄像头已清理。")
+            
             if self.vehicle:
                 self.vehicle.destroy()
                 self.vehicle = None
@@ -328,25 +415,126 @@ class CarlaClient:
             return
         
         try:
-            # 获取车辆 transform
             transform = self.vehicle.get_transform()
         except RuntimeError:
-            return  # 车辆已被销毁
+            return
         
-        # 计算跟随位置：车后8米，高5米
         forward = transform.get_forward_vector()
         location = carla.Location(
-            x=transform.location.x - forward.x * 12,
-            y=transform.location.y - forward.y * 12,
-            z=transform.location.z + 5
+            x=transform.location.x - forward.x * 8,
+            y=transform.location.y - forward.y * 8,
+            z=transform.location.z + 4
         )
         
-        # 保持与车辆相同的朝向
         rotation = carla.Rotation(
-            pitch=transform.rotation.pitch,
+            pitch=-15,
             yaw=transform.rotation.yaw,
             roll=transform.rotation.roll
         )
         
-        # 更新 spectator
         self.spectator.set_transform(carla.Transform(location, rotation))
+    
+    def update_hud_info(self, fps, detection_count, brake_status=""):
+        """更新 HUD 显示信息"""
+        self.hud_fps = fps
+        self.hud_detection_count = detection_count
+        self.hud_brake_status = brake_status
+    
+    def draw_hud(self):
+        """在 CARLA 画面上绘制 HUD 信息"""
+        if not self.world or not self.vehicle:
+            return
+        
+        try:
+            # 获取车辆位置（用于在画面上方显示）
+            vehicle_location = self.vehicle.get_location()
+            
+            # 显示 FPS（黄色，最大字号）
+            fps_text = f"  FPS: {self.hud_fps:.1f}  "
+            self.debug_helper.draw_string(
+                carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 3.5),
+                fps_text,
+                draw_shadow=True,
+                color=carla.Color(255, 255, 0),
+                life_time=-1  # 永久显示直到被覆盖
+            )
+            
+            # 显示检测数量（青色）
+            detection_text = f"  Detections: {self.hud_detection_count}  "
+            self.debug_helper.draw_string(
+                carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 3.2),
+                detection_text,
+                draw_shadow=True,
+                color=carla.Color(0, 255, 255),
+                life_time=-1
+            )
+            
+            # 显示当前视角（橙色）
+            camera_name = self.camera_configs[self.current_camera]['name']
+            camera_text = f"  View: {camera_name}  "
+            self.debug_helper.draw_string(
+                carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 2.9),
+                camera_text,
+                draw_shadow=True,
+                color=carla.Color(255, 128, 0),
+                life_time=-1
+            )
+            
+            # 显示刹车状态（红色）
+            if self.hud_brake_status:
+                brake_text = "  !!! EMERGENCY BRAKING !!!  "
+                self.debug_helper.draw_string(
+                    carla.Location(vehicle_location.x - 3, vehicle_location.y, vehicle_location.z + 2.6),
+                    brake_text,
+                    draw_shadow=True,
+                    color=carla.Color(255, 0, 0),
+                    life_time=-1
+                )
+                
+        except Exception as e:
+            print(f"[WARNING] HUD绘制失败: {e}")
+    
+    def check_collision_and_reset(self):
+        """检测车辆是否卡住或碰撞，并自动重置位置"""
+        if not self.vehicle:
+            return
+        
+        try:
+            # 获取车辆速度
+            velocity = self.vehicle.get_velocity()
+            current_speed = velocity.length()
+            
+            # 判断是否卡住（速度接近0但应该在移动）
+            if current_speed < 0.1:  # 速度小于0.1 m/s
+                self.stuck_counter += 1
+            else:
+                self.stuck_counter = 0
+            
+            # 如果连续300帧卡住，重置车辆位置
+            if self.stuck_counter > 300:
+                print("[WARNING] 车辆已卡住，正在重置位置...")
+                
+                # 获取随机生成点
+                if self.spawn_points is None:
+                    self.spawn_points = self.world.get_map().get_spawn_points()
+                
+                if self.spawn_points:
+                    # 选择一个新的生成点
+                    new_spawn_point = random.choice(self.spawn_points)
+                    
+                    # 停止自动驾驶
+                    self.vehicle.set_autopilot(False)
+                    
+                    # 重置车辆位置
+                    self.vehicle.set_transform(new_spawn_point)
+                    
+                    # 重新启动自动驾驶
+                    traffic_manager = self.client.get_trafficmanager(8000)
+                    self.vehicle.set_autopilot(True, traffic_manager.get_port())
+                    
+                    print(f"[INFO] 车辆已重置到新位置")
+                
+                self.stuck_counter = 0
+                
+        except Exception as e:
+            print(f"[WARNING] 碰撞检测失败: {e}")

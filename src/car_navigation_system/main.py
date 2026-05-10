@@ -129,6 +129,7 @@ class SimpleDrivingSystem:
         ]  # 车辆颜色列表
         self.current_color_index = 0  # 当前颜色索引
         self.screenshot_dir = 'screenshots'  # 截图保存目录
+        self.is_night_mode = False  # 夜晚模式标志
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -396,6 +397,40 @@ class SimpleDrivingSystem:
         except Exception as e:
             print(f"切换天气时出错: {e}")
 
+    def toggle_night_mode(self):
+        """切换夜晚模式并自动打开/关闭近光灯"""
+        try:
+            self.is_night_mode = not self.is_night_mode
+            
+            if self.is_night_mode:
+                # 切换到夜晚模式
+                night_weather = carla.WeatherParameters(
+                    cloudiness=80.0,
+                    precipitation=0.0,
+                    sun_altitude_angle=-30.0,  # 负角度表示夜晚
+                    fog_density=30.0,
+                    fog_distance=50.0
+                )
+                self.world.set_weather(night_weather)
+                
+                # 打开近光灯
+                if self.vehicle:
+                    self.vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.LowBeam))
+                
+                print("已切换到夜晚模式，近光灯已打开")
+            else:
+                # 切换回白天模式（使用当前天气）
+                self.set_weather(self.current_weather)
+                
+                # 关闭近光灯
+                if self.vehicle:
+                    self.vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.NONE))
+                
+                print("已切换到白天模式，近光灯已关闭")
+                
+        except Exception as e:
+            print(f"切换夜晚模式时出错: {e}")
+
     def switch_color(self):
         """切换车辆颜色"""
         try:
@@ -569,6 +604,7 @@ class SimpleDrivingSystem:
         print("  w - 切换天气（晴天/雨天/多云/湿滑）")
         print("  c - 切换车辆颜色")
         print("  p - 保存当前画面截图")
+        print("  l - 切换夜晚模式（自动打开/关闭近光灯）")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -684,6 +720,9 @@ class SimpleDrivingSystem:
                         self.take_screenshot(self.camera_image)
                     else:
                         print("当前没有图像可保存")
+                elif key == ord('l') or key == ord('L'):
+                    # 切换夜晚模式（支持大小写）
+                    self.toggle_night_mode()
 
                 frame_count += 1
 
