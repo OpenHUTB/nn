@@ -5,6 +5,8 @@
 # 1. 导入 numpy 库
 import numpy as np                    # 将 numpy 库命名为 np
 import matplotlib.pyplot as plt       # 仅保留需要使用的导入
+import argparse
+from pathlib import Path
 # import 放一起代码美观
 
 
@@ -33,7 +35,7 @@ def question_3():
 
 # 4. (1) 建立一个全 0 矩阵 a, 大小为 3x3; 类型为整型（提示: dtype = int）(2) 建立一个全 1 矩阵 b, 大小为 4x5;  (3) 建立一个单位矩阵 c ,大小为 4x4; (4) 生成一个随机数矩阵 d,
 # 大小为 3x2.
-def question_4():
+def question_4(seed=42):
     print("第四题：")
 
 # 全 0 矩阵，3x3，指定数据类型为int
@@ -46,7 +48,7 @@ def question_4():
     c = np.eye(4)
     print("(3) 单位矩阵:\n", c)
 # 随机数矩阵，3x2：设置随机种子（42）确保结果可复现，生成0-1之间的浮点数
-    np.random.seed(42)  #  固定随机种子，使随机结果可复现
+    np.random.seed(seed)  #  固定随机种子，使随机结果可复现
     d = np.random.rand(3, 2)# 生成一个形状为(3, 2)的NumPy数组，其中每个元素都是0到1之间的随机浮点数
     print("(4) 随机矩阵:\n", d)
 
@@ -226,7 +228,7 @@ def question_23(x):
     print("每行最大值的下标:", np.argmax(x, axis=1))   # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
 # 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
-def question_24(): #绘制二次函数 y = x^2 的图像。
+def question_24(show=True, save_dir=None): #绘制二次函数 y = x^2 的图像。
 
     print("\n第二十四题：绘制二次函数")
 
@@ -246,11 +248,16 @@ def question_24(): #绘制二次函数 y = x^2 的图像。
 
     # 在右上角显示图例
     plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
-    plt.show()  # 显示绘制的图像
+    if save_dir is not None:
+        save_path = Path(save_dir)
+        save_path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path / "quadratic.png", dpi=140, bbox_inches='tight')
+    if show:
+        plt.show()  # 显示绘制的图像
     plt.close()  # 关闭图形，释放内存
 
 # 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
-def question_25():
+def question_25(show=True, save_dir=None):
     print("第二十五题：绘制正弦和余弦函数")
     # 改用linspace确保包含端点
     x = np.linspace(0, 3 * np.pi, 100)  ## 生成从 0 到 3π 的 x 值，步长为 0.1
@@ -276,13 +283,24 @@ def question_25():
     plt.tight_layout() 
 
     # 显示图像
-    plt.show()
+    if save_dir is not None:
+        save_path = Path(save_dir)
+        save_path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path / "trigonometric.png", dpi=140, bbox_inches='tight')
+    if show:
+        plt.show()
     plt.close()  # 关闭图形，释放内存
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="NumPy warmup exercise")
+    parser.add_argument("--seed", type=int, default=42, help="随机种子")
+    parser.add_argument("--save-dir", type=str, default=None, help="图像保存目录")
+    parser.add_argument("--no-show", action="store_true", help="不显示图像窗口")
+    args = parser.parse_args()
+
     # 按顺序执行所有问题
     question_2()
     question_3()
-    question_4()
+    question_4(seed=args.seed)
     a5 = question_5()
     question_6(a5)
     question_7(a5)
@@ -302,5 +320,5 @@ if __name__ == "__main__":
     question_21(x13)
     question_22(x13)
     question_23(x13)
-    question_24()
-    question_25()
+    question_24(show=not args.no_show, save_dir=args.save_dir)
+    question_25(show=not args.no_show, save_dir=args.save_dir)

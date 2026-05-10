@@ -14,6 +14,9 @@ import cv2
 import numpy as np
 import os
 import sys
+import json
+import csv
+from datetime import datetime
 
 # 导入各个模块
 from config import AppConfig, SceneConfig, config_manager
@@ -23,6 +26,8 @@ from direction_analyzer import DirectionAnalyzer
 from visualizer import Visualizer
 from video_processor import VideoProcessor
 from utils import PerformanceMonitor, Timer, safe_resize, calculate_fps
+from confidence_calibrator import ConfidenceCalibrator
+from quality_evaluator import QualityEvaluator
 
 
 class LaneDetectionApp:
@@ -61,6 +66,11 @@ class LaneDetectionApp:
         self.is_processing = False
         self.is_video_mode = False
         self.processing_history = deque(maxlen=10)
+
+        # 导出相关状态
+        self.last_detection_result = None
+        self.result_image = None
+        self.export_history = []
         
         # 视频相关变量
         self.video_file_path = None
@@ -91,6 +101,8 @@ class LaneDetectionApp:
             self.direction_analyzer = DirectionAnalyzer(self.config)
             self.visualizer = Visualizer(self.config)
             self.video_processor = VideoProcessor(self.config)
+            self.confidence_calibrator = ConfidenceCalibrator()
+            self.quality_evaluator = QualityEvaluator()
             print("所有模块初始化完成")
         except Exception as e:
             print(f"模块初始化失败: {e}")
@@ -186,25 +198,25 @@ class LaneDetectionApp:
         # 主容器
         main_container = ttk.Frame(self.root)
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
-        
+
         # 标题栏
         self._create_title_bar(main_container)
-        
+
         # 内容区域
         content_frame = ttk.Frame(main_container)
         content_frame.pack(fill="both", expand=True, pady=(10, 0))
-        
+
         # 左侧控制面板
         control_frame = self._create_control_panel(content_frame)
         control_frame.pack(side="left", fill="y", padx=(0, 10))
-        
+
         # 右侧图像显示区域
         display_frame = self._create_display_panel(content_frame)
         display_frame.pack(side="right", fill="both", expand=True)
-        
+
         # 状态栏
         self._create_status_bar(main_container)
-        
+
         # 性能监控按钮
         self._create_performance_button(main_container)
     
@@ -239,26 +251,54 @@ class LaneDetectionApp:
             foreground="#27ae60"
         )
         self.config_status_label.pack(side="right", padx=(0, 10))
-    
+
     def _create_control_panel(self, parent):
         """创建控制面板"""
+        # 创建外部容器
+        control_container = ttk.Frame(parent)
+        control_container.pack_propagate(False)
+        control_container.config(width=350)
+
+        # 创建Canvas用于滚动
+        canvas = tk.Canvas(control_container, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(control_container, orient="vertical", command=canvas.yview)
+
+        # 创建内部框架（控制面板）
         control_frame = ttk.LabelFrame(
-            parent,
+            canvas,
             text="控制面板",
             padding="15",
             relief="groove"
         )
-        control_frame.pack_propagate(False)
-        control_frame.config(width=350)
-        
+
+        # 配置滚动
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas_window = canvas.create_window((0, 0), window=control_frame, anchor="nw")
+
+        # 绑定事件以更新滚动区域
+        def _configure_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        control_frame.bind("<Configure>", _configure_scroll_region)
+
+        # 布局Canvas和滚动条
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # 鼠标滚轮支持
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
         # 输入模式选择
         mode_frame = ttk.LabelFrame(control_frame, text="输入模式", padding="10")
         mode_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 模式选择按钮
         mode_buttons_frame = ttk.Frame(mode_frame)
         mode_buttons_frame.pack()
-        
+
         self.image_mode_btn = ttk.Button(
             mode_buttons_frame,
             text="图像模式",
@@ -266,7 +306,7 @@ class LaneDetectionApp:
             width=12
         )
         self.image_mode_btn.pack(side="left", padx=(0, 5))
-        
+
         self.video_mode_btn = ttk.Button(
             mode_buttons_frame,
             text="视频模式",
@@ -274,7 +314,7 @@ class LaneDetectionApp:
             width=12
         )
         self.video_mode_btn.pack(side="left", padx=(0, 5))
-        
+
         self.camera_mode_btn = ttk.Button(
             mode_buttons_frame,
             text="摄像头模式",
@@ -282,11 +322,11 @@ class LaneDetectionApp:
             width=12
         )
         self.camera_mode_btn.pack(side="left")
-        
+
         # 文件操作区域
         self.file_frame = ttk.LabelFrame(control_frame, text="文件操作", padding="10")
         self.file_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 选择图片按钮
         self.select_image_btn = ttk.Button(
             self.file_frame,
@@ -295,7 +335,7 @@ class LaneDetectionApp:
             width=20
         )
         self.select_image_btn.pack(pady=(0, 10))
-        
+
         # 重新检测按钮
         self.redetect_btn = ttk.Button(
             self.file_frame,
@@ -305,7 +345,7 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.redetect_btn.pack(pady=(0, 10))
-        
+
         # 文件信息显示
         self.file_info_label = ttk.Label(
             self.file_frame,
@@ -314,10 +354,10 @@ class LaneDetectionApp:
             foreground="#3498db"
         )
         self.file_info_label.pack()
-        
+
         # 视频控制区域（初始隐藏）
         self.video_frame = ttk.LabelFrame(control_frame, text="视频控制", padding="10")
-        
+
         # 选择视频按钮
         self.select_video_btn = ttk.Button(
             self.video_frame,
@@ -326,11 +366,11 @@ class LaneDetectionApp:
             width=20
         )
         self.select_video_btn.pack(pady=(0, 10))
-        
+
         # 摄像头索引选择
         camera_frame = ttk.Frame(self.video_frame)
         camera_frame.pack(fill="x", pady=(0, 10))
-        
+
         ttk.Label(camera_frame, text="摄像头索引:").pack(side="left")
         self.camera_index_var = tk.StringVar(value=str(self.config.camera_id))
         self.camera_index_combo = ttk.Combobox(
@@ -341,7 +381,7 @@ class LaneDetectionApp:
             width=8
         )
         self.camera_index_combo.pack(side="left", padx=(5, 0))
-        
+
         # 摄像头测试按钮
         self.camera_test_btn = ttk.Button(
             self.video_frame,
@@ -350,11 +390,11 @@ class LaneDetectionApp:
             width=20
         )
         self.camera_test_btn.pack(pady=(0, 10))
-        
+
         # 视频控制按钮
         self.video_control_frame = ttk.Frame(self.video_frame)
         self.video_control_frame.pack()
-        
+
         self.play_btn = ttk.Button(
             self.video_control_frame,
             text="开始",
@@ -363,7 +403,7 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.play_btn.pack(side="left", padx=(0, 5))
-        
+
         self.pause_btn = ttk.Button(
             self.video_control_frame,
             text="暂停",
@@ -372,7 +412,7 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.pause_btn.pack(side="left", padx=(0, 5))
-        
+
         self.stop_btn = ttk.Button(
             self.video_control_frame,
             text="停止",
@@ -381,11 +421,11 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.stop_btn.pack(side="left")
-        
+
         # 高级设置区域
         advanced_frame = ttk.LabelFrame(control_frame, text="高级设置", padding="10")
         advanced_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 性能优化选项
         self.enable_buffer_var = tk.BooleanVar(value=self.config.enable_frame_buffer)
         buffer_check = ttk.Checkbutton(
@@ -395,7 +435,7 @@ class LaneDetectionApp:
             command=self._on_advanced_option_change
         )
         buffer_check.pack(anchor="w", pady=(0, 5))
-        
+
         self.adaptive_skip_var = tk.BooleanVar(value=self.config.adaptive_skip_frames)
         skip_check = ttk.Checkbutton(
             advanced_frame,
@@ -404,11 +444,11 @@ class LaneDetectionApp:
             command=self._on_advanced_option_change
         )
         skip_check.pack(anchor="w", pady=(0, 10))
-        
+
         # 参数调节区域
         param_frame = ttk.LabelFrame(control_frame, text="参数调节", padding="10")
         param_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 敏感度调节
         ttk.Label(param_frame, text="检测敏感度:").pack(anchor="w", pady=(0, 5))
         self.sensitivity_var = tk.DoubleVar(value=0.5)
@@ -422,7 +462,7 @@ class LaneDetectionApp:
             length=300
         )
         sensitivity_scale.pack(fill="x", pady=(0, 10))
-        
+
         # 场景选择
         ttk.Label(param_frame, text="场景模式:").pack(anchor="w", pady=(0, 5))
         self.scene_var = tk.StringVar(value="auto")
@@ -435,11 +475,55 @@ class LaneDetectionApp:
         )
         scene_combo.pack(fill="x", pady=(0, 10))
         scene_combo.bind("<<ComboboxSelected>>", self._on_scene_change)
-        
+
+        # 导出操作区域（移到参数调节下面）
+        export_frame = ttk.LabelFrame(control_frame, text="导出选项", padding="10")
+        export_frame.pack(fill="x", pady=(0, 15))
+
+        # 导出按钮行
+        export_buttons_frame = ttk.Frame(export_frame)
+        export_buttons_frame.pack(fill="x")
+
+        self.export_image_btn = ttk.Button(
+            export_buttons_frame,
+            text="导出图片",
+            command=self._export_result_image,
+            width=10,
+            state="disabled"
+        )
+        self.export_image_btn.pack(side="left", padx=(0, 5), pady=(0, 5))
+
+        self.export_json_btn = ttk.Button(
+            export_buttons_frame,
+            text="导出JSON",
+            command=self._export_json_report,
+            width=10,
+            state="disabled"
+        )
+        self.export_json_btn.pack(side="left", padx=(0, 5), pady=(0, 5))
+
+        self.export_csv_btn = ttk.Button(
+            export_buttons_frame,
+            text="导出CSV",
+            command=self._export_csv_report,
+            width=10,
+            state="disabled"
+        )
+        self.export_csv_btn.pack(side="left", pady=(0, 5))
+
+        # 批量导出按钮
+        self.batch_export_btn = ttk.Button(
+            export_frame,
+            text="批量导出文件夹",
+            command=self._batch_export_folder,
+            width=20
+        )
+        self.batch_export_btn.pack(pady=(5, 0))
+
         # 结果显示区域
         result_frame = ttk.LabelFrame(control_frame, text="检测结果", padding="10")
         result_frame.pack(fill="x")
-        
+
         # 方向显示
         self.direction_label = ttk.Label(
             result_frame,
@@ -448,7 +532,7 @@ class LaneDetectionApp:
             foreground="#2c3e50"
         )
         self.direction_label.pack(anchor="w", pady=(0, 5))
-        
+
         # 置信度显示
         self.confidence_label = ttk.Label(
             result_frame,
@@ -456,7 +540,7 @@ class LaneDetectionApp:
             font=("微软雅黑", 11)
         )
         self.confidence_label.pack(anchor="w", pady=(0, 5))
-        
+
         # 检测质量显示
         self.quality_label = ttk.Label(
             result_frame,
@@ -465,7 +549,7 @@ class LaneDetectionApp:
             foreground="#7f8c8d"
         )
         self.quality_label.pack(anchor="w", pady=(0, 5))
-        
+
         # 处理时间/FPS显示
         self.time_label = ttk.Label(
             result_frame,
@@ -474,7 +558,7 @@ class LaneDetectionApp:
             foreground="#95a5a6"
         )
         self.time_label.pack(anchor="w")
-        
+
         # 性能信息显示
         self.performance_label = ttk.Label(
             result_frame,
@@ -483,9 +567,9 @@ class LaneDetectionApp:
             foreground="#bdc3c7"
         )
         self.performance_label.pack(anchor="w", pady=(5, 0))
-        
-        return control_frame
-    
+
+        return control_container
+
     def _create_display_panel(self, parent):
         """创建显示面板"""
         display_frame = ttk.Frame(parent)
@@ -1036,11 +1120,23 @@ class LaneDetectionApp:
                 
                 # 车道线检测
                 with self.performance_monitor.start_timer("lane_detection"):
-                    lane_info = self.lane_detector.detect(
-                        processed_frame, 
-                        roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8))
-                    )
-                
+                    # 1. 提取光照条件
+                    light_mode = roi_info.get('light_condition', 'day')
+
+                    # 2. 获取 mask（安全获取）
+                    mask = roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8))
+
+                    # 3. 传入光照条件到检测器
+                    lane_info = self.lane_detector.detect(processed_frame, mask, light_mode)
+
+                    # 可选：更新状态栏显示模式
+                    if light_mode == 'night':
+                        self.status_var.set(f"视频检测中 [夜间模式] | FPS: {self.current_fps:.1f}")
+                    elif light_mode == 'dusk':
+                        self.status_var.set(f"视频检测中 [黄昏模式] | FPS: {self.current_fps:.1f}")
+                    else:
+                        self.status_var.set(f"视频检测中 | FPS: {self.current_fps:.1f}")
+
                 # 方向分析
                 with self.performance_monitor.start_timer("direction_analysis"):
                     direction_info = self.direction_analyzer.analyze(road_info, lane_info)
@@ -1088,7 +1184,7 @@ class LaneDetectionApp:
                 messagebox.showwarning("警告", "错误次数过多，建议重启应用程序")
         
         self.last_error_time = current_time
-    
+
     def _load_image(self, file_path):
         """加载图像"""
         try:
@@ -1096,12 +1192,12 @@ class LaneDetectionApp:
             self.status_var.set("正在加载图片...")
             self.file_info_label.config(text=os.path.basename(file_path))
             self.redetect_btn.config(state="normal")
-            
+
             # 在后台线程中处理
             thread = threading.Thread(target=self._process_image_with_recovery, args=(file_path,))
             thread.daemon = True
             thread.start()
-            
+
         except Exception as e:
             self._handle_error(e)
             messagebox.showerror("错误", f"加载图片失败: {str(e)}")
@@ -1139,8 +1235,23 @@ class LaneDetectionApp:
                 
                 # 3. 车道线检测
                 with self.performance_monitor.start_timer("lane_detection"):
-                    lane_info = self.lane_detector.detect(self.current_image, roi_info['mask'])
-                
+                    # 1. 提取光照条件
+                    light_mode = roi_info.get('light_condition', 'day')
+
+                    # 2. 获取 mask（安全获取）
+                    mask = roi_info.get('mask', np.ones(self.current_image.shape[:2], dtype=np.uint8))
+
+                    # 3. 传入光照条件到检测器
+                    lane_info = self.lane_detector.detect(self.current_image, mask, light_mode)
+
+                    # 可选：在界面上显示当前光照模式
+                    if light_mode == 'night':
+                        self.status_var.set("图像检测完成 [夜间模式]")
+                    elif light_mode == 'dusk':
+                        self.status_var.set("图像检测完成 [黄昏模式]")
+                    else:
+                        self.status_var.set("图像检测完成")
+
                 # 4. 方向分析
                 with self.performance_monitor.start_timer("direction_analysis"):
                     direction_info = self.direction_analyzer.analyze(road_info, lane_info)
@@ -1195,6 +1306,10 @@ class LaneDetectionApp:
             # 显示图像
             self._display_image(self.current_image, self.original_canvas, "原始图像")
             self._display_image(visualization, self.result_canvas, "检测结果")
+
+            # 保存结果供导出使用
+            self.result_image = visualization
+            self.last_detection_result = direction_info
             
             # 获取信息
             direction = direction_info['direction']
@@ -1233,7 +1348,10 @@ class LaneDetectionApp:
                          f"车道{perf_stats.get('lane_detection_time', {}).get('avg', 0):.3f}s, "
                          f"方向{perf_stats.get('direction_analysis_time', {}).get('avg', 0):.3f}s"
                 )
-            
+
+            # 更新导出按钮状态
+            self._update_export_buttons_state()
+
             # 更新状态
             self.status_var.set(f"分析完成 - {direction}")
             
@@ -1249,6 +1367,10 @@ class LaneDetectionApp:
             # 显示图像
             self._display_image(original_frame, self.original_canvas, "原始视频")
             self._display_image(visualization, self.result_canvas, "实时检测")
+
+            # 保存结果供导出使用
+            self.result_image = visualization
+            self.last_detection_result = direction_info
             
             # 获取信息
             direction = direction_info['direction']
@@ -1301,6 +1423,9 @@ class LaneDetectionApp:
                 
                 if module_times:
                     self.performance_label.config(text=" | ".join(module_times))
+
+            # 更新导出按钮状态
+            self._update_export_buttons_state()
             
             # 更新状态
             video_type = "摄像头" if self.camera_mode else "视频"
@@ -1390,12 +1515,122 @@ class LaneDetectionApp:
             font=("微软雅黑", 12),
             fill="#7f8c8d"
         )
-    
+
     def _redetect(self):
-        """重新检测"""
-        if self.current_image_path and not self.is_processing and not self.is_video_mode:
-            self._process_image_with_recovery(self.current_image_path)
-    
+        """重新检测当前图像"""
+        if not self.current_image_path or self.is_processing:
+            return
+
+        self._process_image_threaded(self.current_image_path)
+
+    def _export_result_image(self):
+        """导出带标注的结果图片"""
+        if self.result_image is None:
+            messagebox.showwarning("警告", "没有可导出的结果图片")
+            return
+
+        # 选择保存路径
+        default_name = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        file_path = filedialog.asksaveasfilename(
+            title="保存结果图片",
+            defaultextension=".png",
+            initialfile=default_name,
+            filetypes=[
+                ("PNG图片", "*.png"),
+                ("JPEG图片", "*.jpg *.jpeg"),
+                ("所有文件", "*.*")
+            ]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # 保存图片
+            success = cv2.imwrite(file_path, self.result_image)
+
+            if success:
+                # 记录导出历史
+                self.export_history.append({
+                    'type': 'image',
+                    'path': file_path,
+                    'time': datetime.now().isoformat()
+                })
+
+                messagebox.showinfo("成功", f"结果图片已保存到:\n{file_path}")
+                self.status_var.set(f"图片已导出: {os.path.basename(file_path)}")
+            else:
+                messagebox.showerror("错误", "保存图片失败")
+
+        except Exception as e:
+            messagebox.showerror("错误", f"导出图片时出错: {str(e)}")
+            print(f"导出图片失败: {e}")
+
+    def _update_export_buttons_state(self):
+        """更新导出按钮状态"""
+        has_result = self.result_image is not None and self.last_detection_result is not None
+
+        state = "normal" if has_result else "disabled"
+        self.export_image_btn.config(state=state)
+        self.export_json_btn.config(state=state)
+        self.export_csv_btn.config(state=state)
+
+    def _export_json_report(self):
+        """导出JSON格式的检测报告"""
+        if self.last_detection_result is None:
+            messagebox.showwarning("警告", "没有可导出的检测结果")
+            return
+
+        # 选择保存路径
+        default_name = f"detection_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        file_path = filedialog.asksaveasfilename(
+            title="保存JSON报告",
+            defaultextension=".json",
+            initialfile=default_name,
+            filetypes=[
+                ("JSON文件", "*.json"),
+                ("所有文件", "*.*")
+            ]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # 构建完整的报告数据
+            report_data = {
+                'report_info': {
+                    'generated_at': datetime.now().isoformat(),
+                    'software_version': '1.0',
+                    'source_image': self.current_image_path
+                },
+                'detection_result': self.last_detection_result,
+                'image_info': {
+                    'width': int(self.current_image.shape[1]) if self.current_image is not None else None,
+                    'height': int(self.current_image.shape[0]) if self.current_image is not None else None,
+                    'channels': int(self.current_image.shape[2]) if self.current_image is not None and len(
+                        self.current_image.shape) > 2 else None
+                }
+            }
+
+            # 写入JSON文件
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(report_data, f, indent=2, ensure_ascii=False, default=str)
+
+            # 记录导出历史
+            self.export_history.append({
+                'type': 'json',
+                'path': file_path,
+                'time': datetime.now().isoformat()
+            })
+
+            messagebox.showinfo("成功", f"JSON报告已保存到:\n{file_path}")
+            self.status_var.set(f"JSON报告已导出: {os.path.basename(file_path)}")
+
+        except Exception as e:
+            messagebox.showerror("错误", f"导出JSON报告时出错: {str(e)}")
+            print(f"导出JSON失败: {e}")
+
     def _on_parameter_change(self, value):
         """参数变化回调"""
         sensitivity = self.sensitivity_var.get()
@@ -1415,7 +1650,272 @@ class LaneDetectionApp:
         # 如果已有图像，自动重新检测
         if self.current_image_path and not self.is_processing and not self.is_video_mode:
             self._redetect()
-    
+
+    def _export_csv_report(self):
+        """导出CSV格式的检测报告"""
+        if self.last_detection_result is None:
+            messagebox.showwarning("警告", "没有可导出的检测结果")
+            return
+
+        # 选择保存路径
+        default_name = f"detection_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        file_path = filedialog.asksaveasfilename(
+            title="保存CSV报告",
+            defaultextension=".csv",
+            initialfile=default_name,
+            filetypes=[
+                ("CSV文件", "*.csv"),
+                ("所有文件", "*.*")
+            ]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # 准备CSV数据
+            result = self.last_detection_result
+
+            # 定义CSV表头和数据
+            headers = [
+                '字段', '值'
+            ]
+
+            rows = [
+                ['生成时间', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+                ['源图片', self.current_image_path or 'N/A'],
+                ['', ''],
+                ['检测结果', ''],
+                ['方向', result.get('direction', 'N/A')],
+                ['置信度', f"{result.get('confidence', 0):.2%}"],
+                ['推理说明', result.get('reasoning', 'N/A')],
+                ['', ''],
+                ['概率分布', ''],
+            ]
+
+            # 添加各方向的概率
+            probabilities = result.get('probabilities', {})
+            for direction, prob in probabilities.items():
+                rows.append([f'{direction}概率', f"{prob:.2%}"])
+
+            # 添加图像信息
+            rows.extend([
+                ['', ''],
+                ['图像信息', ''],
+            ])
+
+            if self.current_image is not None:
+                rows.extend([
+                    ['宽度', self.current_image.shape[1]],
+                    ['高度', self.current_image.shape[0]],
+                ])
+                if len(self.current_image.shape) > 2:
+                    rows.append(['通道数', self.current_image.shape[2]])
+
+            # 写入CSV文件
+            with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                writer.writerows(rows)
+
+            # 记录导出历史
+            self.export_history.append({
+                'type': 'csv',
+                'path': file_path,
+                'time': datetime.now().isoformat()
+            })
+
+            messagebox.showinfo("成功", f"CSV报告已保存到:\n{file_path}")
+            self.status_var.set(f"CSV报告已导出: {os.path.basename(file_path)}")
+
+        except Exception as e:
+            messagebox.showerror("错误", f"导出CSV报告时出错: {str(e)}")
+            print(f"导出CSV失败: {e}")
+
+    def _batch_export_folder(self):
+        """批量导出文件夹中的所有图片"""
+        # 选择输入文件夹
+        input_folder = filedialog.askdirectory(
+            title="选择包含道路图片的文件夹"
+        )
+
+        if not input_folder:
+            return
+
+        # 选择输出文件夹
+        output_folder = filedialog.askdirectory(
+            title="选择导出结果的保存文件夹"
+        )
+
+        if not output_folder:
+            return
+
+        # 获取所有图片文件
+        image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
+        image_files = [
+            f for f in os.listdir(input_folder)
+            if f.lower().endswith(image_extensions)
+        ]
+
+        if not image_files:
+            messagebox.showwarning("警告", "所选文件夹中没有找到图片文件")
+            return
+
+        # 确认批量处理
+        confirm = messagebox.askyesno(
+            "确认批量处理",
+            f"将处理 {len(image_files)} 张图片\n\n是否继续？"
+        )
+
+        if not confirm:
+            return
+
+        # 创建进度窗口
+        progress_window = tk.Toplevel(self.root)
+        progress_window.title("批量处理中...")
+        progress_window.geometry("400x200")
+        progress_window.transient(self.root)
+        progress_window.grab_set()
+
+        # 进度信息标签
+        info_label = ttk.Label(
+            progress_window,
+            text=f"正在处理 0/{len(image_files)} 张图片...",
+            font=("微软雅黑", 10)
+        )
+        info_label.pack(pady=20)
+
+        # 进度条
+        progress_bar = ttk.Progressbar(
+            progress_window,
+            mode='determinate',
+            length=350
+        )
+        progress_bar.pack(pady=10)
+        progress_bar['maximum'] = len(image_files)
+
+        # 状态标签
+        status_label = ttk.Label(
+            progress_window,
+            text="",
+            font=("微软雅黑", 9),
+            foreground="#7f8c8d"
+        )
+        status_label.pack(pady=10)
+
+        # 在后台线程中处理
+        def batch_process():
+            success_count = 0
+            fail_count = 0
+            results = []
+
+            for i, image_file in enumerate(image_files):
+                try:
+                    # 更新进度
+                    progress_window.after(0, lambda idx=i + 1, total=len(image_files), name=image_file: (
+                        info_label.config(text=f"正在处理 {idx}/{total}: {name}"),
+                        progress_bar.step(1),
+                        status_label.config(text=f"当前: {name}")
+                    ))
+
+                    # 读取图片
+                    image_path = os.path.join(input_folder, image_file)
+                    image = cv2.imread(image_path)
+
+                    if image is None:
+                        fail_count += 1
+                        continue
+
+                    # 检测方向
+                    direction_result = self._detect_single_image(image)
+
+                    # 保存结果图片
+                    result_filename = f"result_{os.path.splitext(image_file)[0]}.png"
+                    result_path = os.path.join(output_folder, result_filename)
+                    cv2.imwrite(result_path, direction_result['result_image'])
+
+                    # 保存JSON报告
+                    json_filename = f"report_{os.path.splitext(image_file)[0]}.json"
+                    json_path = os.path.join(output_folder, json_filename)
+
+                    report_data = {
+                        'image_file': image_file,
+                        'generated_at': datetime.now().isoformat(),
+                        'direction': direction_result['direction'],
+                        'confidence': direction_result['confidence'],
+                        'reasoning': direction_result.get('reasoning', '')
+                    }
+
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(report_data, f, indent=2, ensure_ascii=False)
+
+                    results.append({
+                        'file': image_file,
+                        'direction': direction_result['direction'],
+                        'confidence': direction_result['confidence']
+                    })
+
+                    success_count += 1
+
+                except Exception as e:
+                    print(f"处理 {image_file} 失败: {e}")
+                    fail_count += 1
+
+            # 处理完成
+            progress_window.after(0, lambda: (
+                info_label.config(text=f"处理完成！成功: {success_count}, 失败: {fail_count}"),
+                status_label.config(text=f"结果已保存到: {output_folder}"),
+                progress_window.after(2000, progress_window.destroy)
+            ))
+
+            # 保存汇总报告
+            summary_path = os.path.join(output_folder, "batch_summary.csv")
+            with open(summary_path, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=['file', 'direction', 'confidence'])
+                writer.writeheader()
+                writer.writerows(results)
+
+            progress_window.after(0, lambda: messagebox.showinfo(
+                "批量处理完成",
+                f"成功: {success_count}\n失败: {fail_count}\n\n汇总报告: {summary_path}"
+            ))
+
+        # 启动后台线程
+        thread = threading.Thread(target=batch_process, daemon=True)
+        thread.start()
+
+    def _detect_single_image(self, image):
+        """检测单张图片（用于批量处理）"""
+        try:
+            # 使用现有模块进行检测
+            road_features = self.road_detector.detect_road(image)
+            lane_info = self.lane_detector.detect_lanes(image)
+            direction_result = self.direction_analyzer.analyze(road_features, lane_info)
+
+            # 可视化
+            result_image = self.visualizer.draw_result(
+                image.copy(),
+                road_features,
+                lane_info,
+                direction_result
+            )
+
+            return {
+                'direction': direction_result['direction'],
+                'confidence': direction_result['confidence'],
+                'reasoning': direction_result.get('reasoning', ''),
+                'result_image': result_image
+            }
+
+        except Exception as e:
+            print(f"检测失败: {e}")
+            return {
+                'direction': '未知',
+                'confidence': 0.0,
+                'reasoning': f'检测失败: {str(e)}',
+                'result_image': image
+            }
+
     def _on_scene_change(self, event):
         """场景选择变化"""
         scene = self.scene_var.get()

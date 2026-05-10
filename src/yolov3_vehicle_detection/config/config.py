@@ -1,15 +1,20 @@
+import os
+
 class Config:
+    # 项目根目录 (config/config.py -> yolo_detection/)
+    _base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    
     # YOLO模型配置
-    yolo_cfg_path = "models/yolov3-tiny.cfg"
-    yolo_weights_path = "models/yolov3-tiny.weights"
-    yolo_names_path = "models/coco.names"
+    yolo_cfg_path = os.path.join(_base_dir, "models", "yolov3-tiny.cfg")
+    yolo_weights_path = os.path.join(_base_dir, "models", "yolov3-tiny.weights")
+    yolo_names_path = os.path.join(_base_dir, "models", "coco.names")
     conf_thres = 0.5
     nms_thres = 0.4
 
     # CARLA配置
     carla_host = "127.0.0.1"
     carla_port = 2000
-    carla_timeout = 10.0
+    carla_timeout = 30.0
     CARLA_HOST = carla_host
     CARLA_PORT = carla_port
     CARLA_TIMEOUT = carla_timeout
