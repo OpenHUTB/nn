@@ -119,12 +119,16 @@ WEATHER_LABELS = {
 
 
 class ImageQualityAssessor:
-    """图像质量评估：模糊度/亮度/可见度三维打分"""
+    """图像质量评估：多维度详细分解打分"""
 
     def assess(self, rgb_image):
         gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+
+        # 1. 模糊度评分 (Laplacian方差)
         laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
         blur_score = np.clip(laplacian_var / 500.0, 0.0, 1.0)
+
+        # 2. 亮度评分
         mean_brightness = np.mean(gray)
         if mean_brightness < IMAGE_BRIGHTNESS_LOW:
             brightness_score = mean_brightness / IMAGE_BRIGHTNESS_LOW
@@ -132,12 +136,59 @@ class ImageQualityAssessor:
             brightness_score = (255.0 - mean_brightness) / (255.0 - IMAGE_BRIGHTNESS_HIGH)
         else:
             brightness_score = 1.0
-        visibility_score = np.clip(np.std(gray) / 80.0, 0.0, 1.0)
-        overall = blur_score * 0.3 + brightness_score * 0.3 + visibility_score * 0.4
+
+        # 3. 对比度评分 (灰度标准差)
+        contrast_score = np.clip(np.std(gray) / 80.0, 0.0, 1.0)
+
+        # 4. 可见度评分 (边缘检测比例)
+        edges = cv2.Canny(gray, 50, 150)
+        edge_ratio = np.sum(edges > 0) / edges.size
+        visibility_score = np.clip(edge_ratio * 20, 0.0, 1.0)
+
+        # 5. 噪点评分 (基于高斯滤波差异)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        noise_est = np.mean(np.abs(gray.astype(float) - blurred.astype(float)))
+        noise_score = np.clip(1.0 - noise_est / 20.0, 0.0, 1.0)
+
+        # 6. 色彩饱和度评分
+        hsv = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
+        saturation = np.mean(hsv[:, :, 1])
+        saturation_score = np.clip(saturation / 128.0, 0.0, 1.0)
+
+        # 7. 雾霾影响评估 (暗通道先验简化版)
+        dark_channel = cv2.erode(gray, np.ones((15, 15)))
+        haze_ratio = np.mean(dark_channel) / 255.0
+        haze_score = 1.0 - haze_ratio
+
+        # 综合评分 (权重可调)
+        overall = (
+            blur_score * 0.15 +
+            brightness_score * 0.15 +
+            contrast_score * 0.1 +
+            visibility_score * 0.2 +
+            noise_score * 0.15 +
+            saturation_score * 0.05 +
+            haze_score * 0.2
+        )
+
         return {
-            "blur_score": float(blur_score), "brightness_score": float(brightness_score),
-            "visibility_score": float(visibility_score), "overall": float(overall),
-            "laplacian_var": float(laplacian_var), "mean_brightness": float(mean_brightness),
+            # 基础分数
+            "blur_score": float(blur_score),
+            "brightness_score": float(brightness_score),
+            "contrast_score": float(contrast_score),
+            "visibility_score": float(visibility_score),
+            "noise_score": float(noise_score),
+            "saturation_score": float(saturation_score),
+            "haze_score": float(haze_score),
+            # 综合评分
+            "overall": float(overall),
+            # 原始数值
+            "laplacian_var": float(laplacian_var),
+            "mean_brightness": float(mean_brightness),
+            "std_brightness": float(np.std(gray)),
+            "edge_ratio": float(edge_ratio),
+            "noise_est": float(noise_est),
+            "haze_ratio": float(haze_ratio),
         }
 
 
@@ -490,28 +541,39 @@ class WeatherRobustnessSystem:
             display = self._add_rain_effect(display, weather_name)
 
         overlay = display.copy()
-        cv2.rectangle(overlay, (0, 0), (w, 165), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.6, display, 0.4, 0, display)
+        cv2.rectangle(overlay, (0, 0), (w, 220), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, display, 0.3, 0, display)
 
-        y = 28
+        y = 25
         # 天气名称 + 状态
         if self._is_stable:
             remaining = STEPS_PER_WEATHER - WEATHER_TRANSITION_STEPS - self._stable_steps
-            cv2.putText(display, f"Weather: {label} [{weather_name}] [稳定期-{remaining}步]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+            cv2.putText(display, f"Weather: {label} [{weather_name}] [稳定期-{remaining}步]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
         elif self._is_transitioning:
             transition_pct = int(self._transition_step / WEATHER_TRANSITION_STEPS * 100)
-            cv2.putText(display, f"Weather: {label} [{weather_name}] -> {transition_pct}%", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 200, 0), 2)
+            cv2.putText(display, f"Weather: {label} [{weather_name}] -> {transition_pct}%", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 0), 2)
         else:
-            cv2.putText(display, f"Weather: {label} [{weather_name}]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
-        y += 28
-        cv2.putText(display, f"Speed: {speed:.1f} km/h  |  Steer: {steer:+.2f}  |  Obstacles: {fusion['num_obstacles']}  |  Nearest: {fusion['nearest_distance']:.1f}m", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        y += 25
-        cv2.putText(display, f"Image: blur={iq['blur_score']:.2f}  bright={iq['brightness_score']:.2f}  vis={iq['visibility_score']:.2f}  overall={iq['overall']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        y += 25
+            cv2.putText(display, f"Weather: {label} [{weather_name}]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        y += 22
+        cv2.putText(display, f"Speed: {speed:.1f} km/h  |  Steer: {steer:+.2f}  |  Obs: {fusion['num_obstacles']}  |  Near: {fusion['nearest_distance']:.1f}m", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+        y += 20
+
+        # ===== 图像质量详细分解 =====
+        cv2.putText(display, f"Image Quality (Overall: {iq['overall']:.2f})", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 0), 1)
+        y += 18
+        cv2.putText(display, f"  blur={iq['blur_score']:.2f}  bright={iq['brightness_score']:.2f}  contrast={iq['contrast_score']:.2f}  vis={iq['visibility_score']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+        y += 16
+        cv2.putText(display, f"  noise={iq['noise_score']:.2f}  saturation={iq['saturation_score']:.2f}  haze={iq['haze_score']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+        y += 18
+
+        # 原始数值
+        cv2.putText(display, f"Raw: lap={iq['laplacian_var']:.1f}  mean={iq['mean_brightness']:.1f}  std={iq['std_brightness']:.1f}  edge={iq['edge_ratio']:.4f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (150, 150, 150), 1)
+        y += 18
+
         mode_color = (0, 255, 0) if fusion["fusion_mode"] == "camera_dominant" else (0, 0, 255) if fusion["fusion_mode"] == "lidar_dominant" else (0, 255, 255)
-        cv2.putText(display, f"Fusion: {fusion['fusion_mode']}  cam={fusion['camera_weight']:.2f}  lidar={fusion['lidar_weight']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, mode_color, 2)
-        y += 25
-        cv2.putText(display, "CARLA Weather Robustness Test - Road Following", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1)
+        cv2.putText(display, f"Fusion: {fusion['fusion_mode']}  cam={fusion['camera_weight']:.2f}  lidar={fusion['lidar_weight']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, mode_color, 2)
+        y += 20
+        cv2.putText(display, "CARLA Weather Robustness Test", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1)
 
         cv2.imshow("Weather Robustness", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
         cv2.waitKey(1)

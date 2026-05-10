@@ -6,6 +6,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+<<<<<<< HEAD
+=======
+import sys
+>>>>>>> upstream/main
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,6 +27,18 @@ WHITE_LOWER = np.array([0, 120, 0], dtype=np.uint8)
 WHITE_UPPER = np.array([180, 255, 170], dtype=np.uint8)
 YELLOW_LOWER = np.array([15, 70, 70], dtype=np.uint8)
 YELLOW_UPPER = np.array([40, 255, 255], dtype=np.uint8)
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
+
+
+@dataclass
+class LaneResult:
+    frame: np.ndarray
+    line_count: int
+    has_left: bool
+    has_right: bool
+    confidence: float
+    deviation: float
+    departure_status: str
 
 
 @dataclass
@@ -67,16 +83,32 @@ class RunReporter:
             max(float(fps), 1.0),
             frame_size,
         )
+<<<<<<< HEAD
 
     def add_frame(self, frame: np.ndarray, frame_idx: int, fps: float, line_count: int, has_left: bool, has_right: bool) -> None:
+=======
+        if not self.writer.isOpened():
+            raise RuntimeError(f"Cannot create output video writer: {self.video_path}")
+
+    def add_frame(self, frame: np.ndarray, frame_idx: int, fps: float, result: LaneResult) -> None:
+>>>>>>> upstream/main
         self.writer.write(frame)
         self.rows.append(
             {
                 "frame": frame_idx,
                 "fps": f"{fps:.2f}",
+<<<<<<< HEAD
                 "hough_lines": line_count,
                 "left_lane": int(has_left),
                 "right_lane": int(has_right),
+=======
+                "hough_lines": result.line_count,
+                "left_lane": int(result.has_left),
+                "right_lane": int(result.has_right),
+                "confidence": f"{result.confidence:.3f}",
+                "lane_deviation": f"{result.deviation:.4f}",
+                "departure_status": result.departure_status,
+>>>>>>> upstream/main
             }
         )
 
@@ -95,10 +127,86 @@ class RunReporter:
     def close(self) -> None:
         self.writer.release()
         with open(self.report_path, "w", newline="", encoding="utf-8") as f:
+<<<<<<< HEAD
             fieldnames = ["frame", "fps", "hough_lines", "left_lane", "right_lane"]
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(self.rows)
+=======
+            fieldnames = [
+                "frame",
+                "fps",
+                "hough_lines",
+                "left_lane",
+                "right_lane",
+                "confidence",
+                "lane_deviation",
+                "departure_status",
+            ]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(self.rows)
+
+
+class FrameSource:
+    def __init__(self, source: Path, carla_test: bool):
+        self.source = source
+        self.carla_test = carla_test
+        self.cap: cv2.VideoCapture | None = None
+        self.images: list[Path] = []
+        self.image_index = 0
+        self.width = 0
+        self.height = 0
+        self.fps = 20.0 if carla_test else 30.0
+        self.total_frames = 0
+
+        if source.is_dir():
+            self.images = sorted(p for p in source.iterdir() if p.suffix.lower() in IMAGE_EXTENSIONS)
+            if not self.images:
+                raise RuntimeError(f"No image frames found in directory: {source}")
+            first = cv2.imread(str(self.images[0]))
+            if first is None:
+                raise RuntimeError(f"Cannot read first image frame: {self.images[0]}")
+            self.height, self.width = first.shape[:2]
+            self.total_frames = len(self.images)
+        else:
+            self.cap = cv2.VideoCapture(str(source), cv2.CAP_FFMPEG)
+            if not self.cap.isOpened():
+                raise RuntimeError(f"Cannot open video: {source}")
+            self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or self.fps
+            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        if self.width <= 0 or self.height <= 0:
+            raise RuntimeError(f"Invalid input frame size: {self.width}x{self.height}")
+
+    def read(self) -> tuple[bool, np.ndarray | None]:
+        if self.images:
+            if self.image_index >= len(self.images):
+                return False, None
+            path = self.images[self.image_index]
+            self.image_index += 1
+            frame = cv2.imread(str(path))
+            if frame is None:
+                print(f"Warning: skip unreadable image frame: {path}")
+                return self.read()
+            return True, frame
+
+        if self.cap is None:
+            return False, None
+        return self.cap.read()
+
+    def release(self) -> None:
+        if self.cap is not None:
+            self.cap.release()
+
+    @property
+    def mode_label(self) -> str:
+        if self.carla_test:
+            return "CARLA TEST"
+        return "VIDEO"
+>>>>>>> upstream/main
 
 
 def color_filter(frame: np.ndarray) -> np.ndarray:
@@ -182,12 +290,57 @@ def line_points(fit: np.ndarray | None, y_top: int, y_bottom: int, width: int) -
     return (x_top, y_top), (x_bottom, y_bottom)
 
 
+<<<<<<< HEAD
 def lane_detection(frame: np.ndarray, smoother: LaneSmoother) -> tuple[np.ndarray, int, bool, bool]:
     h, w = frame.shape[:2]
     mask = color_filter(frame)
     blur = cv2.GaussianBlur(mask, (5, 5), 0)
     edges = cv2.Canny(blur, CANNY_LOW, CANNY_HIGH)
 
+=======
+def departure_status(deviation: float, confidence: float) -> str:
+    if confidence < 0.45:
+        return "LOW_CONF"
+    if deviation <= -0.08:
+        return "LEFT_DEPARTURE"
+    if deviation >= 0.08:
+        return "RIGHT_DEPARTURE"
+    if abs(deviation) >= 0.05:
+        return "CAUTION"
+    return "CENTERED"
+
+
+def lane_confidence(line_count: int, left_points, right_points, width: int) -> tuple[float, float, str]:
+    has_left = left_points is not None
+    has_right = right_points is not None
+    detection_score = 0.25 * int(has_left) + 0.25 * int(has_right)
+    line_score = min(line_count / 24.0, 1.0) * 0.25
+
+    deviation = 0.0
+    geometry_score = 0.0
+    if has_left and has_right:
+        left_bottom = left_points[1][0]
+        right_bottom = right_points[1][0]
+        lane_width = max(1, right_bottom - left_bottom)
+        lane_center = (left_bottom + right_bottom) / 2.0
+        deviation = (lane_center - width / 2.0) / width
+        width_ratio = lane_width / width
+        geometry_score = 0.25 * max(0.0, 1.0 - abs(width_ratio - 0.55) / 0.45)
+    elif has_left or has_right:
+        deviation = -0.12 if has_left else 0.12
+        geometry_score = 0.08
+
+    confidence = max(0.0, min(1.0, detection_score + line_score + geometry_score))
+    return confidence, deviation, departure_status(deviation, confidence)
+
+
+def lane_detection(frame: np.ndarray, smoother: LaneSmoother) -> LaneResult:
+    h, w = frame.shape[:2]
+    mask = color_filter(frame)
+    blur = cv2.GaussianBlur(mask, (5, 5), 0)
+    edges = cv2.Canny(blur, CANNY_LOW, CANNY_HIGH)
+
+>>>>>>> upstream/main
     roi_vertices = trapezoid_roi(w, h)
     roi_mask = np.zeros_like(edges)
     cv2.fillPoly(roi_mask, roi_vertices, 255)
@@ -214,6 +367,7 @@ def lane_detection(frame: np.ndarray, smoother: LaneSmoother) -> tuple[np.ndarra
         cv2.fillPoly(overlay, [lane_area], (0, 180, 0))
 
     detected = cv2.addWeighted(detected, 1.0, overlay, 0.35, 0)
+<<<<<<< HEAD
     return detected, line_count, left_points is not None, right_points is not None
 
 
@@ -248,17 +402,77 @@ def process_video(video_path: Path, output_dir: Path, display: bool, save_every:
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     progress_total = max_frames if max_frames > 0 else total_frames
 
+=======
+    confidence, deviation, status = lane_confidence(line_count, left_points, right_points, w)
+    return LaneResult(
+        frame=detected,
+        line_count=line_count,
+        has_left=left_points is not None,
+        has_right=right_points is not None,
+        confidence=confidence,
+        deviation=deviation,
+        departure_status=status,
+    )
+
+
+def draw_hud(frame: np.ndarray, frame_idx: int, total_frames: int, fps: float, output_path: Path, result: LaneResult, mode_label: str) -> None:
+    h, w = frame.shape[:2]
+    progress = frame_idx / total_frames if total_frames > 0 else 0.0
+    frame_text = f"{frame_idx}/{total_frames}" if total_frames > 0 else f"{frame_idx}/?"
+    progress_text = f"{progress * 100:.1f}%" if total_frames > 0 else "N/A"
+
+    cv2.rectangle(frame, (0, 0), (w, 76), (0, 0, 0), -1)
+    cv2.putText(frame, f"FPS: {fps:.1f}", (18, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
+    cv2.putText(frame, f"Frame: {frame_text}", (150, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+    cv2.putText(frame, f"Progress: {progress_text}", (18, 61), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (255, 255, 255), 1)
+    cv2.putText(frame, f"Hough lines: {result.line_count}", (220, 61), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (200, 220, 255), 1)
+    cv2.putText(frame, f"{mode_label} | {output_path.name}", (430, 61), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 220, 255), 1)
+
+    status_color = (0, 255, 0)
+    if result.departure_status in {"LEFT_DEPARTURE", "RIGHT_DEPARTURE"}:
+        status_color = (0, 0, 255)
+    elif result.departure_status in {"CAUTION", "LOW_CONF"}:
+        status_color = (0, 215, 255)
+
+    cv2.rectangle(frame, (0, h - 72), (w, h), (0, 0, 0), -1)
+    cv2.putText(frame, f"Confidence: {result.confidence:.2f}", (18, h - 42), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (0, 255, 255), 2)
+    cv2.putText(frame, f"Lane offset: {result.deviation:+.3f}", (260, h - 42), cv2.FONT_HERSHEY_SIMPLEX, 0.68, (255, 255, 255), 2)
+    cv2.putText(frame, f"Status: {result.departure_status}", (520, h - 42), cv2.FONT_HERSHEY_SIMPLEX, 0.68, status_color, 2)
+    cv2.line(frame, (w // 2, h - 12), (w // 2, h - 32), (180, 180, 180), 2)
+    marker_x = int(w // 2 + result.deviation * w)
+    marker_x = max(20, min(w - 20, marker_x))
+    cv2.circle(frame, (marker_x, h - 22), 8, status_color, -1)
+
+    bar_w = 220
+    bar_x = max(20, w - bar_w - 24)
+    bar_y = 24
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + 12), (80, 80, 80), 1)
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + int(bar_w * progress), bar_y + 12), (0, 190, 0), -1)
+
+
+def process_video(video_path: Path, output_dir: Path, display: bool, save_every: int, max_frames: int, carla_test: bool) -> tuple[Path, Path, Path | None, int]:
+    source = FrameSource(video_path, carla_test=carla_test)
+
+    width = source.width
+    height = source.height
+    fps = source.fps
+    total_frames = source.total_frames
+    progress_total = max_frames if max_frames > 0 else total_frames
+
+>>>>>>> upstream/main
     reporter = RunReporter(video_path, output_dir, fps, (width * 2, height), save_every)
     smoother = LaneSmoother()
     frame_idx = 0
     fps_values: list[float] = []
 
     print("=== Lane Detection Split Screen ===")
+    print(f"Mode: {source.mode_label}")
     print(f"Input: {video_path}")
     print(f"Size: {width}x{height} | FPS: {fps:.2f} | Total frames: {progress_total if progress_total > 0 else 'unknown'}")
     print(f"Output video: {reporter.video_path}")
     print(f"Metrics CSV: {reporter.report_path}")
 
+<<<<<<< HEAD
     while True:
         start = time.perf_counter()
         ret, frame = cap.read()
@@ -296,6 +510,51 @@ def process_video(video_path: Path, output_dir: Path, display: bool, save_every:
     reporter.close()
     if display:
         cv2.destroyAllWindows()
+=======
+    try:
+        while True:
+            start = time.perf_counter()
+            ret, frame = source.read()
+            if not ret:
+                break
+
+            try:
+                result = lane_detection(frame, smoother)
+                split_frame = np.hstack((frame, result.frame))
+            except Exception as exc:
+                print(f"Warning: skip frame {frame_idx + 1} because lane detection failed: {exc}")
+                continue
+
+            elapsed_fps = 1.0 / max(time.perf_counter() - start, 1e-6)
+            fps_values.append(elapsed_fps)
+
+            cv2.putText(split_frame, "Original", (20, 112), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+            cv2.putText(split_frame, "Lane Detection", (width + 20, 112), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+
+            frame_idx += 1
+            draw_hud(split_frame, frame_idx, progress_total, elapsed_fps, reporter.video_path, result, source.mode_label)
+            reporter.add_frame(split_frame, frame_idx, elapsed_fps, result)
+
+            if progress_total > 0 and frame_idx % max(1, int(fps)) == 0:
+                print(f"\rProcessed {frame_idx}/{progress_total} frames ({frame_idx / progress_total * 100:.1f}%)", end="")
+
+            if display:
+                cv2.imshow("Lane Detection - Split Screen", split_frame)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord("q"):
+                    break
+                if key == ord("s"):
+                    reporter.save_screenshot(split_frame, frame_idx)
+
+            if max_frames > 0 and frame_idx >= max_frames:
+                break
+    finally:
+        print()
+        source.release()
+        reporter.close()
+        if display:
+            cv2.destroyAllWindows()
+>>>>>>> upstream/main
 
     avg_fps = float(np.mean(fps_values)) if fps_values else 0.0
     print(f"Done. Processed frames: {frame_idx}")
@@ -310,17 +569,35 @@ def process_video(video_path: Path, output_dir: Path, display: bool, save_every:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Detect lane lines in a driving video.")
+<<<<<<< HEAD
     parser.add_argument("video", type=Path, help="Input video path")
+=======
+    parser.add_argument("video", type=Path, help="Input video path, or CARLA RGB image directory when --carla-test is enabled")
+>>>>>>> upstream/main
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help="Directory for video, screenshots, and CSV metrics")
     parser.add_argument("--no-display", action="store_true", help="Run without opening an OpenCV window")
     parser.add_argument("--save-every", type=int, default=0, help="Save a screenshot every N frames")
     parser.add_argument("--max-frames", type=int, default=0, help="Stop after N frames; 0 means process the whole video")
+    parser.add_argument("--carla-test", action="store_true", help="Enable CARLA test mode for videos or RGB image sequences")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    process_video(args.video, args.output_dir, display=not args.no_display, save_every=args.save_every, max_frames=args.max_frames)
+    try:
+        process_video(
+            args.video,
+            args.output_dir,
+            display=not args.no_display,
+            save_every=args.save_every,
+            max_frames=args.max_frames,
+            carla_test=args.carla_test,
+        )
+    except KeyboardInterrupt:
+        print("Interrupted by user.")
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

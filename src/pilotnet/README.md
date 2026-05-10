@@ -131,6 +131,13 @@ PilotNet 是一个端到端自动驾驶系统，通过深度神经网络直接�
 │ 红: Validation  │  │ 红: Validation  │
 └─────────────────┘  └─────────────────┘
 ```
+<<<<<<< HEAD
+=======
+- **Total Loss**: 总损失（模型整体预测误差）
+- **Steering Angle Loss**: 转向角度的预测误差
+- **Throttle Pressure Loss**: 油门压力的预测误差
+- **Brake Pressure Loss**: 刹车压力的预测误差
+>>>>>>> upstream/main
 
 **训练曲线解读：**
 - **蓝色曲线**：训练集损失（模型在训练数据上的预测误差）

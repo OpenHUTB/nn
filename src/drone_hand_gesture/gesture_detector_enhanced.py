@@ -309,19 +309,54 @@ class EnhancedGestureDetector:
         """规则分类"""
         return "open_palm", 0.5
 
-    def _smooth_prediction(self, gesture, confidence):
-        """平滑预测"""
-        self.prediction_history.append((gesture, confidence))
-        if len(self.prediction_history) > self.max_history:
-            self.prediction_history.pop(0)
+        left_commands = {
+            "victory": "forward",
+            "thumb_up": "backward",
+            "pointing_up": "left",
+            "pointing_down": "right",
+        }
 
-    def get_command(self, gesture):
-        """获取控制指令"""
-        return self.gesture_commands.get(gesture, "none")
+        right_commands = {
+            "pointing_up": "up",
+            "pointing_down": "down",
+            "ok_sign": "hover",
+        }
 
-    def get_gesture_intensity(self, landmarks, gesture_type):
-        """获取手势强度"""
-        return 0.5
+        both_commands = {
+            "open_palm": "takeoff",
+            "closed_fist": "land",
+            "thumb_down": "stop",
+        }
+
+        if left_hand_data:
+            gesture = left_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(left_hand_data, gesture)
+            result['left_gesture'] = gesture
+
+            if gesture in self.swipe_commands:
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
+            elif gesture in left_commands:
+                result['direction_command'] = left_commands[gesture]
+                result['direction_intensity'] = intensity
+            elif gesture in both_commands:
+                result['special_command'] = both_commands[gesture]
+
+        if right_hand_data:
+            gesture = right_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(right_hand_data, gesture)
+            result['right_gesture'] = gesture
+
+            if gesture in self.swipe_commands:
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
+            elif gesture in right_commands:
+                result['altitude_command'] = right_commands[gesture]
+                result['altitude_intensity'] = intensity
+            elif gesture in both_commands:
+                result['special_command'] = both_commands[gesture]
+
+        return result
 
     # ============ 滑动手势检测方法 ============
     

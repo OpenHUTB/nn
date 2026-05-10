@@ -34,7 +34,7 @@ class Trainer:
         self.save_model(paths, epoch_i)
         
         training_paths = self.replaybuffer.sample_recent_rollouts(self.config['training_n'])
-        self.ac_net.update(training_paths, epoch_i)
+        self.ac_net.update(training_paths, epoch_i, util)
 
     def training_loop(self):
         """Main training loop."""

@@ -1,0 +1,59 @@
+{
+  "project": "road_surface_slip_abs",
+  "initial_speed_mps": 30.0,
+  "optimal_slip": 0.18,
+  "road_segments": [
+    {
+      "name": "dry asphalt",
+      "start_m": 0.0,
+      "end_m": 18.0,
+      "friction_mu": 0.86
+    },
+    {
+      "name": "wet asphalt",
+      "start_m": 18.0,
+      "end_m": 55.0,
+      "friction_mu": 0.5
+    },
+    {
+      "name": "thin ice",
+      "start_m": 55.0,
+      "end_m": 110.0,
+      "friction_mu": 0.22
+    },
+    {
+      "name": "recovered asphalt",
+      "start_m": 110.0,
+      "end_m": 260.0,
+      "friction_mu": 0.72
+    }
+  ],
+  "baseline_locked_brake": {
+    "stopping_distance_m": 181.8169,
+    "stopping_time_s": 11.64,
+    "max_slip_ratio": 0.94,
+    "mean_abs_slip_error": 0.728,
+    "comfort_cost": 0.074
+  },
+  "optimized_adaptive_abs": {
+    "stopping_distance_m": 110.565,
+    "stopping_time_s": 8.94,
+    "max_slip_ratio": 0.193,
+    "mean_abs_slip_error": 0.0073,
+    "comfort_cost": 0.1828,
+    "low_mu_detection_time_s": 2.6
+  },
+  "improvement": {
+    "stopping_distance_percent": 39.19,
+    "stopping_time_percent": 23.2,
+    "max_slip_percent": 79.47,
+    "slip_error_percent": 99.0
+  },
+  "generated_files": [
+    "speed_distance_comparison.png",
+    "friction_estimation.png",
+    "slip_control_response.png",
+    "metric_comparison.png",
+    "braking_timeseries.csv"
+  ]
+}

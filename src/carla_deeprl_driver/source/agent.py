@@ -3,20 +3,12 @@ import numpy as np
 import queue
 from PIL import Image
 from torchvision import transforms
+import torch
 import random
 from typing import Tuple, Optional
 
 
 class ActorCar:
-    """ActorCar combines a vehicle with attached sensors for autonomous driving.
-    
-    Attributes:
-        actor_car: The CARLA vehicle actor
-        rgb_camera: RGB camera sensor
-        col_sensor: Collision sensor
-        front_camera: Processed camera image tensor
-        collision_intensity: Collision impulse magnitude
-    """
 
     def __init__(self, client: carla.Client, world: carla.World, bp: carla.BlueprintLibrary, 
                  spawn_points: list, config: dict):
@@ -56,27 +48,11 @@ class ActorCar:
         ])
 
     def retrieve_data(self, frame_index: int) -> Tuple[Optional[torch.Tensor], float]:
-        """Retrieve sensor data for a specific frame.
-        
-        Args:
-            frame_index: The expected frame number
-            
-        Returns:
-            Tuple of (processed camera image, collision intensity)
-        """
         self.process_img(frame_index)
         self.process_col_event(frame_index)
         return self.front_camera, self.collision_intensity
 
     def process_img(self, frame_index: int) -> bool:
-        """Process camera image from queue.
-        
-        Args:
-            frame_index: The expected frame number
-            
-        Returns:
-            True if image was processed successfully, False otherwise
-        """
         if not self._camera_queue.empty():
             img = self._camera_queue.get(timeout=2)
             if frame_index == img.frame:
@@ -90,11 +66,6 @@ class ActorCar:
         return False
 
     def process_col_event(self, frame_index: int):
-        """Process collision event from queue.
-        
-        Args:
-            frame_index: The expected frame number
-        """
         if not self._col_queue.empty():
             event = self._col_queue.get(timeout=2)
             if frame_index == event.frame:
@@ -102,7 +73,6 @@ class ActorCar:
                 self.collision_intensity = impulse.length()
 
     def cleanup(self):
-        """Clean up all actors associated with this agent."""
         self.rgb_camera.stop()
         self.col_sensor.stop()
         self.client.apply_batch([carla.command.DestroyActor(x) for x in self.actor_list])

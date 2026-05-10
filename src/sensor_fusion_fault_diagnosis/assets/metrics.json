@@ -1,0 +1,59 @@
+{
+  "steps": 180,
+  "sensors": [
+    "gps",
+    "radar",
+    "odometry"
+  ],
+  "fault_windows": [
+    {
+      "sensor": "gps",
+      "start": 45,
+      "end": 75,
+      "type": "bias drift"
+    },
+    {
+      "sensor": "radar",
+      "start": 95,
+      "end": 118,
+      "type": "spike noise"
+    },
+    {
+      "sensor": "odometry",
+      "start": 130,
+      "end": 158,
+      "type": "scale drift"
+    }
+  ],
+  "rmse_naive": 1.1385,
+  "rmse_robust": 0.4557,
+  "rmse_improvement_percent": 59.98,
+  "diagnosis": {
+    "gps": {
+      "true_positive": 16,
+      "false_positive": 0,
+      "false_negative": 14,
+      "precision": 1.0,
+      "recall": 0.533
+    },
+    "radar": {
+      "true_positive": 17,
+      "false_positive": 0,
+      "false_negative": 6,
+      "precision": 1.0,
+      "recall": 0.739
+    },
+    "odometry": {
+      "true_positive": 20,
+      "false_positive": 2,
+      "false_negative": 8,
+      "precision": 0.909,
+      "recall": 0.714
+    }
+  },
+  "outputs": {
+    "trajectory": "assets\\fusion_trajectory.png",
+    "residuals": "assets\\fault_residuals.png",
+    "rmse_chart": "assets\\rmse_comparison.png"
+  }
+}

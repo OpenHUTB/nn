@@ -9,6 +9,12 @@ from typing import Tuple, Optional
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def _process_imgs(imgs: torch.Tensor) -> torch.Tensor:
+    if len(imgs.shape) == 3:
+        return imgs.unsqueeze(0)
+    return imgs
+
+
 class ActorCritic(nn.Module):
     """Actor-Critic network for A2C algorithm with ResNet50 backbone."""
 
@@ -36,18 +42,11 @@ class ActorCritic(nn.Module):
         self.loss_fn = nn.MSELoss()
 
     def _build_layers(self) -> nn.Sequential:
-        """Build fully connected layers between ResNet and output heads."""
         layers = [nn.Linear(self.resnet.fc.out_features, self.hidden_dim)]
         for _ in range(self.n_layers):
             layers.append(nn.Linear(self.hidden_dim, self.hidden_dim))
             layers.append(nn.Tanh())
         return nn.Sequential(*layers)
-
-    def _process_imgs(self, imgs: torch.Tensor) -> torch.Tensor:
-        """Add batch dimension if missing."""
-        if len(imgs.shape) == 3:
-            return imgs.unsqueeze(0)
-        return imgs
 
     def forward(self, obs: torch.Tensor) -> Tuple[distributions.Categorical, torch.Tensor]:
         """Forward pass through the network.
@@ -66,15 +65,7 @@ class ActorCritic(nn.Module):
         return action_dist, v_value
 
     def get_action(self, obs: torch.Tensor) -> torch.Tensor:
-        """Sample action from the policy.
-        
-        Args:
-            obs: Input observation tensor
-            
-        Returns:
-            Sampled action index
-        """
-        obs = self._process_imgs(obs).to(device)
+        obs = _process_imgs(obs).to(device)
         action_prob, _ = self.forward(obs)
         return action_prob.sample()
 
@@ -101,21 +92,13 @@ class ActorCritic(nn.Module):
         
         return advantages
 
-    def update(self, paths: list, epoch_i: int):
-        """Update the actor-critic network.
-        
-        Args:
-            paths: List of trajectory dictionaries
-            epoch_i: Current epoch index
-        """
-        from source import utility as util
-        
+    def update(self, paths: list, epoch_i: int, util):
         observations, actions, rewards, next_obs, terminals, _ = util.convert_path2list(paths)
         loss_list = []
         
         for obs, acs, rws, nextobs, terminal in zip(observations, actions, rewards, next_obs, terminals):
-            obs = self._process_imgs(obs).to(device)
-            nextobs = self._process_imgs(nextobs).to(device)
+            obs = _process_imgs(obs).to(device)
+            nextobs = _process_imgs(nextobs).to(device)
             
             _, v_current = self.forward(obs)
             _, v_next = self.forward(nextobs)

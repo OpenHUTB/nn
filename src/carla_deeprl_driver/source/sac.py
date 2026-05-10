@@ -11,10 +11,9 @@ device = util.device
 
 
 class ValueNetwork(nn.Module):
-    """Value network for SAC algorithm."""
 
     def __init__(self):
-        super(ValueNetwork, self).__init__()
+        super().__init__()
         self.resnet = util.build_resnet()
         self.layers = self._build_layers()
         self.optimizer = optim.Adam(self.parameters(), lr=config['valuenet_lr'])
@@ -30,15 +29,13 @@ class ValueNetwork(nn.Module):
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         features = self.resnet(obs.to(device))
-        value = self.layers(features)
-        return value
+        return self.layers(features)
 
 
 class SoftQNet(nn.Module):
-    """Soft Q-network for SAC algorithm."""
 
     def __init__(self, action_dim: int):
-        super(SoftQNet, self).__init__()
+        super().__init__()
         self.resnet = util.build_resnet()
         self.layers = self._build_layers(action_dim)
         self.action_dim = action_dim
@@ -57,15 +54,13 @@ class SoftQNet(nn.Module):
         acs = util.totensor(acs) if not isinstance(acs, torch.Tensor) else acs
         features = self.resnet(obs.to(device))
         input_tensor = torch.cat((features, acs), 1)
-        q_value = self.layers(input_tensor)
-        return q_value
+        return self.layers(input_tensor)
 
 
 class PolicyNet(nn.Module):
-    """Policy network for SAC algorithm with Gaussian policy."""
 
     def __init__(self, action_dim: int, epsilon: float = 1e-6):
-        super(PolicyNet, self).__init__()
+        super().__init__()
         self.resnet = util.build_resnet()
         self.mean_layer = self._build_layers(action_dim)
         self.std_layer = self._build_layers(action_dim)
@@ -87,8 +82,7 @@ class PolicyNet(nn.Module):
         features = self.resnet(obs.to(device))
         mean = self.mean_layer(features)
         log_std = self.std_layer(features)
-        log_std = torch.clamp(log_std, self.log_min, self.log_max)
-        return mean, log_std
+        return mean, torch.clamp(log_std, self.log_min, self.log_max)
 
     def evaluate(self, obs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         mean, log_std = self.forward(obs)
@@ -99,18 +93,17 @@ class PolicyNet(nn.Module):
         log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + self.epsilon)
         return action, log_prob, z, mean, log_std
 
-    def get_action(self, obs: torch.Tensor) -> carla.VehicleControl:
+    def get_action(self, obs: torch.Tensor) -> torch.Tensor:
         with torch.no_grad():
             mean, log_std = self.forward(obs.to(device))
             std = log_std.exp()
             normal = Normal(mean, std)
             z = normal.sample()
             action = torch.tanh(z)
-        return carla.VehicleControl(1, util.tonumpy(action), 0)
+        return action
 
 
 class SAC:
-    """Soft Actor-Critic algorithm implementation."""
 
     def __init__(self, action_dim: int, log_min: float, log_max: float, 
                  replaybuffer, gamma: float, soft_tau: float):
@@ -129,13 +122,13 @@ class SAC:
     def update(self, paths: list) -> Tuple[float, float, float]:
         obs, acs, rws, next_obs, terminals, _ = util.convert_path2list(paths)
         
-        soft_q_value = self.soft_q_net.forward(obs, acs)
+        soft_q_value = self.soft_q_net(obs, acs)
         target_soft_q = util.totensor(rws) + self.gamma * (1 - terminals) * self.target_value_net(next_obs)
         soft_q_loss = self.soft_q_net.loss_fn(soft_q_value, target_soft_q.detach())
         
-        v_value = self.value_net.forward(obs)
+        v_value = self.value_net(obs)
         sample_acs, log_prob, _, _, _ = self.policy_net.evaluate(obs)
-        new_soft_q = self.soft_q_net.forward(obs, sample_acs)
+        new_soft_q = self.soft_q_net(obs, sample_acs)
         target_v = new_soft_q - log_prob
         value_loss = self.value_net.loss_fn(v_value, target_v.detach())
         
