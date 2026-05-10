@@ -345,12 +345,17 @@ class IntegratedDroneSimulation:
                 self._show_help()
             elif key == ord('f'):  # 切换全屏
                 self._toggle_fullscreen()
-            elif key == ord('['):  # 降低灵敏度
-                self._adjust_sensitivity(-1)
-            elif key == ord(']'):  # 提高灵敏度
-                self._adjust_sensitivity(1)
-            elif key == ord('='):  # 重置灵敏度为默认值
-                self._reset_sensitivity()
+            elif key == ord('i'):  # 切换镜像模式
+                self.mirror_mode = not self.mirror_mode
+                mode_text = "开启" if self.mirror_mode else "关闭"
+                print(f"[INFO] 摄像头镜像模式: {mode_text}")
+            elif key == ord('w'):  # 添加航点标记
+                self._add_waypoint()
+            elif key == ord('x'):  # 清除航点
+                self._clear_waypoints()
+            elif key >= ord('1') and key <= ord('7'):  # 数字键快速添加航点
+                label_index = key - ord('1')
+                self.drone_controller.add_waypoint_by_index(label_index)
 
         print("手势识别线程结束")
 
@@ -377,6 +382,15 @@ class IntegratedDroneSimulation:
         """重置灵敏度为默认值（中）"""
         self.gesture_detector.set_sensitivity(2)
         print("[灵敏度] 已重置为默认灵敏度: MEDIUM")
+
+    def _add_waypoint(self):
+        """添加航点标记"""
+        waypoint = self.drone_controller.add_waypoint(f"航点{len(self.drone_controller.waypoints)}")
+        print(f"[航点] 位置: ({waypoint.position[0]:.1f}, {waypoint.position[1]:.1f}, {waypoint.position[2]:.1f})")
+
+    def _clear_waypoints(self):
+        """清除所有航点"""
+        self.drone_controller.clear_waypoints()
 
     def _enhance_interface(self, frame, gesture, confidence):
         """增强界面显示（支持双手控制模式）"""
@@ -593,7 +607,10 @@ class IntegratedDroneSimulation:
             "M: Toggle Mode",
             "[ : Lower Sensitivity",
             "] : Raise Sensitivity",
-            "= : Reset Sensitivity"
+            "= : Reset Sensitivity",
+            "W: Add Waypoint",
+            "X: Clear Waypoints",
+            "1-7: Quick Waypoint"
         ]
         
         for control in controls:
@@ -631,6 +648,13 @@ class IntegratedDroneSimulation:
             cv2.putText(enhanced_frame, f"REPLAY: {replay_progress}/{replay_total} @{speed}x",
                         (width + 150, height - 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+
+        # 显示航点信息
+        waypoint_count = len(self.drone_controller.waypoints)
+        if waypoint_count > 0:
+            cv2.putText(enhanced_frame, f"WAYPOINTS: {waypoint_count}",
+                        (width + 150, height - 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
         return enhanced_frame
 
@@ -687,6 +711,9 @@ class IntegratedDroneSimulation:
         print("  O - 停止录制并保存")
         print("  J - 加载并回放轨迹")
         print("  +/- - 调整回放速度")
+        print("  W - 添加航点标记")
+        print("  X - 清除所有航点")
+        print("  1-7 - 快速添加航点（起飞/左转/右转/上升/下降/悬停/降落）")
         print("  D - 显示调试信息")
         print("  H - 显示帮助")
         print("  F - 切换全屏")
@@ -1143,13 +1170,14 @@ class IntegratedDroneSimulation:
                 physics_state = self.physics_engine.update(dt, control_input)
 
             trajectory = self.drone_controller.get_trajectory()
+            waypoints = self.drone_controller.get_waypoints_for_display()
 
             drone_state_with_gesture = drone_state.copy()
             if self.current_gesture:
                 drone_state_with_gesture['current_gesture'] = self.current_gesture
                 drone_state_with_gesture['gesture_confidence'] = self.gesture_confidence
 
-            self.viewer.render(drone_state_with_gesture, trajectory)
+            self.viewer.render(drone_state_with_gesture, trajectory, waypoints)
 
             # 控制帧率，避免CPU占用过高
             elapsed = time.time() - start_time
@@ -1297,6 +1325,9 @@ class IntegratedDroneSimulation:
         print("  3. 左手在屏幕左侧控制方向，右手在右侧控制高度")
         print("  4. 按 'm' 键可切换回单手控制模式")
         print("  5. 按 '[' 或 ']' 键调节手势识别灵敏度")
+        print("  6. 按 'w' 键在当前位置添加航点标记")
+        print("  7. 按 '1-7' 数字键快速添加带标签的航点")
+        print("  8. 航点会与轨迹一起保存，方便航线回放")
         print("=" * 60)
         print("系统启动中...")
 
