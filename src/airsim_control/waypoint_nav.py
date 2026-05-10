@@ -1,110 +1,152 @@
-"""
-航点导航主入口（PID控制 + 3D实时可视化）
-用法:
-  python waypoint_nav.py                      # 交互式添加航点
-  python waypoint_nav.py --waypoints 10,0,-5 10,10,-5 0,10,-10  # 命令行指定
-  python waypoint_nav.py --loop              # 循环模式
-  python waypoint_nav.py --no-visual        # 关闭可视化
-"""
-import argparse
-import sys
-import time
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""航点导航入口（含降落后返航功能）"""
 
+import sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 from client.drone_client import DroneClient
 from agents.waypoint_agent import WaypointAgent
 
 
-def parse_waypoints(wp_strings):
-    """解析航点参数 'x,y,z' 格式，z为高度（向上为正）"""
-    waypoints = []
-    for s in wp_strings:
-        try:
-            x, y, z = map(float, s.split(','))
-            waypoints.append((x, y, z))  # 直接存储，z表示高度
-        except ValueError:
-            print(f"警告: 忽略无效航点 '{s}'，格式应为 x,y,z")
-    return waypoints
+def _print_wp_list(agent):
+    """打印航点列表及当前模式"""
+    print("\n  序号 |      坐标      | 降落 | 返航 | 飞行速度 | 下降速度 | 悬停时间")
+    print("  " + "-" * 72)
+    for i, wp in enumerate(agent.planner.waypoints):
+        land = "●" if wp.is_landing else "○"
+        home = "●" if wp.is_return_home else "○"
+        print(f"  {i+1:>4} | ({wp.x:>5.1f},{wp.y:>5.1f},{wp.z:>5.1f}) |   {land}  |  {home}  | {wp.fly_speed:>7.1f}m/s | {wp.descend_speed:>7.1f}m/s | {wp.hover_time:>5.1f}s")
+
+
+def waypoint_edit_menu(agent):
+    """航点编辑菜单：配置模式、执行选择、开始飞行"""
+    while True:
+        _print_wp_list(agent)
+        print("""
+  操作选项:
+    l <序号>   - 开启/关闭该航点的降落模式
+    r <序号>   - 开启/关闭该航点的返航模式
+    d <序号>   - 删除该航点
+    a          - 继续添加航点
+    s <序号> <速度> - 修改该航点的飞行速度 (m/s)
+    v <序号> <速度> - 修改该航点的下降速度 (m/s)
+    t <序号> <秒数> - 修改该航点的悬停时间 (s)
+    exec        - 开始执行当前航点列表
+    q           - 退出""")
+
+        inp = input("\n操作> ").strip().lower()
+        if not inp:
+            continue
+
+        parts = inp.split()
+        cmd = parts[0]
+        idx = None
+        if len(parts) > 1:
+            try:
+                idx = int(parts[1]) - 1
+            except ValueError:
+                print("  无效的序号")
+                continue
+
+        if cmd == 'l':
+            if idx is None or not (0 <= idx < len(agent.planner.waypoints)):
+                print("  序号无效")
+                continue
+            wp = agent.planner.waypoints[idx]
+            wp.is_landing = not wp.is_landing
+            print(f"  WP{idx+1} 降落: {'开启' if wp.is_landing else '关闭'}")
+
+        elif cmd == 'r':
+            if idx is None or not (0 <= idx < len(agent.planner.waypoints)):
+                print("  序号无效")
+                continue
+            wp = agent.planner.waypoints[idx]
+            wp.is_return_home = not wp.is_return_home
+            print(f"  WP{idx+1} 返航: {'开启' if wp.is_return_home else '关闭'}")
+
+        elif cmd == 'd':
+            if idx is None or not (0 <= idx < len(agent.planner.waypoints)):
+                print("  序号无效")
+                continue
+            removed = agent.planner.waypoints.pop(idx)
+            agent.navigator.trajectory = []
+            print(f"  已删除 WP{idx+1}: ({removed.x}, {removed.y}, {removed.z})")
+
+        elif cmd == 'a':
+            print("  继续添加 (输入 'done' 返回编辑菜单)")
+            agent.add_waypoint_interactive(show_help=False)
+
+        elif cmd in ('s', 'v', 't'):
+            if idx is None or len(parts) < 3:
+                print("  格式: s <序号> <速度值>")
+                continue
+            try:
+                val = float(parts[2])
+            except ValueError:
+                print("  无效的数值")
+                continue
+            if not (0 <= idx < len(agent.planner.waypoints)):
+                print("  序号无效")
+                continue
+            wp = agent.planner.waypoints[idx]
+            if cmd == 's':
+                wp.fly_speed = max(0.1, val)
+                print(f"  WP{idx+1} 飞行速度: {wp.fly_speed:.1f} m/s")
+            elif cmd == 'v':
+                wp.descend_speed = max(0.1, val)
+                print(f"  WP{idx+1} 下降速度: {wp.descend_speed:.1f} m/s")
+            elif cmd == 't':
+                wp.hover_time = max(0.0, val)
+                print(f"  WP{idx+1} 悬停时间: {wp.hover_time:.1f} s")
+
+        elif cmd == 'exec':
+            if not agent.planner.waypoints:
+                print("  航点列表为空，请先添加航点")
+                continue
+            print("\n" + "=" * 50)
+            return True  # 开始飞行
+
+        elif cmd == 'q':
+            return False  # 退出
 
 
 def main():
-    parser = argparse.ArgumentParser(description='航点导航 - PID控制 + 3D可视化')
-    parser.add_argument('--waypoints', nargs='*', default=[],
-                        help='航点列表，格式: x,y,z x,y,z ...')
-    parser.add_argument('--loop', action='store_true', help='循环模式')
-    parser.add_argument('--reach-threshold', type=float, default=0.5,
-                        help='到达阈值（米），默认0.5')
-    parser.add_argument('--kp', type=float, default=2.0, help='P参数')
-    parser.add_argument('--ki', type=float, default=0.02, help='I参数')
-    parser.add_argument('--kd', type=float, default=1.0, help='D参数')
-    parser.add_argument('--max-vel', type=float, default=1.5, help='最大速度')
-    parser.add_argument('--no-visual', action='store_true', help='关闭3D可视化')
-    parser.add_argument('--interval', type=float, default=0.5,
-                        help='可视化更新间隔（秒）')
-    args = parser.parse_args()
+    client = DroneClient(interval=0.05)
 
-    # 解析航点
-    waypoints = parse_waypoints(args.waypoints)
-
-    print("=== 航点导航系统 ===\n")
-    print(f"PID参数: kp={args.kp}, ki={args.ki}, kd={args.kd}")
-    print(f"最大速度: {args.max_vel}m/s")
-    print(f"到达阈值: {args.reach_threshold}m")
-    print(f"循环模式: {'是' if args.loop else '否'}")
-    print(f"3D可视化: {'否' if args.no_visual else '是'}\n")
-
-    # 连接无人机
-    print("连接无人机...")
-    client = DroneClient(interval=0.1, root_path='./')
-
-    # 起飞
-    print("无人机起飞中...")
+    print("\n=== 初始化 ===")
+    print("正在连接 AirSim...")
     client.start()
-    import time
-    time.sleep(3)  # 等待起飞稳定
 
-    # 检查起飞是否成功
-    pos = client.get_state().kinematics_estimated.position
-    print(f"起飞后位置: x={pos.x_val:.2f}, y={pos.y_val:.2f}, z={pos.z_val:.2f} (NED)")
-    print(f"当前高度约: {-pos.z_val:.1f}m")
-    if -pos.z_val < 1.0:
-        print("警告: 起飞可能失败，无人机高度过低！")
-    else:
-        print("起飞成功!\n")
+    state = client.get_state()
+    pos = state.kinematics_estimated.position
+    print(f"起飞位置: ({pos.x_val:.1f}, {pos.y_val:.1f}, {pos.z_val:.1f})")
 
-    # 创建Agent
+    waypoints = []
     agent = WaypointAgent(
-        client=client,
-        waypoints=waypoints if waypoints else None,
-        reach_threshold=args.reach_threshold,
-        kp=args.kp, ki=args.ki, kd=args.kd,
-        max_vel=args.max_vel,
-        update_interval=args.interval
+        client,
+        waypoints=waypoints,
+        reach_threshold=2.0,
+        kp=1.0, ki=0.01, kd=0.5,
+        max_vel=1.0
     )
 
-    # 如果没有航点，交互式添加
-    if not waypoints:
-        agent.add_waypoint_interactive()
+    print("\n=== 自行设置航点 ===")
+    print("输入格式: x y z")
+    print("示例: 10 10 10")
+    print("输入 'done' 完成添加")
+    agent.add_waypoint_interactive()
 
     if not agent.planner.waypoints:
-        print("未添加航点，退出")
+        print("未添加任何航点，退出。")
         return
 
-    print(f"\n航点列表:")
-    for i, wp in enumerate(agent.planner.waypoints):
-        tag = " [降落]" if wp.is_landing else ""
-        print(f"  {i+1}. ({wp.x:.1f}, {wp.y:.1f}, {wp.z:.1f}){tag}")
+    # 进入编辑/执行菜单
+    if waypoint_edit_menu(agent):
+        agent.run(loop=False)
 
-    # 等待用户确认
-    input("\n按Enter开始导航，Ctrl+C取消...")
-
-    # 运行导航
-    agent.run(loop=args.loop)
+    print("\n飞行结束。")
 
 
-if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\n程序已退出")
+if __name__ == "__main__":
+    main()

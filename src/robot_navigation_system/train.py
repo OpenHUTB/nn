@@ -8,28 +8,35 @@ from dqn_agent import DQNAgent
 from visualization import NavigationVisualizer
 from config import Config
 
-def train():
+def train(episodes=None, visualize=None):
     config = Config()
-    
+
+    # 命令行参数覆盖配置
+    if episodes is not None:
+        config.EPISODES = episodes
+    if visualize is not None:
+        config.VISUALIZE = visualize
+
     # 创建结果目录
     os.makedirs(config.RESULT_DIR, exist_ok=True)
-    
+
     env = RobotNavigationEnv()
     agent = DQNAgent(config.STATE_SIZE, config.ACTION_SIZE)
     visualizer = NavigationVisualizer()
-    
+
     all_rewards = []
     all_distances = []
     all_lengths = []
-    
+
     print("=" * 60)
     print("开始训练DQN导航代理...")
     print(f"训练轮数: {config.EPISODES}")
     print(f"最大步数: {config.MAX_STEPS}")
     print(f"状态维度: {config.STATE_SIZE}")
     print(f"动作数量: {config.ACTION_SIZE}")
+    print(f"可视化: {'开启' if config.VISUALIZE else '关闭'}")
     print("=" * 60)
-    
+
     for episode in range(config.EPISODES):
         state = env.reset()
         total_reward = 0

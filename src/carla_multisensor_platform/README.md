@@ -244,5 +244,25 @@ Data being recorded:
 | YOLOPv2 模型缺失 | 添加 `yolopv2.pt` 预训练模型文件 |
 | 入口文件名不符合规范 | 将 `Main.py` 重命名为 `main.py` |
 
+## ⚠️ 硬件要求
+
+- **最低要求**：独立显卡（6GB+ 显存）
+- **集成显卡**：只能运行无渲染模式（`-RenderOffScreen`），无法显示 3D 画面
+
+## 📝 已知问题
+
+- 集成显卡环境下，CARLA 3D 城市窗口无法正常显示
+- 建议在独立显卡环境下运行以获得完整可视化体验
+
+## 🚀 一键启动
+
+### Windows
+双击 `main.bat` 即可启动
+
+### Linux/Mac
+```bash
+chmod +x main.sh
+./main.sh
+
 🤝 贡献
 欢迎提交 Issue 和 Pull Request。

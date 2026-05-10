@@ -9,8 +9,8 @@ import random
 import os
 import sys
 import cv2
-
-sys.path.append(r"D:\nn\src\grasp_rl\grasp_rl")
+#改成相对路径 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from envs.grasp import GraspRobot
 from modules.ddpg import ReplayBuffer, Transition
@@ -34,8 +34,8 @@ class VisualFeatureEnhancer(nn.Module):
         return torch.clamp(x, -1.0, 1.0)
 
 class DQN_Trainer(object):
-    def __init__(self, learning_rate=0.001, mem_size=2000, eps_start=0.9, eps_end=0.05,
-                 eps_decay=2000, seed=20, log_dir="test", render_mode=None):
+    def __init__(self, learning_rate=0.0005, mem_size=10000, eps_start=1.0, eps_end=0.01,
+                 eps_decay=8000, seed=20, log_dir="test", render_mode=None):
         self.writer = SummaryWriter(f"grasprl/log/DQN/{log_dir}")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.env = GraspRobot(render_mode=render_mode)
@@ -44,11 +44,17 @@ class DQN_Trainer(object):
         self.eps_end = eps_end
         self.eps_decay = eps_decay
         self.steps_done = 0
+        self.best_success_rate = 0.0
 
         self.q_net = MULTIDISCRETE_RESNET(1).to(self.device)
+        self.target_q_net = MULTIDISCRETE_RESNET(1).to(self.device)
+        self.target_q_net.load_state_dict(self.q_net.state_dict())
+        self.target_q_net.eval()
+        
         self.feat_enhance = VisualFeatureEnhancer().to(self.device)
-        self.optimizer = optim.Adam(self.q_net.parameters(), lr=learning_rate, weight_decay=0.00002)
+        self.optimizer = optim.Adam(self.q_net.parameters(), lr=learning_rate, weight_decay=0.0001)
         self.criterion = torch.nn.SmoothL1Loss(reduction="none").to(self.device)
+        self.target_update_freq = 100
 
         torch.manual_seed(seed)
         np.random.seed(seed)
@@ -118,6 +124,7 @@ class DQN_Trainer(object):
         if len(self.memory) < BATCH_SIZE:
             print("Filling the replay buffer ...")
             return
+        
         transitions = self.memory.sample(BATCH_SIZE)
         batch = Transition(*zip(*transitions))
         state_batch = torch.cat(batch.state).to(self.device)
@@ -128,19 +135,26 @@ class DQN_Trainer(object):
         reward_batch = reward_batch.float().view(-1, 1)
         q_out = self.q_net(state_batch).view(-1, self.env.IMAGE_WIDTH * self.env.IMAGE_HEIGHT)
         q_pred = q_out.gather(1, action_batch)
+        
         with torch.no_grad():
-            q_next = self.q_net(next_state_batch).max(1, keepdim=True)[0]
+            q_next = self.target_q_net(next_state_batch).max(1, keepdim=True)[0]
             q_target = reward_batch + gamma * q_next
 
         loss = self.criterion(q_pred, q_target).mean()
         self.optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.q_net.parameters(), 1.0)
         self.optimizer.step()
         self.writer.add_scalar("losses", loss.item(), self.steps_done)
+
+        if self.steps_done % self.target_update_freq == 0:
+            self.target_q_net.load_state_dict(self.q_net.state_dict())
 
     def save(self, path_name, filename):
         os.makedirs(path_name, exist_ok=True)
         torch.save(self.q_net.state_dict(), os.path.join(path_name, filename + "_qnet"))
+        torch.save(self.target_q_net.state_dict(), os.path.join(path_name, filename + "_target_qnet"))
+        torch.save(self.feat_enhance.state_dict(), os.path.join(path_name, filename + "_feat_enhance"))
         
     def save_dataset_sample(self, action, reward, info, iter_num):
         data_dir = "grasprl/dataset/grasp_samples"
@@ -154,11 +168,12 @@ class DQN_Trainer(object):
 
 def main():
     max_iter = 100
-    trainer = DQN_Trainer(log_dir="resnet_dqn_insne", render_mode="human")
+    trainer = DQN_Trainer(log_dir="resnet_dqn_insne_v2", render_mode="human")
     state = trainer.env.reset_without_random()
     state = trainer.transform_state(state)
     loop = tqdm(range(1, max_iter + 1))
     grasp_success = 0
+    recent_successes = []
 
     for i_iter in loop:
         max_idx = trainer.select_action_by_instruction(state)
@@ -167,14 +182,26 @@ def main():
         next_state, reward, done, info = trainer.env.step(action)
         loop.set_description(f"iter [{i_iter}]/[{max_iter}]")
         loop.set_postfix(grasp_info=info['grasp'], reward=reward, action=trainer.last_action)
+        
         if info["grasp"] == "Success":
             grasp_success += 1
+            recent_successes.append(1)
+        else:
+            recent_successes.append(0)
+        
+        if len(recent_successes) > 50:
+            recent_successes.pop(0)
+        
         if done:
             state = trainer.env.reset_without_random()
             state = trainer.transform_state(state)
         else:
             success_rate = grasp_success / i_iter
+            recent_success_rate = sum(recent_successes) / len(recent_successes) if recent_successes else 0.0
+            
             trainer.writer.add_scalar("Grasping performance(Success rate)", success_rate, trainer.steps_done)
+            trainer.writer.add_scalar("Recent Success Rate (last 50)", recent_success_rate, trainer.steps_done)
+            
             reward_tensor = torch.tensor([[reward]], dtype=torch.float32)
             next_state = trainer.transform_state(next_state)
             trainer.memory.push(state.detach(), max_idx, next_state.detach(), reward_tensor)
@@ -182,8 +209,14 @@ def main():
             trainer.save_dataset_sample(action, reward, info, i_iter)
             trainer.learn()
 
-    trainer.save("grasprl/trained/resnet/resnet", "insne")
+            if recent_success_rate > trainer.best_success_rate and i_iter > 100:
+                trainer.best_success_rate = recent_success_rate
+                trainer.save("grasprl/trained/resnet/resnet_best", f"insne_{i_iter}")
+
+    trainer.save("grasprl/trained/resnet/resnet", "insne_final")
     trainer.writer.close()
 
 if __name__ == "__main__":
     main()
+
+
