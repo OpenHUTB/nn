@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>USAD - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "USAD";
+        var mkdocs_page_input_path = "unsupervised_driving_segmentation/README.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">USAD</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/unsupervised_driving_segmentation/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="usad">USAD</h1>
+<p>本仓库实现了一种专门面向自动驾驶应用的无监督分割模型。本项目旨在开发一种稳定可靠的分割算法，无需依赖标注数据，可为现实自动驾驶场景提供可落地的通用解决方案。</p>
+<p>项目整体分为多个关键环节来完成语义分割任务，整体流程如下：</p>
+<ul>
+<li>data_collection</li>
+<li>data_processing</li>
+<li>image_cropping</li>
+<li>knn_index_precomputation</li>
+<li>model_training</li>
+<li>model_evaluation</li>
+<li>real_time_segmentation</li>
+</ul>
+<h2 id="_1">代码来源说明</h2>
+<p>本仓库整合了其他开源项目代码：</p>
+<h3 id="_2">修改使用</h3>
+<ul>
+<li>Cheating by Segmentation 2</li>
+<li>STEGO</li>
+</ul>
+<h3 id="_3">直接引用未做修改</h3>
+<ul>
+<li>DriveAndSegment</li>
+</ul>
+<h2 id="carla">CARLA安装教程</h2>
+<p>在自定义路径下载安装CARLA：</p>
+<pre><code class="language-bash">wget https://carla-releases.s3.eu-west-3.amazonaws.com/Linux/CARLA_0.9.10.1.tar.gz
+tar -xvzf CARLA_0.9.10.1.tar.gz -C carla09101
+</code></pre>
+<p>在指定路径克隆USAD项目仓库：</p>
+<pre><code class="language-bash">git clone https://github.com/flixtkc/Unsupervised-Segmentation-for-Autonomous-Driving-Cars.git
+cd Unsupervised-Segmentation-for-Autonomous-Driving-Cars
+</code></pre>
+<p>本项目需要创建两个独立的Conda虚拟环境，请提前安装Anaconda。</p>
+<pre><code class="language-bash">cd CBS2
+conda env create -f docs/cbs2.yml
+conda activate cbs2
+</code></pre>
+<p>确认第一个环境配置无误后，返回根目录创建第二个环境：</p>
+<pre><code class="language-bash">cd ..
+cd STEGO
+conda env create -f environment.yml
+conda activate stego
+</code></pre>
+<p>将以下环境变量添加到 ~/.bashrc 配置文件中：</p>
+<pre><code class="language-bash">export CARLA_ROOT=&lt;your_path&gt;/carla09101
+export CBS2_ROOT=&lt;your_path&gt;/CBS2
+export LEADERBOARD_ROOT=${CBS2_ROOT}/leaderboard
+export SCENARIO_RUNNER_ROOT=${CBS2_ROOT}/scenario_runner
+export PYTHONPATH=${PYTHONPATH}:&quot;${CARLA_ROOT}/PythonAPI/carla/&quot;:&quot;${SCENARIO_RUNNER_ROOT}&quot;:&quot;${LEADERBOARD_ROOT}&quot;:&quot;${CARLA_ROOT}/PythonAPI/carla/dist/carla-0.9.10-py3.7-linux-x86_64.egg&quot;
+</code></pre>
+<p>激活cbs2环境，执行命令启动CARLA验证环境是否正常：</p>
+<pre><code class="language-bash">source ~/.bashrc
+$CBS2_ROOT/scripts/launch_carla.sh 1 2000
+</code></pre>
+<h2 id="_4">配置说明</h2>
+<p>进行数据采集前需要配置多个文件，可使用任意文本编辑器查看以下路径文件：</p>
+<ul>
+<li><code>CBS2/autoagents/collector_agents/config_data_collection.yaml</code></li>
+<li><code>CBS2/autoagents/collector_agents/collector.py</code></li>
+<li><code>CBS2/rails/data_phase1.py</code></li>
+<li><code>CBS2/assets/</code></li>
+</ul>
+<p><code>config_data_collection.yaml</code>文件包含数据采集阶段的全部参数设置，其中分辨率配置对分割模型最终性能影响最大。</p>
+<p><code>collector.py</code>文件定义了所有数据采集相关功能函数，同时内置了wandb日志工具配置，默认关闭日志记录。</p>
+<p><code>data_phase1.py</code>用于配置单次自动驾驶采集任务的专属参数。</p>
+<p><code>assets</code>文件夹存放各个仿真城镇的行驶路线与场景文件，是数据采集运行的必要文件，需要在<code>data_phase1.py</code>中指定调用对应的路线配置。</p>
+<h2 id="_5">数据采集步骤</h2>
+<p>开启两个终端窗口，第一个终端启动CARLA服务，第二个终端进入CBS2目录执行数据采集脚本。</p>
+<p><strong>终端1执行</strong>：</p>
+<pre><code class="language-bash">$CBS2_ROOT/scripts/launch_carla.sh &lt;运行进程数&gt; &lt;端口号&gt;
+</code></pre>
+<p><strong>终端2执行</strong>：</p>
+<pre><code class="language-bash">cd CBS2
+python rails/data_phase1.py --port &lt;端口号&gt; --num-runner=&lt;运行进程数&gt;
+</code></pre>
+<p>注意：多进程运行时，端口号同时作为各进程的端口递增偏移量。</p>
+<h2 id="_6">数据格式处理</h2>
+<p>确认采集的数据合格后，进行数据格式转换。原始数据需要经过处理才能用于STEGO模型训练。回到项目根目录，运行数据集格式转换脚本，运行前需手动设置数据集输入路径和输出路径。</p>
+<h2 id="_7">环境切换</h2>
+<p>数据处理完成后，退出cbs2环境并激活stego环境，后续所有操作均需在该环境下进行。</p>
+<h2 id="stego">STEGO模型配置</h2>
+<p>进入配置文件目录修改参数：</p>
+<pre><code class="language-bash">cd STEGO/src/
+vi configs/train_config.yml
+</code></pre>
+<p>填写数据集路径，与上一步数据转换的输出路径保持一致；同时调整图像裁剪相关超参数，避免训练过程出现内存溢出错误。</p>
+<h3 id="_8">裁剪参数配置示例</h3>
+<p>无标签数据，采用五点裁剪模式，裁剪比例0.5，分辨率200，中心加载裁剪。</p>
+<p>裁剪模式支持四角加中心五点裁剪，或随机裁剪；裁剪比例控制裁剪区域相对原图的大小。调整参数至稳定可用后，修改配置文件中的数据集路径，指向裁剪后新数据集文件夹。</p>
+<h2 id="knn_index_precomputation">knn_index_precomputation</h2>
+<p>为大幅加快训练速度，必须提前执行KNN索引预计算：</p>
+<pre><code class="language-bash">python precompute_knns.py
+</code></pre>
+<h2 id="model_training">model_training</h2>
+<p>配置全部完成后，运行训练脚本，在CARLA仿真采集数据集上训练分割模型。需提前在配置文件中指定日志保存文件夹。</p>
+<pre><code class="language-bash">python train_segmentation.py
+</code></pre>
+<p>训练过程可通过TensorBoard实时查看训练日志与指标变化，示例命令：</p>
+<pre><code class="language-bash">tensorboard --logdir logs/logs/five_crop_0.5/directory_new_crop_date_Jul25_02-25-32/default/version_0/
+</code></pre>
+<h2 id="model_evaluation">model_evaluation</h2>
+<p>可通过TensorBoard日志查看各项评估指标，也可运行实时分割脚本进行实际效果测试。论文原版暂未实现真正实时部署，后续版本将优化完善。项目还提供通用视频、图片分割脚本，加载训练好的模型即可对普通媒体文件做语义分割并保存结果，可自行注释启用图片或视频分割功能，测试示例可查看testing_videos文件夹。</p>
+<p>执行测试脚本命令：</p>
+<pre><code class="language-bash">cd STEGO/src/
+python STEGO_create_segmented_video_or_image.py
+python STEGO_real_time_segmenter.py
+</code></pre>
+<h2 id="_9">额外测试工具</h2>
+<p>项目附带多个辅助测试脚本，可用于测试程序批处理大小、进程线程数、SSH远程X11转发等功能，用于排查各类运行报错问题。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
