@@ -45,6 +45,7 @@ class MultirotorDynamicsAirsim:
         self.v_xy_sp = 0
         self.v_z_sp = 0
         self.yaw_rate_sp = 0
+        self.yaw_sp = 0
 
         # 动作空间
         self.acc_xy_max = cfg.getfloat("multirotor", "acc_xy_max")
@@ -54,6 +55,15 @@ class MultirotorDynamicsAirsim:
         self.yaw_rate_max_deg = cfg.getfloat("multirotor", "yaw_rate_max_deg")
         self.yaw_rate_max_rad = math.radians(self.yaw_rate_max_deg)
         self.max_vertical_difference = 5
+        self.action_smoothing_alpha = cfg.getfloat(
+            "multirotor", "action_smoothing_alpha", fallback=0.25
+        )
+        self.action_smoothing_alpha = float(
+            np.clip(self.action_smoothing_alpha, 0.0, 1.0)
+        )
+        self.yaw_rate_change_max_rad = math.radians(
+            cfg.getfloat("multirotor", "yaw_rate_change_max_deg", fallback=5.0)
+        )
 
         if self.navigation_3d:
             if self.using_velocity_state:
@@ -78,6 +88,9 @@ class MultirotorDynamicsAirsim:
 
     def reset(self):
         self.client.reset()
+        self.v_xy_sp = 0
+        self.v_z_sp = 0
+        self.yaw_rate_sp = 0
         # 重置目标
         self.update_goal_pose()
 
@@ -102,12 +115,34 @@ class MultirotorDynamicsAirsim:
 
     def set_action(self, action):
 
-        self.v_xy_sp = action[0] * 0.7
-        self.yaw_rate_sp = action[-1] * 2
+        v_xy_target = float(np.clip(action[0], self.v_xy_min, self.v_xy_max))
+        yaw_rate_target = float(
+            np.clip(action[-1], -self.yaw_rate_max_rad, self.yaw_rate_max_rad)
+        )
         if self.navigation_3d:
-            self.v_z_sp = float(action[1])
+            v_z_target = float(np.clip(action[1], -self.v_z_max, self.v_z_max))
         else:
-            self.v_z_sp = 0
+            v_z_target = 0
+
+        alpha = self.action_smoothing_alpha
+        v_xy_smoothed = self.v_xy_sp + alpha * (v_xy_target - self.v_xy_sp)
+        v_z_smoothed = self.v_z_sp + alpha * (v_z_target - self.v_z_sp)
+        yaw_rate_smoothed = self.yaw_rate_sp + alpha * (
+            yaw_rate_target - self.yaw_rate_sp
+        )
+
+        v_xy_delta_max = self.acc_xy_max * self.dt
+        self.v_xy_sp += float(
+            np.clip(v_xy_smoothed - self.v_xy_sp, -v_xy_delta_max, v_xy_delta_max)
+        )
+        self.v_z_sp = float(np.clip(v_z_smoothed, -self.v_z_max, self.v_z_max))
+        self.yaw_rate_sp += float(
+            np.clip(
+                yaw_rate_smoothed - self.yaw_rate_sp,
+                -self.yaw_rate_change_max_rad,
+                self.yaw_rate_change_max_rad,
+            )
+        )
 
         self.yaw = self.get_attitude()[2]
         self.yaw_sp = self.yaw + self.yaw_rate_sp * self.dt

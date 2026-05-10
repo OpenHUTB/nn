@@ -5,8 +5,89 @@ import tensorflow as tf
 import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler, Callback
 import datetime
+import matplotlib
+matplotlib.use('TkAgg')  # Use TkAgg backend for real-time plotting
+import matplotlib.pyplot as plt
 from utils.logger import logger
+
+# Custom callback for real-time loss visualization
+class RealTimeLossPlot(Callback):
+    def __init__(self):
+        super().__init__()
+        self.train_losses = []
+        self.val_losses = []
+        self.train_steering_losses = []
+        self.val_steering_losses = []
+        self.train_throttle_losses = []
+        self.val_throttle_losses = []
+        self.train_brake_losses = []
+        self.val_brake_losses = []
+        
+        # Initialize plot
+        plt.ion()  # Turn on interactive mode
+        self.fig, ((self.ax1, self.ax2), (self.ax3, self.ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+        plt.subplots_adjust(hspace=0.3, wspace=0.2)
+        
+    def on_epoch_end(self, epoch, logs=None):
+        # Store losses
+        self.train_losses.append(logs.get('loss'))
+        self.val_losses.append(logs.get('val_loss'))
+        self.train_steering_losses.append(logs.get('steering_angle_loss'))
+        self.val_steering_losses.append(logs.get('val_steering_angle_loss'))
+        self.train_throttle_losses.append(logs.get('throttle_press_loss'))
+        self.val_throttle_losses.append(logs.get('val_throttle_press_loss'))
+        self.train_brake_losses.append(logs.get('brake_pressure_loss'))
+        self.val_brake_losses.append(logs.get('val_brake_pressure_loss'))
+        
+        # Clear and redraw plots
+        self._update_plot()
+        
+    def _update_plot(self):
+        # Total Loss plot
+        self.ax1.clear()
+        self.ax1.plot(self.train_losses, 'b-', label='Training Loss')
+        self.ax1.plot(self.val_losses, 'r-', label='Validation Loss')
+        self.ax1.set_title('Total Loss')
+        self.ax1.set_xlabel('Epoch')
+        self.ax1.set_ylabel('Loss')
+        self.ax1.legend()
+        self.ax1.grid(True)
+        
+        # Steering Angle Loss plot
+        self.ax2.clear()
+        self.ax2.plot(self.train_steering_losses, 'b-', label='Training')
+        self.ax2.plot(self.val_steering_losses, 'r-', label='Validation')
+        self.ax2.set_title('Steering Angle Loss')
+        self.ax2.set_xlabel('Epoch')
+        self.ax2.set_ylabel('Loss')
+        self.ax2.legend()
+        self.ax2.grid(True)
+        
+        # Throttle Loss plot
+        self.ax3.clear()
+        self.ax3.plot(self.train_throttle_losses, 'b-', label='Training')
+        self.ax3.plot(self.val_throttle_losses, 'r-', label='Validation')
+        self.ax3.set_title('Throttle Pressure Loss')
+        self.ax3.set_xlabel('Epoch')
+        self.ax3.set_ylabel('Loss')
+        self.ax3.legend()
+        self.ax3.grid(True)
+        
+        # Brake Loss plot
+        self.ax4.clear()
+        self.ax4.plot(self.train_brake_losses, 'b-', label='Training')
+        self.ax4.plot(self.val_brake_losses, 'r-', label='Validation')
+        self.ax4.set_title('Brake Pressure Loss')
+        self.ax4.set_xlabel('Epoch')
+        self.ax4.set_ylabel('Loss')
+        self.ax4.legend()
+        self.ax4.grid(True)
+        
+        # Refresh the plot
+        plt.draw()
+        plt.pause(0.05)
 
 class PilotNet():
     def __init__(self, width, height, predict=False):
@@ -61,26 +142,90 @@ class PilotNet():
         logger.info('PilotNet model built successfully')
         return model
 
-    def train(self, name: 'Filename for saving model', data: 'Training data as an instance of pilotnet.src.Data()', epochs: 'Number of epochs to run' = 30, steps: 'Number of steps per epoch' = 10, steps_val: 'Number of steps to validate' = 10, batch_size: 'Batch size to be used for training' = 64):
+    def train(self, name: 'Filename for saving model', data: 'Training data as an instance of pilotnet.src.Data()', epochs: 'Number of epochs to run' = 50, steps: 'Number of steps per epoch' = None, steps_val: 'Number of steps to validate' = None, batch_size: 'Batch size to be used for training' = 64):
         # x_train & y_train are np.array() objects with data extracted directly from the PilotData object instances
+        training_frames = data.training_data()
+        testing_frames = data.testing_data()
+        
+        # Calculate steps automatically based on data size
+        num_train_samples = len(training_frames)
+        num_val_samples = int(num_train_samples * 0.2)
+        
+        if steps is None:
+            steps = max(1, num_train_samples // batch_size)
+        if steps_val is None:
+            steps_val = max(1, num_val_samples // batch_size)
+        
         logger.info(f'Starting model training - epochs: {epochs}, steps: {steps}, batch_size: {batch_size}')
-
+        logger.info(f'Training samples: {num_train_samples}, Validation samples: {num_val_samples}')
+        
+        # Prepare data
+        x_train = np.array([frame.image for frame in training_frames])
+        y_train = np.array([(frame.steering, frame.throttle, frame.brake) for frame in training_frames])
+        
+        # Learning rate scheduler - reduce learning rate when stuck
+        def lr_scheduler(epoch, lr):
+            if epoch % 10 == 0 and epoch > 0:
+                new_lr = lr * 0.8
+                logger.info(f'Reducing learning rate from {lr:.6f} to {new_lr:.6f}')
+                return new_lr
+            return lr
+        
+        # Callbacks
+        early_stopping = EarlyStopping(
+            monitor='val_loss',
+            patience=5,
+            restore_best_weights=True,
+            verbose=1
+        )
+        
+        model_checkpoint = ModelCheckpoint(
+            f'models/{name}_best.h5',
+            monitor='val_loss',
+            save_best_only=True,
+            verbose=1
+        )
+        
+        lr_schedule = LearningRateScheduler(lr_scheduler)
+        
+        # Real-time loss plot callback
+        real_time_plot = RealTimeLossPlot()
+        
+        callbacks = [early_stopping, model_checkpoint, lr_schedule, real_time_plot]
+        
         # fit data to model for training
-        self.model.fit(np.array([frame.image for frame in data.training_data()]), np.array([(frame.steering, frame.throttle, frame.brake) for frame in data.training_data()]), batch_size=batch_size, epochs=epochs, steps_per_epoch=steps, validation_split=0.2, validation_steps=steps_val)
+        history = self.model.fit(
+            x_train, y_train,
+            batch_size=batch_size,
+            epochs=epochs,
+            steps_per_epoch=steps,
+            validation_split=0.2,
+            validation_steps=steps_val,
+            callbacks=callbacks,
+            shuffle=True
+        )
         
         # test the model by fitting the test data
         logger.info('Evaluating model on test data')
-        stats = self.model.evaluate(np.array([frame.image for frame in data.testing_data()]), np.array([(frame.steering, frame.throttle, frame.brake) for frame in data.testing_data()]), verbose=2)
+        x_test = np.array([frame.image for frame in testing_frames])
+        y_test = np.array([(frame.steering, frame.throttle, frame.brake) for frame in testing_frames])
+        stats = self.model.evaluate(x_test, y_test, verbose=2)
         
         # print the stats
-        print(f'Model accuracy: {stats[1]}\nModel loss: {stats[0]}')
-        logger.info(f'Training completed - accuracy: {stats[1]}, loss: {stats[0]}')
+        print(f'\nModel Evaluation Results:')
+        print(f'  - Total Loss: {stats[0]:.6f}')
+        print(f'  - Steering Angle Loss: {stats[1]:.6f}')
+        print(f'  - Throttle Pressure Loss: {stats[2]:.6f}')
+        print(f'  - Brake Pressure Loss: {stats[3]:.6f}')
+        logger.info(f'Training completed - loss: {stats[0]}, steering_loss: {stats[1]}, throttle_loss: {stats[2]}, brake_loss: {stats[3]}')
         
         input('\nPress [ENTER] to continue...')
         
         # save the trained model
         self.model.save(f"models/{name}.h5")
         logger.info(f'Model saved to: models/{name}.h5')
+        
+        return history
     
     # this method can be used for enabling the feature mentioned in app.py but needs more work
     def predict(self, data, given_model = 'default'):

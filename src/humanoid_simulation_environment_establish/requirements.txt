@@ -1,0 +1,17 @@
+# 基础数据处理
+pandas==2.1.0
+numpy==1.25.2
+# Web框架
+flask==2.3.3
+# 数据库
+sqlalchemy==2.0.20
+pymysql==1.1.0
+# 爬虫/请求
+requests==2.31.0
+beautifulsoup4==4.12.2
+# 可视化
+matplotlib==3.7.2
+seaborn==0.12.2
+# 其他
+python-dotenv==1.0.0
+openpyxl==3.1.2  # 处理Excel

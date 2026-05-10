@@ -7,8 +7,16 @@
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
 """Example of automatic vehicle control from client side."""
-
+# -*- coding: utf-8 -*-
 from __future__ import print_function
+
+import sys
+import os
+
+# 添加 CARLA PythonAPI 路径
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'CARLA_0.9.15', 'WindowsNoEditor', 'PythonAPI', 'carla'))
 
 import argparse
 import collections
@@ -16,10 +24,8 @@ import datetime
 import glob
 import logging
 import math
-import os
 import random
 import re
-import sys
 import weakref
 
 try:
@@ -59,7 +65,7 @@ import carla
 from carla import ColorConverter as cc
 
 from agents.navigation.behavior_agent import BehaviorAgent  # pylint: disable=import-error
-from agents.navigation.roaming_agent import RoamingAgent  # pylint: disable=import-error
+#from agents.navigation.roaming_agent import RoamingAgent  # pylint: disable=import-error
 from agents.navigation.basic_agent import BasicAgent  # pylint: disable=import-error
 
 
@@ -200,7 +206,9 @@ class World(object):
 
 class KeyboardControl(object):
     def __init__(self, world):
+        self.world = world
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
+
 
     def parse_events(self):
         for event in pygame.event.get():
@@ -209,6 +217,13 @@ class KeyboardControl(object):
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+                elif event.key == pygame.K_c:
+                    # 切换摄像头视角
+                    self.world.camera_manager.toggle_camera()
+                    self.world.hud.notification("Camera angle changed", seconds=1.0)
+                elif event.key == pygame.K_h:
+                    # 显示帮助
+                    self.world.hud.help.toggle()
 
     @staticmethod
     def _is_quit_shortcut(key):
@@ -692,21 +707,19 @@ def game_loop(args):
         elif args.agent == "Basic":
             agent = BasicAgent(world.player)
             spawn_point = world.map.get_spawn_points()[0]
-            agent.set_destination((spawn_point.location.x,
-                                   spawn_point.location.y,
-                                   spawn_point.location.z))
+            agent.set_destination(spawn_point.location)
         else:
             agent = BehaviorAgent(world.player, behavior=args.behavior)
 
             spawn_points = world.map.get_spawn_points()
             random.shuffle(spawn_points)
 
-            if spawn_points[0].location != agent.vehicle.get_location():
+            if spawn_points[0].location != world.player.get_location():
                 destination = spawn_points[0].location
             else:
                 destination = spawn_points[1].location
 
-            agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
+            agent.set_destination(world.player.get_location(), destination)
 
         clock = pygame.time.Clock()
 
@@ -733,27 +746,28 @@ def game_loop(args):
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
             else:
-                agent.update_information()
+                #agent.update_information()
 
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
 
                 # Set new destination when target has been reached
-                if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
-                    agent.reroute(spawn_points)
-                    tot_target_reached += 1
-                    world.hud.notification("The target has been reached " +
-                                           str(tot_target_reached) + " times.", seconds=4.0)
+                #if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
+                #    agent.reroute(spawn_points)
+                #    tot_target_reached += 1
+                #    world.hud.notification("The target has been reached " +
+                #                           str(tot_target_reached) + " times.", seconds=4.0)
 
-                elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
-                    print("Target reached, mission accomplished...")
-                    break
+                #elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
+                #    print("Target reached, mission accomplished...")
+                #    break
 
                 speed_limit = world.player.get_speed_limit()
                 agent.get_local_planner().set_speed(speed_limit)
 
                 control = agent.run_step()
+                print(f"Throttle: {control.throttle}, Steer: {control.steer}, Brake: {control.brake}")  # 添加这行
                 world.player.apply_control(control)
 
     finally:
