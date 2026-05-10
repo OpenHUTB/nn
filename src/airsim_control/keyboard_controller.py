@@ -69,7 +69,42 @@ class KeyboardController(Agent):
         return vx, vy, vz
 
     def act(self):
+        # 先获取键盘输入
         vx, vy, vz = self.handle_keyboard_input()
+        
+        # 检查碰撞信息
+        collision_info = self.client.get_collision_info()
+        if collision_info.has_collided:
+            print("碰撞发生！")
+            # 碰撞后停止移动并开始掉落
+            vx, vy = 0, 0
+            vz = 2  # 在NED坐标系中，正值表示向下移动，让无人机开始掉落
+            print("无人机开始下降...")
+            # 尝试获取更详细的碰撞信息
+            try:
+                # 检查是否有碰撞位置信息
+                if hasattr(collision_info, 'position'):
+                    pos = collision_info.position
+                    print(f"碰撞位置: ({pos.x_val}, {pos.y_val}, {pos.z_val})")
+                # 检查是否有碰撞物体信息
+                if hasattr(collision_info, 'object_name'):
+                    print(f"碰撞物体: {collision_info.object_name}")
+                # 检查是否有碰撞法线信息
+                if hasattr(collision_info, 'normal'):
+                    normal = collision_info.normal
+                    print(f"碰撞法线: ({normal.x_val}, {normal.y_val}, {normal.z_val})")
+                # 尝试获取无人机当前状态信息
+                state = self.client.get_state()
+                if state:
+                    pos = state.kinematics_estimated.position
+                    print(f"当前位置: ({pos.x_val}, {pos.y_val}, {pos.z_val})")
+                    vel = state.kinematics_estimated.linear_velocity
+                    print(f"当前速度: ({vel.x_val}, {vel.y_val}, {vel.z_val})")
+            except Exception as e:
+                # 如果获取详细信息失败，忽略错误
+                pass
+        
+        # 移动无人机
         self.client.move(self.move_type, vx, vy, vz)
 
         # 检查是否按下ESC键退出
@@ -78,6 +113,8 @@ class KeyboardController(Agent):
             return False
         
         return True
+
+
 
     def run(self, loop_cnt=100):
         for _ in range(loop_cnt):

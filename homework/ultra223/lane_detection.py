@@ -77,3 +77,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("=" * 50)
+    print("车道与路径检测项目")
+    print("作者：ultra223")
+    print("进度：预处理 + 边缘检测 + ROI提取")
+    print("=" * 50)
+    lane_detection("test.jpg")

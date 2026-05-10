@@ -449,3 +449,31 @@ python cifar10_alexnet.py
 4. **学习率调度**：实现动态学习率调整策略，优化训练过程
 5. **模型优化**：调整卷积核数量、大小和网络深度，寻找最佳模型结构
 
+---
+
+# tutorial_random_filter.py 工程化补充说明
+
+本次对 `tutorial_random_filter.py` 做了小幅工程化增强，在不改变“随机卷积可视化”核心流程的前提下，提升可复现与可提交性：
+
+1. 增加环境变量参数：
+   - `RANDOM_FILTER_SEED`：随机种子（默认 `42`）
+   - `RANDOM_FILTER_IMAGE`：输入图片路径（默认 `corgi.jpg`）
+   - `RANDOM_FILTER_OUT_DIR`：输出目录（默认 `outputs`）
+   - `RANDOM_FILTER_SHOW`：是否弹窗显示（`1` 显示，`0` 不显示）
+2. 自动保存实验结果：
+   - 输出可视化图：`outputs/random_filter_result.png`
+   - 输出统计报告：`outputs/random_filter_report.json`
+3. 路径处理增强：
+   - 输入图片支持相对路径和绝对路径
+   - 路径不存在时给出明确报错
+
+## 运行示例
+
+```powershell
+$env:RANDOM_FILTER_SEED=42
+$env:RANDOM_FILTER_IMAGE="corgi.jpg"
+$env:RANDOM_FILTER_OUT_DIR="outputs"
+$env:RANDOM_FILTER_SHOW=0
+python .\tutorial_random_filter.py
+```
+
