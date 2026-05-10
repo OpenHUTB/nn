@@ -172,85 +172,39 @@ class GaussianMixtureModel:
         # 初始化协方差矩阵为单位矩阵
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
 
-        log_likelihood = -np.inf  # 初始化对数似然值为负无穷
+        log_likelihood = -np.inf
         
-        # EM算法主循环：交替执行E步(期望)和M步(最大化)
+        log_pi = np.log(self.pi)
+        
         for iter in range(self.max_iter):
-            # E步：计算后验概率（每个样本属于各个高斯成分的概率）
-            log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵
+            log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
+            log_prob += log_pi[np.newaxis, :]
             
-            # 对每个高斯成分，计算样本的对数概率密度
-            for k in range(self.n_components):
-                # 对数概率 = log(混合权重) + log(高斯概率密度)
-                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯混合成分的对数概率密度，并存储在log_prob的第k列
+            log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
             
-            # 使用logsumexp计算归一化因子，确保数值稳定性
-            log_prob_sum = logsumexp(log_prob, axis = 1, keepdims = True)
-            
-            # 计算后验概率（responsibility）：gamma_{ik} = P(z_i=k|x_i)
             gamma = np.exp(log_prob - log_prob_sum)
 
-            # M步：更新模型参数（基于后验概率）
-            Nk = np.sum(gamma, axis=0) # 每个高斯成分的"有效样本数"
+            Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
             
-            # 更新混合权重
-            # 计算类别先验概率（class prior），即每个类别在样本中的比例
-            # Nk: 当前类别k的样本数量
-            # n_samples: 总样本数量
-           # 结果self.pi表示类别k在总体中的出现频率，用于后续的概率计算
             self.pi = Nk / n_samples
+            log_pi = np.log(self.pi)
             
-            # 初始化新均值和新协方差矩阵
-            new_mu = np.zeros_like(self.mu)# 创建一个与 self.mu 形状相同且全为零的数组，作为新的均值向量
-            new_sigma = np.zeros_like(self.sigma)# 创建一个与 self.sigma 形状相同且全为零的数组，作为新的协方差矩阵
-
-            # 对每个高斯成分更新参数
-            for k in range(self.n_components):
-                # 更新均值：加权平均
-                new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
-
-                # 更新协方差矩阵
-                X_centered = X - new_mu[k]  # 中心化数据
-                weighted_X = gamma[:, k, None] * X_centered  # 加权中心化数据
-                
-                # 使用einsum高效计算协方差矩阵
-                # 等价于: new_sigma_k = (X_centered.T @ diag(gamma[:,k]) @ X_centered) / Nk[k]
-                # 更稳定的协方差计算方式
-                new_sigma_k = np.einsum('ki,kj->ij', gamma[:, k, None] * X_centered, X_centered) / Nk[k]
-
-                # 统一正则化处理，确保协方差矩阵正定
-                new_sigma_k += np.eye(n_features) * 1e-6
-                
-                new_sigma[k] = new_sigma_k  # 存储更新后的协方差矩阵
-
-            # 计算对数似然（模型对数据的拟合程度）
-            current_log_likelihood = np.sum(log_prob_sum)  # 所有样本的对数似然之和
-            self.log_likelihoods.append(current_log_likelihood)  # 记录当前对数似然
+            current_log_likelihood = np.sum(log_prob_sum)
+            self.log_likelihoods.append(current_log_likelihood)
             
-            # 检查收敛条件：如果对数似然变化小于阈值，则停止迭代
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
                 
-            log_likelihood = current_log_likelihood   # 更新记录的上一次迭代的对数似然值
+            log_likelihood = current_log_likelihood
             
-            # 更新模型参数
-
-            # 更新模型的均值参数（self.mu）为计算得到的新均值（new_mu）
-            # new_mu通常是通过优化算法（如EM算法、梯度下降）得到的当前最优估计值
             self.mu = new_mu
-            # 更新模型的协方差参数（self.sigma）为计算得到的新协方差（new_sigma）
-            # new_sigma需保证为正定矩阵，常见实现中会通过Cholesky分解等方法确保数值稳定性
             self.sigma = new_sigma
         
-        # 记录实际收敛所用的迭代次数（for 循环结束后 iter 保留最后一次值）
         self.n_iters_ = iter + 1
-        # 最终聚类结果：每个样本分配到概率最大的高斯成分
         self.labels_ = np.argmax(gamma, axis=1)
         
-        # 计算 AIC 和 BIC 准则
         self._compute_aic_bic(X)
         
-        # 基于软聚类结果确定最终的硬聚类标签
         return self
 
     def _compute_aic_bic(self, X):
@@ -380,6 +334,56 @@ class GaussianMixtureModel:
             inv = np.linalg.inv(sigma) #计算协方差矩阵的逆
             exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered) #计算指数部分（二次型）
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent #组合对数概率密度
+        
+    def _log_gaussian_batch(self, X, mu, sigma):
+        """向量化计算多个高斯成分的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 所有成分的均值，形状为(n_components, n_features)
+            sigma: 所有成分的协方差矩阵，形状为(n_components, n_features, n_features)
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        n_components = mu.shape[0]
+
+        log_prob = np.zeros((n_samples, n_components))
+        
+        for k in range(n_components):
+            log_prob[:, k] = self._log_gaussian(X, mu[k], sigma[k])
+        
+        return log_prob
+
+    def _compute_statistics_vectorized(self, X, gamma):
+        """向量化计算 M 步的统计量
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            gamma: 后验概率，形状为(n_samples, n_components)
+            
+        返回:
+            Nk: 每个成分的有效样本数，形状为(n_components,)
+            new_mu: 新均值，形状为(n_components, n_features)
+            new_sigma: 新协方差矩阵，形状为(n_components, n_features, n_features)
+        """
+        n_samples, n_features = X.shape
+        n_components = gamma.shape[1]
+        
+        Nk = np.sum(gamma, axis=0)
+        
+        gamma_X = gamma[:, :, np.newaxis] * X[:, np.newaxis, :]
+        new_mu = np.sum(gamma_X, axis=0) / Nk[:, np.newaxis]
+        
+        X_centered = X[:, np.newaxis, :] - new_mu[np.newaxis, :, :]
+        gamma_X_centered = gamma[:, :, np.newaxis] * X_centered
+        new_sigma = np.einsum('nki,nkj->kij', gamma_X_centered, X_centered) / Nk[:, np.newaxis, np.newaxis]
+        
+        regularization = np.eye(n_features) * 1e-6
+        new_sigma += regularization
+        
+        return Nk, new_mu, new_sigma
         
     def plot_convergence(self, save_path = None, show = True):
         """可视化对数似然的收敛过程"""
