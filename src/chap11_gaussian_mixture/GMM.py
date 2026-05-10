@@ -14,6 +14,8 @@ import csv
 from pathlib import Path
 #添加类型提示支持
 from typing import Tuple, List 
+# 导入多线程并行计算支持
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 生成混合高斯分布数据
 def generate_data(n_samples = 1000, random_state = 42):
@@ -132,13 +134,15 @@ class GaussianMixtureModel:
         max_iter: int, EM算法最大迭代次数 (默认=100)
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
+        n_jobs: int, 并行计算使用的线程数 (默认=1，即不并行；-1表示使用所有CPU核心)
     """
-    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, init = 'random'):
+    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, init = 'random', n_jobs = 1):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
         self.init = init                  # 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
+        self.n_jobs = n_jobs              # 并行线程数
         self.log_likelihoods = []         # 存储每轮迭代的对数似然值
         self.n_iters_ = 0                 # 实际收敛所用的迭代次数
         self.aic_ = None                  # AIC 值（训练后计算）
@@ -175,9 +179,15 @@ class GaussianMixtureModel:
         log_likelihood = -np.inf
         
         log_pi = np.log(self.pi)
+        log_likelihood = -np.inf
+        
+        log_pi = np.log(self.pi)
         
         for iter in range(self.max_iter):
-            log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
+            if self.n_jobs != 1:
+                log_prob = self._log_gaussian_parallel(X, self.mu, self.sigma)
+            else:
+                log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
             log_prob += log_pi[np.newaxis, :]
             
             log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
@@ -185,8 +195,13 @@ class GaussianMixtureModel:
             gamma = np.exp(log_prob - log_prob_sum)
 
             Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
+            Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
             
             self.pi = Nk / n_samples
+            log_pi = np.log(self.pi)
+            
+            current_log_likelihood = np.sum(log_prob_sum)
+            self.log_likelihoods.append(current_log_likelihood)
             log_pi = np.log(self.pi)
             
             current_log_likelihood = np.sum(log_prob_sum)
@@ -195,6 +210,7 @@ class GaussianMixtureModel:
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
                 
+            log_likelihood = current_log_likelihood
             log_likelihood = current_log_likelihood
             
             self.mu = new_mu
@@ -356,6 +372,35 @@ class GaussianMixtureModel:
         
         return log_prob
 
+    def _log_gaussian_parallel(self, X, mu, sigma):
+        """并行计算多个高斯成分的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 所有成分的均值，形状为(n_components, n_features)
+            sigma: 所有成分的协方差矩阵，形状为(n_components, n_features, n_features)
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        n_components = mu.shape[0]
+        n_jobs = self.n_jobs if self.n_jobs > 0 else min(n_components, 4)
+        
+        log_prob = np.zeros((n_samples, n_components))
+        
+        def compute_component(k):
+            return k, self._log_gaussian(X, mu[k], sigma[k])
+        
+        with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+            futures = [executor.submit(compute_component, k) for k in range(n_components)]
+            
+            for future in as_completed(futures):
+                k, result = future.result()
+                log_prob[:, k] = result
+        
+        return log_prob
+
     def _compute_statistics_vectorized(self, X, gamma):
         """向量化计算 M 步的统计量
         
@@ -433,7 +478,7 @@ def _cluster_accuracy(y_true, y_pred, n_classes):
 # ============================================================
 # 模型选择工具：基于 BIC 自动选择最佳成分数量
 # ============================================================
-def select_best_components(X, min_components=2, max_components=10, random_state=42):
+def select_best_components(X, min_components=2, max_components=10, random_state=42, n_jobs=1):
     """基于 BIC 准则自动选择 GMM 的最佳高斯成分数量
     
     参数:
@@ -441,6 +486,7 @@ def select_best_components(X, min_components=2, max_components=10, random_state=
         min_components: 最小成分数量（默认=2）
         max_components: 最大成分数量（默认=10）
         random_state: 随机种子
+        n_jobs: 并行计算线程数（默认=1）
     
     返回:
         best_gmm: 最佳成分数量的 GMM 模型
@@ -458,7 +504,8 @@ def select_best_components(X, min_components=2, max_components=10, random_state=
             max_iter=100,
             tol=1e-6,
             random_state=random_state,
-            init='kmeans++'
+            init='kmeans++',
+            n_jobs=n_jobs
         )
         gmm.fit(X)
         bic = gmm.bic()
@@ -495,6 +542,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-iter",     type=int,   default=100,     help="EM最大迭代次数")
     parser.add_argument("--tol",          type=float, default=1e-6,    help="收敛阈值")
     parser.add_argument("--n-trials",     type=int,   default=50,      help="对比实验重复次数")
+    parser.add_argument("--n-jobs",       type=int,   default=1,       help="并行计算线程数（-1表示使用所有CPU核心）")
     parser.add_argument("--out-dir",      type=str,   default="outputs", help="输出目录")
     parser.add_argument("--no-show",      action="store_true",         help="不弹出图像窗口，仅保存文件")
     args = parser.parse_args()
@@ -523,6 +571,7 @@ if __name__ == "__main__":
                 tol=args.tol,
                 random_state=seed,
                 init=init_method,
+                n_jobs=args.n_jobs,
             )
             gmm.fit(X)
             iters_list.append(gmm.n_iters_)
@@ -616,12 +665,12 @@ if __name__ == "__main__":
     # ============================================================
     gmm_rand = GaussianMixtureModel(
         n_components=args.n_components, max_iter=args.max_iter,
-        tol=args.tol, random_state=42, init='random')
+        tol=args.tol, random_state=42, init='random', n_jobs=args.n_jobs)
     gmm_rand.fit(X)
 
     gmm_kpp = GaussianMixtureModel(
         n_components=args.n_components, max_iter=args.max_iter,
-        tol=args.tol, random_state=42, init='kmeans++')
+        tol=args.tol, random_state=42, init='kmeans++', n_jobs=args.n_jobs)
     gmm_kpp.fit(X)
 
     acc_rand = _cluster_accuracy(y_true, gmm_rand.labels_, args.n_components)
@@ -692,7 +741,7 @@ if __name__ == "__main__":
     # 图4：BIC/AIC 模型选择曲线
     # ============================================================
     print("\n--- 基于 BIC 的模型选择 ---")
-    best_gmm, bic_results = select_best_components(X, min_components=2, max_components=8, random_state=42)
+    best_gmm, bic_results = select_best_components(X, min_components=2, max_components=8, random_state=42, n_jobs=args.n_jobs)
 
     n_components_list = [r['n_components'] for r in bic_results]
     bic_values = [r['bic'] for r in bic_results]
