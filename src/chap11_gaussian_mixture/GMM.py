@@ -173,55 +173,40 @@ class GaussianMixtureModel:
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
 
         log_likelihood = -np.inf  # 初始化对数似然值为负无穷
-        
+
         # EM算法主循环：交替执行E步(期望)和M步(最大化)
         for iter in range(self.max_iter):
-            # E步：计算后验概率（每个样本属于各个高斯成分的概率）
-            log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵
-            
-            # 对每个高斯成分，计算样本的对数概率密度
-            for k in range(self.n_components):
-                # 对数概率 = log(混合权重) + log(高斯概率密度)
-                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯混合成分的对数概率密度，并存储在log_prob的第k列
-            
+            # E步（向量化）：计算所有样本在所有成分下的对数概率密度
+            log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
+            log_prob += np.log(self.pi)[np.newaxis, :]
+
             # 使用logsumexp计算归一化因子，确保数值稳定性
-            log_prob_sum = logsumexp(log_prob, axis = 1, keepdims = True)
-            
+            log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
+
             # 计算后验概率（responsibility）：gamma_{ik} = P(z_i=k|x_i)
             gamma = np.exp(log_prob - log_prob_sum)
 
-            # M步：更新模型参数（基于后验概率）
-            Nk = np.sum(gamma, axis=0) # 每个高斯成分的"有效样本数"
-            
+            # M步（向量化）：更新模型参数
+            Nk = np.sum(gamma, axis=0)
+
             # 更新混合权重
-            # 计算类别先验概率（class prior），即每个类别在样本中的比例
-            # Nk: 当前类别k的样本数量
-            # n_samples: 总样本数量
-           # 结果self.pi表示类别k在总体中的出现频率，用于后续的概率计算
             self.pi = Nk / n_samples
-            
-            # 初始化新均值和新协方差矩阵
-            new_mu = np.zeros_like(self.mu)# 创建一个与 self.mu 形状相同且全为零的数组，作为新的均值向量
-            new_sigma = np.zeros_like(self.sigma)# 创建一个与 self.sigma 形状相同且全为零的数组，作为新的协方差矩阵
 
-            # 对每个高斯成分更新参数
-            for k in range(self.n_components):
-                # 更新均值：加权平均
-                new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
+            # 向量化更新均值：new_mu[k] = sum(gamma[:,k] * X) / Nk[k]
+            gamma_X = gamma.T @ X  # (n_components, n_features)
+            new_mu = gamma_X / Nk[:, np.newaxis]
 
-                # 更新协方差矩阵
-                X_centered = X - new_mu[k]  # 中心化数据
-                weighted_X = gamma[:, k, None] * X_centered  # 加权中心化数据
-                
-                # 使用einsum高效计算协方差矩阵
-                # 等价于: new_sigma_k = (X_centered.T @ diag(gamma[:,k]) @ X_centered) / Nk[k]
-                # 更稳定的协方差计算方式
-                new_sigma_k = np.einsum('ki,kj->ij', gamma[:, k, None] * X_centered, X_centered) / Nk[k]
+            # 向量化中心化并更新协方差矩阵
+            X_centered = X[np.newaxis, :, :] - new_mu[:, np.newaxis, :]  # (n_components, n_samples, n_features)
+            gamma_T = gamma.T[:, :, np.newaxis]  # (n_components, n_samples, 1)
+            gamma_X_centered = gamma_T * X_centered  # (n_components, n_samples, n_features)
 
-                # 统一正则化处理，确保协方差矩阵正定
-                new_sigma_k += np.eye(n_features) * 1e-6
-                
-                new_sigma[k] = new_sigma_k  # 存储更新后的协方差矩阵
+            # 使用批量矩阵乘法计算协方差矩阵
+            # gamma_X_centered[k].T @ X_centered[k] 得到 (n_features, n_features)
+            new_sigma = np.array([gamma_X_centered[k].T @ X_centered[k] for k in range(self.n_components)]) / Nk[:, np.newaxis, np.newaxis]
+
+            # 统一正则化处理，确保协方差矩阵正定
+            new_sigma += np.eye(n_features) * 1e-6
 
             # 计算对数似然（模型对数据的拟合程度）
             current_log_likelihood = np.sum(log_prob_sum)  # 所有样本的对数似然之和
@@ -334,52 +319,66 @@ class GaussianMixtureModel:
         return np.array(centers)
 
     def _log_gaussian(self, X, mu, sigma):
-        """计算多维高斯分布的对数概率密度
-        
+        """计算多维高斯分布的对数概率密度（单个成分）
+
         参数:
             X: 输入数据点/样本集，形状为(n_samples, n_features)
             mu: 高斯分布的均值向量，形状为(n_features,)
             sigma: 高斯分布的协方差矩阵，形状为(n_features, n_features)
-            
-        返回:
-            log_prob: 每个样本的对数概率密度，形状为(n_samples,)
+
+            返回:
+                log_prob: 每个样本的对数概率密度，形状为(n_samples,)
         """
-        # 获取特征维度数（协方差矩阵的维度）
         n_features = mu.shape[0]
+        X_centered = X - mu
+        sign, logdet = np.linalg.slogdet(sigma)
 
-        # 数据归一化：将数据减去均值，得到中心化数据
-        # 高斯分布公式中的(x-μ)项
-        X_centered = X - mu  # 形状保持(n_samples, n_features)
-
-        # 计算协方差矩阵的行列式符号和对数值
-        # sign: 行列式的符号（正负）
-        # logdet: 行列式的自然对数值
-        sign, logdet = np.linalg.slogdet(sigma)  # 数值稳定的行列式计算方法
-
-        # 处理协方差矩阵可能奇异（不可逆）的情况
-        if sign <= 0:  # 行列式非正（理论上协方差矩阵应是正定的）
-            # 添加一个小的对角扰动项（单位矩阵乘以1e-6）
-            # 确保矩阵可逆且正定，提高数值稳定性
-            sigma += np.eye(n_features) * 1e-6  # 正则化处理
-            
-            # 重新计算调整后的协方差矩阵的行列式
+        if sign <= 0:
+            sigma += np.eye(n_features) * 1e-6
             sign, logdet = np.linalg.slogdet(sigma)
-
-            # 使用solve方法计算逆矩阵，更稳定高效
             inv = np.linalg.solve(sigma, np.eye(n_features))
-            
-            # 计算二次型：(x-μ)^T·Σ^(-1)·(x-μ)
-            # 使用einsum高效计算多个样本的二次型
             exponent = -0.5 * np.sum(X_centered @ inv * X_centered, axis=1)
-
-            # 返回对数概率密度
-            # 公式：log_p(x) = -0.5*D*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^T·Σ^(-1)·(x-μ)
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
         else:
-            # 处理非奇异协方差矩阵
-            inv = np.linalg.inv(sigma) #计算协方差矩阵的逆
-            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered) #计算指数部分（二次型）
-            return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent #组合对数概率密度
+            inv = np.linalg.inv(sigma)
+            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
+            return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
+
+    def _log_gaussian_batch(self, X, mu, sigma):
+        """向量化计算多个高斯成分的对数概率密度
+
+        参数:
+            X: 输入数据点，形状为(n_samples, n_features)
+            mu: 所有高斯成分的均值，形状为(n_components, n_features)
+            sigma: 所有高斯成分的协方差矩阵，形状为(n_components, n_features, n_features)
+
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        n_components = mu.shape[0]
+
+        X_expanded = X[:, np.newaxis, :]
+        mu_expanded = mu[np.newaxis, :, :]
+        X_centered = X_expanded - mu_expanded
+
+        sign, logdet = np.linalg.slogdet(sigma)
+        valid = sign > 0
+        sigma_inv = np.zeros_like(sigma)
+        for k in range(n_components):
+            if valid[k]:
+                sigma_inv[k] = np.linalg.inv(sigma[k])
+            else:
+                sigma[k] += np.eye(n_features) * 1e-6
+                sign[k], logdet[k] = np.linalg.slogdet(sigma[k])
+                sigma_inv[k] = np.linalg.inv(sigma[k])
+
+        exponents = -0.5 * np.einsum('nki,kij,nkj->nk', X_centered, sigma_inv, X_centered)
+
+        constant = -0.5 * n_features * np.log(2 * np.pi)
+        log_prob = constant - 0.5 * logdet + exponents
+
+        return log_prob #组合对数概率密度
         
     def plot_convergence(self, save_path = None, show = True):
         """可视化对数似然的收敛过程"""

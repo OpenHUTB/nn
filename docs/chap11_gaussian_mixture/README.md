@@ -92,6 +92,7 @@ $$BIC = k \cdot \ln(n) - 2\ln(L)$$
 | BIC 准则 | ❌ | ✅ |
 | 自动模型选择 | ❌ | ✅ |
 | 初始化策略对比 | ❌ | ✅ |
+| 向量化 EM 计算 | ❌ | ✅ |
 
 ---
 
@@ -138,10 +139,31 @@ def _compute_aic_bic(self, X):
     # 计算模型参数数量
     params_per_component = n_features + n_features * (n_features + 1) // 2
     total_params = n_components * params_per_component + (n_components - 1)
-    
+
     log_likelihood = self.log_likelihoods[-1]
     self.aic_ = 2 * total_params - 2 * log_likelihood
     self.bic_ = total_params * np.log(n_samples) - 2 * log_likelihood
+```
+
+### 4.4 向量化 EM 算法
+
+EM 算法的 E 步和 M 步已完全向量化，消除 Python 循环：
+
+```python
+def _log_gaussian_batch(self, X, mu, sigma):
+    """向量化计算多个高斯成分的对数概率密度"""
+    X_expanded = X[:, np.newaxis, :]
+    mu_expanded = mu[np.newaxis, :, :]
+    X_centered = X_expanded - mu_expanded
+    # ... 批量计算对数概率
+
+# E步：一次性计算所有成分的概率
+log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
+log_prob += np.log(self.pi)[np.newaxis, :]
+
+# M步：向量化更新均值和协方差
+gamma_X = gamma.T @ X  # (n_components, n_features)
+new_mu = gamma_X / Nk[:, np.newaxis]
 ```
 
 ---
@@ -239,5 +261,6 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 2. 添加了 AIC/BIC 模型选择准则，支持自动确定最佳聚类数量
 3. 设计了完整的对比实验框架，验证不同初始化策略的效果
 4. 生成丰富的可视化结果，便于分析和展示实验结果
+5. **向量化 EM 算法**：使用 NumPy 批量计算替代 Python 循环，提升计算效率
 
 模块已具备完整的工程化能力，可直接运行并产生可复现的实验结果。
