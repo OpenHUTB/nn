@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use('TkAgg')  # Use TkAgg backend for real-time plotting
 import matplotlib.pyplot as plt
 from utils.logger import logger
+from utils.piloterror import PilotError
 
 # Custom callback for real-time loss visualization
 class RealTimeLossPlot(Callback):
@@ -205,23 +206,23 @@ class PilotNet():
             shuffle=True
         )
         
-        # test the model by fitting the test data
+        # 在测试数据上评估模型
         logger.info('Evaluating model on test data')
         x_test = np.array([frame.image for frame in testing_frames])
         y_test = np.array([(frame.steering, frame.throttle, frame.brake) for frame in testing_frames])
         stats = self.model.evaluate(x_test, y_test, verbose=2)
         
-        # print the stats
-        print(f'\nModel Evaluation Results:')
-        print(f'  - Total Loss: {stats[0]:.6f}')
-        print(f'  - Steering Angle Loss: {stats[1]:.6f}')
-        print(f'  - Throttle Pressure Loss: {stats[2]:.6f}')
-        print(f'  - Brake Pressure Loss: {stats[3]:.6f}')
+        # 打印评估结果
+        print(f'\n模型评估结果：')
+        print(f'  - 总损失: {stats[0]:.6f}')
+        print(f'  - 转向角度损失: {stats[1]:.6f}')
+        print(f'  - 油门压力损失: {stats[2]:.6f}')
+        print(f'  - 刹车压力损失: {stats[3]:.6f}')
         logger.info(f'Training completed - loss: {stats[0]}, steering_loss: {stats[1]}, throttle_loss: {stats[2]}, brake_loss: {stats[3]}')
         
-        input('\nPress [ENTER] to continue...')
+        input('\n按 [ENTER] 继续...')
         
-        # save the trained model
+        # 保存训练好的模型
         self.model.save(f"models/{name}.h5")
         logger.info(f'Model saved to: models/{name}.h5')
         
@@ -229,15 +230,40 @@ class PilotNet():
     
     # this method can be used for enabling the feature mentioned in app.py but needs more work
     def predict(self, data, given_model = 'default'):
+        import os
         logger.info(f'Starting prediction with model: {given_model}')
         if given_model != 'default':
             try:
-                # load the model
-                model = keras.models.load_model(f'models/{given_model}', custom_objects = {"tf": tf})
-                logger.info(f'Model loaded successfully: {given_model}')
+                # Try to load model from multiple possible paths
+                model_path_h5 = f'models/{given_model}.h5'
+                model_path_no_ext = f'models/{given_model}'
+                
+                # Check all possible paths
+                possible_paths = [model_path_h5, model_path_no_ext]
+                found_path = None
+                
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        found_path = path
+                        break
+                
+                if found_path is None:
+                    # List available model files for debugging
+                    available_models = []
+                    if os.path.exists('models/'):
+                        with os.scandir('models/') as entries:
+                            for entry in entries:
+                                if entry.is_file():
+                                    available_models.append(entry.name)
+                    raise FileNotFoundError(f"Model file not found. Available models: {available_models}")
+                
+                # Try to load the model
+                model = keras.models.load_model(found_path, custom_objects={"tf": tf})
+                logger.info(f'Model loaded successfully from: {found_path}')
+                
             except Exception as e:
                 logger.error(f'Failed to load model {given_model}: {e}')
-                raise PilotError('An unexpected error occured when loading the saved model. Please rerun...')
+                raise PilotError(f'An unexpected error occured when loading the saved model: {e}')
         else: 
             model = self.model
             logger.info('Using current model for prediction')

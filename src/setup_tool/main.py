@@ -105,6 +105,12 @@ def parse_args():
         default="normal",
         help="Set demo speed: fast, normal, or slow",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["basic", "full"],
+        default="full",
+        help="Set demo mode: basic or full",
+    )
     return parser.parse_args()
 
 
@@ -126,11 +132,12 @@ def main():
    print("  This is a demonstration of the progress display features.")
    print("  No actual downloads or installations will be performed.")
    print(f"  Demo speed: {args.speed}")
+   print(f"  Demo mode: {args.mode}")
    print("=" * 80)
    print()
 
 
-   steps = [
+   full_steps = [
         {
             "description": "Checking hutb_downloader.exe",
             "actions": [
@@ -217,6 +224,19 @@ def main():
             ],
         },
     ]
+   
+   basic_steps = [
+        full_steps[0],
+        full_steps[2],
+        full_steps[6],
+        full_steps[8],
+        full_steps[10],
+    ]
+   
+   if args.mode == "basic":
+        steps = basic_steps
+   else:
+        steps = full_steps
 
    demo = ProgressDemo(total_steps=len(steps))
 

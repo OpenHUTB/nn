@@ -584,6 +584,9 @@ class IntegratedDroneSimulation:
             "Q/ESC: Exit",
             "C: Switch Camera",
             "I: Mirror On/Off",
+            "P: Record Trajectory",
+            "O: Save Recording",
+            "J: Replay Trajectory",
             "D: Debug Info",
             "H: Help",
             "F: Fullscreen",
@@ -614,6 +617,20 @@ class IntegratedDroneSimulation:
         cv2.putText(enhanced_frame, mirror_text,
                     (width + 20, height - 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, mirror_color, 1)
+
+        # 显示录制/回放状态
+        if self.drone_controller.is_recording:
+            record_count = len(self.drone_controller.recorded_trajectory)
+            cv2.putText(enhanced_frame, f"REC: {record_count} pts",
+                        (width + 150, height - 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+        elif self.drone_controller.is_replaying:
+            replay_progress = self.drone_controller.replay_index
+            replay_total = len(self.drone_controller.replay_trajectory)
+            speed = self.drone_controller.replay_speed
+            cv2.putText(enhanced_frame, f"REPLAY: {replay_progress}/{replay_total} @{speed}x",
+                        (width + 150, height - 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
 
         return enhanced_frame
 
@@ -666,6 +683,10 @@ class IntegratedDroneSimulation:
         print("  Q/ESC - 退出")
         print("  C - 切换摄像头")
         print("  I - 切换镜像模式")
+        print("  P - 开始录制轨迹")
+        print("  O - 停止录制并保存")
+        print("  J - 加载并回放轨迹")
+        print("  +/- - 调整回放速度")
         print("  D - 显示调试信息")
         print("  H - 显示帮助")
         print("  F - 切换全屏")
@@ -967,6 +988,9 @@ class IntegratedDroneSimulation:
         print("           按 'T' 键手动起飞")
         print("           按 'L' 键手动降落")
         print("           按 'H' 键悬停")
+        print("           按 'P' 键开始录制轨迹")
+        print("           按 'O' 键停止录制并保存")
+        print("           按 'J' 键加载并回放轨迹")
 
         # 按键防抖记录
         self._last_key_press = {}
@@ -1039,6 +1063,59 @@ class IntegratedDroneSimulation:
                     self.drone_controller.send_command("stop")
                     self._last_key_press['s'] = current_time
 
+            # ========== 轨迹录制/回放控制 ==========
+            # 检查录制键 P
+            if keys[pygame.K_p]:
+                if ('p' not in self._last_key_press or
+                        current_time - self._last_key_press['p'] > 1.0):
+                    if not self.drone_controller.is_replaying:
+                        self.drone_controller.start_recording()
+                    self._last_key_press['p'] = current_time
+
+            # 检查停止录制键 O
+            if keys[pygame.K_o]:
+                if ('o' not in self._last_key_press or
+                        current_time - self._last_key_press['o'] > 1.0):
+                    if self.drone_controller.is_recording:
+                        self.drone_controller.stop_recording()
+                        self.drone_controller.save_trajectory_to_file()
+                    self._last_key_press['o'] = current_time
+
+            # 检查回放键 J
+            if keys[pygame.K_j]:
+                if ('j' not in self._last_key_press or
+                        current_time - self._last_key_press['j'] > 1.0):
+                    if not self.drone_controller.is_recording:
+                        saved_files = self.drone_controller.list_saved_trajectories()
+                        if saved_files:
+                            print("\n已保存的轨迹文件：")
+                            for i, f in enumerate(saved_files[:5]):
+                                print(f"  {i + 1}. {f}")
+                            print(f"\n最新轨迹: {saved_files[0]}")
+                            # 自动加载最新的轨迹并回放
+                            loaded = self.drone_controller.load_trajectory_from_file(saved_files[0])
+                            if loaded:
+                                self.drone_controller.start_replay(speed=1.0)
+                        else:
+                            print("[INFO] 没有找到已保存的轨迹文件")
+                            print("   请先录制轨迹（按P开始录制，按O停止并保存）")
+                    self._last_key_press['j'] = current_time
+
+            # 检查回放速度调整
+            if self.drone_controller.is_replaying:
+                if keys[pygame.K_EQUALS] or keys[pygame.K_PLUS]:
+                    if ('=' not in self._last_key_press or
+                            current_time - self._last_key_press['='] > 0.3):
+                        self.drone_controller.replay_speed = min(5.0, self.drone_controller.replay_speed + 0.5)
+                        print(f"[INFO] 回放速度: {self.drone_controller.replay_speed}x")
+                        self._last_key_press['='] = current_time
+                if keys[pygame.K_MINUS]:
+                    if ('-' not in self._last_key_press or
+                            current_time - self._last_key_press['-'] > 0.3):
+                        self.drone_controller.replay_speed = max(0.1, self.drone_controller.replay_speed - 0.5)
+                        print(f"[INFO] 回放速度: {self.drone_controller.replay_speed}x")
+                        self._last_key_press['-'] = current_time
+
             if not self.viewer.handle_events():
                 self.running = False
                 break
@@ -1047,7 +1124,19 @@ class IntegratedDroneSimulation:
                 break
 
             drone_state = self.drone_controller.get_state()
-            self.drone_controller.update_physics(dt)
+
+            # 处理轨迹回放
+            if self.drone_controller.is_replaying:
+                replay_result = self.drone_controller.update_replay()
+                if replay_result:
+                    position, mode = replay_result
+                    self.drone_controller.state['position'] = position
+                    self.drone_controller.state['mode'] = mode
+                elif replay_result is None and not self.drone_controller.is_replaying:
+                    # 回放结束，停止更新物理
+                    self.drone_controller.update_physics(dt)
+            else:
+                self.drone_controller.update_physics(dt)
 
             if self.physics_engine and self.drone_controller.state['armed']:
                 control_input = self._get_control_input_from_state(drone_state)
@@ -1196,6 +1285,11 @@ class IntegratedDroneSimulation:
         print("    ↑↓←→ - 旋转视角")
         print("    +/- - 缩放视角")
         print("    空格 - 重置视角")
+        print("  轨迹录制回放:")
+        print("    P - 开始录制轨迹")
+        print("    O - 停止录制并保存")
+        print("    J - 加载并回放轨迹")
+        print("    +/- - 调整回放速度")
         print("=" * 60)
         print("提示:")
         print("  1. 无人机初始在地面，等待手势指令")

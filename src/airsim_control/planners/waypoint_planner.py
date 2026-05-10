@@ -14,8 +14,10 @@ class Waypoint:
     y: float
     z: float          # 目标高度（向上为正）
     is_landing: bool = False      # 是否触发降落
-    descend_speed: float = 0.5   # 下降速度 m/s
-    hover_time: float = 2.0      # 悬停时间 s（减速段）
+    descend_speed: float = 1.0   # 下降速度 m/s
+    hover_time: float = 3.0      # 悬停时间 s（减速段）
+    is_return_home: bool = False  # 降落后是否返回初始点
+    fly_speed: float = 1.0        # 飞向该航点时的最大速度 m/s
 
     def pos(self):
         return np.array([self.x, self.y, self.z])
@@ -34,11 +36,11 @@ class WaypointPlanner:
         self.current_idx = 0
         self.reached_history = []
 
-    def add_waypoint(self, x, y, z, is_landing=False, descend_speed=0.5, hover_time=2.0):
-        self.waypoints.append(Waypoint(x, y, z, is_landing, descend_speed, hover_time))
+    def add_waypoint(self, x, y, z, is_landing=False, descend_speed=1.0, hover_time=3.0, is_return_home=False, fly_speed=1.0):
+        self.waypoints.append(Waypoint(x, y, z, is_landing, descend_speed, hover_time, is_return_home, fly_speed))
 
     def get_current_target(self):
-        if not self.waypoints:
+        if not self.waypoints or self.current_idx >= len(self.waypoints):
             return None
         return self.waypoints[self.current_idx].pos()
 
@@ -144,7 +146,7 @@ class WaypointNavigator:
             if normal_wps:
                 nx, ny, nz = zip(*normal_wps)
                 self.ax.scatter(nx, ny, nz, c='#4cc9f0', s=200, marker='^',
-                              edgecolors='white', linewidths=1.2, zorder=5)
+                              edgecolors='white', linewidths=1.2, zorder=5, label='普通航点')
                 for i, (wx, wy, wz) in enumerate(normal_wps):
                     self.ax.text(wx + 0.3, wy + 0.3, wz + 0.3,
                                f'WP{i+1}', color='#4cc9f0', fontsize=9, fontweight='bold')
@@ -153,7 +155,7 @@ class WaypointNavigator:
             landing_wps = [(w.x, w.y, w.z, i) for i, w in enumerate(waypoints) if w.is_landing]
             for wx, wy, wz, idx in landing_wps:
                 self.ax.scatter([wx], [wy], [wz], c='#f72585', s=300, marker='v',
-                              edgecolors='yellow', linewidths=2, zorder=6)
+                              edgecolors='yellow', linewidths=2, zorder=6, label='降落航点')
                 self.ax.text(wx + 0.3, wy + 0.3, wz + 0.3,
                            f'降落\nWP{idx+1}', color='#f72585', fontsize=9, fontweight='bold')
 
@@ -203,8 +205,17 @@ class WaypointNavigator:
                          fontweight='bold', pad=20)
 
         # 图例
-        self.ax.legend(loc='upper left', fontsize=10, facecolor='#1a1a2e',
-                      edgecolor='#495057', labelcolor='white')
+        handles, labels = self.ax.get_legend_handles_labels()
+        # 只保留有标签的元素
+        valid_handles = []
+        valid_labels = []
+        for h, l in zip(handles, labels):
+            if l:  # 只保留有标签的元素
+                valid_handles.append(h)
+                valid_labels.append(l)
+        if valid_handles:  # 只有在有有效元素时才创建图例
+            self.ax.legend(handles=valid_handles, labels=valid_labels, loc='upper left', fontsize=10, facecolor='#1a1a2e',
+                         edgecolor='#495057', labelcolor='white')
 
         # 网格
         self.ax.xaxis.pane.fill = False

@@ -1,40 +1,51 @@
 import carla
-from min_carla_env.env import CarlaEnv
+import time
+from min_carla_env.env import CarlaEnv, CONFIG
 
-# 1. 初始化CARLA客户端
-client = carla.Client('localhost', 2000)  # 默认端口2000，根据你的CARLA服务调整
-client.set_timeout(10.0)
 
-# 2. 配置参数（对应CONFIG字典）
-config = {
-    "width": 480,
-    "height": 480,
-    "max_step": 90000,
-    "render": False  # 不渲染（对应你想要的show=False）
-}
+def test_carla_env():
+    # 1. 连接Carla客户端
+    client = carla.Client('localhost', 2000)
+    client.set_timeout(30.0)
 
-# 3. world配置（对应MatrixWorld的参数）
-world_config = {
-    "fast": True,     # 快速模式
-    "town": "Town02"  # 可选，指定地图
-}
+    # 2. 初始化环境
+    try:
+        env = CarlaEnv(client, CONFIG, world_config={
+            "render": True,
+            "fast": True,
+            "town": "Town02"
+        }, debug=True)
+        print("环境初始化成功")
 
-# 4. 初始化CarlaEnv
-env = CarlaEnv(
-    client=client,    # 必须传client
-    config=config,    # 渲染/分辨率等配置
-    world_config=world_config,  # 快速模式/地图等配置
-    debug=False,      # 可选：是否输出调试图片
-    demo=False        # 可选：是否演示模式
-)
+        # 3. 测试reset
+        obs = env.reset()
+        print(f"Reset成功，观测维度: {obs.shape if obs is not None else 'None'}")
 
-# 测试环境重置和步进
-obs = env.reset()
-print(f"重置后观测形状: {obs.shape}")
+        # 4. 测试step（执行100步）
+        total_reward = 0
+        for step in range(100):
+            action = 0  # 直行
+            obs, reward, done, info = env.step(action)
+            total_reward += reward
+            print(f"Step {step + 1}: 奖励={reward:.2f}, 累计奖励={total_reward:.2f}, Done={done}")
+            time.sleep(0.1)
+            if done:
+                print("提前结束，重置环境")
+                env.reset()
 
-# 测试执行动作（0=直行，1=左转，2=右转）
-obs, reward, done, info = env.step(0)
-print(f"动作执行后 - 奖励: {reward}, 是否结束: {done}")
+        # 5. 测试地图切换
+        env.mw.change_map("Town07")
+        print("地图切换到Town07成功")
+        env.reset()
 
-# 清理环境
-env.mw.clean_world()
+    except Exception as e:
+        print(f"测试失败: {e}")
+    finally:
+        # 6. 关闭环境
+        if 'env' in locals():
+            env.close()
+        print("环境已关闭")
+
+
+if __name__ == "__main__":
+    test_carla_env()
