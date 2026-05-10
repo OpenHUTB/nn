@@ -129,6 +129,15 @@ class SimpleDrivingSystem:
         ]  # 车辆颜色列表
         self.current_color_index = 0  # 当前颜色索引
         self.screenshot_dir = 'screenshots'  # 截图保存目录
+        self.is_night_mode = False  # 夜晚模式标志
+        self.vehicle_models = [  # 车辆款式列表
+            'vehicle.tesla.model3',      # 特斯拉 Model3
+            'vehicle.chevrolet.impala',  # 雪佛兰 Impala
+            'vehicle.ford.mustang',      # 福特 Mustang
+            'vehicle.mercedes.coupe',    # 奔驰 Coupe
+            'vehicle.nissan.patrol',     # 日产 Patrol
+        ]  # 车辆款式列表
+        self.current_model_index = 0  # 当前车辆款式索引
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -396,6 +405,40 @@ class SimpleDrivingSystem:
         except Exception as e:
             print(f"切换天气时出错: {e}")
 
+    def toggle_night_mode(self):
+        """切换夜晚模式并自动打开/关闭近光灯"""
+        try:
+            self.is_night_mode = not self.is_night_mode
+            
+            if self.is_night_mode:
+                # 切换到夜晚模式
+                night_weather = carla.WeatherParameters(
+                    cloudiness=80.0,
+                    precipitation=0.0,
+                    sun_altitude_angle=-30.0,  # 负角度表示夜晚
+                    fog_density=30.0,
+                    fog_distance=50.0
+                )
+                self.world.set_weather(night_weather)
+                
+                # 打开近光灯
+                if self.vehicle:
+                    self.vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.LowBeam))
+                
+                print("已切换到夜晚模式，近光灯已打开")
+            else:
+                # 切换回白天模式（使用当前天气）
+                self.set_weather(self.current_weather)
+                
+                # 关闭近光灯
+                if self.vehicle:
+                    self.vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.NONE))
+                
+                print("已切换到白天模式，近光灯已关闭")
+                
+        except Exception as e:
+            print(f"切换夜晚模式时出错: {e}")
+
     def switch_color(self):
         """切换车辆颜色"""
         try:
@@ -470,6 +513,84 @@ class SimpleDrivingSystem:
             # 重置颜色索引
             self.current_color_index = (self.current_color_index - 1) % len(self.car_colors)
             # 尝试恢复车辆
+            if not self.vehicle:
+                self.spawn_vehicle()
+
+    def switch_vehicle_model(self):
+        """切换车辆款式"""
+        try:
+            if self.vehicle:
+                transform = self.vehicle.get_transform()
+                
+                # 停止所有相机
+                for view_mode, camera in self.cameras.items():
+                    if camera:
+                        try:
+                            camera.stop()
+                            camera.destroy()
+                        except:
+                            pass
+                self.cameras.clear()
+                
+                # 销毁当前车辆
+                self.vehicle.destroy()
+                self.vehicle = None
+                
+                # 切换到下一个车辆款式
+                self.current_model_index = (self.current_model_index + 1) % len(self.vehicle_models)
+                next_model = self.vehicle_models[self.current_model_index]
+                
+                # 获取蓝图库
+                blueprint_library = self.world.get_blueprint_library()
+                vehicle_bp = blueprint_library.find(next_model)
+                
+                # 如果找不到指定车型，随机选择一个
+                if not vehicle_bp:
+                    all_vehicles = blueprint_library.filter('vehicle.*')
+                    if all_vehicles:
+                        vehicle_bp = random.choice(list(all_vehicles))
+                        print(f"未找到 {next_model}，使用随机车辆: {vehicle_bp.id}")
+                
+                if vehicle_bp:
+                    # 设置当前颜色
+                    color = self.car_colors[self.current_color_index]
+                    vehicle_bp.set_attribute('color', f'{color[0]},{color[1]},{color[2]}')
+                    
+                    # 尝试在相同位置生成新车辆
+                    self.vehicle = self.world.try_spawn_actor(vehicle_bp, transform)
+                    
+                    # 如果失败，尝试使用出生点
+                    if not self.vehicle:
+                        spawn_points = self.world.get_map().get_spawn_points()
+                        for spawn_point in spawn_points[:5]:
+                            self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
+                            if self.vehicle:
+                                print("车辆已移动到新位置")
+                                break
+                    
+                    if self.vehicle:
+                        # 禁用自动驾驶
+                        self.vehicle.set_autopilot(False)
+                        
+                        # 重新设置相机
+                        self.setup_camera()
+                        
+                        # 重新设置控制器
+                        self.setup_controller()
+                        
+                        print(f"车辆款式已切换: {next_model.split('.')[-1]}")
+                    else:
+                        print("无法生成新车辆，款式切换失败")
+                        self.current_model_index = (self.current_model_index - 1) % len(self.vehicle_models)
+                        self.spawn_vehicle()
+                else:
+                    print("无法获取车辆蓝图")
+                    self.spawn_vehicle()
+            else:
+                print("车辆不存在，无法切换款式")
+        except Exception as e:
+            print(f"切换车辆款式时出错: {e}")
+            self.current_model_index = (self.current_model_index - 1) % len(self.vehicle_models)
             if not self.vehicle:
                 self.spawn_vehicle()
 
@@ -569,6 +690,8 @@ class SimpleDrivingSystem:
         print("  w - 切换天气（晴天/雨天/多云/湿滑）")
         print("  c - 切换车辆颜色")
         print("  p - 保存当前画面截图")
+        print("  l - 切换夜晚模式（自动打开/关闭近光灯）")
+        print("  u - 切换车辆款式")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -640,6 +763,13 @@ class SimpleDrivingSystem:
                     cv2.putText(display_img, f"Color: {current_color_name}",
                                 (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (0, 128, 255), 2)  # 橙色显示
+                    
+                    # 显示当前车辆款式
+                    current_model = self.vehicle_models[self.current_model_index]
+                    model_name = current_model.split('.')[-1]
+                    cv2.putText(display_img, f"Model: {model_name}",
+                                (20, 400), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (128, 255, 0), 2)  # 亮绿色显示
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
@@ -684,6 +814,12 @@ class SimpleDrivingSystem:
                         self.take_screenshot(self.camera_image)
                     else:
                         print("当前没有图像可保存")
+                elif key == ord('l') or key == ord('L'):
+                    # 切换夜晚模式（支持大小写）
+                    self.toggle_night_mode()
+                elif key == ord('u') or key == ord('U'):
+                    # 切换车辆款式（支持大小写）
+                    self.switch_vehicle_model()
 
                 frame_count += 1
 

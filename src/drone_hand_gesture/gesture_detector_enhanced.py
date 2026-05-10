@@ -3,7 +3,7 @@ import os
 import numpy as np
 import time
 
-# å°è¯•å¯¼å…¥ MediaPipeï¼ˆå¯é€‰ï¼‰
+# ³¢ÊÔµ¼Èë MediaPipe£¨¿ÉÑ¡£©
 try:
     import mediapipe as mp
     HAS_MEDIAPIPE = True
@@ -12,83 +12,83 @@ except ImportError:
     mp = None
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+"    from PIL import Image, ImageDraw, ImageFont"
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
-    print("[WARNING] PILæœªå®‰è£…ï¼Œä¸­æ–‡æ˜¾ç¤ºä¸å¯ç”¨")
+    print("[WARNING] PILÎ´°²×°£¬ÖĞÎÄÏÔÊ¾²»¿ÉÓÃ")
 
 
 class EnhancedGestureDetector:
-    """å¢å¼ºç‰ˆæ‰‹åŠ¿æ£€æµ‹å™¨ï¼ˆæ”¯æŒæœºå™¨å­¦ä¹ æˆ–çº¯OpenCV + æ»‘åŠ¨æ‰‹åŠ¿ï¼‰"""
+    """ÔöÇ¿°æÊÖÊÆ¼ì²âÆ÷£¨Ö§³Ö»úÆ÷Ñ§Ï°»ò´¿OpenCV + »¬¶¯ÊÖÊÆ£©"""
 
-    def __init__(self, ml_model_path=None, use_ml=True):
+"    def __init__(self, ml_model_path=None, use_ml=True):"
         self.use_ml = use_ml and HAS_MEDIAPIPE
         self.ml_classifier = None
         
         if HAS_MEDIAPIPE:
-            # MediaPipe æ¨¡å¼
+            # MediaPipe Ä£Ê½
             try:
                 self.mp_hands = mp.solutions.hands
                 self.mp_drawing = mp.solutions.drawing_utils
                 self.mp_drawing_styles = mp.solutions.drawing_styles
                 
                 self.hands = self.mp_hands.Hands(
-                    static_image_mode=False,
-                    max_num_hands=2,  # æ”¯æŒåŒæ‰‹
-                    min_detection_confidence=0.5,
+"                    static_image_mode=False,"
+"                    max_num_hands=1,"
+"                    min_detection_confidence=0.5,"
                     min_tracking_confidence=0.5
                 )
                 self.mode = "mediapipe"
-                print("[INFO] ä½¿ç”¨ MediaPipe æ‰‹åŠ¿æ£€æµ‹æ¨¡å¼ + æ»‘åŠ¨æ‰‹åŠ¿æ”¯æŒ")
+                print("[INFO] Ê¹ÓÃ MediaPipe ÊÖÊÆ¼ì²âÄ£Ê½")
             except Exception as e:
-                print(f"[WARNING] MediaPipe åˆå§‹åŒ–å¤±è´¥: {e}")
+                print(f"[WARNING] MediaPipe ³õÊ¼»¯Ê§°Ü: {e}")
                 self.mode = "opencv"
                 self.use_ml = False
                 self._init_opencv_detector()
         else:
-            # OpenCV æ¨¡å¼
+            # OpenCV Ä£Ê½
             self.mode = "opencv"
             self.use_ml = False
             self._init_opencv_detector()
-            print("[INFO] ä½¿ç”¨çº¯ OpenCV æ‰‹åŠ¿æ£€æµ‹æ¨¡å¼")
+            print("[INFO] Ê¹ÓÃ´¿ OpenCV ÊÖÊÆ¼ì²âÄ£Ê½")
 
-        # åŠ è½½æœºå™¨å­¦ä¹ æ¨¡å‹
+        # ¼ÓÔØ»úÆ÷Ñ§Ï°Ä£ĞÍ
         if self.use_ml and ml_model_path and os.path.exists(ml_model_path):
             try:
                 from gesture_classifier import GestureClassifier
                 self.ml_classifier = GestureClassifier(model_path=ml_model_path)
-                print(f"[INFO] æœºå™¨å­¦ä¹ æ¨¡å‹å·²åŠ è½½: {ml_model_path}")
+                print(f"[INFO] »úÆ÷Ñ§Ï°Ä£ĞÍÒÑ¼ÓÔØ: {ml_model_path}")
             except Exception as e:
-                print(f"[WARNING] åŠ è½½MLæ¨¡å‹å¤±è´¥: {e}")
+                print(f"[WARNING] ¼ÓÔØMLÄ£ĞÍÊ§°Ü: {e}")
                 self.use_ml = False
 
-        # æ‰‹åŠ¿å‘½ä»¤æ˜ å°„
+        # ÊÖÊÆÃüÁîÓ³Éä
         self.gesture_commands = {
-            "open_palm": "takeoff",
-            "closed_fist": "land",
-            "pointing_up": "up",
-            "pointing_down": "down",
-            "victory": "forward",
-            "thumb_up": "backward",
-            "thumb_down": "stop",
-            "ok_sign": "hover",
-            "hand_detected": "hover",
-            # æ»‘åŠ¨æ‰‹åŠ¿
-            "swipe_left": "left",
-            "swipe_right": "right",
-            "swipe_up": "forward",
-            "swipe_down": "backward",
+"            ""open_palm"": ""takeoff"","
+"            ""closed_fist"": ""land"","
+"            ""pointing_up"": ""up"","
+"            ""pointing_down"": ""down"","
+"            ""victory"": ""forward"","
+"            ""thumb_up"": ""backward"","
+"            ""thumb_down"": ""stop"","
+"            ""ok_sign"": ""hover"","
+"            ""hand_detected"": ""hover"","
+            # »¬¶¯ÊÖÊÆ
+"            ""swipe_left"": ""left"","
+"            ""swipe_right"": ""right"","
+"            ""swipe_up"": ""forward"","
+"            ""swipe_down"": ""backward"","
         }
 
-        # æ»‘åŠ¨æ‰‹åŠ¿ç›¸å…³
-        self.palm_history = {'left': [], 'right': []}
+        # »¬¶¯ÊÖÊÆÏà¹Ø
+"        self.palm_history = {'left': [], 'right': []}"
         self.max_history_length = 10
         self.swipe_commands = {
-            "swipe_left": "left",
-            "swipe_right": "right",
-            "swipe_up": "forward",
-            "swipe_down": "backward",
+"            ""swipe_left"": ""left"","
+"            ""swipe_right"": ""right"","
+"            ""swipe_up"": ""forward"","
+"            ""swipe_down"": ""backward"","
         }
         self.swipe_threshold = 0.15
         self.swipe_min_velocity = 0.3
@@ -97,99 +97,99 @@ class EnhancedGestureDetector:
         self.current_swipe = None
         self.swipe_intensity = 0.5
 
-        # å†å²è®°å½•
+        # ÀúÊ·¼ÇÂ¼
         self.prediction_history = []
         self.max_history = 5
         
-        # ä¸­æ–‡å­—ä½“
+        # ÖĞÎÄ×ÖÌå
         self.chinese_font = None
         if HAS_PIL:
             self._init_chinese_font()
 
     def _init_opencv_detector(self):
-        """åˆå§‹åŒ– OpenCV æ£€æµ‹å™¨"""
-        self.skin_lower = np.array([0, 20, 70], dtype=np.uint8)
-        self.skin_upper = np.array([20, 255, 255], dtype=np.uint8)
+        """³õÊ¼»¯ OpenCV ¼ì²âÆ÷"""
+"        self.skin_lower = np.array([0, 20, 70], dtype=np.uint8)"
+"        self.skin_upper = np.array([20, 255, 255], dtype=np.uint8)"
         
-        # åŠ è½½ Haar Cascade ä½œä¸ºå¤‡é€‰
+        # ¼ÓÔØ Haar Cascade ×÷Îª±¸Ñ¡
         cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         self.face_cascade = cv2.CascadeClassifier(cascade_path)
     
     def _init_chinese_font(self):
-        """åˆå§‹åŒ–ä¸­æ–‡å­—ä½“"""
+        """³õÊ¼»¯ÖĞÎÄ×ÖÌå"""
         font_paths = [
-            "C:/Windows/Fonts/msyh.ttc",
-            "C:/Windows/Fonts/simhei.ttf",
-            "C:/Windows/Fonts/simsun.ttc",
+"            ""C:/Windows/Fonts/msyh.ttc"","
+"            ""C:/Windows/Fonts/simhei.ttf"","
+"            ""C:/Windows/Fonts/simsun.ttc"","
         ]
         for font_path in font_paths:
             if os.path.exists(font_path):
                 try:
-                    self.chinese_font = ImageFont.truetype(font_path, 30)
-                    print(f"[OK] åŠ è½½ä¸­æ–‡å­—ä½“: {os.path.basename(font_path)}")
+"                    self.chinese_font = ImageFont.truetype(font_path, 30)"
+                    print(f"[OK] ¼ÓÔØÖĞÎÄ×ÖÌå: {os.path.basename(font_path)}")
                     break
                 except:
                     continue
 
-    def detect_gestures(self, image, simulation_mode=False):
-        """æ£€æµ‹æ‰‹åŠ¿"""
+"    def detect_gestures(self, image, simulation_mode=False):"
+        """¼ì²âÊÖÊÆ"""
         if self.mode == "mediapipe":
-            return self._detect_with_mediapipe(image, simulation_mode)
+"            return self._detect_with_mediapipe(image, simulation_mode)"
         else:
-            return self._detect_with_opencv(image, simulation_mode)
+"            return self._detect_with_opencv(image, simulation_mode)"
 
-    def _detect_with_mediapipe(self, image, simulation_mode):
-        """ä½¿ç”¨ MediaPipe æ£€æµ‹ï¼ˆæ”¯æŒæ»‘åŠ¨æ‰‹åŠ¿ï¼‰"""
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+"    def _detect_with_mediapipe(self, image, simulation_mode):"
+        """Ê¹ÓÃ MediaPipe ¼ì²â£¨Ö§³Ö»¬¶¯ÊÖÊÆ£©"""
+"        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)"
         results = self.hands.process(image_rgb)
 
         gesture = "no_hand"
         confidence = 0.0
         landmarks_data = None
-        height, width = image.shape[:2]
+"        height, width = image.shape[:2]"
         current_time = time.time()
 
-        # é‡ç½®æ»‘åŠ¨æ‰‹åŠ¿
+        # ÖØÖÃ»¬¶¯ÊÖÊÆ
         self.current_swipe = None
         self.swipe_intensity = 0.5
 
         if results.multi_hand_landmarks and results.multi_handedness:
-            for idx, (hand_landmarks, handedness) in enumerate(
-                zip(results.multi_hand_landmarks, results.multi_handedness)
+"            for idx, (hand_landmarks, handedness) in enumerate("
+"                zip(results.multi_hand_landmarks, results.multi_handedness)"
             ):
-                # è·å–æ‰‹ç±»å‹
-                hand_type = handedness.classification[0].label  # "Left" æˆ– "Right"
+                # »ñÈ¡ÊÖÀàĞÍ
+                hand_type = handedness.classification[0].label  # "Left" »ò "Right"
                 
                 self.mp_drawing.draw_landmarks(
-                    image, hand_landmarks, self.mp_hands.HAND_CONNECTIONS,
-                    self.mp_drawing_styles.get_default_hand_landmarks_style(),
+"                    image, hand_landmarks, self.mp_hands.HAND_CONNECTIONS,"
+"                    self.mp_drawing_styles.get_default_hand_landmarks_style(),"
                     self.mp_drawing_styles.get_default_hand_connections_style()
                 )
                 
                 landmarks = self._extract_landmarks(hand_landmarks)
                 
                 if self.use_ml and self.ml_classifier:
-                    gesture, confidence = self.ml_classifier.predict(landmarks)
-                    self._smooth_prediction(gesture, confidence)
+"                    gesture, confidence = self.ml_classifier.predict(landmarks)"
+"                    self._smooth_prediction(gesture, confidence)"
                 else:
-                    gesture, confidence = self._classify_by_rules(hand_landmarks)
+"                    gesture, confidence = self._classify_by_rules(hand_landmarks)"
                 
-                # è·å–æ‰‹æŒä¸­å¿ƒä½ç½®ç”¨äºæ»‘åŠ¨æ£€æµ‹
+                # »ñÈ¡ÊÖÕÆÖĞĞÄÎ»ÖÃÓÃÓÚ»¬¶¯¼ì²â
                 palm_position = self._get_palm_center(hand_landmarks)
                 
-                # æ£€æµ‹æ»‘åŠ¨æ‰‹åŠ¿
+                # ¼ì²â»¬¶¯ÊÖÊÆ
                 if palm_position:
                     palm_key = 'left' if hand_type == "Left" else 'right'
                     
                     self.palm_history[palm_key].append({
-                        'position': (palm_position['x'], palm_position['y']),
+"                        'position': (palm_position['x'], palm_position['y']),"
                         'timestamp': current_time
                     })
                     
                     if len(self.palm_history[palm_key]) > self.max_history_length:
                         self.palm_history[palm_key].pop(0)
                     
-                    swipe_result = self._detect_swipe_gesture(palm_key, width, height, current_time)
+"                    swipe_result = self._detect_swipe_gesture(palm_key, width, height, current_time)"
                     if swipe_result:
                         self.current_swipe = swipe_result['direction']
                         self.swipe_intensity = swipe_result['intensity']
@@ -198,82 +198,82 @@ class EnhancedGestureDetector:
                 
                 landmarks_data = landmarks
 
-        return image, gesture, confidence, landmarks_data
+"        return image, gesture, confidence, landmarks_data"
 
-    def _detect_with_opencv(self, image, simulation_mode):
-        """ä½¿ç”¨çº¯ OpenCV æ£€æµ‹"""
+"    def _detect_with_opencv(self, image, simulation_mode):"
+        """Ê¹ÓÃ´¿ OpenCV ¼ì²â"""
         result_image = image.copy()
-        height, width = image.shape[:2]
+"        height, width = image.shape[:2]"
         
-        # è‚¤è‰²æ£€æµ‹
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        skin_mask = cv2.inRange(hsv, self.skin_lower, self.skin_upper)
+        # ·ôÉ«¼ì²â
+"        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)"
+"        skin_mask = cv2.inRange(hsv, self.skin_lower, self.skin_upper)"
         
-        # å»å™ª
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        skin_mask = cv2.erode(skin_mask, kernel, iterations=2)
-        skin_mask = cv2.dilate(skin_mask, kernel, iterations=2)
-        skin_mask = cv2.GaussianBlur(skin_mask, (3, 3), 0)
+        # È¥Ôë
+"        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))"
+"        skin_mask = cv2.erode(skin_mask, kernel, iterations=2)"
+"        skin_mask = cv2.dilate(skin_mask, kernel, iterations=2)"
+"        skin_mask = cv2.GaussianBlur(skin_mask, (3, 3), 0)"
         
-        # æ‰¾è½®å»“
-        contours, _ = cv2.findContours(skin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # ÕÒÂÖÀª
+"        contours, _ = cv2.findContours(skin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)"
         
         gesture = "no_hand"
         confidence = 0.0
         landmarks_data = None
         
         if contours:
-            max_contour = max(contours, key=cv2.contourArea)
+"            max_contour = max(contours, key=cv2.contourArea)"
             contour_area = cv2.contourArea(max_contour)
             min_area = (width * height) * 0.01
             
             if contour_area > min_area:
-                cv2.drawContours(result_image, [max_contour], -1, (0, 255, 0), 2)
-                gesture, confidence = self._analyze_hand_opencv(max_contour)
+"                cv2.drawContours(result_image, [max_contour], -1, (0, 255, 0), 2)"
+"                gesture, confidence = self._analyze_hand_opencv(max_contour)"
                 
                 if simulation_mode:
                     landmarks_data = self._generate_landmarks(max_contour)
         
-        return result_image, gesture, confidence, landmarks_data
+"        return result_image, gesture, confidence, landmarks_data"
 
-    def _analyze_hand_opencv(self, contour):
-        """åˆ†ææ‰‹å‹ï¼ˆOpenCVæ¨¡å¼ï¼‰"""
+"    def _analyze_hand_opencv(self, contour):"
+        """·ÖÎöÊÖĞÍ£¨OpenCVÄ£Ê½£©"""
         try:
-            hull = cv2.convexHull(contour, returnPoints=False)
-            defects = cv2.convexityDefects(contour, hull)
+"            hull = cv2.convexHull(contour, returnPoints=False)"
+"            defects = cv2.convexityDefects(contour, hull)"
         except:
             defects = None
         
         finger_count = 0
         if defects is not None:
             for i in range(defects.shape[0]):
-                s, e, d, _ = defects[i, 0]
+"                s, e, d, _ = defects[i, 0]"
                 far = tuple(contour[d][0])
                 if abs(far[1]) > 20:
                     finger_count += 1
-            finger_count = max(0, finger_count // 2)
+"            finger_count = max(0, finger_count // 2)"
         
         if finger_count == 0:
-            return "closed_fist", 0.85
+"            return ""closed_fist"", 0.85"
         elif finger_count == 1:
-            return "pointing_up", 0.80
+"            return ""pointing_up"", 0.80"
         elif finger_count == 2:
-            return "victory", 0.80
+"            return ""victory"", 0.80"
         elif finger_count >= 4:
-            return "open_palm", 0.75
+"            return ""open_palm"", 0.75"
         
-        return "hand_detected", 0.5
+"        return ""hand_detected"", 0.5"
 
-    def _generate_landmarks(self, contour):
-        """ç”Ÿæˆç®€åŒ–å…³é”®ç‚¹"""
-        x, y, w, h = cv2.boundingRect(contour)
+"    def _generate_landmarks(self, contour):"
+        """Éú³É¼ò»¯¹Ø¼üµã"""
+"        x, y, w, h = cv2.boundingRect(contour)"
         landmarks = []
         
         for i in range(5):
             landmarks.extend([
-                (x + w * (0.2 + i * 0.15)) / 640,
-                (y) / 480,
-                0
+"                (x + w * (0.2 + i * 0.15)) / 640,"
+"                (y) / 480,"
+0
             ])
         
         M = cv2.moments(contour)
@@ -281,13 +281,13 @@ class EnhancedGestureDetector:
             cx = int(M["m10"] / M["m00"])
             cy = int(M["m01"] / M["m00"])
         else:
-            cx, cy = x + w // 2, y + h // 2
+"            cx, cy = x + w // 2, y + h // 2"
         
         for i in range(5):
             landmarks.extend([
-                (x + w * (0.2 + i * 0.15)) / 640,
-                (y + h * 0.3) / 480,
-                0
+"                (x + w * (0.2 + i * 0.15)) / 640,"
+"                (y + h * 0.3) / 480,"
+0
             ])
         
         while len(landmarks) < 63:
@@ -295,42 +295,42 @@ class EnhancedGestureDetector:
         
         return landmarks[:63]
 
-    def _extract_landmarks(self, hand_landmarks):
-        """æå–å…³é”®ç‚¹"""
+"    def _extract_landmarks(self, hand_landmarks):"
+        """ÌáÈ¡¹Ø¼üµã"""
         landmarks = []
         for landmark in hand_landmarks.landmark:
-            landmarks.extend([landmark.x, landmark.y, landmark.z])
+"            landmarks.extend([landmark.x, landmark.y, landmark.z])"
         
         if len(landmarks) < 63:
             landmarks.extend([0.0] * (63 - len(landmarks)))
         return landmarks[:63]
 
-    def _classify_by_rules(self, hand_landmarks):
-        """è§„åˆ™åˆ†ç±»"""
-        return "open_palm", 0.5
+"    def _classify_by_rules(self, hand_landmarks):"
+        """¹æÔò·ÖÀà"""
+"        return ""open_palm"", 0.5"
 
         left_commands = {
-            "victory": "forward",
-            "thumb_up": "backward",
-            "pointing_up": "left",
-            "pointing_down": "right",
+"            ""victory"": ""forward"","
+"            ""thumb_up"": ""backward"","
+"            ""pointing_up"": ""left"","
+"            ""pointing_down"": ""right"","
         }
 
         right_commands = {
-            "pointing_up": "up",
-            "pointing_down": "down",
-            "ok_sign": "hover",
+"            ""pointing_up"": ""up"","
+"            ""pointing_down"": ""down"","
+"            ""ok_sign"": ""hover"","
         }
 
         both_commands = {
-            "open_palm": "takeoff",
-            "closed_fist": "land",
-            "thumb_down": "stop",
+"            ""open_palm"": ""takeoff"","
+"            ""closed_fist"": ""land"","
+"            ""thumb_down"": ""stop"","
         }
 
         if left_hand_data:
-            gesture = left_hand_data.get('gesture', 'none')
-            intensity = self.get_gesture_intensity(left_hand_data, gesture)
+"            gesture = left_hand_data.get('gesture', 'none')"
+"            intensity = self.get_gesture_intensity(left_hand_data, gesture)"
             result['left_gesture'] = gesture
 
             if gesture in self.swipe_commands:
@@ -343,8 +343,8 @@ class EnhancedGestureDetector:
                 result['special_command'] = both_commands[gesture]
 
         if right_hand_data:
-            gesture = right_hand_data.get('gesture', 'none')
-            intensity = self.get_gesture_intensity(right_hand_data, gesture)
+"            gesture = right_hand_data.get('gesture', 'none')"
+"            intensity = self.get_gesture_intensity(right_hand_data, gesture)"
             result['right_gesture'] = gesture
 
             if gesture in self.swipe_commands:
@@ -358,25 +358,26 @@ class EnhancedGestureDetector:
 
         return result
 
-    # ============ æ»‘åŠ¨æ‰‹åŠ¿æ£€æµ‹æ–¹æ³• ============
+
+    # ============ »¬¶¯ÊÖÊÆ¼ì²â·½·¨ ============
     
-    def _get_palm_center(self, hand_landmarks):
-        """è·å–æ‰‹æŒä¸­å¿ƒä½ç½®"""
+"    def _get_palm_center(self, hand_landmarks):"
+        """»ñÈ¡ÊÖÕÆÖĞĞÄÎ»ÖÃ"""
         if not hand_landmarks:
             return None
         palm_landmark = hand_landmarks.landmark[9]
         return {
-            'x': palm_landmark.x,
-            'y': palm_landmark.y,
-            'z': palm_landmark.z if hasattr(palm_landmark, 'z') else 0
+"            'x': palm_landmark.x,"
+"            'y': palm_landmark.y,"
+"            'z': palm_landmark.z if hasattr(palm_landmark, 'z') else 0"
         }
     
-    def _detect_swipe_gesture(self, hand_key, frame_width, frame_height, current_time):
-        """æ£€æµ‹æ»‘åŠ¨æ‰‹åŠ¿"""
+"    def _detect_swipe_gesture(self, hand_key, frame_width, frame_height, current_time):"
+        """¼ì²â»¬¶¯ÊÖÊÆ"""
         if current_time - self.last_swipe_time < self.swipe_cooldown:
             return None
         
-        history = self.palm_history.get(hand_key, [])
+"        history = self.palm_history.get(hand_key, [])"
         if len(history) < 3:
             return None
         
@@ -404,8 +405,8 @@ class EnhancedGestureDetector:
             else:
                 direction = "swipe_left"
                 gesture_name = "swipe_left"
-            intensity = min(abs(delta_x) * 2, 1.0)
-            confidence = min(velocity_x / 2.0, 1.0)
+"            intensity = min(abs(delta_x) * 2, 1.0)"
+"            confidence = min(velocity_x / 2.0, 1.0)"
             
         elif abs(delta_y) > self.swipe_threshold and velocity_y > self.swipe_min_velocity:
             if delta_y < 0:
@@ -414,64 +415,64 @@ class EnhancedGestureDetector:
             else:
                 direction = "swipe_down"
                 gesture_name = "swipe_down"
-            intensity = min(abs(delta_y) * 2, 1.0)
-            confidence = min(velocity_y / 2.0, 1.0)
+"            intensity = min(abs(delta_y) * 2, 1.0)"
+"            confidence = min(velocity_y / 2.0, 1.0)"
         
         if direction:
             self.last_swipe_time = current_time
             self.palm_history[hand_key] = []
             
             return {
-                'direction': direction,
-                'intensity': intensity,
-                'gesture_name': gesture_name,
-                'confidence': confidence,
+"                'direction': direction,"
+"                'intensity': intensity,"
+"                'gesture_name': gesture_name,"
+"                'confidence': confidence,"
             }
         
         return None
     
-    def get_swipe_command(self, swipe_gesture):
-        """è·å–æ»‘åŠ¨æ‰‹åŠ¿å¯¹åº”çš„æ§åˆ¶æŒ‡ä»¤"""
-        return self.swipe_commands.get(swipe_gesture, "none")
+"    def get_swipe_command(self, swipe_gesture):"
+        """»ñÈ¡»¬¶¯ÊÖÊÆ¶ÔÓ¦µÄ¿ØÖÆÖ¸Áî"""
+"        return self.swipe_commands.get(swipe_gesture, ""none"")"
     
     def get_current_swipe(self):
-        """è·å–å½“å‰æ£€æµ‹åˆ°çš„æ»‘åŠ¨æ‰‹åŠ¿"""
-        return (self.current_swipe, self.swipe_intensity)
+        """»ñÈ¡µ±Ç°¼ì²âµ½µÄ»¬¶¯ÊÖÊÆ"""
+"        return (self.current_swipe, self.swipe_intensity)"
     
-    def get_dual_hand_commands(self, left_hand_data, right_hand_data):
-        """è·å–åŒæ‰‹æ§åˆ¶å‘½ä»¤ï¼ˆæ”¯æŒæ»‘åŠ¨æ‰‹åŠ¿ï¼‰"""
+"    def get_dual_hand_commands(self, left_hand_data, right_hand_data):"
+        """»ñÈ¡Ë«ÊÖ¿ØÖÆÃüÁî£¨Ö§³Ö»¬¶¯ÊÖÊÆ£©"""
         result = {
-            'direction_command': None,
-            'direction_intensity': 0.5,
-            'altitude_command': None,
-            'altitude_intensity': 0.5,
-            'special_command': None,
-            'left_gesture': None,
+"            'direction_command': None,"
+"            'direction_intensity': 0.5,"
+"            'altitude_command': None,"
+"            'altitude_intensity': 0.5,"
+"            'special_command': None,"
+"            'left_gesture': None,"
             'right_gesture': None
         }
 
         left_commands = {
-            "victory": "forward",
-            "thumb_up": "backward",
-            "pointing_up": "left",
-            "pointing_down": "right",
+"            ""victory"": ""forward"","
+"            ""thumb_up"": ""backward"","
+"            ""pointing_up"": ""left"","
+"            ""pointing_down"": ""right"","
         }
 
         right_commands = {
-            "pointing_up": "up",
-            "pointing_down": "down",
-            "ok_sign": "hover",
+"            ""pointing_up"": ""up"","
+"            ""pointing_down"": ""down"","
+"            ""ok_sign"": ""hover"","
         }
 
         both_commands = {
-            "open_palm": "takeoff",
-            "closed_fist": "land",
-            "thumb_down": "stop",
+"            ""open_palm"": ""takeoff"","
+"            ""closed_fist"": ""land"","
+"            ""thumb_down"": ""stop"","
         }
 
         if left_hand_data:
-            gesture = left_hand_data.get('gesture', 'none')
-            intensity = self.get_gesture_intensity(left_hand_data, gesture)
+"            gesture = left_hand_data.get('gesture', 'none')"
+"            intensity = self.get_gesture_intensity(left_hand_data, gesture)"
             result['left_gesture'] = gesture
 
             if gesture in self.swipe_commands:
@@ -484,8 +485,8 @@ class EnhancedGestureDetector:
                 result['special_command'] = both_commands[gesture]
 
         if right_hand_data:
-            gesture = right_hand_data.get('gesture', 'none')
-            intensity = self.get_gesture_intensity(right_hand_data, gesture)
+"            gesture = right_hand_data.get('gesture', 'none')"
+"            intensity = self.get_gesture_intensity(right_hand_data, gesture)"
             result['right_gesture'] = gesture
 
             if gesture in self.swipe_commands:
@@ -499,25 +500,25 @@ class EnhancedGestureDetector:
 
         return result
 
-    # ============ æ»‘åŠ¨æ‰‹åŠ¿æ£€æµ‹æ–¹æ³• ============
+    # ============ »¬¶¯ÊÖÊÆ¼ì²â·½·¨ ============
     
-    def _get_palm_center(self, hand_landmarks):
-        """è·å–æ‰‹æŒä¸­å¿ƒä½ç½®"""
+"    def _get_palm_center(self, hand_landmarks):"
+        """»ñÈ¡ÊÖÕÆÖĞĞÄÎ»ÖÃ"""
         if not hand_landmarks:
             return None
         palm_landmark = hand_landmarks.landmark[9]
         return {
-            'x': palm_landmark.x,
-            'y': palm_landmark.y,
-            'z': palm_landmark.z if hasattr(palm_landmark, 'z') else 0
+"            'x': palm_landmark.x,"
+"            'y': palm_landmark.y,"
+"            'z': palm_landmark.z if hasattr(palm_landmark, 'z') else 0"
         }
     
-    def _detect_swipe_gesture(self, hand_key, frame_width, frame_height, current_time):
-        """æ£€æµ‹æ»‘åŠ¨æ‰‹åŠ¿"""
+"    def _detect_swipe_gesture(self, hand_key, frame_width, frame_height, current_time):"
+        """¼ì²â»¬¶¯ÊÖÊÆ"""
         if current_time - self.last_swipe_time < self.swipe_cooldown:
             return None
         
-        history = self.palm_history.get(hand_key, [])
+"        history = self.palm_history.get(hand_key, [])"
         if len(history) < 3:
             return None
         
@@ -545,8 +546,8 @@ class EnhancedGestureDetector:
             else:
                 direction = "swipe_left"
                 gesture_name = "swipe_left"
-            intensity = min(abs(delta_x) * 2, 1.0)
-            confidence = min(velocity_x / 2.0, 1.0)
+"            intensity = min(abs(delta_x) * 2, 1.0)"
+"            confidence = min(velocity_x / 2.0, 1.0)"
             
         elif abs(delta_y) > self.swipe_threshold and velocity_y > self.swipe_min_velocity:
             if delta_y < 0:
@@ -555,64 +556,64 @@ class EnhancedGestureDetector:
             else:
                 direction = "swipe_down"
                 gesture_name = "swipe_down"
-            intensity = min(abs(delta_y) * 2, 1.0)
-            confidence = min(velocity_y / 2.0, 1.0)
+"            intensity = min(abs(delta_y) * 2, 1.0)"
+"            confidence = min(velocity_y / 2.0, 1.0)"
         
         if direction:
             self.last_swipe_time = current_time
             self.palm_history[hand_key] = []
             
             return {
-                'direction': direction,
-                'intensity': intensity,
-                'gesture_name': gesture_name,
-                'confidence': confidence,
+"                'direction': direction,"
+"                'intensity': intensity,"
+"                'gesture_name': gesture_name,"
+"                'confidence': confidence,"
             }
         
         return None
     
-    def get_swipe_command(self, swipe_gesture):
-        """è·å–æ»‘åŠ¨æ‰‹åŠ¿å¯¹åº”çš„æ§åˆ¶æŒ‡ä»¤"""
-        return self.swipe_commands.get(swipe_gesture, "none")
+"    def get_swipe_command(self, swipe_gesture):"
+        """»ñÈ¡»¬¶¯ÊÖÊÆ¶ÔÓ¦µÄ¿ØÖÆÖ¸Áî"""
+"        return self.swipe_commands.get(swipe_gesture, ""none"")"
     
     def get_current_swipe(self):
-        """è·å–å½“å‰æ£€æµ‹åˆ°çš„æ»‘åŠ¨æ‰‹åŠ¿"""
-        return (self.current_swipe, self.swipe_intensity)
+        """»ñÈ¡µ±Ç°¼ì²âµ½µÄ»¬¶¯ÊÖÊÆ"""
+"        return (self.current_swipe, self.swipe_intensity)"
     
-    def get_dual_hand_commands(self, left_hand_data, right_hand_data):
-        """è·å–åŒæ‰‹æ§åˆ¶å‘½ä»¤ï¼ˆæ”¯æŒæ»‘åŠ¨æ‰‹åŠ¿ï¼‰"""
+"    def get_dual_hand_commands(self, left_hand_data, right_hand_data):"
+        """»ñÈ¡Ë«ÊÖ¿ØÖÆÃüÁî£¨Ö§³Ö»¬¶¯ÊÖÊÆ£©"""
         result = {
-            'direction_command': None,
-            'direction_intensity': 0.5,
-            'altitude_command': None,
-            'altitude_intensity': 0.5,
-            'special_command': None,
-            'left_gesture': None,
+"            'direction_command': None,"
+"            'direction_intensity': 0.5,"
+"            'altitude_command': None,"
+"            'altitude_intensity': 0.5,"
+"            'special_command': None,"
+"            'left_gesture': None,"
             'right_gesture': None
         }
 
         left_commands = {
-            "victory": "forward",
-            "thumb_up": "backward",
-            "pointing_up": "left",
-            "pointing_down": "right",
+"            ""victory"": ""forward"","
+"            ""thumb_up"": ""backward"","
+"            ""pointing_up"": ""left"","
+"            ""pointing_down"": ""right"","
         }
 
         right_commands = {
-            "pointing_up": "up",
-            "pointing_down": "down",
-            "ok_sign": "hover",
+"            ""pointing_up"": ""up"","
+"            ""pointing_down"": ""down"","
+"            ""ok_sign"": ""hover"","
         }
 
         both_commands = {
-            "open_palm": "takeoff",
-            "closed_fist": "land",
-            "thumb_down": "stop",
+"            ""open_palm"": ""takeoff"","
+"            ""closed_fist"": ""land"","
+"            ""thumb_down"": ""stop"","
         }
 
         if left_hand_data:
-            gesture = left_hand_data.get('gesture', 'none')
-            intensity = self.get_gesture_intensity(left_hand_data, gesture)
+"            gesture = left_hand_data.get('gesture', 'none')"
+"            intensity = self.get_gesture_intensity(left_hand_data, gesture)"
             result['left_gesture'] = gesture
 
             if gesture in self.swipe_commands:
@@ -625,8 +626,8 @@ class EnhancedGestureDetector:
                 result['special_command'] = both_commands[gesture]
 
         if right_hand_data:
-            gesture = right_hand_data.get('gesture', 'none')
-            intensity = self.get_gesture_intensity(right_hand_data, gesture)
+"            gesture = right_hand_data.get('gesture', 'none')"
+"            intensity = self.get_gesture_intensity(right_hand_data, gesture)"
             result['right_gesture'] = gesture
 
             if gesture in self.swipe_commands:
@@ -640,7 +641,9 @@ class EnhancedGestureDetector:
 
         return result
 
+
+upstream/main
     def release(self):
-        """é‡Šæ”¾èµ„æº"""
-        if hasattr(self, 'hands'):
+        """ÊÍ·Å×ÊÔ´"""
+"        if hasattr(self, 'hands'):"
             self.hands.close()

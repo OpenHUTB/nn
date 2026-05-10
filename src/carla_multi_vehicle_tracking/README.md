@@ -1,72 +1,37 @@
-在 Carla 模拟器中使用 YOLOv8 + DeepSORT 实现多车辆目标跟踪
+# Multi Vehicle tracking in carla simulator 
 
-项目说明
+This repo host a comprehensive solution for multi-object tracking in combination with YOLO and DeepSORT in carla simulator .
+YOLOV8 model is trained on Carla dataset , which is avaiable in kaggle (https://www.kaggle.com/datasets/alechantson/carladataset)
 
-本项目基于 YOLOv8 与 DeepSORT 算法，在 Carla 模拟器环境下实现多车辆实时跟踪。模型在 Carla 数据集上训练，可直接用于仿真环境目标跟踪、指标评估与二次开发。
+![ezgif com-optimize](https://github.com/Bsornapudi/Carla-YOLO-DeepSort-Multi-Object-Tracking/assets/48683074/c365a981-e314-4cae-b4aa-d234b3de5cfa)
 
-环境依赖（必须先安装）
+Following software are required before installing required packages
 
-Carla 模拟器https://carla.readthedocs.io/en/latest/start\_quickstart/
+1. Carla simulator : Download Carla simulator and follow the instuction guide - https://carla.readthedocs.io/en/latest/start_quickstart/
+2. CUDA : Download and install CUDA - https://developer.nvidia.com/cuda-downloads
+3. CuDnn : Install Cuda DNN - https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html
+4. Anacoda : https://www.anaconda.com/download
+5. PyMOT : Download / clone this repo for evaluations - https://github.com/Videmo/pymot
+6. Create and activate a new virtural conda env 
 
-CUDAhttps://developer.nvidia.com/cuda-downloads
+    ```
+    conda create --name <env-name> python=3.8
+    conda activate <env-name> 
+        NOTE : <env-name> should be the name of your virtural env
+    ```
+7. Install required packages
+    ```
+    pip install  requirements.txt
+    ```
+8. Once the setup is done Run Calra.exe file to launch simulator
+9. One commapnd prompt or launch jupyter from conda prompt
+10. Run track.ipynb file in jupyter 
+11. Run gt_deepsort.ipynv file followed by evaluate.ipynb to generate MOTA and MOTP values
+NOTE : 
 
-cuDNNhttps://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html
+step to check PyTorch compatibility and install an appropriate version based on their CUDA and cuDNN configurations from this link , scroll down and you will see an option to select your system configs and tis will generate PIP INSTALL for CUDnn+torch which is compatable 
+https://pytorch.org/
 
-Anacondahttps://www.anaconda.com/download
-
-PyMOT（用于指标评估）https://github.com/Videmo/pymot
-
-运行步骤
-
-创建并激活 Conda 虚拟环境
-
-plaintext
-
-conda create --name carla\_tracking python=3.8
-
-conda activate carla\_tracking
-
-安装项目依赖
-
-plaintext
-
-pip install -r requirements.txt
-
-安装匹配 CUDA 版本的 PyTorch前往 https://pytorch.org/ 获取对应命令示例（CUDA 11.7）：
-
-plaintext
-
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
-
-启动 Carla 模拟器运行 Carla.exe 或对应启动脚本
-
-启动 Jupyter
-
-plaintext
-
-jupyter notebook
-
-运行跟踪主程序打开并执行 track.ipynb
-
-生成真值与跟踪结果打开并执行 gt\_deepsort.ipynb
-
-计算跟踪指标（MOTA / MOTP）打开并执行 evaluate.ipynb
-
-数据集
-
-模型训练使用 Carla 数据集，下载地址：https://www.kaggle.com/datasets/alechantson/carladataset
-
-后续更新说明
-
-本项目将逐步优化：
-
-跟踪效果调参
-
-代码结构整理
-
-新增命令行运行方式
-
-支持更多类别跟踪
-
-可视化与日志优化
-
+Eg : pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
+    
+       

@@ -7,6 +7,38 @@ import imutils
 import numpy as np
 from min_carla_env.matrix_world import MatrixWorld
 
+import logging
+from typing import Optional
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Carla 客户端重连工具
+def reconnect_carla_client(original_client, host='localhost', port=2000,
+                           timeout=30, retries=3) -> Optional[carla.Client]:
+    """Carla客户端重连工具"""
+    for retry in range(retries):
+        try:
+            # 关闭原有连接（如果存在）
+            if original_client:
+                try:
+                    original_client.close()
+                except:
+                    pass
+            # 新建连接
+            client = carla.Client(host, port)
+            client.set_timeout(timeout)
+            # 验证连接（获取服务器版本）
+            client.get_server_version()
+            logger.info(f"Carla客户端重连成功 (重试 {retry+1}/{retries})")
+            return client
+        except Exception as e:
+            logger.warning(f"Carla客户端重连失败 (重试 {retry+1}/{retries}): {e}")
+            time.sleep(2)
+    logger.error(f"Carla客户端重连失败，已重试 {retries} 次")
+    return None
+
 CONFIG = {
     "width": 480,
     "height": 480,
@@ -42,16 +74,41 @@ class CarlaEnv(gym.Env):
         self.config = config
         self.max_step = config["max_step"]
         self.demo = demo
-
-        # build world
-        self.mw = MatrixWorld(client, **world_config)
-        self.world = self.mw.world
+        self.client = client  # 保存客户端引用
+        self.mw = None  # 初始化MatrixWorld为None
+        self.world = None
+        self.vehicle = None
+        self.rgb_sensor = None
+        self.semantic_sensor = None
+        self.col_sensor = None
+        self.lane_sensor = None
         self.measurements = {
             "kmh": 0.0,
             "prev_loc": None
         }
-        self.spawn_actors()
         self.hist_wp = None
+
+        try:
+            # 初始化MatrixWorld（增加重连机制）
+            self.mw = MatrixWorld(self.client, **world_config)
+            self.world = self.mw.world
+            # 生成actor
+            self.spawn_actors()
+        except Exception as e:
+            logger.error(f"CarlaEnv初始化失败: {e}")
+            # 初始化失败时清理资源
+            if self.mw:
+                self.mw.clean_world()
+            # 尝试重连客户端
+            new_client = reconnect_carla_client(self.client)
+            if new_client:
+                self.client = new_client
+                self.mw = MatrixWorld(self.client, **world_config)
+                self.world = self.mw.world
+                self.spawn_actors()
+                logger.info("重连后初始化成功")
+            else:
+                raise RuntimeError("CarlaEnv初始化失败，且重连客户端失败")
 
     def spawn_actors(self):
         """Spawns agent car and sensors."""
@@ -66,7 +123,7 @@ class CarlaEnv(gym.Env):
             self.vehicle, carla.Location(x=2.5, z=0.7))
         self.semantic_sensor.listen(lambda image: self.process_semantic(image))
         self.col_sensor = self.mw.spawn_collision_sensor(
-                self.vehicle, carla.Location(x=2.5, z=0.7))
+            self.vehicle, carla.Location(x=2.5, z=0.7))
         self.col_sensor.listen(lambda event: self.collision_data(event))
         self.lane_sensor = self.mw.spawn_lane_sensor(self.vehicle)
         self.lane_sensor.listen(lambda event: self.lane_data(event))
@@ -177,24 +234,55 @@ class CarlaEnv(gym.Env):
         self.collision_hist = []
         self.crossed_lane_hist = []
         self.hist_wp = None
+        self.stuck_count = 0
 
-        self.mw.clean_world()
-        for _ in range(5):
-            try:
-                self.spawn_actors()
-                break
-            except Exception as e:
-                print("Exception {}".format(e))
-                self.mw.clean_world()
+        try:
+            self.mw.clean_world()
+            # 重新初始化 MatrixWorld（复用初始化时的配置，而非 __dict__）
+            world_config = {
+                "im_width": self.config["width"],
+                "im_height": self.config["height"],
+                "render": self.config["render"],
+                "weather": self.mw.weather,
+                "fast": getattr(self.mw, 'fast', False),
+                "town": self.mw.world.get_map().name.split('/')[-1]  # 保留当前地图
+            }
+            # 重试生成actor
+            spawn_success = False
+            for _ in range(5):
+                try:
+                    self.mw = MatrixWorld(self.client, **world_config)  # 重新初始化
+                    self.world = self.mw.world
+                    self.spawn_actors()
+                    spawn_success = True
+                    logger.info("Actor生成成功")
+                    break
+                except Exception as e:
+                    logger.warning(f"Actor生成失败 (重试 {_ + 1}/5): {e}")
+                    self.mw.clean_world()
+                    time.sleep(1)
 
-        self.measurements = {
-                "kmh": 0.0,
-                "prev_loc": None
-        }
-        time.sleep(1)
-        # return self.rgb_data
-        return self.semantic_data
-        # return (self.rgb_data, self.semantic_data)
+            if not spawn_success:
+                logger.warning("Actor生成多次失败，尝试重连Carla客户端")
+                new_client = reconnect_carla_client(self.client)
+                if new_client:
+                    self.client = new_client
+                    self.mw = MatrixWorld(self.client, **world_config)
+                    self.world = self.mw.world
+                    self.spawn_actors()
+                    logger.info("重连后Actor生成成功")
+                else:
+                    raise RuntimeError("Actor生成失败，且重连客户端失败")
+
+            self.measurements = {"kmh": 0.0, "prev_loc": None}
+            time.sleep(1)
+            return self.semantic_data
+        except Exception as e:
+            logger.error(f"Reset失败: {e}")
+            self.mw.clean_world()
+            raise
+        finally:
+            logger.debug("Reset流程完成，资源已清理")
 
     def __euclid_dist(self, loc1, loc2):
         """Calc euclid distance of carla Locations."""
@@ -294,3 +382,23 @@ class CarlaEnv(gym.Env):
 
         return self.semantic_data, reward, self.done, {}
         # return (self.rgb_data, self.semantic_data), reward, self.done, {}
+
+    def close(self):
+        """手动关闭环境，释放所有资源"""
+        logger.info("开始关闭CarlaEnv环境...")
+        try:
+            # 停止传感器监听
+            if self.rgb_sensor:
+                self.rgb_sensor.stop()
+            if self.semantic_sensor:
+                self.semantic_sensor.stop()
+            if self.col_sensor:
+                self.col_sensor.stop()
+            if self.lane_sensor:
+                self.lane_sensor.stop()
+            # 清理MatrixWorld资源
+            if self.mw:
+                self.mw.clean_world()
+            logger.info("CarlaEnv环境关闭成功")
+        except Exception as e:
+            logger.error(f"关闭CarlaEnv环境失败: {e}")

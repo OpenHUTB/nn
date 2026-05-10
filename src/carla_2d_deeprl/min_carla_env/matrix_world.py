@@ -1,6 +1,18 @@
 import carla
 import random
 
+import time
+import logging
+from typing import Optional
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Carla 连接配置
+CARLA_CONNECT_TIMEOUT = 30  # 连接超时时间（秒）
+CARLA_RECONNECT_RETRIES = 3  # 重连重试次数
+MAP_LOAD_RETRIES = 2  # 地图加载重试次数
 
 class MatrixWorld(object):
     """Builds the world, cars, sensors etc."""
@@ -16,38 +28,87 @@ class MatrixWorld(object):
         self.im_width = im_width
         self.im_height = im_height
         self.client = client
-
-        # prepare world
-        self.world = client.load_world(town)
+        self.world = None  # 初始化world为None
         self.weather = weather
-        if self.weather is not None:
-            self.world.set_weather(self.weather)
-
-        if not render:
-            settings = self.world.get_settings()
-            settings.no_rendering_mode = True
-            self.world.apply_settings(settings)
-
-        # Run sim faster
-        if fast:
-            settings = self.world.get_settings()
-            settings.fixed_delta_seconds = 0.05
-            self.world.apply_settings(settings)
-
-        self.bp_lib = self.world.get_blueprint_library()
+        self.bp_lib = None
         self.spawn_points = []
         self.actor_list = []
         self.yaw = 0
 
+        try:
+            # 加载地图（增加重试）
+            for retry in range(MAP_LOAD_RETRIES):
+                try:
+                    self.world = self.client.load_world(town)
+                    logger.info(f"成功加载地图: {town}")
+                    break
+                except Exception as e:
+                    logger.warning(f"加载地图 {town} 失败 (重试 {retry + 1}/{MAP_LOAD_RETRIES}): {e}")
+                    time.sleep(1)
+                    if retry == MAP_LOAD_RETRIES - 1:
+                        raise RuntimeError(f"地图 {town} 加载失败，已重试 {MAP_LOAD_RETRIES} 次")
+
+            # 设置天气（增加异常捕获）
+            if self.weather is not None:
+                try:
+                    self.world.set_weather(self.weather)
+                    logger.info(f"成功设置天气: {self.weather}")
+                except Exception as e:
+                    logger.warning(f"设置天气失败: {e}，使用默认天气")
+
+            # 渲染/帧率设置
+            if not render:
+                try:
+                    settings = self.world.get_settings()
+                    settings.no_rendering_mode = True
+                    self.world.apply_settings(settings)
+                except Exception as e:
+                    logger.warning(f"关闭渲染模式失败: {e}")
+
+            if fast:
+                try:
+                    settings = self.world.get_settings()
+                    settings.fixed_delta_seconds = 0.05
+                    self.world.apply_settings(settings)
+                    logger.info("设置快速仿真模式（fixed_delta_seconds=0.05）")
+                except Exception as e:
+                    logger.warning(f"设置快速仿真模式失败: {e}")
+
+            self.bp_lib = self.world.get_blueprint_library()
+
+        except Exception as e:
+            logger.error(f"MatrixWorld 初始化失败: {e}")
+            # 清理已创建的actor
+            self.clean_world()
+            raise
+
     def change_map(self, map_name=None):
+        """切换地图（增加异常处理）"""
         if map_name is None:
-            # map_id = random.randrange(1, 6)
             map_id = random.choice([7, 2])
             map_name = "Town0{}".format(map_id)
-        self.world = self.client.load_world(map_name)
-        self.bp_lib = self.world.get_blueprint_library()
-        self.spawn_points = []
-        return self.world
+
+        try:
+            # 切换前先清理actor
+            self.clean_world()
+            # 加载新地图（重试机制）
+            for retry in range(MAP_LOAD_RETRIES):
+                try:
+                    self.world = self.client.load_world(map_name)
+                    logger.info(f"成功切换到地图: {map_name}")
+                    break
+                except Exception as e:
+                    logger.warning(f"切换地图 {map_name} 失败 (重试 {retry + 1}/{MAP_LOAD_RETRIES}): {e}")
+                    time.sleep(1)
+                    if retry == MAP_LOAD_RETRIES - 1:
+                        raise RuntimeError(f"切换地图 {map_name} 失败，已重试 {MAP_LOAD_RETRIES} 次")
+
+            self.bp_lib = self.world.get_blueprint_library()
+            self.spawn_points = []
+            return self.world
+        except Exception as e:
+            logger.error(f"切换地图失败: {e}")
+            raise
 
     def is_close_to_junction(self, location, max_d):
         """Checks the next waypoints to given locations are junction."""
@@ -144,7 +205,27 @@ class MatrixWorld(object):
         return lane_sensor
 
     def clean_world(self):
+        """彻底清理所有actor（传感器、车辆），停止传感器监听"""
+        if not self.actor_list:
+            logger.info("无需要清理的actor")
+            return
+
+        logger.info(f"开始清理 {len(self.actor_list)} 个actor...")
         for actor in self.actor_list:
-            if actor is not None:
-                actor.destroy()
+            try:
+                if actor is None:
+                    continue
+                # 停止传感器监听（针对camera/collision等传感器）
+                if hasattr(actor, 'is_listening') and actor.is_listening:
+                    actor.stop()
+                    logger.debug(f"停止传感器监听: {actor.type_id}")
+                # 销毁actor
+                if actor.is_alive:
+                    actor.destroy()
+                    logger.debug(f"销毁actor: {actor.type_id}")
+            except Exception as e:
+                logger.error(f"清理actor {actor.id if actor else '未知'} 失败: {e}")
+        # 清空列表
         self.actor_list = []
+        self.spawn_points = []
+        logger.info("Actor清理完成")

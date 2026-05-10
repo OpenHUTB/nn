@@ -1,6 +1,10 @@
-numpy==1.21.6
-opencv-python==4.5.5.64
-pygame==2.1.2
-transforms3d==0.4.1
-colorama==0.4.6
 carla==0.9.15 
+pygame==2.1.2 
+numpy==1.21.6 
+opencv-python==4.5.5.64 
+transforms3d==0.4.1 
+colorama==0.4.6 
+torch
+torchvision
+ultralytics
+open3d
