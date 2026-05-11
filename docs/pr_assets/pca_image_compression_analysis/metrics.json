@@ -1,0 +1,15 @@
+{
+  "project": "pca_image_compression_analysis",
+  "sample_count": 260,
+  "image_size": 16,
+  "best_components": 16,
+  "best_mse": 0.011118,
+  "best_explained_variance": 0.9178,
+  "best_compression_ratio": 0.1279,
+  "generated_files": [
+    "pca_reconstruction_grid.png",
+    "pca_error_curve.png",
+    "pca_variance_compression.png",
+    "pca_metrics.csv"
+  ]
+}
