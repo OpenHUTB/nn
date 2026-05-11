@@ -1,0 +1,42 @@
+{
+  "project": "elevator_group_dispatch",
+  "seed": 31,
+  "request_count": 98,
+  "passenger_throughput": 129,
+  "elevator_count": 4,
+  "floor_count": 16,
+  "baseline_nearest_car": {
+    "mean_wait_s": 88.2653,
+    "p90_wait_s": 202.66,
+    "max_wait_s": 392.0,
+    "mean_ride_s": 28.9714,
+    "total_distance_floors": 1190.0,
+    "empty_distance_floors": 456.0,
+    "energy_index": 2032.22,
+    "long_wait_count": 37
+  },
+  "optimized_destination_aware": {
+    "mean_wait_s": 66.1469,
+    "p90_wait_s": 181.02,
+    "max_wait_s": 245.8,
+    "mean_ride_s": 28.9714,
+    "total_distance_floors": 1219.0,
+    "empty_distance_floors": 485.0,
+    "energy_index": 2093.12,
+    "long_wait_count": 25
+  },
+  "improvement": {
+    "mean_wait_percent": 25.06,
+    "p90_wait_percent": 10.68,
+    "empty_distance_percent": -6.36,
+    "energy_index_percent": -3.0,
+    "long_wait_count_percent": 32.43
+  },
+  "generated_files": [
+    "wait_time_distribution.png",
+    "elevator_timeline.png",
+    "floor_demand_heatmap.png",
+    "metric_comparison.png",
+    "dispatch_assignments.csv"
+  ]
+}
