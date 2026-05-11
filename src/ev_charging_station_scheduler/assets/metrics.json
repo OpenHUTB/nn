@@ -1,0 +1,39 @@
+{
+  "project": "ev_charging_station_scheduler",
+  "seed": 23,
+  "vehicle_count": 30,
+  "charger_count": 6,
+  "charger_power_kw": 22.0,
+  "grid_limit_kw": 118.0,
+  "baseline_fcfs": {
+    "completed_count": 30,
+    "average_wait_min": 7.6667,
+    "deadline_miss_count": 0,
+    "peak_grid_load_kw": 203.0147,
+    "overload_minutes": 355,
+    "solar_utilization_percent": 31.0584,
+    "load_variance": 2660.2399
+  },
+  "optimized_load_aware": {
+    "completed_count": 30,
+    "average_wait_min": 100.6667,
+    "deadline_miss_count": 0,
+    "peak_grid_load_kw": 159.4073,
+    "overload_minutes": 185,
+    "solar_utilization_percent": 39.5765,
+    "load_variance": 906.318
+  },
+  "improvement": {
+    "peak_grid_load_percent": 21.48,
+    "overload_minutes_percent": 47.89,
+    "load_variance_percent": 65.93,
+    "solar_utilization_delta_percent": 8.52
+  },
+  "generated_files": [
+    "load_profile_comparison.png",
+    "charger_occupancy.png",
+    "waiting_time_distribution.png",
+    "metric_comparison.png",
+    "vehicle_schedule.csv"
+  ]
+}
