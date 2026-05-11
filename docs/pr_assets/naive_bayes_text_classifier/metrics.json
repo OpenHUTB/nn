@@ -1,0 +1,15 @@
+{
+  "project": "naive_bayes_text_classifier",
+  "train_size": 240,
+  "test_size": 105,
+  "class_count": 3,
+  "vocabulary_size": 32,
+  "accuracy": 1.0,
+  "macro_f1": 1.0,
+  "generated_files": [
+    "nb_confusion_matrix.png",
+    "nb_top_words.png",
+    "nb_metric_summary.png",
+    "nb_predictions.csv"
+  ]
+}
