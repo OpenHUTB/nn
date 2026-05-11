@@ -1,0 +1,40 @@
+{
+  "project": "bus_headway_control",
+  "bus_count": 8,
+  "stop_count": 10,
+  "target_headway_min": 6.0,
+  "injected_delay_min": 4.5,
+  "baseline_no_control": {
+    "mean_headway_min": 5.995,
+    "headway_std_min": 2.428,
+    "headway_cv": 0.405,
+    "bunching_count": 7,
+    "average_passenger_wait_min": 3.9111,
+    "total_holding_min": 0.0,
+    "max_load": 48,
+    "service_reliability_score": 67.9763
+  },
+  "optimized_adaptive_holding": {
+    "mean_headway_min": 6.5917,
+    "headway_std_min": 2.1571,
+    "headway_cv": 0.3273,
+    "bunching_count": 4,
+    "average_passenger_wait_min": 3.8674,
+    "total_holding_min": 41.3753,
+    "max_load": 48,
+    "service_reliability_score": 75.5429
+  },
+  "improvement": {
+    "headway_std_percent": 11.15,
+    "bunching_count_percent": 42.86,
+    "average_wait_percent": 1.12,
+    "reliability_score_delta": 7.57
+  },
+  "generated_files": [
+    "time_space_diagram.png",
+    "headway_heatmap.png",
+    "passenger_wait_by_stop.png",
+    "metric_comparison.png",
+    "headway_by_stop.csv"
+  ]
+}
