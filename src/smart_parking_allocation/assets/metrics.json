@@ -1,0 +1,39 @@
+{
+  "project": "smart_parking_allocation",
+  "seed": 41,
+  "spot_count": 84,
+  "vehicle_count": 84,
+  "baseline_nearest_spot": {
+    "served_count": 80,
+    "rejected_count": 4,
+    "average_walking_distance_m": 143.02,
+    "p90_walking_distance_m": 159.18,
+    "average_wait_min": 12.0625,
+    "peak_zone_occupancy_ratio": 0.9444,
+    "zone_imbalance_index": 0.1564,
+    "traffic_distance_m": 15420.0
+  },
+  "optimized_balanced_allocation": {
+    "served_count": 83,
+    "rejected_count": 1,
+    "average_walking_distance_m": 83.3084,
+    "p90_walking_distance_m": 141.6,
+    "average_wait_min": 24.9398,
+    "peak_zone_occupancy_ratio": 0.3889,
+    "zone_imbalance_index": 0.0264,
+    "traffic_distance_m": 16149.6
+  },
+  "improvement": {
+    "average_walking_distance_percent": 41.75,
+    "p90_walking_distance_percent": 11.04,
+    "zone_imbalance_percent": 83.14,
+    "traffic_distance_percent": -4.73
+  },
+  "generated_files": [
+    "parking_layout_allocation.png",
+    "zone_occupancy_curve.png",
+    "walking_distance_distribution.png",
+    "metric_comparison.png",
+    "parking_assignments.csv"
+  ]
+}
