@@ -25,11 +25,23 @@ class RealTimeLossPlot(Callback):
         self.val_throttle_losses = []
         self.train_brake_losses = []
         self.val_brake_losses = []
+        self.learning_rates = []  # Track learning rates
+        self.epochs = []          # Track epoch numbers
         
-        # Initialize plot
+        # Initialize plot with 3 rows x 2 columns for better layout
         plt.ion()  # Turn on interactive mode
-        self.fig, ((self.ax1, self.ax2), (self.ax3, self.ax4)) = plt.subplots(2, 2, figsize=(12, 10))
-        plt.subplots_adjust(hspace=0.3, wspace=0.2)
+        self.fig = plt.figure(figsize=(14, 14))
+        self.fig.suptitle('PilotNet Training Monitor', fontsize=16, y=0.98)
+        
+        # Create subplots
+        self.ax1 = plt.subplot(3, 2, 1)  # Total Loss
+        self.ax2 = plt.subplot(3, 2, 2)  # Steering Angle Loss
+        self.ax3 = plt.subplot(3, 2, 3)  # Throttle Pressure Loss
+        self.ax4 = plt.subplot(3, 2, 4)  # Brake Pressure Loss
+        self.ax5 = plt.subplot(3, 2, 5)  # Learning Rate
+        self.ax6 = plt.subplot(3, 2, 6)  # Loss Ratio (Train/Val)
+        
+        plt.subplots_adjust(hspace=0.3, wspace=0.25)
         
     def on_epoch_end(self, epoch, logs=None):
         # Store losses
@@ -42,49 +54,85 @@ class RealTimeLossPlot(Callback):
         self.train_brake_losses.append(logs.get('brake_pressure_loss'))
         self.val_brake_losses.append(logs.get('val_brake_pressure_loss'))
         
+        # Track epoch number
+        self.epochs.append(epoch + 1)
+        
+        # Get current learning rate
+        lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+        if epoch > 0 and epoch % 10 == 0:
+            lr = lr * (0.8 ** (epoch // 10))
+        self.learning_rates.append(lr)
+        
         # Clear and redraw plots
         self._update_plot()
         
     def _update_plot(self):
         # Total Loss plot
         self.ax1.clear()
-        self.ax1.plot(self.train_losses, 'b-', label='Training Loss')
-        self.ax1.plot(self.val_losses, 'r-', label='Validation Loss')
-        self.ax1.set_title('Total Loss')
+        self.ax1.plot(self.epochs, self.train_losses, 'b-', label='Training Loss', linewidth=2)
+        self.ax1.plot(self.epochs, self.val_losses, 'r-', label='Validation Loss', linewidth=2)
+        self.ax1.set_title('Total Loss', fontsize=12)
         self.ax1.set_xlabel('Epoch')
         self.ax1.set_ylabel('Loss')
         self.ax1.legend()
-        self.ax1.grid(True)
+        self.ax1.grid(True, linestyle='--', alpha=0.7)
+        self.ax1.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         
         # Steering Angle Loss plot
         self.ax2.clear()
-        self.ax2.plot(self.train_steering_losses, 'b-', label='Training')
-        self.ax2.plot(self.val_steering_losses, 'r-', label='Validation')
-        self.ax2.set_title('Steering Angle Loss')
+        self.ax2.plot(self.epochs, self.train_steering_losses, 'b-', label='Training', linewidth=2)
+        self.ax2.plot(self.epochs, self.val_steering_losses, 'r-', label='Validation', linewidth=2)
+        self.ax2.set_title('Steering Angle Loss', fontsize=12)
         self.ax2.set_xlabel('Epoch')
         self.ax2.set_ylabel('Loss')
         self.ax2.legend()
-        self.ax2.grid(True)
+        self.ax2.grid(True, linestyle='--', alpha=0.7)
+        self.ax2.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         
         # Throttle Loss plot
         self.ax3.clear()
-        self.ax3.plot(self.train_throttle_losses, 'b-', label='Training')
-        self.ax3.plot(self.val_throttle_losses, 'r-', label='Validation')
-        self.ax3.set_title('Throttle Pressure Loss')
+        self.ax3.plot(self.epochs, self.train_throttle_losses, 'b-', label='Training', linewidth=2)
+        self.ax3.plot(self.epochs, self.val_throttle_losses, 'r-', label='Validation', linewidth=2)
+        self.ax3.set_title('Throttle Pressure Loss', fontsize=12)
         self.ax3.set_xlabel('Epoch')
         self.ax3.set_ylabel('Loss')
         self.ax3.legend()
-        self.ax3.grid(True)
+        self.ax3.grid(True, linestyle='--', alpha=0.7)
+        self.ax3.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         
         # Brake Loss plot
         self.ax4.clear()
-        self.ax4.plot(self.train_brake_losses, 'b-', label='Training')
-        self.ax4.plot(self.val_brake_losses, 'r-', label='Validation')
-        self.ax4.set_title('Brake Pressure Loss')
+        self.ax4.plot(self.epochs, self.train_brake_losses, 'b-', label='Training', linewidth=2)
+        self.ax4.plot(self.epochs, self.val_brake_losses, 'r-', label='Validation', linewidth=2)
+        self.ax4.set_title('Brake Pressure Loss', fontsize=12)
         self.ax4.set_xlabel('Epoch')
         self.ax4.set_ylabel('Loss')
         self.ax4.legend()
-        self.ax4.grid(True)
+        self.ax4.grid(True, linestyle='--', alpha=0.7)
+        self.ax4.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+        
+        # Learning Rate plot
+        self.ax5.clear()
+        self.ax5.plot(self.epochs, self.learning_rates, 'g-', label='Learning Rate', linewidth=2, marker='o', markersize=4)
+        self.ax5.set_title('Learning Rate', fontsize=12)
+        self.ax5.set_xlabel('Epoch')
+        self.ax5.set_ylabel('Learning Rate')
+        self.ax5.legend()
+        self.ax5.grid(True, linestyle='--', alpha=0.7)
+        self.ax5.ticklabel_format(style='sci', axis='y', scilimits=(-5,-3))
+        
+        # Loss Ratio plot (Training / Validation) - helps detect overfitting
+        self.ax6.clear()
+        if len(self.train_losses) > 0 and len(self.val_losses) > 0:
+            loss_ratio = [train / val if val > 0 else 1 for train, val in zip(self.train_losses, self.val_losses)]
+            self.ax6.plot(self.epochs, loss_ratio, 'purple', label='Train/Val Loss Ratio', linewidth=2)
+            self.ax6.axhline(y=1.0, color='red', linestyle='--', label='Equal Loss')
+        self.ax6.set_title('Loss Ratio (Train/Validation)', fontsize=12)
+        self.ax6.set_xlabel('Epoch')
+        self.ax6.set_ylabel('Ratio')
+        self.ax6.legend()
+        self.ax6.grid(True, linestyle='--', alpha=0.7)
+        self.ax6.set_ylim(bottom=0.5)
         
         # Refresh the plot
         plt.draw()

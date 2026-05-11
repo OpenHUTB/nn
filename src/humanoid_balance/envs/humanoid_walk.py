@@ -8,208 +8,234 @@ import zipfile
 import shutil
 from pathlib import Path
 
-# --- 1. åŠ¨æ€æ³¨å…¥å…¼å®¹æ€§è¡¥ä¸ ---
-<<<<<<< HEAD
-# è§£å†³æ–°ç‰ˆ Mujoco (3.x+) ç§»é™¤ solver_iter å¯¼è‡´çš„æ¸²æŸ“é”™è¯¯
-=======
->>>>>>> upstream/main
-if not hasattr(mujoco.MjData, 'solver_iter'):
+# --- 1. ¶¯Ì¬×¢Èë¼æÈİĞÔ²¹¶¡ ---
+
+# ½â¾öĞÂ°æ Mujoco (3.x+) ÒÆ³ı solver_iter µ¼ÖÂµÄäÖÈ¾´íÎó
+
+
+"if not hasattr(mujoco.MjData, 'solver_iter'):"
     mujoco.MjData.solver_iter = property(lambda self: self.solver_niter)
 
 def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
-<<<<<<< HEAD
+
     """
-    æ”¹è¿›ç‚¹ï¼š
-    1. ä½¿ç”¨ Pathlib è§£å†³ Windows/Linux è·¯å¾„æ–œæ å·®å¼‚
-    2. å¢åŠ è‡ªåŠ¨æ¸…ç†æœºåˆ¶ï¼Œé˜²æ­¢æ®‹ç•™ temp æ–‡ä»¶
-    3. å®‰å…¨åŠ è½½æ¨¡å‹æƒé‡
+    ¸Ä½øµã£º
+    1. Ê¹ÓÃ Pathlib ½â¾ö Windows/Linux Â·¾¶Ğ±¸Ü²îÒì
+    2. Ôö¼Ó×Ô¶¯ÇåÀí»úÖÆ£¬·ÀÖ¹²ĞÁô temp ÎÄ¼ş
+    3. °²È«¼ÓÔØÄ£ĞÍÈ¨ÖØ
     """
-    # è·¯å¾„å¯¹è±¡åŒ–
-=======
->>>>>>> upstream/main
+    # Â·¾¶¶ÔÏó»¯
+
+
     zip_path = Path(zip_path_str)
     extract_dir = Path("temp_model_extract")
     
     if not zip_path.exists():
-<<<<<<< HEAD
-        print(f"è‡´å‘½é”™è¯¯ï¼šå½“å‰ç›®å½•ä¸‹æœªæ‰¾åˆ°æƒé‡å‹ç¼©åŒ… {zip_path.name}")
-=======
-        print(f"è‡´å‘½é”™è¯¯ï¼šæœªæ‰¾åˆ°æƒé‡åŒ… {zip_path.name}")
->>>>>>> upstream/main
+
+        print(f"ÖÂÃü´íÎó£ºµ±Ç°Ä¿Â¼ÏÂÎ´ÕÒµ½È¨ÖØÑ¹Ëõ°ü {zip_path.name}")
+
+        print(f"ÖÂÃü´íÎó£ºÎ´ÕÒµ½È¨ÖØ°ü {zip_path.name}")
+
         return
 
-    # --- 2. ç¯å¢ƒä¸æ¨¡å‹æ¶æ„åˆå§‹åŒ– ---
+    # --- 2. »·¾³ÓëÄ£ĞÍ¼Ü¹¹³õÊ¼»¯ ---
     try:
-<<<<<<< HEAD
-        # æ£€æµ‹è®¾å¤‡åŠ é€Ÿ
+
+        # ¼ì²âÉè±¸¼ÓËÙ
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        # æ˜¾å¼æŒ‡å®šæ¸²æŸ“åç«¯ï¼Œé¿å…éƒ¨åˆ†ç¯å¢ƒå´©æºƒ
-        env = gym.make("Humanoid-v4", render_mode="human")
-        print(f"ç‰©ç†ç¯å¢ƒå¯åŠ¨æˆåŠŸ | è¿è¡Œè®¾å¤‡: {device}")
+        # ÏÔÊ½Ö¸¶¨äÖÈ¾ºó¶Ë£¬±ÜÃâ²¿·Ö»·¾³±ÀÀ£
+"        env = gym.make(""Humanoid-v4"", render_mode=""human"")"
+        print(f"ÎïÀí»·¾³Æô¶¯³É¹¦ | ÔËĞĞÉè±¸: {device}")
         
-        # é¢„å…ˆæ„å»º SAC ç»“æ„ï¼Œverbose=0 å‡å°‘æ— å…³æ—¥å¿—å¹²æ‰°
-        model = SAC("MlpPolicy", env, verbose=0, device=device)
+        # Ô¤ÏÈ¹¹½¨ SAC ½á¹¹£¬verbose=0 ¼õÉÙÎŞ¹ØÈÕÖ¾¸ÉÈÅ
+"        model = SAC(""MlpPolicy"", env, verbose=0, device=device)"
     except Exception as e:
-        print(f"ç¯å¢ƒæˆ–æ¶æ„åˆå§‹åŒ–å¤±è´¥: {e}")
-=======
+        print(f"»·¾³»ò¼Ü¹¹³õÊ¼»¯Ê§°Ü: {e}")
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        # æ˜¾å¼æŒ‡å®šæ¸²æŸ“æ¨¡å¼
-        env = gym.make("Humanoid-v4", render_mode="human")
-        print(f"ç‰©ç†ç¯å¢ƒå¯åŠ¨æˆåŠŸ | è¿è¡Œè®¾å¤‡: {device}")
+"        env = gym.make(""Humanoid-v4"", render_mode=""human"")"
+        print(f"ÎïÀí»·¾³Æô¶¯³É¹¦ | ÔËĞĞÉè±¸: {device}")
         
-        model = SAC("MlpPolicy", env, verbose=0, device=device)
+"        model = SAC(""MlpPolicy"", env, verbose=0, device=device)"
     except Exception as e:
-        print(f"ç¯å¢ƒåˆå§‹åŒ–å¤±è´¥: {e}")
->>>>>>> upstream/main
+        print(f"»·¾³³õÊ¼»¯Ê§°Ü: {e}")
+
         return
 
-    # --- 3. æƒé‡åŠ¨æ€æå–ä¸å¯¹é½ ---
+    # --- 3. È¨ÖØÌáÈ¡Óë¶ÔÆë ---
     try:
-<<<<<<< HEAD
-        # å¦‚æœç›®å½•å·²å­˜åœ¨åˆ™å…ˆæ¸…ç†ï¼Œç¡®ä¿æƒé‡æœ€æ–°
+
+        # Èç¹ûÄ¿Â¼ÒÑ´æÔÚÔòÏÈÇåÀí£¬È·±£È¨ÖØ×îĞÂ
 =======
->>>>>>> upstream/main
+
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
-        extract_dir.mkdir(parents=True, exist_ok=True)
-
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extract("policy.pth", extract_dir)
+"        extract_dir.mkdir(parents=True, exist_ok=True)"
+"        with zipfile.ZipFile(zip_path, 'r') as zip_ref:"
+"            zip_ref.extract(""policy.pth"", extract_dir)"
         
-<<<<<<< HEAD
+
         target_pth = extract_dir / "policy.pth"
         
-        # weights_only=True æ˜¯ PyTorch æ¨èçš„å®‰å…¨åŠ è½½æ–¹å¼
-        state_dict = torch.load(target_pth, map_location=device, weights_only=True)
+        # weights_only=True ÊÇ PyTorch ÍÆ¼öµÄ°²È«¼ÓÔØ·½Ê½
+"        state_dict = torch.load(target_pth, map_location=device, weights_only=True)"
         
-        # å¼ºåˆ¶å…¼å®¹åŠ è½½ï¼šstrict=False å…è®¸å¿½ç•¥éæ ¸å¿ƒå±‚çš„é”®åå·®å¼‚
-        model.policy.load_state_dict(state_dict, strict=False)
-        print("âœ… æƒé‡åŠ è½½æˆåŠŸï¼šæ ¸å¿ƒæ§åˆ¶å‚æ•°å·²æ³¨å…¥")
+        # Ç¿ÖÆ¼æÈİ¼ÓÔØ£ºstrict=False ÔÊĞíºöÂÔ·ÇºËĞÄ²ãµÄ¼üÃû²îÒì
+"        model.policy.load_state_dict(state_dict, strict=False)"
+        print("? È¨ÖØ¼ÓÔØ³É¹¦£ººËĞÄ¿ØÖÆ²ÎÊıÒÑ×¢Èë")
         
     except Exception as e:
-        print(f"âŒ æƒé‡å¤„ç†æ•…éšœ: {e}")
+        print(f"? È¨ÖØ´¦Àí¹ÊÕÏ: {e}")
         env.close()
         return
 
-    # --- 4. ç¨³å¥ä»¿çœŸå¾ªç¯ ---
-    obs, _ = env.reset()
-    # ç¨å¾®æé«˜å¹³æ»‘å› å­ï¼Œå¹³è¡¡ç¨³å®šæ€§å’Œå“åº”é€Ÿåº¦
+    # --- 4. ÎÈ½¡·ÂÕæÑ­»· ---
+"    obs, _ = env.reset()"
+    # ÉÔÎ¢Ìá¸ßÆ½»¬Òò×Ó£¬Æ½ºâÎÈ¶¨ĞÔºÍÏìÓ¦ËÙ¶È
     ACTION_SCALE = 0.88 
     
-    print("å¼€å§‹æ¼”ç¤ºï¼šäººå½¢æœºå™¨äººåŠ¨æ€å¹³è¡¡æ§åˆ¶ï¼ˆæŒ‰ Ctrl+C åœæ­¢ï¼‰")
-=======
-        state_dict = torch.load(extract_dir / "policy.pth", map_location=device, weights_only=True)
-        model.policy.load_state_dict(state_dict, strict=False)
-        print("âœ… æƒé‡åŠ è½½æˆåŠŸ")
+    print("¿ªÊ¼ÑİÊ¾£ºÈËĞÎ»úÆ÷ÈË¶¯Ì¬Æ½ºâ¿ØÖÆ£¨°´ Ctrl+C Í£Ö¹£©")
+
+"        state_dict = torch.load(extract_dir / ""policy.pth"", map_location=device, weights_only=True)"
+"        model.policy.load_state_dict(state_dict, strict=False)"
+        print("? È¨ÖØ¼ÓÔØ³É¹¦")
     except Exception as e:
-        print(f"âŒ æƒé‡åŠ è½½æ•…éšœ: {e}")
+        print(f"? ¼ÓÔØ¹ÊÕÏ: {e}")
         env.close()
         return
 
-    # --- 4. ç¨³å¥ä»¿çœŸå¾ªç¯ (æœ¬æ¬¡ä¿®æ”¹é‡ç‚¹) ---
->>>>>>> upstream/main
+
+    # --- 4. ÎÈ½¡·ÂÕæÑ­»· (±¾´ÎĞŞ¸ÄÖØµã) ---
+
+
+    # --- 4. ÓÅ»¯ºóµÄ·ÂÕæÑ­»· (±¾´ÎĞŞ¸ÄÖØµã) ---
+
     try:
-        obs, _ = env.reset()
+"        obs, _ = env.reset()"
+        env.render() # Ô¤ÈÈ
         
-        # ã€æ–°å¢ï¼šæ¸²æŸ“é¢„çƒ­ã€‘å¼ºåˆ¶è§¦å‘ GLFW åˆå§‹åŒ–ï¼Œè§£å†³â€œNot Initializedâ€æŠ¥é”™
-        print("æ­£åœ¨æ¿€æ´»æ¸²æŸ“ä¸Šä¸‹æ–‡...")
-        env.render() 
+        # ¿ØÖÆ²ÎÊı
+        ACTION_SCALE = 0.88
+        SMOOTH_FACTOR = 0.7  # ¡¾ĞÂÔö¡¿Æ½»¬Òò×Ó£¬0-1Ö®¼ä£¬ÖµÔ½´ó¶¯×÷Ô½Æ½»¬
+        prev_action = np.zeros(env.action_space.shape)
         
-        ACTION_SCALE = 0.88 
-        print("æ¼”ç¤ºå¼€å§‹ï¼šæŒ‰ Ctrl+C åœæ­¢")
+        # ÎïÀí²½³¤¿ØÖÆ (200Hz -> 0.005s)
+        dt = 0.005
+        print(f"ÑİÊ¾¿ªÊ¼£ºÒÑÆôÓÃ¸ß¾«¶ÈÍ¬²½Óë¶¯×÷Æ½»¬Æ÷ (Factor: {SMOOTH_FACTOR})")
         
         while True:
-<<<<<<< HEAD
-            # å¼€å¯ç¡®å®šæ€§é¢„æµ‹
-            action, _ = model.predict(obs, deterministic=True)
+
+
+            # ¿ªÆôÈ·¶¨ĞÔÔ¤²â
+"            action, _ = model.predict(obs, deterministic=True)"
             
-            # è”åˆç¼©æ”¾ä¸é™å¹…ï¼ŒæŠ‘åˆ¶é«˜é¢‘æŠ–åŠ¨
-            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
+            # ÁªºÏËõ·ÅÓëÏŞ·ù£¬ÒÖÖÆ¸ßÆµ¶¶¶¯
+"            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)"
             
-            obs, _, terminated, truncated, _ = env.step(action)
+"            obs, _, terminated, truncated, _ = env.step(action)"
             env.render()
             
-            # åŒ¹é… 200Hz ç‰©ç†ä»¿çœŸæ­¥é•¿
+            # Æ¥Åä 200Hz ÎïÀí·ÂÕæ²½³¤
             time.sleep(0.005) 
             
-=======
-            action, _ = model.predict(obs, deterministic=True)
-            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
+
+
+            start_time = time.perf_counter()
             
-            obs, _, terminated, truncated, _ = env.step(action)
+            # 1. Ä£ĞÍÔ¤²â
+
+"            action, _ = model.predict(obs, deterministic=True)"
             
-            # ã€ä¼˜åŒ–ï¼šå¼‚å¸¸æ•è·ã€‘é˜²æ­¢å•å¸§æ¸²æŸ“é”™è¯¯å¯¼è‡´æ•´ä¸ªç¨‹åºå´©æºƒ
+            # 2. ¡¾ºËĞÄĞŞ¸Ä¡¿¶¯×÷Æ½»¬ÂË²¨ (EMA Filter)
+            # ·ÀÖ¹¹Ø½ÚÒòÎªÈ¨ÖØ²»ÍêÈ«Æ¥Åä¶ø²úÉú¾çÁÒ¶¶¶¯
+            current_action = action * ACTION_SCALE
+            smoothed_action = SMOOTH_FACTOR * prev_action + (1 - SMOOTH_FACTOR) * current_action
+            prev_action = smoothed_action
+            
+            # 3. Ö´ĞĞ¶¯×÷
+"            obs, _, terminated, truncated, _ = env.step(np.clip(smoothed_action, -1.0, 1.0))"
+            
+            # 4. Òì³£°²È«äÖÈ¾
             try:
                 env.render()
-            except Exception as render_err:
-                print(f"è­¦å‘Šï¼šå•å¸§æ¸²æŸ“è·³è¿‡ ({render_err})")
+            except:
                 break
                 
+
             time.sleep(0.005) 
->>>>>>> upstream/main
+
+
+            # 5. ¡¾ºËĞÄĞŞ¸Ä¡¿¸ß¾«¶ÈÊ±¼ä²¹³¥
+            # ¼ÆËã´úÂëÔËĞĞÏûºÄµÄÊ±¼ä£¬Ö» sleep Ê£Óà²¿·Ö£¬±£Ö¤·ÂÕæËÙ¶Èºã¶¨
+            elapsed = time.perf_counter() - start_time
+            if elapsed < dt:
+                time.sleep(dt - elapsed)
+            
+
             if terminated or truncated:
-                obs, _ = env.reset()
+"                obs, _ = env.reset()"
+                prev_action = np.zeros(env.action_space.shape) # ÖØÖÃÆ½»¬Æ÷
                 
     except KeyboardInterrupt:
-        print("\nç”¨æˆ·æ‰‹åŠ¨åœæ­¢æ¨¡æ‹Ÿã€‚")
-    except Exception as e:
-        print(f"è¿è¡Œä¸­å‘ç”Ÿå¼‚å¸¸: {e}")
+        print("\nÓÃ»§ÊÖ¶¯Í£Ö¹Ä£Äâ¡£")
     finally:
-<<<<<<< HEAD
-        # --- 5. èµ„æºå®‰å…¨é‡Šæ”¾ä¸æ–‡ä»¶æ¸…ç† ---
+
+
+        # --- 5. ×ÊÔ´°²È«ÊÍ·ÅÓëÎÄ¼şÇåÀí ---
         env.close()
         if extract_dir.exists():
-            shutil.rmtree(extract_dir) # å½»åº•åˆ é™¤ä¸´æ—¶è§£å‹æ–‡ä»¶
-        print("ç¯å¢ƒå·²å…³é—­ï¼Œä¸´æ—¶èµ„æºå·²æ¸…ç†ã€‚")
+            shutil.rmtree(extract_dir) # ³¹µ×É¾³ıÁÙÊ±½âÑ¹ÎÄ¼ş
+        print("»·¾³ÒÑ¹Ø±Õ£¬ÁÙÊ±×ÊÔ´ÒÑÇåÀí¡£")
 
 if __name__ == "__main__":
     run_simulation()
-    # ... å‰é¢ä»£ç ä¿æŒä¸å˜ ...
+    # ... Ç°Ãæ´úÂë±£³Ö²»±ä ...
 
-    # --- 4. ç¨³å¥ä»¿çœŸå¾ªç¯ ---
+    # --- 4. ÎÈ½¡·ÂÕæÑ­»· ---
     try:
-        obs, _ = env.reset()
-        # ã€æ–°å¢ï¼šæ¸²æŸ“é¢„çƒ­ã€‘åœ¨å¾ªç¯å‰å…ˆè°ƒç”¨ä¸€æ¬¡æ¸²æŸ“ï¼Œå¼ºåˆ¶è§¦å‘ GLFW åˆå§‹åŒ–
+"        obs, _ = env.reset()"
+        # ¡¾ĞÂÔö£ºäÖÈ¾Ô¤ÈÈ¡¿ÔÚÑ­»·Ç°ÏÈµ÷ÓÃÒ»´ÎäÖÈ¾£¬Ç¿ÖÆ´¥·¢ GLFW ³õÊ¼»¯
         env.render() 
         
         ACTION_SCALE = 0.88 
-        print("å¼€å§‹æ¼”ç¤ºï¼šæ¸²æŸ“ä¸Šä¸‹æ–‡å·²æ¿€æ´»...")
+        print("¿ªÊ¼ÑİÊ¾£ºäÖÈ¾ÉÏÏÂÎÄÒÑ¼¤»î...")
         
         while True:
-            action, _ = model.predict(obs, deterministic=True)
-            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
+"            action, _ = model.predict(obs, deterministic=True)"
+"            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)"
             
-            obs, _, terminated, truncated, _ = env.step(action)
+"            obs, _, terminated, truncated, _ = env.step(action)"
             
-            # ã€ä¼˜åŒ–ã€‘æ•è·å•æ­¥æ¸²æŸ“å¯èƒ½çš„å¼‚å¸¸
+            # ¡¾ÓÅ»¯¡¿²¶»ñµ¥²½äÖÈ¾¿ÉÄÜµÄÒì³£
             try:
                 env.render()
             except Exception as render_err:
-                print(f"æ¸²æŸ“å¸§è·³è¿‡: {render_err}")
+                print(f"äÖÈ¾Ö¡Ìø¹ı: {render_err}")
                 break
                 
             time.sleep(0.005) 
             if terminated or truncated:
-                obs, _ = env.reset()
+"                obs, _ = env.reset()"
                 
     except KeyboardInterrupt:
-        print("\nç”¨æˆ·æ‰‹åŠ¨åœæ­¢ã€‚")
+        print("\nÓÃ»§ÊÖ¶¯Í£Ö¹¡£")
     except Exception as e:
-        print(f"è¿è¡Œä¸­å‘ç”ŸæœªçŸ¥é”™è¯¯: {e}")
+        print(f"ÔËĞĞÖĞ·¢ÉúÎ´Öª´íÎó: {e}")
     finally:
-        # ã€å…³é”®ã€‘æ— è®ºå‘ç”Ÿä»€ä¹ˆï¼Œå¿…é¡»ç¡®ä¿ env.close() è¢«æ‰§è¡Œï¼Œé‡Šæ”¾ GLFW å¥æŸ„
-        print("æ­£åœ¨å®‰å…¨é‡Šæ”¾æ¸²æŸ“èµ„æº...")
+        # ¡¾¹Ø¼ü¡¿ÎŞÂÛ·¢ÉúÊ²Ã´£¬±ØĞëÈ·±£ env.close() ±»Ö´ĞĞ£¬ÊÍ·Å GLFW ¾ä±ú
+        print("ÕıÔÚ°²È«ÊÍ·ÅäÖÈ¾×ÊÔ´...")
         env.close()
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
-=======
-        # ã€å…³é”®ï¼šå®‰å…¨é‡Šæ”¾ã€‘ç¡®ä¿ GLFW å¥æŸ„è¢«æ­£ç¡®å…³é—­ï¼Œé‡Šæ”¾çª—å£èµ„æº
-        print("æ­£åœ¨æ¸…ç†ç³»ç»Ÿèµ„æº...")
+
+        # ¡¾¹Ø¼ü£º°²È«ÊÍ·Å¡¿È·±£ GLFW ¾ä±ú±»ÕıÈ·¹Ø±Õ£¬ÊÍ·Å´°¿Ú×ÊÔ´
+        print("ÕıÔÚÇåÀíÏµÍ³×ÊÔ´...")
+
+
         env.close()
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
-        print("èµ„æºå·²å®‰å…¨å›æ”¶ã€‚")
+        print("×ÊÔ´ÒÑ°²È«»ØÊÕ¡£")
 
 if __name__ == "__main__":
     run_simulation()
->>>>>>> upstream/main
