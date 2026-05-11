@@ -23,7 +23,6 @@ def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
     # --- 2. 环境与模型架构初始化 ---
     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        # 显式指定渲染模式
         env = gym.make("Humanoid-v4", render_mode="human")
         print(f"物理环境启动成功 | 运行设备: {device}")
         
@@ -32,12 +31,11 @@ def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
         print(f"环境初始化失败: {e}")
         return
 
-    # --- 3. 权重动态提取与对齐 ---
+    # --- 3. 权重提取与对齐 ---
     try:
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
         extract_dir.mkdir(parents=True, exist_ok=True)
-
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extract("policy.pth", extract_dir)
         
@@ -45,45 +43,58 @@ def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
         model.policy.load_state_dict(state_dict, strict=False)
         print("✅ 权重加载成功")
     except Exception as e:
-        print(f"❌ 权重加载故障: {e}")
+        print(f"❌ 加载故障: {e}")
         env.close()
         return
 
-    # --- 4. 稳健仿真循环 (本次修改重点) ---
+    # --- 4. 优化后的仿真循环 (本次修改重点) ---
     try:
         obs, _ = env.reset()
+        env.render() # 预热
         
-        # 【新增：渲染预热】强制触发 GLFW 初始化，解决“Not Initialized”报错
-        print("正在激活渲染上下文...")
-        env.render() 
+        # 控制参数
+        ACTION_SCALE = 0.88
+        SMOOTH_FACTOR = 0.7  # 【新增】平滑因子，0-1之间，值越大动作越平滑
+        prev_action = np.zeros(env.action_space.shape)
         
-        ACTION_SCALE = 0.88 
-        print("演示开始：按 Ctrl+C 停止")
+        # 物理步长控制 (200Hz -> 0.005s)
+        dt = 0.005
+        print(f"演示开始：已启用高精度同步与动作平滑器 (Factor: {SMOOTH_FACTOR})")
         
         while True:
+            start_time = time.perf_counter()
+            
+            # 1. 模型预测
             action, _ = model.predict(obs, deterministic=True)
-            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
             
-            obs, _, terminated, truncated, _ = env.step(action)
+            # 2. 【核心修改】动作平滑滤波 (EMA Filter)
+            # 防止关节因为权重不完全匹配而产生剧烈抖动
+            current_action = action * ACTION_SCALE
+            smoothed_action = SMOOTH_FACTOR * prev_action + (1 - SMOOTH_FACTOR) * current_action
+            prev_action = smoothed_action
             
-            # 【优化：异常捕获】防止单帧渲染错误导致整个程序崩溃
+            # 3. 执行动作
+            obs, _, terminated, truncated, _ = env.step(np.clip(smoothed_action, -1.0, 1.0))
+            
+            # 4. 异常安全渲染
             try:
                 env.render()
-            except Exception as render_err:
-                print(f"警告：单帧渲染跳过 ({render_err})")
+            except:
                 break
                 
-            time.sleep(0.005) 
+            # 5. 【核心修改】高精度时间补偿
+            # 计算代码运行消耗的时间，只 sleep 剩余部分，保证仿真速度恒定
+            elapsed = time.perf_counter() - start_time
+            if elapsed < dt:
+                time.sleep(dt - elapsed)
+            
             if terminated or truncated:
                 obs, _ = env.reset()
+                prev_action = np.zeros(env.action_space.shape) # 重置平滑器
                 
     except KeyboardInterrupt:
         print("\n用户手动停止模拟。")
-    except Exception as e:
-        print(f"运行中发生异常: {e}")
     finally:
-        # 【关键：安全释放】确保 GLFW 句柄被正确关闭，释放窗口资源
-        print("正在清理系统资源...")
         env.close()
         if extract_dir.exists():
             shutil.rmtree(extract_dir)

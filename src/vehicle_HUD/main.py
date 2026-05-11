@@ -97,6 +97,10 @@ def main():
     # HUD 显示开关
     hud_enabled = True
     
+    # 速度限制警告系统
+    speed_limit = 60  # 默认限速 60 km/h
+    speed_warning_enabled = True
+    
     # 获取车辆状态数据
     def get_vehicle_data():
         velocity = vehicle.get_velocity()
@@ -142,8 +146,16 @@ def main():
         
         data = get_vehicle_data()
         
+        # 速度警告检测
+        speed_warning = False
+        speed_warning_color = text_color
+        if speed_warning_enabled and data['speed'] > speed_limit:
+            speed_warning = True
+            speed_warning_color = (0, 0, 255)  # 红色警告
+        
         hud_lines = [
             f"Speed: {data['speed']} km/h",
+            f"Limit: {speed_limit} km/h",
             f"Throttle: {data['throttle']}%",
             f"Steer: {data['steer']}%",
             f"Gear: {data['gear']}",
@@ -159,7 +171,9 @@ def main():
             (text_width, text_height), _ = cv2.getTextSize(line, font, font_scale, font_thickness)
             cv2.rectangle(image, (start_x - 5, y - text_height - 5), 
                          (start_x + text_width + 5, y + 5), bg_color, -1)
-            cv2.putText(image, line, (start_x, y), font, font_scale, text_color, font_thickness)
+            # 速度超过限制时使用红色警告
+            current_color = speed_warning_color if i == 0 else text_color
+            cv2.putText(image, line, (start_x, y), font, font_scale, current_color, font_thickness)
         
         return image
 
@@ -222,6 +236,15 @@ def main():
             elif key == ord('h') or key == ord('H'):
                 hud_enabled = not hud_enabled
                 print(f"HUD 显示 {'开启' if hud_enabled else '关闭'}")
+            elif key == ord('+') or key == ord('='):
+                speed_limit += 10
+                print(f"限速提高到: {speed_limit} km/h")
+            elif key == ord('-') or key == ord('_'):
+                speed_limit = max(10, speed_limit - 10)
+                print(f"限速降低到: {speed_limit} km/h")
+            elif key == ord('w') or key == ord('W'):
+                speed_warning_enabled = not speed_warning_enabled
+                print(f"速度警告 {'开启' if speed_warning_enabled else '关闭'}")
 
             # 清理旧帧
             max_to_keep = 5

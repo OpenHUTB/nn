@@ -130,6 +130,19 @@ class SimpleDrivingSystem:
         self.current_color_index = 0  # 当前颜色索引
         self.screenshot_dir = 'screenshots'  # 截图保存目录
         self.is_night_mode = False  # 夜晚模式标志
+        self.vehicle_models = [  # 车辆款式列表
+            'vehicle.tesla.model3',      # 特斯拉 Model3
+            'vehicle.chevrolet.impala',  # 雪佛兰 Impala
+            'vehicle.ford.mustang',      # 福特 Mustang
+            'vehicle.mercedes.coupe',    # 奔驰 Coupe
+            'vehicle.nissan.patrol',     # 日产 Patrol
+        ]  # 车辆款式列表
+        self.current_model_index = 0  # 当前车辆款式索引
+        self.show_trajectory = False  # 轨迹显示标志
+        self.trajectory_points = deque(maxlen=500)  # 轨迹点集合
+        self.map_img = None  # 存储地图图像
+        self.map_width = 800  # 地图图像宽度
+        self.map_height = 800  # 地图图像高度
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -290,6 +303,58 @@ class SimpleDrivingSystem:
         """更新相机视角"""
         print(f"已切换到{self.get_view_name()}视角")
 
+    def generate_topology_map(self):
+        """生成道路拓扑地图图像"""
+        try:
+            # 创建黑色背景
+            self.map_img = np.zeros((self.map_width, self.map_height, 3), dtype=np.uint8)
+
+            # 获取地图拓扑
+            map = self.world.get_map()
+            topology = map.get_topology()
+
+            # 计算道路节点的范围
+            all_x = []
+            all_y = []
+            for waypoint in map.generate_waypoints(2.0):
+                all_x.append(waypoint.transform.location.x)
+                all_y.append(waypoint.transform.location.y)
+
+            if not all_x or not all_y:
+                print("无法获取道路拓扑信息")
+                return
+
+            min_x, max_x = min(all_x), max(all_x)
+            min_y, max_y = min(all_y), max(all_y)
+
+            # 坐标缩放比例
+            scale_x = (self.map_width - 100) / (max_x - min_x) if max_x != min_x else 1
+            scale_y = (self.map_height - 100) / (max_y - min_y) if max_y != min_y else 1
+            self.map_scale = min(scale_x, scale_y) * 0.8
+            self.map_offset_x = min_x
+            self.map_offset_y = min_y
+
+            # 绘制道路
+            for waypoint in map.generate_waypoints(2.0):
+                wp_x = int((waypoint.transform.location.x - self.map_offset_x) * self.map_scale + 50)
+                wp_y = int((waypoint.transform.location.y - self.map_offset_y) * self.map_scale + 50)
+
+                # 绘制道路点（灰色）
+                cv2.circle(self.map_img, (wp_x, wp_y), 1, (80, 80, 80), -1)
+
+            print("道路拓扑地图生成成功")
+        except Exception as e:
+            print(f"生成拓扑地图时出错: {e}")
+
+    def world_to_map(self, location):
+        """将世界坐标转换为地图图像坐标"""
+        try:
+            x = int((location.x - self.map_offset_x) * self.map_scale + 50)
+            y = int((location.y - self.map_offset_y) * self.map_scale + 50)
+            return (x, y)
+        except:
+            return (400, 400)
+
     def switch_map(self):
         """切换到下一个地图"""
         try:
@@ -348,7 +413,10 @@ class SimpleDrivingSystem:
             
             # 应用当前天气
             self.set_weather(self.current_weather)
-            
+
+            # 重新生成道路拓扑地图
+            self.generate_topology_map()
+
             print(f"地图切换成功: {self.current_map}")
             
         except Exception as e:
@@ -508,6 +576,84 @@ class SimpleDrivingSystem:
             if not self.vehicle:
                 self.spawn_vehicle()
 
+    def switch_vehicle_model(self):
+        """切换车辆款式"""
+        try:
+            if self.vehicle:
+                transform = self.vehicle.get_transform()
+                
+                # 停止所有相机
+                for view_mode, camera in self.cameras.items():
+                    if camera:
+                        try:
+                            camera.stop()
+                            camera.destroy()
+                        except:
+                            pass
+                self.cameras.clear()
+                
+                # 销毁当前车辆
+                self.vehicle.destroy()
+                self.vehicle = None
+                
+                # 切换到下一个车辆款式
+                self.current_model_index = (self.current_model_index + 1) % len(self.vehicle_models)
+                next_model = self.vehicle_models[self.current_model_index]
+                
+                # 获取蓝图库
+                blueprint_library = self.world.get_blueprint_library()
+                vehicle_bp = blueprint_library.find(next_model)
+                
+                # 如果找不到指定车型，随机选择一个
+                if not vehicle_bp:
+                    all_vehicles = blueprint_library.filter('vehicle.*')
+                    if all_vehicles:
+                        vehicle_bp = random.choice(list(all_vehicles))
+                        print(f"未找到 {next_model}，使用随机车辆: {vehicle_bp.id}")
+                
+                if vehicle_bp:
+                    # 设置当前颜色
+                    color = self.car_colors[self.current_color_index]
+                    vehicle_bp.set_attribute('color', f'{color[0]},{color[1]},{color[2]}')
+                    
+                    # 尝试在相同位置生成新车辆
+                    self.vehicle = self.world.try_spawn_actor(vehicle_bp, transform)
+                    
+                    # 如果失败，尝试使用出生点
+                    if not self.vehicle:
+                        spawn_points = self.world.get_map().get_spawn_points()
+                        for spawn_point in spawn_points[:5]:
+                            self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
+                            if self.vehicle:
+                                print("车辆已移动到新位置")
+                                break
+                    
+                    if self.vehicle:
+                        # 禁用自动驾驶
+                        self.vehicle.set_autopilot(False)
+                        
+                        # 重新设置相机
+                        self.setup_camera()
+                        
+                        # 重新设置控制器
+                        self.setup_controller()
+                        
+                        print(f"车辆款式已切换: {next_model.split('.')[-1]}")
+                    else:
+                        print("无法生成新车辆，款式切换失败")
+                        self.current_model_index = (self.current_model_index - 1) % len(self.vehicle_models)
+                        self.spawn_vehicle()
+                else:
+                    print("无法获取车辆蓝图")
+                    self.spawn_vehicle()
+            else:
+                print("车辆不存在，无法切换款式")
+        except Exception as e:
+            print(f"切换车辆款式时出错: {e}")
+            self.current_model_index = (self.current_model_index - 1) % len(self.vehicle_models)
+            if not self.vehicle:
+                self.spawn_vehicle()
+
     def take_screenshot(self, image):
         """保存当前画面截图"""
         try:
@@ -593,6 +739,9 @@ class SimpleDrivingSystem:
         # 生成一些NPC车辆
         self.spawn_npc_vehicles(2)
 
+        # 生成道路拓扑地图
+        self.generate_topology_map()
+
         print("\n系统准备就绪！")
         print("控制指令:")
         print("  q - 退出程序")
@@ -605,6 +754,8 @@ class SimpleDrivingSystem:
         print("  c - 切换车辆颜色")
         print("  p - 保存当前画面截图")
         print("  l - 切换夜晚模式（自动打开/关闭近光灯）")
+        print("  u - 切换车辆款式")
+        print("  d - 切换导航轨迹显示")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -630,6 +781,11 @@ class SimpleDrivingSystem:
                     reverse=reverse  # 新代码，支持倒车
                 )
                 self.vehicle.apply_control(control)
+
+                # 记录轨迹点
+                if self.show_trajectory:
+                    vehicle_location = self.vehicle.get_location()
+                    self.trajectory_points.append(vehicle_location)
 
                 # 更新显示
                 if self.camera_image is not None:
@@ -676,6 +832,43 @@ class SimpleDrivingSystem:
                     cv2.putText(display_img, f"Color: {current_color_name}",
                                 (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (0, 128, 255), 2)  # 橙色显示
+                    
+                    # 显示当前车辆款式
+                    current_model = self.vehicle_models[self.current_model_index]
+                    model_name = current_model.split('.')[-1]
+                    cv2.putText(display_img, f"Model: {model_name}",
+                                (20, 400), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (128, 255, 0), 2)  # 亮绿色显示
+
+                    # 绘制道路轨迹
+                    if self.show_trajectory and self.map_img is not None:
+                        # 创建地图副本
+                        map_display = self.map_img.copy()
+
+                        # 绘制轨迹
+                        if len(self.trajectory_points) > 1:
+                            for i in range(1, len(self.trajectory_points)):
+                                pt1 = self.world_to_map(self.trajectory_points[i-1])
+                                pt2 = self.world_to_map(self.trajectory_points[i])
+                                cv2.line(map_display, pt1, pt2, (0, 255, 255), 2)
+
+                        # 绘制车辆位置（红色点）
+                        vehicle_loc = self.vehicle.get_location()
+                        vehicle_pt = self.world_to_map(vehicle_loc)
+                        cv2.circle(map_display, vehicle_pt, 5, (0, 0, 255), -1)
+
+                        # 在主显示图像右上角显示地图
+                        map_resized = cv2.resize(map_display, (200, 200))
+                        display_img[10:210, display_img.shape[1]-210:display_img.shape[1]-10] = map_resized
+
+                        # 显示轨迹状态
+                        cv2.putText(display_img, f"Trajectory: ON ({len(self.trajectory_points)} pts)",
+                                    (20, 440), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6, (0, 255, 255), 2)
+                    else:
+                        cv2.putText(display_img, "Trajectory: OFF",
+                                    (20, 440), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6, (128, 128, 128), 2)
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
@@ -723,6 +916,16 @@ class SimpleDrivingSystem:
                 elif key == ord('l') or key == ord('L'):
                     # 切换夜晚模式（支持大小写）
                     self.toggle_night_mode()
+                elif key == ord('u') or key == ord('U'):
+                    # 切换车辆款式（支持大小写）
+                    self.switch_vehicle_model()
+                elif key == ord('d') or key == ord('D'):
+                    # 切换轨迹显示（支持大小写）
+                    self.show_trajectory = not self.show_trajectory
+                    if self.show_trajectory:
+                        print("轨迹显示已开启")
+                    else:
+                        print("轨迹显示已关闭")
 
                 frame_count += 1
 
