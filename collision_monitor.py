@@ -1,8 +1,9 @@
 import carla
 from datetime import datetime
-from utils import calculate_vehicle_speed_kmh, set_global_collision_speed
+from utils import calculate_vehicle_speed_kmh
+import vehicle_status_gui as vsg  # 新增导入GUI模块
 
-# 全局变量：仅保留碰撞状态标记（删除vital_callback）
+# 全局变量：仅保留碰撞状态标记
 collision_occurred = False
 
 def create_collision_sensor(world: carla.World, vehicle: carla.Vehicle):
@@ -25,16 +26,16 @@ def create_collision_sensor(world: carla.World, vehicle: carla.Vehicle):
 
 def on_collision(event, vehicle: carla.Vehicle):
     """
-    碰撞事件回调处理：记录碰撞信息、更新全局碰撞速度
+    碰撞事件回调处理：记录碰撞信息、直接更新GUI碰撞车速
     :param event: 碰撞事件对象
     :param vehicle: 发生碰撞的车辆Actor
     """
     global collision_occurred
     collision_occurred = True
 
-    # 1. 计算碰撞时车速并写入全局变量
+    # 1. 计算碰撞时车速并直接更新GUI的碰撞车速
     collision_speed = calculate_vehicle_speed_kmh(vehicle)
-    set_global_collision_speed(collision_speed)
+    vsg.update_vehicle_status("collision_speed", collision_speed)  # 直接更新GUI
 
     # 2. 记录碰撞详细日志到文件
     collision_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
