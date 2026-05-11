@@ -1,6 +1,16 @@
 import pygame
 import math
 import sys
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='无人车基础控制')
+    parser.add_argument('--width', type=int, default=800, help='窗口宽度（像素）')
+    parser.add_argument('--height', type=int, default=600, help='窗口高度（像素）')
+    parser.add_argument('--speed', type=float, default=4.0, help='移动速度（像素/帧）')
+    parser.add_argument('--turn-speed', type=float, default=2.0, help='转向速度（度/帧）')
+    parser.add_argument('--fps', type=int, default=60, help='目标帧率')
+    return parser.parse_args()
 
 # 1. 初始化pygame（必须放在最前面）
 try:
@@ -11,8 +21,9 @@ except pygame.error as e:
     sys.exit(1)
 
 # 2. 屏幕配置
-SCREEN_W = 800
-SCREEN_H = 600
+args = parse_args()
+SCREEN_W = args.width
+SCREEN_H = args.height
 try:
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     pygame.display.set_caption("无人车基础控制")
@@ -31,8 +42,8 @@ class Car:
         # 初始方向（向上，角度0为右，90为上）
         self.angle = 90
         # 运动参数
-        self.speed = 4
-        self.turn_speed = 2
+        self.speed = args.speed
+        self.turn_speed = args.turn_speed
 
     def move(self, direction):
         """根据方向移动：forward/backward"""
@@ -105,9 +116,9 @@ def main():
             car.draw()  # 画车辆
             screen.blit(tip_text, (10, 10))  # 画控制说明
 
-            # 4. 更新屏幕+控制帧率（60帧/秒，避免画面卡顿）
+            # 4. 更新屏幕+控制帧率
             pygame.display.update()
-            clock.tick(60)
+            clock.tick(args.fps)
     finally:
         # 5. 退出程序（释放资源）
         pygame.quit()
