@@ -177,46 +177,37 @@ class GaussianMixtureModel:
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
 
         log_likelihood = -np.inf
-        
+
         log_pi = np.log(self.pi)
-        log_likelihood = -np.inf
-        
-        log_pi = np.log(self.pi)
-        
-        for iter in range(self.max_iter):
+
+        for iteration in range(self.max_iter):
             if self.n_jobs != 1:
                 log_prob = self._log_gaussian_parallel(X, self.mu, self.sigma)
             else:
                 log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
             log_prob += log_pi[np.newaxis, :]
-            
+
             log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
-            
+
             gamma = np.exp(log_prob - log_prob_sum)
 
             Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
-            Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
-            
+
             self.pi = Nk / n_samples
             log_pi = np.log(self.pi)
-            
+
             current_log_likelihood = np.sum(log_prob_sum)
             self.log_likelihoods.append(current_log_likelihood)
-            log_pi = np.log(self.pi)
-            
-            current_log_likelihood = np.sum(log_prob_sum)
-            self.log_likelihoods.append(current_log_likelihood)
-            
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
+
+            if iteration > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
-                
+
             log_likelihood = current_log_likelihood
-            log_likelihood = current_log_likelihood
-            
+
             self.mu = new_mu
             self.sigma = new_sigma
-        
-        self.n_iters_ = iter + 1
+
+        self.n_iters_ = iteration + 1
         self.labels_ = np.argmax(gamma, axis=1)
         
         self._compute_aic_bic(X)
@@ -330,7 +321,7 @@ class GaussianMixtureModel:
         if sign <= 0:  # 行列式非正（理论上协方差矩阵应是正定的）
             # 添加一个小的对角扰动项（单位矩阵乘以1e-6）
             # 确保矩阵可逆且正定，提高数值稳定性
-            sigma += np.eye(n_features) * 1e-6  # 正则化处理
+            sigma = sigma + np.eye(n_features) * 1e-6  # 正则化处理
             
             # 重新计算调整后的协方差矩阵的行列式
             sign, logdet = np.linalg.slogdet(sigma)
