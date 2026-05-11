@@ -26,7 +26,18 @@ violation_info = {
     "ignore_sign": False,
     "current_speed": 0.0
 }
-SPEED_LIMIT = 50.0  # 固定限速，恢复原版
+# 新增：违章次数统计
+violation_count = {
+    "speeding_cnt": 0,
+    "red_light_cnt": 0
+}
+# 记录上一帧违章状态，避免同一违章重复计数
+last_violation = {
+    "speeding": False,
+    "red_light": False
+}
+
+SPEED_LIMIT = 50.0  # 固定限速
 
 
 # Load a different map
@@ -45,6 +56,9 @@ def spawn_vehicles(num_vehicles, world, spawn_points):
         vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
         if vehicle:
             spawned_vehicles.append(vehicle)
+        else:
+            print("Failed to spawn vehicle")
+
     return spawned_vehicles
 
 
@@ -56,22 +70,62 @@ def get_vehicle_speed(vehicle):
 
 
 # ------------------------------
-# 【修改】违章判断：使用视觉检测红绿灯
+# 夜间/弱光 红绿灯识别优化
 # ------------------------------
+def detect_traffic_light_vision(img_rgb):
+    gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+    brightness = np.mean(gray)
+
+    if brightness < 50:
+        img_rgb = cv2.convertScaleAbs(img_rgb, alpha=1.8, beta=30)
+
+    hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
+
+    lower_red1 = np.array([0, 120, 120])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([160, 120, 120])
+    upper_red2 = np.array([179, 255, 255])
+
+    mask_red = cv2.inRange(hsv, lower_red1, upper_red1) + cv2.inRange(hsv, lower_red2, upper_red2)
+
+    kernel = np.ones((2, 2), np.uint8)
+    mask_red = cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel)
+
+    red_pixels = cv2.countNonZero(mask_red)
+    threshold = 40 if brightness < 50 else 80
+    return red_pixels > threshold
+
+
+# 违章判断 + 次数统计
 def detect_violations(vehicle, img_rgb):
     speed = get_vehicle_speed(vehicle)
     violation_info["current_speed"] = speed
     violation_info["speeding"] = speed > SPEED_LIMIT
-    # 纯图像识别红绿灯
     violation_info["red_light"] = detect_traffic_light_vision(img_rgb)
     violation_info["ignore_sign"] = False
 
+    # 违章次数累加：只在从无违章变有违章时计数一次
+    if violation_info["speeding"] and not last_violation["speeding"]:
+        violation_count["speeding_cnt"] += 1
+    if violation_info["red_light"] and not last_violation["red_light"]:
+        violation_count["red_light_cnt"] += 1
 
-# 绘制违章信息到画面
+    # 更新上一帧状态
+    last_violation["speeding"] = violation_info["speeding"]
+    last_violation["red_light"] = violation_info["red_light"]
+
+
+# 绘制违章信息 + 实时违章次数
 def draw_violation_info(img):
     speed = violation_info["current_speed"]
     cv2.putText(img, f"Speed: {speed} km/h", (20, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
+
+    # 显示违章统计次数
+    cv2.putText(img, f"Speeding Count: {violation_count['speeding_cnt']}", (20, 200),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 0), 2)
+    cv2.putText(img, f"RedLight Count: {violation_count['red_light_cnt']}", (20, 240),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 0), 2)
 
     if violation_info["speeding"]:
         cv2.putText(img, "VIOLATION: SPEEDING!", (20, 100),
@@ -158,7 +212,7 @@ def get_weather_params(world):
         "precipitation": weather.precipitation,
         "precipitation_deposits": weather.precipitation_deposits,
         "wind_intensity": weather.wind_intensity,
-        sun_azimuth_angle: weather.sun_azimuth_angle,
+        "sun_azimuth_angle": weather.sun_azimuth_angle,
         "sun_altitude_angle": weather.sun_altitude_angle,
         "fog_density": weather.fog_density,
         "wetness": weather.wetness
@@ -249,7 +303,7 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
     return bounding_boxes
 
 
-# 保存XML（删除多余speed_limit字段，恢复原版）
+# 保存XML
 def create_xml_file(image_name, bboxes, width, height, weather_params):
     annotation = ET.Element("annotation")
     filename = ET.SubElement(annotation, "filename")
@@ -281,7 +335,7 @@ def create_xml_file(image_name, bboxes, width, height, weather_params):
         ET.SubElement(bndbox, "xmin").text = str(bbox['xmin'])
         ET.SubElement(bndbox, "ymin").text = str(bbox['ymin'])
         ET.SubElement(bndbox, "xmax").text = str(bbox['xmax'])
-        ET.SubElement(ymax, "ymax").text = str(bbox['ymax'])
+        ET.SubElement(bndbox, "ymax").text = str(bbox['ymax'])
 
     tree = ET.ElementTree(annotation)
     xml_file = os.path.join(output_dir, image_name.replace(".png", ".xml"))

@@ -80,7 +80,7 @@ class EvaluateThread(QtCore.QThread):
         logger.info("Evaluation terminated")
 
     def run(self):
-        return self.run_drl_model()
+        self.results = self.run_drl_model()
 
     def run_drl_model(self):
         logger.info("Start evaluation")
@@ -275,7 +275,7 @@ def main() -> None:
             args.eval_env,
             args.eval_dynamics,
         )
-        results_list.append(evaluate_thread.run())
+        results_list.append(evaluate_thread.run_drl_model())
 
     os.makedirs(PROJECT_ROOT / "logs_eval" / "results", exist_ok=True)
     np.save(

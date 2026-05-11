@@ -5,92 +5,89 @@ import numpy as np
 from stable_baselines3 import SAC
 import mujoco
 import zipfile
-import os
-import sys
+import shutil
+from pathlib import Path
 
-# --- 1. 解决新版 Mujoco 属性名冲突补丁 ---
-# 确保在 Gymnasium 渲染调用 solver_iter 时不会因版本更新而报错
+# --- 1. 动态注入兼容性补丁 ---
 if not hasattr(mujoco.MjData, 'solver_iter'):
     mujoco.MjData.solver_iter = property(lambda self: self.solver_niter)
 
-def run_simulation(zip_container="humanoid_final_walking.zip"):
-    """
-    自动从 zip 中解压 policy.pth 并使用兼容模式加载权重
-    """
-    # --- 2. 环境初始化 ---
-    try:
-        # 使用 Humanoid-v4 匹配 376 维观测空间
-        env = gym.make("Humanoid-v4", render_mode="human")
-        print("物理环境已启动，正在准备演示...")
-    except Exception as e:
-        print(f"环境启动失败: {e}")
+def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
+    zip_path = Path(zip_path_str)
+    extract_dir = Path("temp_model_extract")
+    
+    if not zip_path.exists():
+        print(f"致命错误：未找到权重包 {zip_path.name}")
         return
 
-    # --- 3. 动态提取与兼容性加载 ---
-    extract_dir = "temp_model_extract"
-    if not os.path.exists(extract_dir):
-        os.makedirs(extract_dir)
-    
-    target_pth = os.path.join(extract_dir, "policy.pth")
-
+    # --- 2. 环境与模型架构初始化 ---
     try:
-        print(f"正在从 {zip_container} 中提取权重文件...")
-        with zipfile.ZipFile(zip_container, 'r') as zip_ref:
-            # 提取压缩包内的原始权重文件
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # 显式指定渲染模式
+        env = gym.make("Humanoid-v4", render_mode="human")
+        print(f"物理环境启动成功 | 运行设备: {device}")
+        
+        model = SAC("MlpPolicy", env, verbose=0, device=device)
+    except Exception as e:
+        print(f"环境初始化失败: {e}")
+        return
+
+    # --- 3. 权重动态提取与对齐 ---
+    try:
+        if extract_dir.exists():
+            shutil.rmtree(extract_dir)
+        extract_dir.mkdir(parents=True, exist_ok=True)
+
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extract("policy.pth", extract_dir)
         
-        print("正在构建模型大脑并注入权重...")
-        # 先建立 SAC 模型结构
-        model = SAC("MlpPolicy", env, verbose=1)
-        
-        # 加载提取出的 pth 数据
-        state_dict = torch.load(target_pth, map_location="cuda" if torch.cuda.is_available() else "cpu")
-        
-        # 核心修改：使用 strict=False 强制兼容不同版本的权重命名规则
-        # 解决 Missing key(s) in state_dict: "actor.mu.weight" 等报错
+        state_dict = torch.load(extract_dir / "policy.pth", map_location=device, weights_only=True)
         model.policy.load_state_dict(state_dict, strict=False)
-        print("模型加载成功（已开启兼容模式）！")
-
+        print("✅ 权重加载成功")
     except Exception as e:
-        print(f"加载过程中发生错误: {e}")
+        print(f"❌ 权重加载故障: {e}")
         env.close()
         return
 
-    # --- 4. 运行逻辑 ---
-    obs, info = env.reset()
-    
-    # 针对视频中机器人“过度补偿/扭动”现象的平滑因子
-    action_scale = 0.85 
-    
-    print("开始演示！请观察窗口。按 Ctrl+C 退出。")
+    # --- 4. 稳健仿真循环 (本次修改重点) ---
     try:
+        obs, _ = env.reset()
+        
+        # 【新增：渲染预热】强制触发 GLFW 初始化，解决“Not Initialized”报错
+        print("正在激活渲染上下文...")
+        env.render() 
+        
+        ACTION_SCALE = 0.88 
+        print("演示开始：按 Ctrl+C 停止")
+        
         while True:
-            # 使用确定性预测获取最稳定的步态
-            action, _states = model.predict(obs, deterministic=True)
+            action, _ = model.predict(obs, deterministic=True)
+            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
             
-            # 对动作进行缩放和限幅，增加关节稳定性
-            action = np.clip(action * action_scale, -1.0, 1.0)
+            obs, _, terminated, truncated, _ = env.step(action)
             
-            # 执行环境步进
-            obs, reward, terminated, truncated, info = env.step(action)
-            
-            # 渲染画面
-            env.render()
-            
-            # 匹配物理模拟步长 (200Hz)
+            # 【优化：异常捕获】防止单帧渲染错误导致整个程序崩溃
+            try:
+                env.render()
+            except Exception as render_err:
+                print(f"警告：单帧渲染跳过 ({render_err})")
+                break
+                
             time.sleep(0.005) 
-            
-            # 摔倒或越界后自动重置
             if terminated or truncated:
-                obs, info = env.reset()
+                obs, _ = env.reset()
                 
     except KeyboardInterrupt:
-        print("\n模拟已手动停止。")
+        print("\n用户手动停止模拟。")
+    except Exception as e:
+        print(f"运行中发生异常: {e}")
     finally:
-        # --- 5. 资源释放 ---
+        # 【关键：安全释放】确保 GLFW 句柄被正确关闭，释放窗口资源
+        print("正在清理系统资源...")
         env.close()
-        print("环境已安全关闭。")
+        if extract_dir.exists():
+            shutil.rmtree(extract_dir)
+        print("资源已安全回收。")
 
 if __name__ == "__main__":
-    # 确保当前目录下有 humanoid_final_walking.zip 文件
-    run_simulation("humanoid_final_walking.zip")
+    run_simulation()
