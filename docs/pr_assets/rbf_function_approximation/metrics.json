@@ -1,0 +1,18 @@
+{
+  "project": "rbf_function_approximation",
+  "train_size": 90,
+  "test_size": 220,
+  "rbf_centers": 18,
+  "gamma": 2.6,
+  "linear_mse": 0.541865,
+  "rbf_mse": 0.002173,
+  "mse_reduction": 0.996,
+  "linear_mae": 0.646388,
+  "rbf_mae": 0.03543,
+  "generated_files": [
+    "rbf_fit_comparison.png",
+    "rbf_basis_functions.png",
+    "rbf_metric_comparison.png",
+    "rbf_predictions.csv"
+  ]
+}
