@@ -134,15 +134,23 @@ class GaussianMixtureModel:
         max_iter: int, EM算法最大迭代次数 (默认=100)
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
+        init: str, 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
         n_jobs: int, 并行计算使用的线程数 (默认=1，即不并行；-1表示使用所有CPU核心)
+        covariance_type: str, 协方差类型：'full'（完整协方差）、'tied'（共享协方差）、'diagonal'（对角协方差）、'spherical'（球面协方差）
     """
-    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, init = 'random', n_jobs = 1):
+    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, init = 'random', n_jobs = 1, covariance_type = 'full'):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
-        self.init = init                  # 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
+        self.init = init                  # 初始化策略
         self.n_jobs = n_jobs              # 并行线程数
+        self.covariance_type = covariance_type.lower()  # 协方差类型
+        
+        # 验证协方差类型
+        if self.covariance_type not in ['full', 'tied', 'diagonal', 'spherical']:
+            raise ValueError(f"无效的协方差类型: {covariance_type}，可选值: 'full', 'tied', 'diagonal', 'spherical'")
+        
         self.log_likelihoods = []         # 存储每轮迭代的对数似然值
         self.n_iters_ = 0                 # 实际收敛所用的迭代次数
         self.aic_ = None                  # AIC 值（训练后计算）
@@ -173,12 +181,9 @@ class GaussianMixtureModel:
             indices = self.rng.choice(n_samples, self.n_components, replace=False)
             self.mu = X[indices].copy()
         
-        # 初始化协方差矩阵为单位矩阵
-        self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
+        # 根据协方差类型初始化协方差矩阵
+        self._init_covariance(n_features)
 
-        log_likelihood = -np.inf
-        
-        log_pi = np.log(self.pi)
         log_likelihood = -np.inf
         
         log_pi = np.log(self.pi)
@@ -195,13 +200,8 @@ class GaussianMixtureModel:
             gamma = np.exp(log_prob - log_prob_sum)
 
             Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
-            Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
             
             self.pi = Nk / n_samples
-            log_pi = np.log(self.pi)
-            
-            current_log_likelihood = np.sum(log_prob_sum)
-            self.log_likelihoods.append(current_log_likelihood)
             log_pi = np.log(self.pi)
             
             current_log_likelihood = np.sum(log_prob_sum)
@@ -210,7 +210,6 @@ class GaussianMixtureModel:
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
                 
-            log_likelihood = current_log_likelihood
             log_likelihood = current_log_likelihood
             
             self.mu = new_mu
@@ -357,7 +356,7 @@ class GaussianMixtureModel:
         参数:
             X: 输入数据，形状为(n_samples, n_features)
             mu: 所有成分的均值，形状为(n_components, n_features)
-            sigma: 所有成分的协方差矩阵，形状为(n_components, n_features, n_features)
+            sigma: 协方差参数，形状根据协方差类型不同
             
         返回:
             log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
@@ -365,12 +364,69 @@ class GaussianMixtureModel:
         n_samples, n_features = X.shape
         n_components = mu.shape[0]
 
-        log_prob = np.zeros((n_samples, n_components))
-        
-        for k in range(n_components):
-            log_prob[:, k] = self._log_gaussian(X, mu[k], sigma[k])
+        if self.covariance_type == 'full':
+            log_prob = np.zeros((n_samples, n_components))
+            for k in range(n_components):
+                log_prob[:, k] = self._log_gaussian(X, mu[k], sigma[k])
+        elif self.covariance_type == 'tied':
+            log_prob = np.zeros((n_samples, n_components))
+            for k in range(n_components):
+                log_prob[:, k] = self._log_gaussian(X, mu[k], sigma)
+        elif self.covariance_type == 'diagonal':
+            log_prob = self._log_gaussian_diagonal(X, mu, sigma)
+        elif self.covariance_type == 'spherical':
+            log_prob = self._log_gaussian_spherical(X, mu, sigma)
         
         return log_prob
+
+    def _log_gaussian_diagonal(self, X, mu, sigma):
+        """计算对角协方差高斯分布的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 均值，形状为(n_components, n_features)
+            sigma: 对角协方差（方差），形状为(n_components, n_features)
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        X_centered = X[:, np.newaxis, :] - mu[np.newaxis, :, :]  # (n, k, f)
+        
+        # 计算对数行列式和逆
+        log_det = np.sum(np.log(sigma), axis=1)  # (k,)
+        inv_sigma = 1.0 / sigma  # (k, f)
+        
+        # 计算二次型
+        exponent = -0.5 * np.sum(X_centered ** 2 * inv_sigma[np.newaxis, :, :], axis=2)  # (n, k)
+        
+        return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * log_det[np.newaxis, :] + exponent
+
+    def _log_gaussian_spherical(self, X, mu, sigma):
+        """计算球面协方差高斯分布的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 均值，形状为(n_components, n_features)
+            sigma: 球面方差，形状为(n_components,)
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        
+        # 计算距离平方
+        X_centered = X[:, np.newaxis, :] - mu[np.newaxis, :, :]  # (n, k, f)
+        sq_dist = np.sum(X_centered ** 2, axis=2)  # (n, k)
+        
+        # 计算对数行列式和逆
+        log_det = n_features * np.log(sigma)  # (k,)
+        inv_sigma = 1.0 / sigma  # (k,)
+        
+        # 计算指数部分
+        exponent = -0.5 * sq_dist * inv_sigma[np.newaxis, :]
+        
+        return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * log_det[np.newaxis, :] + exponent
 
     def _log_gaussian_parallel(self, X, mu, sigma):
         """并行计算多个高斯成分的对数概率密度
@@ -401,6 +457,21 @@ class GaussianMixtureModel:
         
         return log_prob
 
+    def _init_covariance(self, n_features):
+        """根据协方差类型初始化协方差矩阵
+        
+        参数:
+            n_features: 特征维度
+        """
+        if self.covariance_type == 'full':
+            self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
+        elif self.covariance_type == 'tied':
+            self.sigma = np.eye(n_features)
+        elif self.covariance_type == 'diagonal':
+            self.sigma = np.ones((self.n_components, n_features))
+        elif self.covariance_type == 'spherical':
+            self.sigma = np.ones(self.n_components)
+
     def _compute_statistics_vectorized(self, X, gamma):
         """向量化计算 M 步的统计量
         
@@ -411,7 +482,7 @@ class GaussianMixtureModel:
         返回:
             Nk: 每个成分的有效样本数，形状为(n_components,)
             new_mu: 新均值，形状为(n_components, n_features)
-            new_sigma: 新协方差矩阵，形状为(n_components, n_features, n_features)
+            new_sigma: 新协方差矩阵，形状根据协方差类型不同
         """
         n_samples, n_features = X.shape
         n_components = gamma.shape[1]
@@ -423,10 +494,22 @@ class GaussianMixtureModel:
         
         X_centered = X[:, np.newaxis, :] - new_mu[np.newaxis, :, :]
         gamma_X_centered = gamma[:, :, np.newaxis] * X_centered
-        new_sigma = np.einsum('nki,nkj->kij', gamma_X_centered, X_centered) / Nk[:, np.newaxis, np.newaxis]
         
-        regularization = np.eye(n_features) * 1e-6
-        new_sigma += regularization
+        if self.covariance_type == 'full':
+            new_sigma = np.einsum('nki,nkj->kij', gamma_X_centered, X_centered) / Nk[:, np.newaxis, np.newaxis]
+            regularization = np.eye(n_features) * 1e-6
+            new_sigma += regularization
+        elif self.covariance_type == 'tied':
+            total_gamma = np.sum(gamma)
+            new_sigma = np.einsum('nki,nkj->ij', gamma_X_centered, X_centered) / total_gamma
+            regularization = np.eye(n_features) * 1e-6
+            new_sigma += regularization
+        elif self.covariance_type == 'diagonal':
+            new_sigma = np.sum(gamma_X_centered ** 2, axis=0) / Nk[:, np.newaxis]
+            new_sigma = np.maximum(new_sigma, 1e-6)
+        elif self.covariance_type == 'spherical':
+            new_sigma = np.sum(gamma_X_centered ** 2) / np.sum(Nk * n_features)
+            new_sigma = np.maximum(new_sigma, 1e-6) * np.ones(n_components)
         
         return Nk, new_mu, new_sigma
         
@@ -478,7 +561,7 @@ def _cluster_accuracy(y_true, y_pred, n_classes):
 # ============================================================
 # 模型选择工具：基于 BIC 自动选择最佳成分数量
 # ============================================================
-def select_best_components(X, min_components=2, max_components=10, random_state=42, n_jobs=1):
+def select_best_components(X, min_components=2, max_components=10, random_state=42, n_jobs=1, covariance_type='full'):
     """基于 BIC 准则自动选择 GMM 的最佳高斯成分数量
     
     参数:
@@ -487,6 +570,7 @@ def select_best_components(X, min_components=2, max_components=10, random_state=
         max_components: 最大成分数量（默认=10）
         random_state: 随机种子
         n_jobs: 并行计算线程数（默认=1）
+        covariance_type: 协方差类型（默认='full'）
     
     返回:
         best_gmm: 最佳成分数量的 GMM 模型
@@ -505,7 +589,8 @@ def select_best_components(X, min_components=2, max_components=10, random_state=
             tol=1e-6,
             random_state=random_state,
             init='kmeans++',
-            n_jobs=n_jobs
+            n_jobs=n_jobs,
+            covariance_type=covariance_type
         )
         gmm.fit(X)
         bic = gmm.bic()
@@ -543,6 +628,8 @@ if __name__ == "__main__":
     parser.add_argument("--tol",          type=float, default=1e-6,    help="收敛阈值")
     parser.add_argument("--n-trials",     type=int,   default=50,      help="对比实验重复次数")
     parser.add_argument("--n-jobs",       type=int,   default=1,       help="并行计算线程数（-1表示使用所有CPU核心）")
+    parser.add_argument("--covariance-type", type=str, default="full", 
+                        help="协方差类型：full（完整协方差）、tied（共享协方差）、diagonal（对角协方差）、spherical（球面协方差）")
     parser.add_argument("--out-dir",      type=str,   default="outputs", help="输出目录")
     parser.add_argument("--no-show",      action="store_true",         help="不弹出图像窗口，仅保存文件")
     args = parser.parse_args()
@@ -572,6 +659,7 @@ if __name__ == "__main__":
                 random_state=seed,
                 init=init_method,
                 n_jobs=args.n_jobs,
+                covariance_type=args.covariance_type,
             )
             gmm.fit(X)
             iters_list.append(gmm.n_iters_)
@@ -665,12 +753,14 @@ if __name__ == "__main__":
     # ============================================================
     gmm_rand = GaussianMixtureModel(
         n_components=args.n_components, max_iter=args.max_iter,
-        tol=args.tol, random_state=42, init='random', n_jobs=args.n_jobs)
+        tol=args.tol, random_state=42, init='random', n_jobs=args.n_jobs,
+        covariance_type=args.covariance_type)
     gmm_rand.fit(X)
 
     gmm_kpp = GaussianMixtureModel(
         n_components=args.n_components, max_iter=args.max_iter,
-        tol=args.tol, random_state=42, init='kmeans++', n_jobs=args.n_jobs)
+        tol=args.tol, random_state=42, init='kmeans++', n_jobs=args.n_jobs,
+        covariance_type=args.covariance_type)
     gmm_kpp.fit(X)
 
     acc_rand = _cluster_accuracy(y_true, gmm_rand.labels_, args.n_components)
@@ -741,7 +831,7 @@ if __name__ == "__main__":
     # 图4：BIC/AIC 模型选择曲线
     # ============================================================
     print("\n--- 基于 BIC 的模型选择 ---")
-    best_gmm, bic_results = select_best_components(X, min_components=2, max_components=8, random_state=42, n_jobs=args.n_jobs)
+    best_gmm, bic_results = select_best_components(X, min_components=2, max_components=8, random_state=42, n_jobs=args.n_jobs, covariance_type=args.covariance_type)
 
     n_components_list = [r['n_components'] for r in bic_results]
     bic_values = [r['bic'] for r in bic_results]

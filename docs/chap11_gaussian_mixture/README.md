@@ -87,7 +87,7 @@ $$BIC = k \cdot \ln(n) - 2\ln(L)$$
 
 | 功能 | 原版本 | 优化后 |
 |---|---|---|
-| EM 算法实现 | ✅ | ✅（向量化增强 + 并行加速） |
+| EM 算法实现 | ✅ | ✅（向量化增强 + 并行加速 + 协方差类型扩展） |
 | 随机初始化 | ✅ | ✅ |
 | k-means++ 初始化 | ❌ | ✅ |
 | AIC 准则 | ❌ | ✅ |
@@ -97,6 +97,10 @@ $$BIC = k \cdot \ln(n) - 2\ln(L)$$
 | 向量化 E 步计算 | ❌ | ✅ |
 | 向量化 M 步计算 | ❌ | ✅ |
 | 多线程并行计算 | ❌ | ✅ |
+| 完整协方差 (full) | ✅ | ✅ |
+| 共享协方差 (tied) | ❌ | ✅ |
+| 对角协方差 (diagonal) | ❌ | ✅ |
+| 球面协方差 (spherical) | ❌ | ✅ |
 
 ---
 
@@ -225,6 +229,43 @@ def _log_gaussian_parallel(self, X, mu, sigma):
 - 当成分数量较多（如 k > 8）时，并行优势明显
 - 在多核 CPU 上可获得近线性加速比
 - 特别适合大规模数据和多成分场景
+
+### 4.6 协方差类型扩展
+
+支持四种协方差类型，适用于不同的数据分布特性：
+
+| 协方差类型 | 参数化形式 | 参数数量 | 适用场景 |
+|---|---|---|---|
+| `full` | 每个成分独立的完整协方差矩阵 | k * d*(d+1)/2 | 数据各维度有复杂相关性 |
+| `tied` | 所有成分共享同一个协方差矩阵 | d*(d+1)/2 | 各类别分布形状相似 |
+| `diagonal` | 每个成分独立的对角协方差 | k * d | 维度间独立，计算高效 |
+| `spherical` | 每个成分只有一个标量方差 | k | 球形分布，参数最少 |
+
+**对角协方差计算示例**：
+```python
+def _log_gaussian_diagonal(self, X, mu, sigma):
+    X_centered = X[:, np.newaxis, :] - mu[np.newaxis, :, :]
+    log_det = np.sum(np.log(sigma), axis=1)
+    inv_sigma = 1.0 / sigma
+    exponent = -0.5 * np.sum(X_centered ** 2 * inv_sigma[np.newaxis, :, :], axis=2)
+    return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * log_det[np.newaxis, :] + exponent
+```
+
+**球面协方差计算示例**：
+```python
+def _log_gaussian_spherical(self, X, mu, sigma):
+    X_centered = X[:, np.newaxis, :] - mu[np.newaxis, :, :]
+    sq_dist = np.sum(X_centered ** 2, axis=2)
+    log_det = n_features * np.log(sigma)
+    inv_sigma = 1.0 / sigma
+    exponent = -0.5 * sq_dist * inv_sigma[np.newaxis, :]
+    return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * log_det[np.newaxis, :] + exponent
+```
+
+**协方差类型选择建议**：
+- 数据维度高、样本量有限 → `diagonal` 或 `spherical`（减少过拟合）
+- 各类别分布相似 → `tied`（共享协方差）
+- 需要捕捉复杂相关性 → `full`（完整协方差）
 
 ---
 
