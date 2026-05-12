@@ -1,9 +1,10 @@
 import carla
 import numpy as np
 import queue
-from PIL import Image
-from torchvision import transforms
 import random
+from PIL import Image
+from torch import Tensor
+from torchvision import transforms
 from typing import Tuple, Optional
 
 

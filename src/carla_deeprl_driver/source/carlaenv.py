@@ -128,7 +128,7 @@ class CarlaEnv(object):
             self.agent.cleanup()
         self.agent = None
         self.actor_list_env = []
-        print("clean up the wrold, after cleanup world actors: ", len(self.world.get_actors().filter(
+        print("clean up the world, after cleanup world actors: ", len(self.world.get_actors().filter(
             'vehicle')))
         assert len(self.world.get_actors().filter(
             'vehicle')) == 0, "cleanup world wrong"
