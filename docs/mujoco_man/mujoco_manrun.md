@@ -129,8 +129,8 @@ MuJoCo（Multi-Joint Dynamics with Contact）是一个面向机器人控制的�
 
 相关代码位置：
 
-- MuJoCo 模型加载：[HumanoidStabilizer.__init__](main.py#L234-L242)
-- 仿真主循环：[simulate\_stable\_standing](main.py#L856-L928)
+- MuJoCo 模型加载：HumanoidStabilizer.__init__(main.py#L234-L242)
+- 仿真主循环：simulate\_stable\_standing(main.py#L856-L928)
 - 物理步进：`mujoco.mj_step`（见 (main.py#L883)、(main.py#L904)）
 
 ### 3.3 控制层：状态机与执行器映射
@@ -161,7 +161,7 @@ def _torques_to_ctrl(self, joint_torques):
     return ctrl
 ```
 
-对应代码：[HumanoidStabilizer.\_torques\_to\_ctrl](main.py#L400-L411)
+对应代码：HumanoidStabilizer.\_torques\_to\_ctrl(main.py#L400-L411)
 
 ### 3.4 控制算法与运动学基础
 
@@ -281,7 +281,6 @@ if com[2] < 0.25 or (com[2] < 0.4 and tilt > 0.6):
 图 1 人形机器人控制整体架构图
 <img width="980" height="540" alt="mujoco_manrun_arch" src="assets/mujoco_manrun_arch.png" />
 本项目的控制闭环包含输入层、高层状态机、CPG 步态生成、低阶 PD/PID 控制、执行器映射、MuJoCo 仿真与传感器反馈七大模块，形成完整的状态机 - 步态 - 控制 - 仿真闭环。
-
 ## 5 系统优化
 
 ### 5.1 优化一：异步交互优化：引入键盘与 ROS 双线程，提升交互性
@@ -506,22 +505,22 @@ def _should_log(self, key, interval_s):
 ### 6.1 qpos/qvel 索引错位导致控制发散
 
 - **问题本质**：MuJoCo 的关节在 `qpos/qvel` 中的布局依赖模型定义，不能用固定切片假设。
-- **解决方案**：通过 `jnt_qposadr/jnt_dofadr` 建立地址表并统一访问 [HumanoidStabilizer.__init__](main.py#L276-L285)。
+- **解决方案**：通过 `jnt_qposadr/jnt_dofadr` 建立地址表并统一访问 HumanoidStabilizer.__init__(main.py#L276-L285)。
 
 ### 6.2 力矩直接写 ctrl 导致控制无效
 
 - **问题本质**：actuator 的 `ctrl` 受 gear、ctrlrange 限制，需进行反解与限幅。
-- **解决方案**：实现 torque→ctrl 映射 [HumanoidStabilizer.\_torques\_to\_ctrl](main.py#L400-L411)。
+- **解决方案**：实现 torque→ctrl 映射 HumanoidStabilizer.\_torques\_to\_ctrl(main.py#L400-L411)。
 
 ### 6.3 足底接触误判与“偶发为 0”
 
 - **问题本质**：接触需要遍历 `data.ncon` 并使用 `mj_contactForce` 才能得到每个接触对的力。
-- **解决方案**：以足底 geom 集合筛选接触并累加力范数 [HumanoidStabilizer.\_compute\_foot\_forces](main.py#L701-L718)；在初始化支撑期直接输出 true force，避免延迟缓冲造成的“零值” [HumanoidStabilizer.\_simulate\_foot\_force\_data](main.py#L518-L548)。
+- **解决方案**：以足底 geom 集合筛选接触并累加力范数 [HumanoidStabilizer.\_compute\_foot\_forces](main.py#L701-L718)；在初始化支撑期直接输出 true force，避免延迟缓冲造成的“零值” HumanoidStabilizer.\_simulate\_foot\_force\_data(main.py#L518-L548)。
 
 ### 6.4 开局“秒摔”与复位后连摔
 
 - **问题本质**：落地接触未建立时系统处于欠约束；复位后立刻切 WALK 容易重复摔倒。
-- **解决方案**：外力支撑窗口 + 跌倒恢复锁 [HumanoidStabilizer.\_calculate\_stabilizing\_torques](main.py#L760-L772)、[simulate\_stable\_standing](main.py#L906-L921)。
+- **解决方案**：外力支撑窗口 + 跌倒恢复锁 HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L760-L772)、simulate\_stable\_standing(main.py#L906-L921)。
 
 ## 7. 系统运行效果
 
@@ -574,6 +573,7 @@ def _should_log(self, key, interval_s):
 系统具备良好工程可复现性与算法扩展性，既可以作为规则控制基线，也可直接对接残差强化学习、模仿学习与 Sim2Real 迁移研究，为人形机器人后续高级运动控制奠定完整基础。
 
 项目代码位置：src/mujoco\_manrun/main.py
+
 模型文件位置：src/mujoco\_manrun/models/humanoid.xml
 
 ## 参考文献
