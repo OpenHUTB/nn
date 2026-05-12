@@ -138,6 +138,11 @@ class SimpleDrivingSystem:
             'vehicle.nissan.patrol',     # 日产 Patrol
         ]  # 车辆款式列表
         self.current_model_index = 0  # 当前车辆款式索引
+        self.show_trajectory = False  # 轨迹显示标志
+        self.trajectory_points = deque(maxlen=500)  # 轨迹点集合
+        self.map_img = None  # 存储地图图像
+        self.map_width = 800  # 地图图像宽度
+        self.map_height = 800  # 地图图像高度
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -298,6 +303,58 @@ class SimpleDrivingSystem:
         """更新相机视角"""
         print(f"已切换到{self.get_view_name()}视角")
 
+    def generate_topology_map(self):
+        """生成道路拓扑地图图像"""
+        try:
+            # 创建黑色背景
+            self.map_img = np.zeros((self.map_width, self.map_height, 3), dtype=np.uint8)
+
+            # 获取地图拓扑
+            map = self.world.get_map()
+            topology = map.get_topology()
+
+            # 计算道路节点的范围
+            all_x = []
+            all_y = []
+            for waypoint in map.generate_waypoints(2.0):
+                all_x.append(waypoint.transform.location.x)
+                all_y.append(waypoint.transform.location.y)
+
+            if not all_x or not all_y:
+                print("无法获取道路拓扑信息")
+                return
+
+            min_x, max_x = min(all_x), max(all_x)
+            min_y, max_y = min(all_y), max(all_y)
+
+            # 坐标缩放比例
+            scale_x = (self.map_width - 100) / (max_x - min_x) if max_x != min_x else 1
+            scale_y = (self.map_height - 100) / (max_y - min_y) if max_y != min_y else 1
+            self.map_scale = min(scale_x, scale_y) * 0.8
+            self.map_offset_x = min_x
+            self.map_offset_y = min_y
+
+            # 绘制道路
+            for waypoint in map.generate_waypoints(2.0):
+                wp_x = int((waypoint.transform.location.x - self.map_offset_x) * self.map_scale + 50)
+                wp_y = int((waypoint.transform.location.y - self.map_offset_y) * self.map_scale + 50)
+
+                # 绘制道路点（灰色）
+                cv2.circle(self.map_img, (wp_x, wp_y), 1, (80, 80, 80), -1)
+
+            print("道路拓扑地图生成成功")
+        except Exception as e:
+            print(f"生成拓扑地图时出错: {e}")
+
+    def world_to_map(self, location):
+        """将世界坐标转换为地图图像坐标"""
+        try:
+            x = int((location.x - self.map_offset_x) * self.map_scale + 50)
+            y = int((location.y - self.map_offset_y) * self.map_scale + 50)
+            return (x, y)
+        except:
+            return (400, 400)
+
     def switch_map(self):
         """切换到下一个地图"""
         try:
@@ -356,7 +413,10 @@ class SimpleDrivingSystem:
             
             # 应用当前天气
             self.set_weather(self.current_weather)
-            
+
+            # 重新生成道路拓扑地图
+            self.generate_topology_map()
+
             print(f"地图切换成功: {self.current_map}")
             
         except Exception as e:
@@ -679,6 +739,9 @@ class SimpleDrivingSystem:
         # 生成一些NPC车辆
         self.spawn_npc_vehicles(2)
 
+        # 生成道路拓扑地图
+        self.generate_topology_map()
+
         print("\n系统准备就绪！")
         print("控制指令:")
         print("  q - 退出程序")
@@ -692,6 +755,7 @@ class SimpleDrivingSystem:
         print("  p - 保存当前画面截图")
         print("  l - 切换夜晚模式（自动打开/关闭近光灯）")
         print("  u - 切换车辆款式")
+        print("  d - 切换导航轨迹显示")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -717,6 +781,11 @@ class SimpleDrivingSystem:
                     reverse=reverse  # 新代码，支持倒车
                 )
                 self.vehicle.apply_control(control)
+
+                # 记录轨迹点
+                if self.show_trajectory:
+                    vehicle_location = self.vehicle.get_location()
+                    self.trajectory_points.append(vehicle_location)
 
                 # 更新显示
                 if self.camera_image is not None:
@@ -771,6 +840,36 @@ class SimpleDrivingSystem:
                                 (20, 400), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (128, 255, 0), 2)  # 亮绿色显示
 
+                    # 绘制道路轨迹
+                    if self.show_trajectory and self.map_img is not None:
+                        # 创建地图副本
+                        map_display = self.map_img.copy()
+
+                        # 绘制轨迹
+                        if len(self.trajectory_points) > 1:
+                            for i in range(1, len(self.trajectory_points)):
+                                pt1 = self.world_to_map(self.trajectory_points[i-1])
+                                pt2 = self.world_to_map(self.trajectory_points[i])
+                                cv2.line(map_display, pt1, pt2, (0, 255, 255), 2)
+
+                        # 绘制车辆位置（红色点）
+                        vehicle_loc = self.vehicle.get_location()
+                        vehicle_pt = self.world_to_map(vehicle_loc)
+                        cv2.circle(map_display, vehicle_pt, 5, (0, 0, 255), -1)
+
+                        # 在主显示图像右上角显示地图
+                        map_resized = cv2.resize(map_display, (200, 200))
+                        display_img[10:210, display_img.shape[1]-210:display_img.shape[1]-10] = map_resized
+
+                        # 显示轨迹状态
+                        cv2.putText(display_img, f"Trajectory: ON ({len(self.trajectory_points)} pts)",
+                                    (20, 440), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6, (0, 255, 255), 2)
+                    else:
+                        cv2.putText(display_img, "Trajectory: OFF",
+                                    (20, 440), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6, (128, 128, 128), 2)
+
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
                 # 处理按键
@@ -820,6 +919,13 @@ class SimpleDrivingSystem:
                 elif key == ord('u') or key == ord('U'):
                     # 切换车辆款式（支持大小写）
                     self.switch_vehicle_model()
+                elif key == ord('d') or key == ord('D'):
+                    # 切换轨迹显示（支持大小写）
+                    self.show_trajectory = not self.show_trajectory
+                    if self.show_trajectory:
+                        print("轨迹显示已开启")
+                    else:
+                        print("轨迹显示已关闭")
 
                 frame_count += 1
 
