@@ -131,7 +131,7 @@ MuJoCo（Multi-Joint Dynamics with Contact）是一个面向机器人控制的�
 
 - MuJoCo 模型加载：HumanoidStabilizer.__init__(main.py#L234-L242)
 - 仿真主循环：simulate\_stable\_standing(main.py#L856-L928)
-- 物理步进：`mujoco.mj_step`（见 (main.py#L883)、(main.py#L904)）
+- 物理步进：mujoco.mj_step（见 (main.py#L883)、(main.py#L904)）
 
 ### 3.3 控制层：状态机与执行器映射
 
@@ -188,55 +188,75 @@ self.state_map = {
 
 CPG（Central Pattern Generator）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
 数学模型：
-text
+```text
 x\_dot = 2π f · y + k · sin(φ\_tar - φ)
 y\_dot = 2π f · ( μ(1 - x^2) · y - x )
-其中：
-φ = atan2 (x, y) 为当前相位
-k 为左右腿相位耦合强度
-输出步态信号：u = A · x
-双腿耦合规则：
-右腿初始相位：0
-左腿初始相位：π（反相迈步）
-系统会根据速度与转向指令自适应调整振幅与耦合强度。
+```
+**参数说明：**
+- $\phi = \text{atan2}(x, y)$：当前相位
+- $k$：左右腿相位耦合强度
+- 输出步态信号：$u = A \cdot x$
+
+**双腿相位耦合规则：**
+- 右腿初始相位：$0$
+- 左腿初始相位：$\pi$（反相交替迈步）
+
+系统可根据行走速度与转向角度，自适应调节步态振幅与相位耦合强度。
 对应代码：CPGOscillator.update(main.py#L207-L217)
 
 #### 3.4.3 步态耦合策略
 
 由 CPG 输出髋关节偏移，通过固定比例耦合生成膝关节与踝关节目标角度：
-python
-运行
-self.joint\_targets\["hip\_y\_right"] = 0.0 + right\_hip\_offset
-self.joint\_targets\["knee\_right"] = 0.0 - right\_hip\_offset \* 1.2
-self.joint\_targets\["ankle\_y\_right"] = 0.0 + right\_hip\_offset \* 0.5
+
+```python
+self.joint_targets["hip_y_right"] = 0.0 + right_hip_offset
+self.joint_targets["knee_right"] = 0.0 - right_hip_offset * 1.2
+self.joint_targets["ankle_y_right"] = 0.0 + right_hip_offset * 0.5
+```
+
 实现自然交替迈步的步态联动。
 对应代码：HumanoidStabilizer.\_state\_walk(main.py#L588-L642)
 
 #### 3.4.4 关节空间 PD 跟踪控制
 
 对每个关节执行独立的位置闭环，实现关节目标跟踪：
-text
-tau\_i = Kp\_i · (q\_des\_i - q\_i) - Kd\_i · qdot\_i
+实现关节目标跟踪：
+
+$$
+\tau_i = K_{p,i} \cdot (q_{des,i} - q_i) - K_{d,i} \cdot \dot{q}_i
+$$
+
+系统根据足...
 系统根据足底接触力动态调整 PD 增益：
-支撑相：增大刚度，提升稳定性
-摆动相：降低刚度，使动作更柔顺
+- 支撑相：增大刚度，提升稳定性
+- 摆动相：降低刚度，使动作更柔顺
 对应代码：HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L743-L755)
 
 #### 3.4.5 躯干姿态 PID 控制（Roll/Pitch）
 
 以 IMU 欧拉角与角速度为反馈，对躯干姿态进行闭环稳定，Roll/Pitch 加入积分项抑制漂移：
-text
-tau\_roll  = Kp·e\_roll  + Kd·(-omega\_roll)  + Ki·∫e\_roll dt
-tau\_pitch = Kp·e\_pitch + Kd·(-omega\_pitch) + Ki·∫e\_pitch dt
+
+$$
+\begin{aligned}
+\tau_{roll} &= K_p \cdot e_{roll} + K_d \cdot (-\omega_{roll}) + K_i \int e_{roll} \, dt \\
+\tau_{pitch} &= K_p \cdot e_{pitch} + K_d \cdot (-\omega_{pitch}) + K_i \int e_{pitch} \, dt
+\end{aligned}
+$$
+
 保证机器人在站立与行走过程中不倾倒。
+
 对应代码：HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L743-L755)
 
 #### 3.4.6 足底接触力计算
 
 遍历 MuJoCo 接触队列，筛选足底几何并累加接触力，用于支撑相判断与刚度自适应：
-text
-F\_foot = sum\_{c in C\_foot} || f\_c ||\_2
-其中 f\_c 为接触点三维力。
+
+$$
+F_{foot} = \sum_{c \in \mathcal{C}_{foot}} \lVert \mathbf{f}_c \rVert_2
+$$
+
+其中 $\mathbf{f}_c$ 为接触点三维力。
+
 对应代码：HumanoidStabilizer.\_compute\_foot\_forces(main.py#L701-L718)：
 
 ### 3.5 工程化机制
@@ -245,12 +265,13 @@ F\_foot = sum\_{c in C\_foot} || f\_c ||\_2
 
 仿真开局时，机器人接触未建立，容易瞬间跌落。解决方案是对躯干施加短时辅助力：
 
-```text
-Fz    = clip(baseline + 2000 · (z_ref - z) - 200 · z_dot, 0, 1.2 * weight)
-tau_x = -120 · roll  - 30 · omega_roll
-tau_y = -120 · pitch - 30 · omega_pitch
-衰减: Fz <- Fz * s^2
-```
+$$
+\begin{aligned}
+F_z &= \mathrm{clip}\Big(F_{base} + 2000 \cdot (z_{ref} - z) - 200 \cdot \dot{z}, \; 0, \; 1.2 \cdot W \Big) \\
+\tau_x &= -120 \cdot roll - 30 \cdot \omega_{roll} \\
+\tau_y &= -120 \cdot pitch - 30 \cdot \omega_{pitch}
+\end{aligned}
+$$
 
 对应代码：main.py:L760-L772
 
@@ -280,7 +301,9 @@ if com[2] < 0.25 or (com[2] < 0.4 and tilt > 0.6):
 ## 4. 系统整体架构
 图 1 人形机器人控制整体架构图
 <img width="980" height="540" alt="mujoco_manrun_arch" src="assets/mujoco_manrun_arch.png" />
+
 本项目的控制闭环包含输入层、高层状态机、CPG 步态生成、低阶 PD/PID 控制、执行器映射、MuJoCo 仿真与传感器反馈七大模块，形成完整的状态机 - 步态 - 控制 - 仿真闭环。
+
 ## 5 系统优化
 
 ### 5.1 优化一：异步交互优化：引入键盘与 ROS 双线程，提升交互性
@@ -515,12 +538,12 @@ def _should_log(self, key, interval_s):
 ### 6.3 足底接触误判与“偶发为 0”
 
 - **问题本质**：接触需要遍历 `data.ncon` 并使用 `mj_contactForce` 才能得到每个接触对的力。
-- **解决方案**：以足底 geom 集合筛选接触并累加力范数 [HumanoidStabilizer.\_compute\_foot\_forces](main.py#L701-L718)；在初始化支撑期直接输出 true force，避免延迟缓冲造成的“零值” HumanoidStabilizer.\_simulate\_foot\_force\_data(main.py#L518-L548)。
+- **解决方案**：以足底 geom 集合筛选接触并累加力范数 HumanoidStabilizer.\_compute\_foot\_forces(main.py#L701-L718)；在初始化支撑期直接输出 true force，避免延迟缓冲造成的“零值” HumanoidStabilizer.\_simulate\_foot\_force\_data(main.py#L518-L548)。
 
 ### 6.4 开局“秒摔”与复位后连摔
 
 - **问题本质**：落地接触未建立时系统处于欠约束；复位后立刻切 WALK 容易重复摔倒。
-- **解决方案**：外力支撑窗口 + 跌倒恢复锁 HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L760-L772)、simulate\_stable\_standing(main.py#L906-L921)。
+- **解决方案**：外力支撑窗口 + 跌倒恢复锁 HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L760-L772)、[simulate\_stable\_standing](main.py#L906-L921)。
 
 ## 7. 系统运行效果
 
@@ -573,7 +596,6 @@ def _should_log(self, key, interval_s):
 系统具备良好工程可复现性与算法扩展性，既可以作为规则控制基线，也可直接对接残差强化学习、模仿学习与 Sim2Real 迁移研究，为人形机器人后续高级运动控制奠定完整基础。
 
 项目代码位置：src/mujoco\_manrun/main.py
-
 模型文件位置：src/mujoco\_manrun/models/humanoid.xml
 
 ## 参考文献
