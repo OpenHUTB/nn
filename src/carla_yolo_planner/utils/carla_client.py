@@ -71,6 +71,7 @@ class CarlaClient:
         self.hud_fps = 0
         self.hud_detection_count = 0
         self.hud_brake_status = ""
+        self.hud_speed = 0  # 车辆速度（km/h）
 
     def connect(self):
         print(f"[INFO] 正在连接 CARLA 服务器 ({self.host}:{self.port})...")
@@ -434,10 +435,11 @@ class CarlaClient:
         
         self.spectator.set_transform(carla.Transform(location, rotation))
     
-    def update_hud_info(self, fps, detection_count, brake_status=""):
+    def update_hud_info(self, fps, detection_count, speed_kmh=0, brake_status=""):
         """更新 HUD 显示信息"""
         self.hud_fps = fps
         self.hud_detection_count = detection_count
+        self.hud_speed = speed_kmh
         self.hud_brake_status = brake_status
     
     def draw_hud(self):
@@ -449,14 +451,24 @@ class CarlaClient:
             # 获取车辆位置（用于在画面上方显示）
             vehicle_location = self.vehicle.get_location()
             
-            # 显示 FPS（黄色，最大字号）
+            # 显示速度（白色，最显眼）
+            speed_text = f"  Speed: {self.hud_speed:.1f} km/h  "
+            self.debug_helper.draw_string(
+                carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 3.8),
+                speed_text,
+                draw_shadow=True,
+                color=carla.Color(255, 255, 255),
+                life_time=-1  # 永久显示直到被覆盖
+            )
+            
+            # 显示 FPS（黄色）
             fps_text = f"  FPS: {self.hud_fps:.1f}  "
             self.debug_helper.draw_string(
                 carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 3.5),
                 fps_text,
                 draw_shadow=True,
                 color=carla.Color(255, 255, 0),
-                life_time=-1  # 永久显示直到被覆盖
+                life_time=-1
             )
             
             # 显示检测数量（青色）

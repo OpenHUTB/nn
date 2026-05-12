@@ -152,16 +152,22 @@ def main():
                     if results:
                         client.draw_detection_in_carla(results, detector.classes)
                     
-                    # 更新并绘制 HUD
-                    client.update_hud_info(fps, len(results), warning_msg if is_brake else "")
+                    # 获取车辆速度（m/s 转换为 km/h）
+                    speed_kmh = 0
+                    if client.vehicle:
+                        velocity = client.vehicle.get_velocity()
+                        speed_kmh = velocity.length() * 3.6
+                    
+                    # 更新并绘制 HUD（包含速度）
+                    client.update_hud_info(fps, len(results), speed_kmh, warning_msg if is_brake else "")
                     client.draw_hud()
                     
                     # 检测碰撞并自动重置
                     client.check_collision_and_reset()
                     
-                    # 控制台显示FPS信息
+                    # 控制台显示FPS和速度信息
                     if frame_count % 30 == 0:
-                        print(f"[INFO] FPS: {fps:.1f} | 检测目标: {len(results)}")
+                        print(f"[INFO] FPS: {fps:.1f} | 速度: {speed_kmh:.1f} km/h | 检测目标: {len(results)}")
                 except Exception as e:
                     if frame_count % 100 == 0:
                         print(f"[WARNING] CARLA 绘制异常: {e}")
