@@ -56,7 +56,7 @@ title: 主页
 [__V2X路侧智能感知__](./edge_intelligence_V2X/README.md) - 基于YOLOv8n的V2X路侧智能感知系统优化与实现
 
 [__目标检测__](./test/object_detection.md) - 目标检测与危险评估
-
+[__图像目标检测__](./image_object_detection/image_object_detection.md) - 多功能图像目标检测系统
 [__跟踪__](#tracking) 
 [__路径追踪__](./test.md)
 
