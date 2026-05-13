@@ -278,15 +278,13 @@ class Menu():
             message('请先从菜单训练一个模型，然后重试...')
             logger.warning('No saved models found for prediction')
         else:
-            choice = int(input('请选择要使用的模型（输入序号） >> ') or 0)
-            while choice not in models:
-                try:
-                    choice = models[choice-1]
-                    message(f'{choice} 已选择。')
-                    logger.info(f'Selected model: {choice}')
-                except:
-                    error('选择错误，请重试...')
-            model = choice
+            choice = int(input('请选择要使用的模型（输入序号） >> ') or 1)
+            while choice < 1 or choice > len(models):
+                error('选择错误，请重试...')
+                choice = int(input('请选择要使用的模型（输入序号） >> ') or 1)
+            model = models[choice - 1]
+            message(f'{model} 已选择。')
+            logger.info(f'Selected model: {model}')
             path = input('请输入相对于当前目录的图像路径 >> ')
             logger.info(f'Input image path: {path}')
             try:

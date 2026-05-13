@@ -130,38 +130,35 @@ class DataProcessor:
         平衡数据集，避免某些数据分布过于集中
         """
         message('正在平衡数据集...')
-        
+
         # 按转向角度分箱
         bins = np.linspace(-1, 1, 21)  # 20个箱子
         digitized = np.digitize(self.steering_angles, bins)
-        
-        # 统计每个箱子的样本数
-        bin_counts = np.bincount(digitized)
-        
+
         # 创建平衡后的数据
         balanced_data = []
-        bin_indices = [[] for _ in range(len(bins))]
-        
+        bin_indices = [[] for _ in range(len(bins) + 1)]
+
         for i, item in enumerate(data):
             bin_idx = digitized[i]
-            if bin_idx < len(bin_indices):
+            if 0 <= bin_idx < len(bin_indices):
                 bin_indices[bin_idx].append(i)
-        
+
         # 对每个箱子进行采样
         for idx_list in bin_indices:
             if len(idx_list) > max_samples_per_bin:
                 selected = np.random.choice(idx_list, max_samples_per_bin, replace=False)
             else:
                 selected = idx_list
-            
+
             for idx in selected:
                 balanced_data.append(data[idx])
-        
+
         self.data_stats['balanced'] = {
             'total_samples': len(balanced_data),
             'original_samples': len(data)
         }
-        
+
         logger.info(f'Data balancing completed. Original: {len(data)}, Balanced: {len(balanced_data)}')
         return balanced_data
     
@@ -237,6 +234,14 @@ class DataProcessor:
     def process(data, enable_cleaning=True, enable_balancing=True):
         """
         完整的数据处理流程
+        
+        Args:
+            data: 输入数据列表
+            enable_cleaning: 是否启用数据清洗（去除异常值）
+            enable_balancing: 是否启用数据平衡
+        
+        Returns:
+            处理后的数据和统计信息
         """
         processor = DataProcessor()
         
@@ -248,7 +253,7 @@ class DataProcessor:
         
         # 清洗数据
         if enable_cleaning:
-            data = processor.clean_data(data)
+            data = processor.clean_data(data, remove_outliers=True)
         
         # 平衡数据
         if enable_balancing:
