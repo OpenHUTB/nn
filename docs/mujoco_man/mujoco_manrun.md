@@ -10,7 +10,7 @@
 
 ### 1.2 项目整体流程
 
-<img width="1280" height="720" alt="standing" src="docs/assets/mujoco_man.png" />
+<img width="1280" height="720" alt="standing" src="docs/mujoco_man/assets/mujoco_man.png" />
 
 该系统形成完整的机器人控制闭环：
 输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈
@@ -538,7 +538,7 @@ def _should_log(self, key, interval_s):
 ### 6.4 开局“秒摔”与复位后连摔
 
 - **问题本质**：落地接触未建立时系统处于欠约束；复位后立刻切 WALK 容易重复摔倒。
-- **解决方案**：外力支撑窗口 + 跌倒恢复锁 HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L760-L772)、[simulate\_stable\_standing](main.py#L906-L921)。
+- **解决方案**：外力支撑窗口 + 跌倒恢复锁 HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L760-L772)、simulate\_stable\_standing(main.py#L906-L921)。
 
 ## 7. 系统运行效果
 
@@ -566,9 +566,9 @@ def _should_log(self, key, interval_s):
 
 ### 7.3 运行结果图片
 图 2 机器人稳定站立仿真效果
-<img width="1280" height="720" alt="standing" src="docs/assets/stand.png" />
+<img width="1280" height="720" alt="standing" src="docs/mujoco_man/assets/stand.png" /
 图 3 机器人周期行走仿真效果
-<img width="1280" height="720" alt="walking" src="docs/assets/walk.png" />
+<img width="1280" height="720" alt="walking" src="docs/mujoco_man/assets/walk.png" />
 
 ## 8. 现存不足与后续优化方向
 
