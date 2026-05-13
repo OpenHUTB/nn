@@ -10,7 +10,7 @@
 
 ### 1.2 项目整体流程
 
-<img width="1280" height="720" alt="standing" src="./assets/mujoco_man.png" />
+<img width="522" height="1271" alt="mujoco" src="./assets/mujoco_man.png" />
 
 该系统形成完整的机器人控制闭环：
 输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈
@@ -566,10 +566,10 @@ def _should_log(self, key, interval_s):
 
 ### 7.3 运行结果图片
 图 2 机器人稳定站立仿真效果
-<img width="1280" height="720" alt="standing" src="./assets/stand.png" />
+<img width="1280" height="720" alt="stand" src="./assets/stand.png" />
 
 图 3 机器人周期行走仿真效果
-<img width="1280" height="720" alt="walking" src="./assets/walk.png" />
+<img width="1280" height="720" alt="walk" src="./assets/walk.png" />
 
 ## 8. 现存不足与后续优化方向
 
