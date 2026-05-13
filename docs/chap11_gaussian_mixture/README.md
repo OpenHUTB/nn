@@ -97,6 +97,11 @@ $$BIC = k \cdot \ln(n) - 2\ln(L)$$
 | 向量化 E 步计算 | ❌ | ✅ |
 | 向量化 M 步计算 | ❌ | ✅ |
 | 多线程并行计算 | ❌ | ✅ |
+| 完整协方差 (full) | ✅ | ✅ |
+| 共享协方差 (tied) | ❌ | ✅ |
+| 对角协方差 (diagonal) | ❌ | ✅ |
+| 球面协方差 (spherical) | ❌ | ✅ |
+| 异常检测功能 | ❌ | ✅ |
 
 ---
 
@@ -226,6 +231,63 @@ def _log_gaussian_parallel(self, X, mu, sigma):
 - 在多核 CPU 上可获得近线性加速比
 - 特别适合大规模数据和多成分场景
 
+### 4.6 协方差类型扩展
+
+支持四种协方差类型，适用于不同的数据分布特性：
+
+| 协方差类型 | 参数化形式 | 参数数量 | 适用场景 |
+|---|---|---|---|
+| `full` | 每个成分独立的完整协方差矩阵 | k * d*(d+1)/2 | 数据各维度有复杂相关性 |
+| `tied` | 所有成分共享同一个协方差矩阵 | d*(d+1)/2 | 各类别分布形状相似 |
+| `diagonal` | 每个成分独立的对角协方差 | k * d | 维度间独立，计算高效 |
+| `spherical` | 每个成分只有一个标量方差 | k | 球形分布，参数最少 |
+
+**协方差类型选择建议**：
+- 数据维度高、样本量有限 → `diagonal` 或 `spherical`（减少过拟合）
+- 各类别分布相似 → `tied`（共享协方差）
+- 需要捕捉复杂相关性 → `full`（完整协方差）
+
+### 4.7 异常检测扩展
+
+基于密度估计的异常检测功能，可识别远离聚类中心的离群点：
+
+**核心方法**：
+
+| 方法 | 功能 |
+|---|---|
+| `predict_proba(X)` | 预测样本属于各高斯成分的后验概率 |
+| `score_samples(X)` | 计算样本的对数概率密度（异常分数） |
+| `detect_anomalies(X, contamination=0.05)` | 检测异常样本 |
+| `plot_anomaly_score(X)` | 可视化异常检测结果 |
+
+**使用示例**：
+```python
+# 训练模型
+gmm = GaussianMixtureModel(n_components=3)
+gmm.fit(X)
+
+# 检测异常（5%异常比例）
+is_anomaly, scores, threshold = gmm.detect_anomalies(X_test, contamination=0.05)
+
+# 可视化结果
+gmm.plot_anomaly_score(X_test, save_path='anomaly.png')
+```
+
+**异常检测原理**：
+- 利用 GMM 拟合数据的概率密度分布
+- 对数概率密度低的样本被判定为异常
+- 通过 `contamination` 参数控制异常比例
+
+**测试结果**：
+```
+异常检测结果:
+  真实异常数: 25
+  检测异常数: 27
+  精确率: 0.8519
+  召回率: 0.9200
+  F1分数: 0.8846
+```
+
 ---
 
 ## 5. 系统运行效果
@@ -259,6 +321,8 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 | `--max-iter` | int | 100 | 最大迭代次数 |
 | `--tol` | float | 1e-6 | 收敛阈值 |
 | `--n-trials` | int | 50 | 对比实验重复次数 |
+| `--n-jobs` | int | 1 | 并行计算线程数（-1表示使用所有CPU核心） |
+| `--covariance-type` | str | full | 协方差类型：full/tied/diagonal/spherical |
 | `--out-dir` | str | outputs | 输出目录 |
 | `--no-show` | flag | - | 不弹出图像窗口 |
 
@@ -272,6 +336,7 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 | `cluster_comparison.png` | 聚类结果散点图对比 |
 | `convergence_comparison.png` | EM 收敛曲线对比 |
 | `bic_model_selection.png` | BIC/AIC 模型选择曲线 |
+| `anomaly_detection.png` | 异常检测结果可视化 |
 | `iteration_log.csv` | 迭代对数似然日志 |
 | `bic_aic_log.csv` | BIC/AIC 模型选择日志 |
 
