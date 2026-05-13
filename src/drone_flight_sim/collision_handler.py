@@ -1,123 +1,225 @@
 # collision_handler.py
-"""碰撞检测和处理模块
+"""碰撞检测和处理模块（深度学习增强版）
 
 本模块负责检测无人机飞行过程中的碰撞事件，
-区分地面接触和严重碰撞，并记录碰撞统计信息。
-提供碰撞后自动恢复和手动接管机制。
+使用神经网络决策避障方向和距离。
 """
 
-# 导入 time 模块，用于获取当前时间实现碰撞冷却
 import time
-# 导入随机模块，用于随机避障方向
 import random
-# 从 config 模块导入飞行配置和地面物体列表
+import torch
+import torch.nn as nn
+import numpy as np
 from config import FlightConfig, GROUND_OBJECTS
 
 
-class CollisionHandler:
-    """碰撞检测处理器类
-
-    负责与 AirSim 仿真器交互，检测并处理碰撞事件。
-    使用冷却机制避免短时间内重复触发同一碰撞。
-    提供碰撞后自动恢复和手动接管功能。
+# ========== 新增：神经网络决策模型 ==========
+class CollisionAvoidanceNN(nn.Module):
+    """碰撞避障神经网络
+    
+    输入特征：
+    - 撞击方向 x (normal.x)
+    - 撞击方向 y (normal.y)
+    - 撞击速度
+    - 当前高度
+    - 碰撞物体类型编码（0=墙,1=树,2=建筑,3=其他）
+    
+    输出：
+    - 避障方向 (-1=左后, 0=正后, 1=右后)
+    - 避障距离 (2~5米)
+    - 上升高度 (1~3米)
     """
+    def __init__(self):
+        super().__init__()
+        # 输入层：5个特征
+        self.fc1 = nn.Linear(5, 16)
+        self.fc2 = nn.Linear(16, 32)
+        self.fc3 = nn.Linear(32, 16)
+        # 输出层：3个值（方向、距离、上升高度）
+        self.fc_out = nn.Linear(16, 3)
+        self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()  # 方向用tanh（-1到1）
+        self.sigmoid = nn.Sigmoid()  # 距离和高度用sigmoid再映射
+    
+    def forward(self, x):
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.relu(self.fc3(x))
+        out = self.fc_out(x)
+        
+        # 解析输出
+        direction = self.tanh(out[:, 0])  # -1 到 1
+        distance = self.sigmoid(out[:, 1]) * 3 + 2  # 2 到 5 米
+        height_up = self.sigmoid(out[:, 2]) * 2 + 1  # 1 到 3 米
+        
+        return direction, distance, height_up
+
+
+# 全局模型
+_avoidance_model = None
+_model_trained = False
+
+
+def train_avoidance_model():
+    """训练碰撞避障神经网络"""
+    print("\n🧠 训练碰撞避障神经网络...")
+    
+    # 训练数据：[撞击方向x, 撞击方向y, 撞击速度, 高度, 物体类型]
+    # 物体类型: 0=墙, 1=树, 2=建筑, 3=其他
+    X_train = [
+        # 撞到墙的情况
+        [1.0, 0.0, 3.5, 5.0, 0],   # 右边撞墙，高速
+        [-1.0, 0.0, 3.0, 4.0, 0],  # 左边撞墙
+        [0.8, 0.3, 2.5, 6.0, 0],   # 右前方撞墙
+        
+        # 撞到树的情况
+        [0.6, 0.6, 2.0, 3.0, 1],   # 右前撞树
+        [-0.5, -0.5, 1.8, 2.5, 1], # 左后撞树
+        [0.0, 1.0, 2.2, 4.0, 1],   # 正前方撞树
+        
+        # 撞到建筑
+        [0.9, 0.1, 4.0, 8.0, 2],   # 高速撞建筑
+        [-0.9, -0.1, 3.8, 7.0, 2], # 左撞建筑
+        
+        # 其他物体
+        [0.4, 0.4, 1.5, 2.0, 3],   # 轻微碰撞
+        [-0.3, 0.5, 1.2, 3.0, 3],  # 侧面碰撞
+    ]
+    
+    # 期望输出：[避障方向(-1~1), 避障距离(2~5), 上升高度(1~3)]
+    # 方向: -1=左后, 0=正后, 1=右后
+    y_train = [
+        [-0.8, 4.0, 2.5],  # 右撞墙 → 向左后大距离后退
+        [0.8, 3.5, 2.0],   # 左撞墙 → 向右后退
+        [0.5, 3.0, 2.0],   # 右前撞墙 → 向右后
+        
+        [0.3, 2.5, 1.5],   # 撞树 → 轻微偏右
+        [-0.5, 2.0, 1.0],  # 撞树 → 向左后
+        [-0.2, 2.5, 1.5],  # 正前撞树 → 正后方
+        
+        [-0.9, 4.5, 3.0],  # 撞建筑 → 大距离左后
+        [0.7, 4.0, 2.5],   # 左撞建筑 → 右后
+        
+        [0.0, 2.0, 1.0],   # 轻微碰撞 → 正后短距离
+        [-0.3, 2.2, 1.2],  # 侧面碰撞 → 稍左
+    ]
+    
+    # 转换为 tensor
+    X = torch.tensor(X_train, dtype=torch.float32)
+    y = torch.tensor(y_train, dtype=torch.float32)
+    
+    model = CollisionAvoidanceNN()
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    
+    print("   训练迭代中...")
+    for epoch in range(300):
+        optimizer.zero_grad()
+        direction, distance, height_up = model(X)
+        
+        # 组合输出用于计算损失
+        pred = torch.stack([direction, distance, height_up], dim=1)
+        loss = criterion(pred, y)
+        
+        loss.backward()
+        optimizer.step()
+        
+        if epoch % 100 == 0:
+            print(f"   Epoch {epoch}, Loss: {loss.item():.6f}")
+    
+    # 保存模型
+    torch.save(model.state_dict(), "collision_avoidance.pth")
+    print(f"✅ 避障神经网络训练完成！最终损失: {loss.item():.6f}")
+    print("   模型已保存为 collision_avoidance.pth\n")
+    
+    return model
+
+
+def load_or_train_model():
+    """加载已有模型或训练新模型"""
+    global _avoidance_model, _model_trained
+    try:
+        _avoidance_model = CollisionAvoidanceNN()
+        _avoidance_model.load_state_dict(torch.load("collision_avoidance.pth"))
+        _avoidance_model.eval()
+        print("📦 加载已有避障神经网络模型")
+    except:
+        print("⚠️  未找到已有模型，开始训练...")
+        _avoidance_model = train_avoidance_model()
+        _avoidance_model.eval()
+    _model_trained = True
+    return _avoidance_model
+
+
+def get_object_type(object_name: str) -> int:
+    """根据物体名称返回类型编码"""
+    obj_lower = object_name.lower()
+    if any(kw in obj_lower for kw in ['wall', 'fence']):
+        return 0
+    elif any(kw in obj_lower for kw in ['tree', 'bush', 'plant']):
+        return 1
+    elif any(kw in obj_lower for kw in ['building', 'house', 'tower']):
+        return 2
+    else:
+        return 3
+
+
+# ========== 主碰撞处理类 ==========
+class CollisionHandler:
+    """碰撞检测处理器类（神经网络增强版）"""
 
     def __init__(self, client):
-        """初始化碰撞处理器
-
-        参数:
-            client: AirSim 多旋翼无人机客户端对象
-        """
-        # 保存 AirSim 客户端引用，用于获取碰撞信息
         self.client = client
-        # 初始化碰撞计数器，记录累计碰撞次数
         self.collision_count = 0
-        # 记录上一次碰撞发生的时间戳（秒）
         self.last_collision_time = 0
-        # 标记当前是否处于碰撞状态
         self.is_collided = False
-        # 自动恢复尝试次数
         self.auto_recovery_attempts = 0
-        # 最大自动恢复尝试次数（从配置读取）
         self.max_auto_recovery_attempts = FlightConfig.MAX_AUTO_RECOVERY_ATTEMPTS
+        
+        # 【新增】加载神经网络模型
+        load_or_train_model()
 
     def check_collision(self):
-        """检测碰撞事件
-
-        从 AirSim 获取碰撞信息，判断是否为严重碰撞。
-        地面接触和冷却期内的碰撞会被忽略。
-
-        返回:
-            tuple: (是否严重碰撞, 碰撞信息对象)
-                   严重碰撞返回 (True, collision_info)
-                   非严重或无碰撞返回 (False, None)
-        """
-        # 调用 AirSim API 获取当前碰撞信息
+        """检测碰撞事件（保持原有逻辑）"""
         collision_info = self.client.simGetCollisionInfo()
 
-        # 检查是否真的发生了碰撞（has_collided 为 False 表示无碰撞）
         if not collision_info.has_collided:
-            # 没有碰撞，返回 False
             return False, None
 
-        # 发生了碰撞，获取当前时间戳
         current_time = time.time()
-        # 检查碰撞冷却：如果距离上次碰撞时间小于阈值，则忽略此次碰撞
         if current_time - self.last_collision_time < FlightConfig.COLLISION_COOLDOWN:
-            # 处于冷却期内，忽略此次碰撞
             return False, None
 
-        # 更新碰撞时间记录
         self.last_collision_time = current_time
-        # 累加碰撞计数器
         self.collision_count += 1
 
-        # 获取无人机当前位置
         drone_pos = self.client.getMultirotorState().kinematics_estimated.position
-        # 计算当前高度（Z 轴向下为正，所以取负值）
         current_height = -drone_pos.z_val
 
         # 判断是否为地面接触
-        # 条件1：当前高度小于地面阈值
-        # 条件2：碰撞物体的名称包含地面相关关键词
         is_ground = (
             current_height < FlightConfig.GROUND_HEIGHT_THRESHOLD or
             any(keyword in collision_info.object_name for keyword in GROUND_OBJECTS)
         )
 
-        # 如果是地面接触，打印提示信息并忽略
         if is_ground:
             print(f"⚠️  检测到与 {collision_info.object_name} 接触（高度: {current_height:.2f}m），忽略")
             return False, None
 
-        # 判定为严重碰撞，打印详细的碰撞信息
         print(f"\n💥 严重碰撞发生！")
-        # 打印碰撞位置坐标
         print(f"   碰撞位置: ({collision_info.position.x_val:.2f}, "
               f"{collision_info.position.y_val:.2f}, {collision_info.position.z_val:.2f})")
-        # 打印碰撞物体的名称
         print(f"   碰撞物体: {collision_info.object_name}")
-        # 打印碰撞时的高度
         print(f"   当前高度: {current_height:.2f}m")
-        # 打印累计碰撞次数
         print(f"   碰撞次数: {self.collision_count}")
 
-        # 返回严重碰撞标志和碰撞信息对象
         return True, collision_info
 
     def auto_recover(self):
-        """自动恢复碰撞
-
-        尝试通过后退和上升来脱离碰撞状态。
-        如果自动恢复失败，返回 False 表示需要手动接管。
-
-        返回:
-            bool: 自动恢复成功返回 True，失败返回 False
-        """
+        """自动恢复碰撞（神经网络决策版）"""
         self.auto_recovery_attempts += 1
 
         if self.auto_recovery_attempts > self.max_auto_recovery_attempts:
-            # 超过最大自动恢复次数，需要手动接管
             return False
 
         print(f"\n🔧 尝试自动恢复 ({self.auto_recovery_attempts}/{self.max_auto_recovery_attempts})...")
@@ -127,32 +229,55 @@ class CollisionHandler:
             self.client.cancelLastTask()
             time.sleep(0.5)
 
-            # 2. 获取当前位置
+            # 2. 获取当前位置和碰撞信息
             pos = self.client.getMultirotorState().kinematics_estimated.position
-
-            # 3. 后退一段距离（随机选择后退方向）
-            backward_distance = 3
-            directions = [-1, 1]  # 后退方向：左后方或右后方
-            direction = random.choice(directions)
-
-            new_x = pos.x_val - backward_distance * 0.7
-            new_y = pos.y_val + direction * backward_distance * 0.7
-            new_z = pos.z_val - 2  # 上升 2 米
-
-            print(f"   后退避障中...")
+            collision_info = self.client.simGetCollisionInfo()
+            
+            # 3. 【神经网络决策】获取避障参数
+            # 提取特征
+            normal_x = collision_info.normal.x_val if hasattr(collision_info, 'normal') else 0
+            normal_y = collision_info.normal.y_val if hasattr(collision_info, 'normal') else 0
+            impact_speed = abs(collision_info.impact_speed) if hasattr(collision_info, 'impact_speed') else 2.0
+            current_height = -pos.z_val
+            obj_type = get_object_type(collision_info.object_name)
+            
+            # 特征向量
+            features = torch.tensor([[
+                normal_x, normal_y, impact_speed, current_height, obj_type
+            ]], dtype=torch.float32)
+            
+            # 神经网络推理
+            with torch.no_grad():
+                direction, distance, height_up = _avoidance_model(features)
+                direction_val = direction.item()
+                distance_val = distance.item()
+                height_up_val = height_up.item()
+            
+            # 打印决策信息
+            dir_desc = "左后" if direction_val < -0.3 else ("右后" if direction_val > 0.3 else "正后")
+            print(f"🧠 神经网络避障决策:")
+            print(f"   方向: {dir_desc} (系数: {direction_val:.2f})")
+            print(f"   后退距离: {distance_val:.1f}米")
+            print(f"   上升高度: {height_up_val:.1f}米")
+            
+            # 4. 执行避障移动
+            # 根据神经网络输出计算移动方向
+            new_x = pos.x_val - distance_val * 0.7  # 后退
+            new_y = pos.y_val + direction_val * distance_val * 0.7  # 横向偏移
+            new_z = pos.z_val - height_up_val  # 上升（Z轴负方向）
+            
+            print(f"   执行避障移动...")
             self.client.moveToPositionAsync(new_x, new_y, new_z, FlightConfig.FLIGHT_VELOCITY)
-
-            # 等待移动完成
             time.sleep(3)
-
-            # 4. 悬停等待稳定
+            
+            # 5. 悬停等待稳定
             self.client.hoverAsync().join()
             time.sleep(1)
 
-            # 5. 检查是否脱离碰撞
+            # 6. 检查是否脱离碰撞
             collision_info = self.client.simGetCollisionInfo()
             if not collision_info.has_collided:
-                print(f"✅ 自动恢复成功！")
+                print(f"✅ 神经网络引导的自动恢复成功！")
                 self.auto_recovery_attempts = 0
                 return True
             else:
@@ -164,13 +289,7 @@ class CollisionHandler:
             return False
 
     def request_manual_control(self):
-        """请求手动接管控制
-
-        打印手动接管提示信息，提示用户如何手动解决碰撞。
-
-        返回:
-            bool: 始终返回 True，表示需要手动接管
-        """
+        """请求手动接管控制（保持不变）"""
         print(f"\n{'=' * 50}")
         print(f"🚨 自动恢复失败，需要手动接管！")
         print(f"{'=' * 50}")
@@ -195,12 +314,33 @@ class CollisionHandler:
         return True
 
     def reset_collision_state(self):
-        """重置碰撞状态
-
-        将碰撞状态标记重置为 False，
-        通常在任务重新开始时调用。
-        """
-        # 重置碰撞状态标志
+        """重置碰撞状态"""
         self.is_collided = False
-        # 重置自动恢复计数器
         self.auto_recovery_attempts = 0
+
+
+# ========== 单独测试入口 ==========
+if __name__ == "__main__":
+    print("🚁 碰撞避障神经网络测试")
+    print("="*40)
+    
+    # 训练模型
+    train_avoidance_model()
+    
+    # 测试决策
+    print("\n🧪 测试神经网络决策效果:")
+    model = load_or_train_model()
+    
+    test_cases = [
+        ([1.0, 0.0, 3.5, 5.0, 0], "撞墙"),
+        ([0.6, 0.6, 2.0, 3.0, 1], "撞树"),
+        ([0.9, 0.1, 4.0, 8.0, 2], "撞建筑"),
+        ([0.4, 0.4, 1.5, 2.0, 3], "轻微碰撞"),
+    ]
+    
+    with torch.no_grad():
+        for features, desc in test_cases:
+            x = torch.tensor([features], dtype=torch.float32)
+            direction, distance, height_up = model(x)
+            dir_str = "左后" if direction.item() < -0.3 else ("右后" if direction.item() > 0.3 else "正后")
+            print(f"  {desc}: {dir_str} 退{distance.item():.1f}m 升{height_up.item():.1f}m")
