@@ -10,12 +10,7 @@
 
 ### 1.2 项目整体流程
 
-```mermaid
-flowchart TD
-  Input[输入层<br/>键盘/ROS] --> FSM[状态机<br/>状态切换] --> CPG[CPG步态生成器] --> Target[关节目标生成]
-  Target --> Torque[力矩计算] --> PID[PD/PID控制器] --> Act[执行器映射] --> Sim[MuJoCo<br/>物理仿真]
-  Sim -->|传感器反馈| Torque
-```
+<img width="1280" height="720" alt="standing" src="docs/assets/mujoco_man.png" />
 
 该系统形成完整的机器人控制闭环：
 输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈
@@ -571,9 +566,9 @@ def _should_log(self, key, interval_s):
 
 ### 7.3 运行结果图片
 图 2 机器人稳定站立仿真效果
-<img width="1280" height="720" alt="standing" src="assets/stand.png" />
+<img width="1280" height="720" alt="standing" src="docs/assets/stand.png" />
 图 3 机器人周期行走仿真效果
-<img width="1280" height="720" alt="walking" src="assets/walk.png" />
+<img width="1280" height="720" alt="walking" src="docs/assets/walk.png" />
 
 ## 8. 现存不足与后续优化方向
 
@@ -600,4 +595,5 @@ def _should_log(self, key, interval_s):
 
 ## 参考文献
 [1] 刘成举。基于自学习 CPG 的仿人机器人自适应行走控制 [J]. 自动化学报，2021, 47 (8): 1652-1661.
+
 [2] Todorov E, Erez T, Tassa Y. MuJoCo: A physics engine for model-based control[C]//2012 IEEE/RSJ International Conference on Intelligent Robots and Systems. IEEE, 2012: 5026-5033.
