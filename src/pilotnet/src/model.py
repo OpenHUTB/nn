@@ -12,6 +12,7 @@ matplotlib.use('TkAgg')  # Use TkAgg backend for real-time plotting
 import matplotlib.pyplot as plt
 from utils.logger import logger
 from utils.piloterror import PilotError
+from utils.screen import message
 
 # Custom callback for real-time loss visualization
 class RealTimeLossPlot(Callback):
@@ -195,6 +196,23 @@ class PilotNet():
         # x_train & y_train are np.array() objects with data extracted directly from the PilotData object instances
         training_frames = data.training_data()
         testing_frames = data.testing_data()
+        
+        # Data processing before training
+        from src.data_processor import DataProcessor
+        
+        logger.info('Starting data processing before training...')
+        message('='*60)
+        message('          数据预处理阶段')
+        message('='*60)
+        
+        # Process training data
+        training_frames, train_stats = DataProcessor.process(training_frames)
+        
+        # Process testing data
+        testing_frames, test_stats = DataProcessor.process(testing_frames, enable_balancing=False)
+        
+        message('数据预处理完成！')
+        message('='*60 + '\n')
         
         # Calculate steps automatically based on data size
         num_train_samples = len(training_frames)

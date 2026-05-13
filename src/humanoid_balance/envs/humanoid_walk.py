@@ -24,11 +24,9 @@ def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         env = gym.make("Humanoid-v4", render_mode="human")
-        print(f"物理环境启动成功 | 运行设备: {device}")
-        
         model = SAC("MlpPolicy", env, verbose=0, device=device)
     except Exception as e:
-        print(f"环境初始化失败: {e}")
+        print(f"初始化失败: {e}")
         return
 
     # --- 3. 权重提取与对齐 ---
@@ -47,58 +45,84 @@ def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
         env.close()
         return
 
-    # --- 4. 优化后的仿真循环 (本次修改重点) ---
+    # --- 4. 增强型性能评价循环 (本次修改重点) ---
+    # 【新增】性能统计变量
+    session_rewards = []
+    episode_counts = 0
+    total_steps = 0
+    start_wall_time = time.time()
+
     try:
         obs, _ = env.reset()
-        env.render() # 预热
+        env.render()
         
-        # 控制参数
+        current_ep_reward = 0
+        current_ep_steps = 0
         ACTION_SCALE = 0.88
-        SMOOTH_FACTOR = 0.7  # 【新增】平滑因子，0-1之间，值越大动作越平滑
+        SMOOTH_FACTOR = 0.7
         prev_action = np.zeros(env.action_space.shape)
-        
-        # 物理步长控制 (200Hz -> 0.005s)
         dt = 0.005
-        print(f"演示开始：已启用高精度同步与动作平滑器 (Factor: {SMOOTH_FACTOR})")
+        
+        print(f"演示开始：已启用性能监控系统。按 Ctrl+C 结束并查看报告。")
         
         while True:
-            start_time = time.perf_counter()
+            step_start = time.perf_counter()
             
-            # 1. 模型预测
+            # 控制逻辑
             action, _ = model.predict(obs, deterministic=True)
-            
-            # 2. 【核心修改】动作平滑滤波 (EMA Filter)
-            # 防止关节因为权重不完全匹配而产生剧烈抖动
-            current_action = action * ACTION_SCALE
-            smoothed_action = SMOOTH_FACTOR * prev_action + (1 - SMOOTH_FACTOR) * current_action
+            smoothed_action = SMOOTH_FACTOR * prev_action + (1 - SMOOTH_FACTOR) * (action * ACTION_SCALE)
             prev_action = smoothed_action
             
-            # 3. 执行动作
-            obs, _, terminated, truncated, _ = env.step(np.clip(smoothed_action, -1.0, 1.0))
+            obs, reward, terminated, truncated, _ = env.step(np.clip(smoothed_action, -1.0, 1.0))
             
-            # 4. 异常安全渲染
+            # 【新增】实时数据累加
+            current_ep_reward += reward
+            current_ep_steps += 1
+            total_steps += 1
+            
             try:
                 env.render()
             except:
                 break
                 
-            # 5. 【核心修改】高精度时间补偿
-            # 计算代码运行消耗的时间，只 sleep 剩余部分，保证仿真速度恒定
-            elapsed = time.perf_counter() - start_time
+            # 时间同步
+            elapsed = time.perf_counter() - step_start
             if elapsed < dt:
                 time.sleep(dt - elapsed)
             
+            # 【新增】回合结束统计
             if terminated or truncated:
+                session_rewards.append(current_ep_reward)
+                episode_counts += 1
+                print(f"回合 {episode_counts} 结束 | 得分: {current_ep_reward:.2f} | 步数: {current_ep_steps}")
+                
+                # 重置
                 obs, _ = env.reset()
-                prev_action = np.zeros(env.action_space.shape) # 重置平滑器
+                prev_action = np.zeros(env.action_space.shape)
+                current_ep_reward = 0
+                current_ep_steps = 0
                 
     except KeyboardInterrupt:
-        print("\n用户手动停止模拟。")
+        print("\n检测到用户中断，正在汇总分析数据...")
     finally:
+        # --- 5. 【新增】生成最终评价报告 ---
+        duration = time.time() - start_wall_time
+        print("\n" + "="*30)
+        print("      仿真性能报告")
+        print("="*30)
+        print(f"总运行时间: {duration:.2f} 秒")
+        print(f"物理步总计: {total_steps} 步")
+        print(f"完成回合数: {episode_counts} 次")
+        if session_rewards:
+            print(f"平均每回合得分: {np.mean(session_rewards):.2f}")
+            print(f"单回合最高得分: {np.max(session_rewards):.2f}")
+        print(f"控制平滑系数: {SMOOTH_FACTOR}")
+        print("="*30)
+
         env.close()
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
-        print("资源已安全回收。")
+        print("资源已回收。")
 
 if __name__ == "__main__":
     run_simulation()

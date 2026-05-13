@@ -157,6 +157,12 @@ class SimpleDrivingSystem:
         }
         self.auto_weather_change = True  # 自动天气变化开关
         self.is_day = True  # 白天/黑夜标志
+        
+        # 交通标志识别（TSR）相关
+        self.tsr_enabled = True  # TSR功能开关
+        self.detected_signs = []  # 当前检测到的标志列表
+        self.sign_detection_history = []  # 标志检测历史
+        self.last_sign_update = 0.0  # 上次更新时间
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -600,6 +606,147 @@ class SimpleDrivingSystem:
             new_weather = random.choice(weather_types)
             self.set_weather(new_weather, random.uniform(0.3, 0.8))
 
+    def detect_traffic_signs(self):
+        """模拟交通标志检测（基于CARLA传感器或模拟）"""
+        import time
+        current_time = time.time()
+        
+        if not self.tsr_enabled:
+            return
+        
+        # 每隔一定时间随机检测标志（模拟真实检测）
+        if current_time - self.last_sign_update > random.uniform(5, 15):
+            self.last_sign_update = current_time
+            
+            # 交通标志类型定义
+            sign_types = [
+                {'type': 'speed_limit', 'value': 30, 'color': (0, 255, 0)},
+                {'type': 'speed_limit', 'value': 50, 'color': (0, 255, 255)},
+                {'type': 'speed_limit', 'value': 70, 'color': (0, 128, 255)},
+                {'type': 'no_overtaking', 'value': None, 'color': (255, 0, 0)},
+                {'type': 'overtaking_allowed', 'value': None, 'color': (0, 255, 0)},
+                {'type': 'stop', 'value': None, 'color': (255, 0, 0)},
+                {'type': 'yield', 'value': None, 'color': (255, 255, 0)},
+                {'type': 'no_entry', 'value': None, 'color': (255, 0, 0)},
+                {'type': 'one_way', 'value': 'right', 'color': (255, 255, 0)},
+                {'type': 'school_zone', 'value': None, 'color': (255, 0, 255)}
+            ]
+            
+            # 随机选择一个标志（模拟检测到标志）
+            if random.random() > 0.3:  # 70%概率检测到标志
+                detected_sign = random.choice(sign_types)
+                detected_sign['timestamp'] = current_time
+                
+                # 添加到检测历史
+                self.sign_detection_history.append(detected_sign)
+                
+                # 保留最近5个检测记录
+                if len(self.sign_detection_history) > 5:
+                    self.sign_detection_history.pop(0)
+                
+                # 更新当前检测到的标志（只保留最新的限速标志和其他重要标志）
+                self.detected_signs = []
+                
+                # 获取最新的限速标志
+                speed_limit_sign = None
+                for sign in reversed(self.sign_detection_history):
+                    if sign['type'] == 'speed_limit':
+                        speed_limit_sign = sign
+                        break
+                
+                if speed_limit_sign:
+                    self.detected_signs.append(speed_limit_sign)
+                
+                # 获取最新的其他重要标志
+                other_sign = None
+                for sign in reversed(self.sign_detection_history):
+                    if sign['type'] != 'speed_limit':
+                        other_sign = sign
+                        break
+                
+                if other_sign and other_sign['timestamp'] > current_time - 10:
+                    self.detected_signs.append(other_sign)
+                
+                # 打印检测信息
+                sign_name = self.get_sign_name(detected_sign)
+                print(f"TSR: 检测到交通标志 - {sign_name}")
+    
+    def get_sign_name(self, sign):
+        """获取标志名称（英文缩写，避免中文显示问题）"""
+        type_names = {
+            'speed_limit': f"{sign['value']}km/h",
+            'no_overtaking': 'NO PASS',
+            'overtaking_allowed': 'PASS OK',
+            'stop': 'STOP',
+            'yield': 'YIELD',
+            'no_entry': 'NO ENTRY',
+            'one_way': 'ONE WAY',
+            'school_zone': 'SCHOOL'
+        }
+        return type_names.get(sign['type'], sign['type'])
+    
+    def draw_traffic_signs(self, image):
+        """在图像上绘制交通标志"""
+        if not self.tsr_enabled or not self.detected_signs:
+            return
+        
+        height, width = image.shape[:2]
+        margin = 15
+        sign_size = 60
+        spacing = 10
+        
+        # 在右上角绘制检测到的标志
+        start_x = width - margin - sign_size
+        start_y = margin
+        
+        for i, sign in enumerate(self.detected_signs):
+            # 计算位置
+            x = start_x
+            y = start_y + i * (sign_size + spacing)
+            
+            # 绘制标志背景
+            cv2.rectangle(image, (x, y), (x + sign_size, y + sign_size), (0, 0, 0), -1)
+            cv2.rectangle(image, (x, y), (x + sign_size, y + sign_size), sign['color'], 2)
+            
+            # 绘制标志内容
+            center_x = x + sign_size // 2
+            center_y = y + sign_size // 2
+            
+            if sign['type'] == 'speed_limit':
+                # 限速标志：圆形背景 + 数字
+                cv2.circle(image, (center_x, center_y), sign_size // 3, sign['color'], -1)
+                cv2.putText(image, str(sign['value']), (center_x - 12, center_y + 6), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+            elif sign['type'] == 'no_overtaking':
+                # 禁止超车标志：红圈 + 斜杠
+                cv2.circle(image, (center_x, center_y), sign_size // 3, sign['color'], 2)
+                cv2.line(image, (x + 10, y + 10), (x + sign_size - 10, y + sign_size - 10), sign['color'], 3)
+            elif sign['type'] == 'stop':
+                # 停车标志：八边形
+                pts = []
+                for j in range(8):
+                    angle = j * 45 + 22.5
+                    px = center_x + (sign_size // 3) * math.cos(math.radians(angle))
+                    py = center_y + (sign_size // 3) * math.sin(math.radians(angle))
+                    pts.append((int(px), int(py)))
+                cv2.fillPoly(image, [np.array(pts)], sign['color'])
+                cv2.putText(image, 'S', (center_x - 6, center_y + 6), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+            elif sign['type'] == 'yield':
+                # 让行标志：三角形
+                pts = [
+                    (center_x, y + 5),
+                    (x + sign_size - 5, y + sign_size - 5),
+                    (x + 5, y + sign_size - 5)
+                ]
+                cv2.fillPoly(image, [np.array(pts)], sign['color'])
+                cv2.putText(image, 'Y', (center_x - 4, center_y + 4), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+            else:
+                # 其他标志：显示类型名称
+                cv2.putText(image, self.get_sign_name(sign)[:2], (center_x - 10, center_y + 5), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, sign['color'], 2)
+
     def create_multi_view_display(self, speed, throttle, steer):
         """创建多视角显示"""
         if self.view_mode == 'single':
@@ -608,9 +755,10 @@ class SimpleDrivingSystem:
             if view_name in self.camera_images and self.camera_images[view_name] is not None:
                 display_img = self.camera_images[view_name].copy()
                 
-                # 在前视图上绘制车道线
+                # 在前视图上绘制车道线和交通标志
                 if view_name == 'front':
                     self.draw_lane_lines(display_img)
+                    self.draw_traffic_signs(display_img)
                 
                 # 添加状态信息
                 cv2.putText(display_img, f"View: {view_name.upper()}",
@@ -768,6 +916,7 @@ class SimpleDrivingSystem:
         print("  r - 重置车辆")
         print("  s - 紧急停止")
         print("  l - 切换车道保持辅助(LKA)")
+        print("  k - 切换交通标志识别(TSR)")
         print("  w - 切换自动天气变化")
         print("  7 - 设置晴天")
         print("  8 - 设置雨天")
@@ -798,6 +947,9 @@ class SimpleDrivingSystem:
 
                 # 自动更新天气
                 self.update_weather()
+
+                # 检测交通标志
+                self.detect_traffic_signs()
 
                 # 获取控制指令（包含LKA辅助）
                 throttle, brake, steer = self.controller.get_control(
@@ -838,6 +990,11 @@ class SimpleDrivingSystem:
                     self.lka_enabled = not self.lka_enabled
                     status = "开启" if self.lka_enabled else "关闭"
                     print(f"车道保持辅助(LKA)已{status}")
+                elif key == ord('k'):
+                    # 切换交通标志识别(TSR)
+                    self.tsr_enabled = not self.tsr_enabled
+                    status = "开启" if self.tsr_enabled else "关闭"
+                    print(f"交通标志识别(TSR)已{status}")
                 elif key == ord('w'):
                     # 切换自动天气变化
                     self.auto_weather_change = not self.auto_weather_change

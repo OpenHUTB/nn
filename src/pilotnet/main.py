@@ -257,6 +257,11 @@ class Menu():
     @staticmethod
     def run_3():
         '单帧预测'
+        import cv2
+        import numpy as np
+        import datetime
+        from PIL import Image, ImageDraw, ImageFont
+        
         logger.info('Starting single frame prediction')
         i = 0
         models = []
@@ -291,13 +296,164 @@ class Menu():
                 logger.error(f'Failed to load image: {e}')
                 raise PilotError('加载失败，你输入的路径可能有误，请重新开始...')
             predictions = PilotNet(160, 120, predict=True).predict(frame, given_model=model)
-            logger.info(f'Prediction completed - steering: {predictions[0][0][0]}, throttle: {predictions[1][0][0]}, brake: {predictions[2][0][0]}')
+            
+            steering = predictions[0][0][0]
+            throttle = predictions[1][0][0]
+            brake = predictions[2][0][0]
+            
+            # 获取状态描述
+            steering_status = "左拐" if steering < -0.1 else "直行" if abs(steering) <= 0.1 else "右拐"
+            throttle_status = "加速" if throttle > 0.5 else "巡航" if throttle > 0.1 else "怠速"
+            brake_status = "制动" if brake > 0.3 else "放松"
+            
+            logger.info(f'Prediction completed - steering: {steering}, throttle: {throttle}, brake: {brake}')
+            
+            # 加载原始图像用于可视化
+            original_img = cv2.imread(path)
+            img_height, img_width = original_img.shape[:2]
+            
+            # 创建可视化图像（放大显示）
+            display_img = cv2.resize(original_img, (int(img_width * 1.5), int(img_height * 1.5)))
+            display_height, display_width = display_img.shape[:2]
+            
+            # 转换为 PIL 图像以便显示中文
+            display_img_pil = Image.fromarray(cv2.cvtColor(display_img, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(display_img_pil)
+            
+            # 尝试加载中文字体
+            try:
+                font = ImageFont.truetype("msyh.ttc", 24)  # Windows 系统字体
+            except:
+                try:
+                    font = ImageFont.truetype("simhei.ttf", 24)  # 备用字体
+                except:
+                    font = ImageFont.load_default()  # 默认字体
+            
+            font_large = ImageFont.truetype("msyh.ttc", 32) if 'font' in dir() else font
+            font_small = ImageFont.truetype("msyh.ttc", 20) if 'font' in dir() else font
+            
+            # 添加标题（中文）
+            draw.text((20, 30), 'PilotNet 预测结果', font=font_large, fill=(0, 255, 0))
+            
+            # 模型名称显示（添加半透明背景）
+            model_text = f'模型: {model[:40]}...' if len(model) > 40 else f'模型: {model}'
+            text_bbox = draw.textbbox((20, 75), model_text, font=font_small)
+            draw.rectangle([text_bbox[0]-5, text_bbox[1]-3, text_bbox[2]+5, text_bbox[3]+3], fill=(0, 0, 0, 150))
+            draw.text((20, 75), model_text, font=font_small, fill=(255, 255, 255))
+            
+            # 预测结果显示区域（带背景框）
+            result_x = 20
+            result_y = 120
+            spacing = 45
+            
+            # 转向角度（中文）
+            steering_color = (0, 255, 0) if abs(steering) < 0.3 else (0, 255, 255) if abs(steering) < 0.6 else (0, 0, 255)
+            steering_text = f'转向角度: {steering:+.3f}  ({steering_status})'
+            text_bbox = draw.textbbox((result_x, result_y), steering_text, font=font)
+            draw.rectangle([text_bbox[0]-5, text_bbox[1]-3, text_bbox[2]+5, text_bbox[3]+3], fill=(0, 0, 0, 150))
+            draw.text((result_x, result_y), steering_text, font=font, fill=steering_color)
+            
+            # 油门（中文）
+            throttle_color = (255, 0, 0) if throttle > 0.5 else (0, 255, 0)
+            throttle_text = f'油门压力: {throttle:.3f}  ({throttle_status})'
+            text_bbox = draw.textbbox((result_x, result_y + spacing), throttle_text, font=font)
+            draw.rectangle([text_bbox[0]-5, text_bbox[1]-3, text_bbox[2]+5, text_bbox[3]+3], fill=(0, 0, 0, 150))
+            draw.text((result_x, result_y + spacing), throttle_text, font=font, fill=throttle_color)
+            
+            # 刹车（中文）
+            brake_color = (0, 0, 255) if brake > 0.5 else (0, 255, 0)
+            brake_text = f'刹车压力: {brake:.3f}  ({brake_status})'
+            text_bbox = draw.textbbox((result_x, result_y + spacing * 2), brake_text, font=font)
+            draw.rectangle([text_bbox[0]-5, text_bbox[1]-3, text_bbox[2]+5, text_bbox[3]+3], fill=(0, 0, 0, 150))
+            draw.text((result_x, result_y + spacing * 2), brake_text, font=font, fill=brake_color)
+            
+            # 转换回 OpenCV 格式
+            display_img = cv2.cvtColor(np.array(display_img_pil), cv2.COLOR_RGB2BGR)
+            
+            # 绘制方向盘可视化
+            steering_wheel_radius = 60
+            steering_center_x = display_width - 100
+            steering_center_y = display_height - 100
+            
+            # 方向盘外圈
+            cv2.circle(display_img, (steering_center_x, steering_center_y), steering_wheel_radius, (200, 200, 200), 3)
+            cv2.circle(display_img, (steering_center_x, steering_center_y), steering_wheel_radius - 10, (100, 100, 100), 2)
+            
+            # 根据转向角度旋转方向盘
+            rotation_angle = -steering * 45  # 将转向角度转换为方向盘角度（最大45度）
+            radians = np.radians(rotation_angle)
+            
+            # 方向盘辐条
+            for i in range(3):
+                angle = np.radians(i * 120) + radians
+                x1 = steering_center_x + int(np.cos(angle) * (steering_wheel_radius - 15))
+                y1 = steering_center_y + int(np.sin(angle) * (steering_wheel_radius - 15))
+                x2 = steering_center_x - int(np.cos(angle) * (steering_wheel_radius - 15))
+                y2 = steering_center_y - int(np.sin(angle) * (steering_wheel_radius - 15))
+                cv2.line(display_img, (x1, y1), (x2, y2), (200, 200, 200), 3)
+            
+            # 方向盘中心
+            cv2.circle(display_img, (steering_center_x, steering_center_y), 8, (255, 0, 0), -1)
+            
+            # 转向指示器
+            indicator_length = 30
+            indicator_x = steering_center_x + int(np.cos(radians) * indicator_length)
+            indicator_y = steering_center_y + int(np.sin(radians) * indicator_length)
+            cv2.line(display_img, (steering_center_x, steering_center_y), (indicator_x, indicator_y), (0, 255, 0), 3)
+            cv2.circle(display_img, (indicator_x, indicator_y), 5, (0, 255, 0), -1)
+            
+            # 状态指示条 - 使用 PIL 绘制以支持中文
+            display_img_pil = Image.fromarray(cv2.cvtColor(display_img, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(display_img_pil)
+            
+            status_bar_y = display_height - 40
+            
+            # 绘制状态栏背景
+            draw.rectangle([(20, status_bar_y), (display_width - 140, status_bar_y + 25)], fill=(50, 50, 50))
+            
+            # 油门指示条
+            throttle_width = int(throttle * 150)
+            draw.rectangle([(30, status_bar_y + 5), (30 + throttle_width, status_bar_y + 20)], fill=(0, 255, 0))
+            draw.text((30, status_bar_y - 8), '油门', font=font_small, fill=(0, 255, 0))
+            
+            # 刹车指示条
+            brake_width = int(brake * 150)
+            draw.rectangle([(200, status_bar_y + 5), (200 + brake_width, status_bar_y + 20)], fill=(0, 0, 255))
+            draw.text((200, status_bar_y - 8), '刹车', font=font_small, fill=(0, 0, 255))
+            
+            # 转换回 OpenCV 格式
+            display_img = cv2.cvtColor(np.array(display_img_pil), cv2.COLOR_RGB2BGR)
+            
+            # 保存预测结果图像
+            save_dir = 'predictions/'
+            os.makedirs(save_dir, exist_ok=True)
+            timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            save_path = f'{save_dir}prediction_{timestamp}.png'
+            cv2.imwrite(save_path, display_img)
+            logger.info(f'Prediction result saved to: {save_path}')
+            
+            # 显示可视化结果
+            cv2.imshow('PilotNet Prediction', display_img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            
+            # 终端显示详细结果
             clear()
-            message('预测结果：')
-            message(f'转向角度: {predictions[0][0][0]}')
-            message(f'油门: {predictions[1][0][0]}')
-            message(f'刹车: {predictions[2][0][0]}')
-            input('按 [ENTER] 继续...')
+            message('='*50)
+            message('          PilotNet 单帧预测结果')
+            message('='*50)
+            message(f'\n模型名称: {model}')
+            message(f'输入图像: {path}')
+            message(f'预测时间: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+            message('\n' + '-'*50)
+            message('预测结果:')
+            message(f'  转向角度: {steering:+.3f}  ({("左拐" if steering < -0.1 else "直行" if abs(steering) <= 0.1 else "右拐")})')
+            message(f'  油门压力: {throttle:.3f}  ({("加速" if throttle > 0.3 else "巡航" if throttle > 0.1 else "怠速")})')
+            message(f'  刹车压力: {brake:.3f}  ({("制动" if brake > 0.3 else "放松")})')
+            message('\n' + '-'*50)
+            message(f'结果已保存至: {save_path}')
+            message('='*50)
+            input('\n按 [ENTER] 继续...')
 
     @staticmethod
     def run_4():

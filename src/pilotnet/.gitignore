@@ -3,3 +3,4 @@ src/__pycache__
 recordings/
 models/
 logs/
+predictions/

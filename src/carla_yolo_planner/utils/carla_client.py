@@ -71,6 +71,7 @@ class CarlaClient:
         self.hud_fps = 0
         self.hud_detection_count = 0
         self.hud_brake_status = ""
+        self.hud_speed = 0  # 车辆速度（km/h）
 
     def connect(self):
         print(f"[INFO] 正在连接 CARLA 服务器 ({self.host}:{self.port})...")
@@ -434,10 +435,11 @@ class CarlaClient:
         
         self.spectator.set_transform(carla.Transform(location, rotation))
     
-    def update_hud_info(self, fps, detection_count, brake_status=""):
+    def update_hud_info(self, fps, detection_count, speed_kmh=0, brake_status=""):
         """更新 HUD 显示信息"""
         self.hud_fps = fps
         self.hud_detection_count = detection_count
+        self.hud_speed = speed_kmh
         self.hud_brake_status = brake_status
     
     def draw_hud(self):
@@ -446,53 +448,73 @@ class CarlaClient:
             return
         
         try:
-            # 获取车辆位置（用于在画面上方显示）
-            vehicle_location = self.vehicle.get_location()
+            # 获取 spectator 位置（用于在画面固定位置显示）
+            spectator_transform = self.spectator.get_transform()
+            spectator_location = spectator_transform.location
             
-            # 显示 FPS（黄色，最大字号）
+            # 计算 HUD 显示位置（在 spectator 前方固定距离）
+            forward = spectator_transform.get_forward_vector()
+            hud_base_location = carla.Location(
+                spectator_location.x + forward.x * 3,
+                spectator_location.y + forward.y * 3,
+                spectator_location.z - 1
+            )
+            
+            # 显示速度（白色，最大字号）
+            speed_text = f"  Speed: {self.hud_speed:.1f} km/h  "
+            self.debug_helper.draw_string(
+                carla.Location(hud_base_location.x, hud_base_location.y, hud_base_location.z + 1.2),
+                speed_text,
+                draw_shadow=True,
+                color=carla.Color(255, 255, 255),
+                life_time=0.2  # 每帧刷新
+            )
+            
+            # 显示 FPS（黄色）
             fps_text = f"  FPS: {self.hud_fps:.1f}  "
             self.debug_helper.draw_string(
-                carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 3.5),
+                carla.Location(hud_base_location.x, hud_base_location.y, hud_base_location.z + 1.0),
                 fps_text,
                 draw_shadow=True,
                 color=carla.Color(255, 255, 0),
-                life_time=-1  # 永久显示直到被覆盖
+                life_time=0.2
             )
             
             # 显示检测数量（青色）
             detection_text = f"  Detections: {self.hud_detection_count}  "
             self.debug_helper.draw_string(
-                carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 3.2),
+                carla.Location(hud_base_location.x, hud_base_location.y, hud_base_location.z + 0.8),
                 detection_text,
                 draw_shadow=True,
                 color=carla.Color(0, 255, 255),
-                life_time=-1
+                life_time=0.2
             )
             
             # 显示当前视角（橙色）
             camera_name = self.camera_configs[self.current_camera]['name']
             camera_text = f"  View: {camera_name}  "
             self.debug_helper.draw_string(
-                carla.Location(vehicle_location.x - 2, vehicle_location.y, vehicle_location.z + 2.9),
+                carla.Location(hud_base_location.x, hud_base_location.y, hud_base_location.z + 0.6),
                 camera_text,
                 draw_shadow=True,
                 color=carla.Color(255, 128, 0),
-                life_time=-1
+                life_time=0.2
             )
             
             # 显示刹车状态（红色）
             if self.hud_brake_status:
                 brake_text = "  !!! EMERGENCY BRAKING !!!  "
                 self.debug_helper.draw_string(
-                    carla.Location(vehicle_location.x - 3, vehicle_location.y, vehicle_location.z + 2.6),
+                    carla.Location(hud_base_location.x, hud_base_location.y, hud_base_location.z + 0.3),
                     brake_text,
                     draw_shadow=True,
                     color=carla.Color(255, 0, 0),
-                    life_time=-1
+                    life_time=0.2
                 )
                 
         except Exception as e:
-            print(f"[WARNING] HUD绘制失败: {e}")
+            if self.hud_fps % 50 == 0:
+                print(f"[WARNING] HUD绘制失败: {e}")
     
     def check_collision_and_reset(self):
         """检测车辆是否卡住或碰撞，并自动重置位置"""

@@ -1,14 +1,24 @@
-#!/usr/bin/env python
+import sys
+import os
 
-# Copyright (c) 2018 Intel Labs.
-# authors: German Ros (german.ros@intel.com)
-#
-# This work is licensed under the terms of the MIT license.
-# For a copy, see <https://opensource.org/licenses/MIT>.
+# 1. 获取当前脚本文件的绝对路径（和运行目录无关）
+script_directory = os.path.dirname(os.path.abspath(__file__))
+
+# 2. 拼接出CARLA PythonAPI的路径（自动适配Windows/Linux/macOS）
+carla_api_path = os.path.join(script_directory, "WindowsNoEditor", "PythonAPI", "carla")
+
+# 3. 检查路径是否存在，提前报错
+if not os.path.exists(carla_api_path):
+    raise FileNotFoundError(f"CARLA API路径不存在: {carla_api_path}\n请检查脚本和WindowsNoEditor文件夹是否在同一目录下")
+
+# 4. 添加到Python路径
+sys.path.append(carla_api_path)
+
+
+from agents.navigation.behavior_agent import BehaviorAgent
 
 """Example of automatic vehicle control from client side."""
 
-from __future__ import print_function
 
 import argparse
 import collections
@@ -59,7 +69,6 @@ import carla
 from carla import ColorConverter as cc
 
 from agents.navigation.behavior_agent import BehaviorAgent  # pylint: disable=import-error
-from agents.navigation.roaming_agent import RoamingAgent  # pylint: disable=import-error
 from agents.navigation.basic_agent import BasicAgent  # pylint: disable=import-error
 
 
@@ -109,7 +118,6 @@ class World(object):
         self._weather_index = 0
         self._actor_filter = args.filter
         self._gamma = args.gamma
-        self.agent = None
         self.restart(args)
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False
@@ -201,33 +209,19 @@ class World(object):
 
 class KeyboardControl(object):
     def __init__(self, world):
-        self.world = world
-        self.manual_mode = False
-        self.reroute_requested = False
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_p:
-                    self.manual_mode = not self.manual_mode
-                    mode_str = "Manual" if self.manual_mode else "Auto"
-                    self.world.hud.notification("Switched to {} mode".format(mode_str), seconds=2.0)
-                if event.key == pygame.K_r:      # 新增
-                    self.reroute_requested = True
-                    self.world.hud.notification("Reroute requested", seconds=1.5)
-                if event.key == pygame.K_v:      # 新增截图功能
-                    if self.world.camera_manager is not None:
-                        self.world.camera_manager.request_screenshot = True
-                        self.world.hud.notification("Screenshot requested", seconds=1.0)
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
 
     @staticmethod
     def _is_quit_shortcut(key):
+        """Shortcut for quitting"""
         return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
 
 # ==============================================================================
@@ -256,8 +250,6 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
-        self.last_waypoint = None
-        self.current_obstacle = None
 
     def on_world_tick(self, timestamp):
         """Gets informations from the world at every tick"""
@@ -297,7 +289,6 @@ class HUD(object):
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % transform.location.z,
-            'Speed limit: % 10.0f km/h' % world.player.get_speed_limit(),
             '']
         if isinstance(control, carla.VehicleControl):
             self._info_text += [
@@ -332,80 +323,6 @@ class HUD(object):
                 break
             vehicle_type = get_actor_display_name(vehicle, truncate=22)
             self._info_text.append('% 4dm %s' % (dist, vehicle_type))
-                
-        # 新增：基于Actor的最近障碍物距离检测（车辆、行人、交通锥、路灯等）
-        obstacle_distance = None
-        vehicle_location = world.player.get_location()
-        vehicle_transform = world.player.get_transform()
-        forward_vector = vehicle_transform.get_forward_vector()
-
-        all_actors = world.world.get_actors()
-        for actor in all_actors:
-            # 排除玩家车自身
-            if actor.id == world.player.id:
-                continue
-            # 排除所有附着在玩家车上的传感器（安全检查父级）
-            if hasattr(actor, 'get_parent'):
-                if actor.get_parent() is not None and actor.get_parent().id == world.player.id:
-                    continue
-            # 只考虑前方30米内的物体，提高性能
-            if actor.get_location().distance(vehicle_location) > 30.0:
-                continue
-            # 计算相对向量
-            delta = actor.get_location() - vehicle_location
-            # 判断是否在前方：点积 > 0
-            dot = forward_vector.x * delta.x + forward_vector.y * delta.y + forward_vector.z * delta.z
-            if dot < 0:
-                continue
-            # 计算距离
-            dist = math.sqrt(delta.x**2 + delta.y**2 + delta.z**2)
-            # 忽略距离小于 3.5 米的物体（自身传感器）
-            if dist < 3.5:
-                continue
-            if obstacle_distance is None or dist < obstacle_distance:
-                obstacle_distance = dist
-
-        if obstacle_distance is not None:
-            self._info_text.append('Obstacle: % 5.1f m' % obstacle_distance)
-        else:
-            self._info_text.append('Obstacle: None')
-        
-        # 将当前障碍物距离保存到实例变量，供 AEB 使用
-        self.current_obstacle = obstacle_distance
-
-        
-        # 新增：显示下一个路径点的距离，并在到达新路径点时提示
-        if hasattr(world, 'agent') and world.agent is not None:
-            try:
-                # 尝试获取局部规划器
-                if hasattr(world.agent, '_local_planner'):
-                    planner = world.agent._local_planner
-                elif hasattr(world.agent, 'get_local_planner'):
-                    planner = world.agent.get_local_planner()
-                else:
-                    planner = None
-
-                if planner is not None and hasattr(planner, 'waypoints_queue') and len(planner.waypoints_queue) > 0:
-                    next_wp = planner.waypoints_queue[0][0]
-                    dist = next_wp.transform.location.distance(world.player.get_location())
-                    self._info_text.append('Next WP: % 5.1f m' % dist)
-
-                    # 到达路径点检测：与上一次记录的路径点位置比较
-                    current_wp_loc = next_wp.transform.location
-                    if self.last_waypoint is None:
-                        self.last_waypoint = current_wp_loc
-                    else:
-                        # 如果当前路径点与上次记录的距离大于 1 米（说明切换到了新路径点）
-                        if self.last_waypoint.distance(current_wp_loc) > 1.0:
-                            # 发送通知（底部淡入淡出文字）
-                            world.hud.notification("Waypoint reached", seconds=1.5)
-                            self.last_waypoint = current_wp_loc
-                else:
-                    # 队列为空时重置记录
-                    self.last_waypoint = None
-            except Exception as e:
-                # 仅调试用，运行正常后可注释或删除
-                print("Next WP error:", e)
 
     def toggle_info(self):
         """Toggle info on or off"""
@@ -498,12 +415,18 @@ class FadingText(object):
 # ==============================================================================
 
 
+# ==============================================================================
+# -- HelpText ------------------------------------------------------------------
+# ==============================================================================
 class HelpText(object):
     """ Helper class for text render"""
-
     def __init__(self, font, width, height):
         """Constructor method"""
-        lines = __doc__.split('\n')
+        # 处理__doc__为None的情况
+        if __doc__ is None:
+            lines = ["CARLA Automatic Control Client"]
+        else:
+            lines = __doc__.split('\n')
         self.font = font
         self.dim = (680, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
@@ -513,7 +436,7 @@ class HelpText(object):
         for i, line in enumerate(lines):
             text_texture = self.font.render(line, True, (255, 255, 255))
             self.surface.blit(text_texture, (22, i * 22))
-            self._render = False
+        self._render = False
         self.surface.set_alpha(220)
 
     def toggle(self):
@@ -646,7 +569,6 @@ class CameraManager(object):
         self._parent = parent_actor
         self.hud = hud
         self.recording = False
-        self.request_screenshot = False   # 新增：截图请求标志
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         attachment = carla.AttachmentType
         self._camera_transforms = [
@@ -751,20 +673,6 @@ class CameraManager(object):
             array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        
-        # 截图请求处理
-        if self.request_screenshot:
-            self.request_screenshot = False
-            # 生成时间戳文件名
-            import datetime
-            import os
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            # 创建 _screenshots 目录（如果不存在）
-            os.makedirs("_screenshots", exist_ok=True)
-            filename = f"_screenshots/screenshot_{timestamp}.png"
-            pygame.image.save(self.surface, filename)
-            self.hud.notification(f"Screenshot saved: {filename}", seconds=2.0)
-
         if self.recording:
             image.save_to_disk('_out/%08d' % image.frame)
 
@@ -792,33 +700,27 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
-        world.aeb_triggered = False   # 初始化自动紧急制动触发标志
         controller = KeyboardControl(world)
 
         if args.agent == "Roaming":
             agent = RoamingAgent(world.player)
-            world.agent = agent
         elif args.agent == "Basic":
             agent = BasicAgent(world.player)
-            world.agent = agent
             spawn_point = world.map.get_spawn_points()[0]
             agent.set_destination((spawn_point.location.x,
                                    spawn_point.location.y,
                                    spawn_point.location.z))
         else:
-            agent = BehaviorAgent(world.player, behavior=args.behavior)
-            world.agent = agent
-            spawn_points = world.map.get_spawn_points()
-            random.shuffle(spawn_points)
-            world.spawn_points = spawn_points
-
-            if spawn_points[0].location != agent.vehicle.get_location():
-                destination = spawn_points[0].location
-            else:
-                destination = spawn_points[1].location
-
-            agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
-
+             agent = BehaviorAgent(world.player, behavior=args.behavior)
+             spawn_points = world.map.get_spawn_points()
+             random.shuffle(spawn_points)
+    # 直接用world.player，永远不会出错
+             current_location = world.player.get_location()
+             if spawn_points[0].location != current_location:
+                 destination = spawn_points[0].location
+             else:
+                  destination = spawn_points[1].location
+        agent.set_destination(current_location, destination)
         clock = pygame.time.Clock()
 
         while True:
@@ -842,115 +744,49 @@ def game_loop(args):
                 pygame.display.flip()
                 control = agent.run_step()
                 control.manual_gear_shift = False
-
-                # 限速功能
-                if args.max_speed > 0:
-                    vel = world.player.get_velocity()
-                    current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-                    if current_speed > args.max_speed:
-                        control.throttle = 0.0
-                        overshoot = (current_speed - args.max_speed) / args.max_speed
-                        control.brake = min(1.0, overshoot)
-                
-                # ===== 自动紧急制动 (AEB) 开始 =====
-                if hasattr(world.hud, 'current_obstacle') and world.hud.current_obstacle is not None:
-                    if world.hud.current_obstacle < args.aeb_distance:
-                        # 强制刹车
-                        control.throttle = 0.0
-                        control.brake = 1.0
-                        control.reverse = False
-                        if not world.aeb_triggered:
-                            world.hud.notification("AEB engaged!", seconds=1.0)
-                            world.aeb_triggered = True
-                    else:
-                        world.aeb_triggered = False
-                # ===== AEB 结束 =====
-
                 world.player.apply_control(control)
             else:
-                # 重规划请求处理
-                if controller.reroute_requested:
-                    controller.reroute_requested = False
-                    if hasattr(world, 'spawn_points') and world.spawn_points:
-                        agent.reroute(world.spawn_points)
-                        world.hud.notification("Rerouting...", seconds=1.5)
-                    else:
-                        temp_spawn = world.map.get_spawn_points()
-                        if temp_spawn:
-                            agent.reroute(temp_spawn)
-                            world.hud.notification("Rerouting...", seconds=1.5)
-                agent.update_information()
+                
 
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
 
                 # Set new destination when target has been reached
-                if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
-                    agent.reroute(spawn_points)
+                if len(agent.get_local_planner()._waypoints_queue) < num_min_waypoints and args.loop:
+                    # 重新获取并打乱生成点，选择新的随机目的地
+                    spawn_points = world.map.get_spawn_points()
+                    random.shuffle(spawn_points)
+                    current_location = world.player.get_location()
+                    if spawn_points[0].location != current_location:
+                     new_destination = spawn_points[0].location
+                    else:
+                         new_destination = spawn_points[1].location
+                         agent.set_destination(current_location, new_destination)
+                         # 重新获取并打乱生成点，选择新的随机目的地
+                         spawn_points = world.map.get_spawn_points()
+                         random.shuffle(spawn_points)
+                         current_location = world.player.get_location()
+                         if spawn_points[0].location != current_location:
+                            new_destination = spawn_points[0].location
+                         else:
+                              new_destination = spawn_points[1].location
+                         agent.set_destination(current_location, new_destination)
+
+# 加上这一行！手动调用一次run_step()初始化内部状态
+                         agent.run_step()
                     tot_target_reached += 1
                     world.hud.notification("The target has been reached " +
                                            str(tot_target_reached) + " times.", seconds=4.0)
 
-                elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
+                elif len(agent.get_local_planner()._waypoints_queue) == 0 and not args.loop:
                     print("Target reached, mission accomplished...")
                     break
 
                 speed_limit = world.player.get_speed_limit()
                 agent.get_local_planner().set_speed(speed_limit)
 
-                # 手动/自动模式切换
-                if controller.manual_mode:
-                    # 手动控制：读取键盘输入生成 control
-                    keys = pygame.key.get_pressed()
-                    control = carla.VehicleControl()
-
-                    control.throttle = 1.0 if (keys[pygame.K_UP] or keys[pygame.K_w]) else 0.0
-                    control.brake = 1.0 if (keys[pygame.K_DOWN] or keys[pygame.K_s]) else 0.0
-                    # 转向：左负右正，范围 -1.0 到 1.0
-                    steer = 0.0
-                    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-                        steer = -1.0
-                    elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-                        steer = 1.0
-                    control.steer = steer
-                    control.reverse = keys[pygame.K_q]
-                    control.hand_brake = keys[pygame.K_SPACE]
-                    control.manual_gear_shift = False
-                else:
-                    control = agent.run_step()
-                    # ✅ 第四次修改：速度闭环控制（P控制）
-                    vel = world.player.get_velocity()
-                    current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-
-                    target_speed = args.max_speed
-                    error = target_speed - current_speed
-
-                    Kp = 0.05
-                    base_throttle = 0.25
-
-                    if error >= 0:
-                        throttle = base_throttle + Kp * error
-                        control.throttle = max(0.0, min(throttle, 1.0))
-                        control.brake = 0.0
-                    else:
-                        control.throttle = 0.0
-                        control.brake = max(0.0, min(-Kp * error, 1.0))
-                
-                # ===== 自动紧急制动 (AEB) 开始 =====
-                if hasattr(world.hud, 'current_obstacle') and world.hud.current_obstacle is not None:
-                    if world.hud.current_obstacle < args.aeb_distance:
-                        # 强制刹车
-                        control.throttle = 0.0
-                        control.brake = 1.0
-                        control.reverse = False
-                        if not world.aeb_triggered:
-                            world.hud.notification("AEB engaged!", seconds=3.0)
-                            world.aeb_triggered = True
-                    else:
-                        world.aeb_triggered = False
-                # ===== AEB 结束 =====
-
+                control = agent.run_step()
                 world.player.apply_control(control)
 
     finally:
@@ -1021,13 +857,6 @@ def main():
         default=None,
         type=int)
 
-    argparser.add_argument(
-        '--max_speed', type=float, default=100.0,
-        help='Maximum speed in km/h for the autonomous agent (default: 100.0)')
-
-    argparser.add_argument(
-        '--aeb_distance', type=float, default=5.0,
-        help='Distance in meters to trigger Automatic Emergency Braking (default: 5.0)')
     args = argparser.parse_args()
 
     args.width, args.height = [int(x) for x in args.res.split('x')]
