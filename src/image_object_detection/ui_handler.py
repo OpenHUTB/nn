@@ -10,7 +10,7 @@
 #   - 支持运行时切换检测模型（热切换）
 #
 # 设计原则：
-#   - 用户友好：错误提示具体到“文件不存在”、“无权限”、“格式不支持”
+#   - 用户友好：错误提示具体到"文件不存在"、"无权限"、"格式不支持"
 #   - 安全兜底：即使用户输错路径或模型，也不崩溃，而是返回主菜单
 #   - 松耦合：依赖 DetectionEngine、CameraDetector 和 BatchDetector，但不硬编码其内部逻辑
 #   - 可扩展：支持未来新增模式（如视频文件检测）
@@ -25,69 +25,100 @@ from camera_detector import CameraOpenError
 from model_manager import ModelManager
 from video_detector import VideoDetector
 
+
 def parse_args():
     """
-    解析命令行参数，支持 --image <path>、--camera 或 --batch <dir> 三种模式。
-    返回 argparse.Namespace 对象。
+    Parse command line arguments.
+    Returns argparse.Namespace object.
     """
-    parser = argparse.ArgumentParser(description="YOLOv8 Detection System")
-    parser.add_argument("--image", type=str, help="Path to input image file")
-    parser.add_argument("--camera", action="store_true", help="Start live camera detection")
-    parser.add_argument("--batch", type=str, help="Path to input directory for batch detection")
+    parser = argparse.ArgumentParser(
+        description="YOLOv8 Image Object Detection System",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument("--image", type=str, help="Path to input image file")
+    mode_group.add_argument("--camera", action="store_true", help="Start live camera detection")
+    mode_group.add_argument("--batch", type=str, help="Path to input directory for batch detection")
+    mode_group.add_argument("--video", type=str, help="Path to input video file")
+    mode_group.add_argument("--compare", action="store_true", help="Enable multi-model comparison")
+
+    parser.add_argument("--model", type=str, default="yolov8n.pt", help="YOLO model path")
+    parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold (0.0-1.0)")
+    parser.add_argument("--models", type=str, nargs='+', help="Multiple models for comparison")
+
+    parser.add_argument("--output", type=str, default=None, help="Output directory/path")
+    parser.add_argument("--save", action="store_true", default=True, help="Save results")
+    parser.add_argument("--no-save", action="store_true", help="Do not save results")
+
+    parser.add_argument("--cam-index", type=int, default=0, help="Camera device index")
+    parser.add_argument("--output-interval", type=float, default=1.0, help="Output interval (seconds)")
+
+    parser.add_argument("--stats", action="store_true", help="Generate statistics report")
+    parser.add_argument("--export-json", type=str, default=None, help="Export results to JSON")
+
+    parser.add_argument("--quiet", action="store_true", help="Suppress verbose output")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+
     return parser.parse_args()
 
 
 class UIHandler:
-    """
-    用户界面控制器。
-    初始化时加载初始模型，失败则立即退出。
-    支持 CLI 模式、交互式菜单及模型热切换。
-    """
+    """User interface handler for YOLO detection system."""
 
     def __init__(self, config):
-        """
-        初始化 UIHandler。
-        若初始模型加载失败，打印错误并退出。
-        """
+        """Initialize UIHandler with configuration."""
         self.config = config
         self.video_detector = VideoDetector()
         try:
-            # 使用 ModelManager 管理检测引擎，支持后续热切换
             self.model_manager = ModelManager(
                 initial_model_path=config.model_path,
                 conf_threshold=config.confidence_threshold
             )
         except Exception as e:
-            # ModelManager 内部已处理加载异常，但若完全无法初始化，应退出
-            print(f"❌ Fatal: Cannot initialize detection engine with initial model: {e}")
+            print(f"❌ Fatal: Cannot initialize detection engine: {e}")
             raise SystemExit(1)
 
     def run(self):
-        """
-        主流程入口：
-          - 若有 --image 参数 → 静态检测
-          - 若有 --camera 参数 → 摄像头检测
-          - 若有 --batch 参数 → 批量检测
-          - 否则 → 交互式菜单
-        """
+        """Main entry point. Handles CLI arguments or interactive menu."""
         args = parse_args()
+
+        if args.conf != self.config.confidence_threshold:
+            self.config.confidence_threshold = args.conf
+            print(f"🔧 Confidence threshold set to: {args.conf}")
+
+        if args.model != self.config.model_path:
+            self.config.model_path = args.model
+            print(f"🔧 Model set to: {args.model}")
+
         if args.image is not None:
             print(f"[CLI Mode] Detecting static image: {args.image}")
-            self._run_static_detection(args.image)
+            self._run_static_detection(args.image, output_path=args.output)
+            if args.stats:
+                self._generate_statistics(args.export_json)
         elif args.camera:
             print("[CLI Mode] Starting live camera detection...")
-            self._run_camera_detection()
+            self._run_camera_detection(camera_index=args.cam_index,
+                                       output_interval=args.output_interval)
         elif args.batch is not None:
             print(f"[CLI Mode] Running batch detection on directory: {args.batch}")
-            self._run_batch_detection(args.batch)
+            output_dir = args.output if args.output else os.path.join(args.batch, "test_picture")
+            self._run_batch_detection(args.batch, output_dir)
+            if args.stats:
+                self._generate_statistics(args.export_json)
+        elif args.video is not None:
+            print(f"[CLI Mode] Processing video file: {args.video}")
+            self._run_video_detection(args.video, output_path=args.output)
+            if args.stats:
+                self._generate_statistics(args.export_json)
+        elif args.compare:
+            print("[CLI Mode] Starting multi-model comparison...")
+            self._run_model_comparison(args.models)
         else:
             self._interactive_menu()
 
     def _interactive_menu(self):
-        """
-        显示交互式文本菜单，处理用户选择。
-        支持 Ctrl+C 中断，无效输入递归重试。
-        """
+        """Display interactive text menu."""
         try:
             print("\n" + "=" * 40)
             print("🚀 YOLOv8 Detection System")
@@ -95,7 +126,7 @@ class UIHandler:
             print("1. Static Image Detection")
             print("2. Live Camera Detection")
             print("3. Batch Image Detection")
-            print("4. Video File Detection")      # 新增视频检测选项
+            print("4. Video File Detection")
             print("5. Switch Detection Model")
             print("6. Exit")
             choice = input("Please select an option (1-6): ").strip()
@@ -109,22 +140,18 @@ class UIHandler:
             self._run_camera_detection()
         elif choice == "3":
             self._run_batch_detection_interactive()
-        elif choice == "4":                        # 视频检测分支
+        elif choice == "4":
             self.video_file_detection()
         elif choice == "5":
             self._switch_model_interactive()
         elif choice == "6":
             print("Goodbye!")
         else:
-            print("Invalid option. Please enter 1, 2, 3, 4, 5, or 6.")
+            print("Invalid option. Please enter 1-6.")
             self._interactive_menu()
 
     def _choose_image_source(self):
-        """
-        子菜单：让用户选择默认测试图或自定义路径。
-        对自定义路径进行 ~ 展开和不可见字符清理。
-        分级验证路径有效性（存在性、可读性）。
-        """
+        """Let user choose between default or custom image path."""
         default_path = self.config.default_image_path
         print("\n--- Static Image Detection ---")
         print(f"a) Use default test image at: {default_path}")
@@ -137,15 +164,12 @@ class UIHandler:
         if sub_choice == "a":
             if not os.path.exists(default_path):
                 print(f"⚠️ Default image not found: {default_path}")
-                print("💡 Place 'test.jpg' in the 'data/' folder or choose (b).")
                 return
             self._run_static_detection(default_path)
         elif sub_choice == "b":
             try:
                 custom_path = input("Enter image path: ").strip()
                 custom_path = os.path.expanduser(custom_path)
-                # 清理从某些系统复制时可能带入的不可见 Unicode 控制字符（如 U+202A）
-                custom_path = ''.join(ch for ch in custom_path if ord(ch) != 0x202A)
             except KeyboardInterrupt:
                 return
 
@@ -161,39 +185,32 @@ class UIHandler:
             print("Invalid choice. Returning to main menu.")
 
     def video_file_detection(self):
-        """视频文件检测交互"""
-        print("\n=== 视频文件检测 ===")
-        video_path = input("请输入视频文件路径: ").strip()
-        
+        """Interactive video file detection."""
+        print("\n=== Video File Detection ===")
+        video_path = input("Enter video file path: ").strip()
+
         if not os.path.exists(video_path):
-            print(f"错误：文件不存在 - {video_path}")
+            print(f"Error: File not found - {video_path}")
             return
 
-        save_choice = input("是否保存检测结果视频？(y/n): ").lower()
+        save_choice = input("Save output video? (y/n): ").lower()
         output_path = None
         if save_choice == 'y':
-            output_path = input("请输入输出视频路径（例如 output.mp4）: ").strip()
+            output_path = input("Enter output video path: ").strip()
 
-        print("\n正在处理视频，按 'q' 键可提前终止...\n")
+        print("\nProcessing video, press 'q' to stop...\n")
         self.video_detector.process_video_file(video_path, output_path)
 
         if output_path:
-            print(f"\n检测完成！结果已保存到: {output_path}")
+            print(f"\nDetection complete! Result saved to: {output_path}")
         else:
-            print("\n检测完成！")
+            print("\nDetection complete!")
 
-    def _run_static_detection(self, image_path):
-        """
-        执行单张图像检测：
-        - 使用 cv2.imread 读取
-        - 若失败，分级诊断原因（路径？权限？格式？）
-        - 显示结果窗口，等待按键关闭
-        - 自动保存结果图（原文件名 + "_detected" + 原扩展名）
-        """
+    def _run_static_detection(self, image_path, output_path=None):
+        """Run single image detection."""
         print(f"🔍 Detecting objects in: {image_path}")
         frame = cv2.imread(image_path)
         if frame is None:
-            # 分级诊断 imread 失败原因
             if not os.path.exists(image_path):
                 print(f"❌ Path does not exist: {image_path}")
             elif not os.access(image_path, os.R_OK):
@@ -202,7 +219,6 @@ class UIHandler:
                 print(f"❌ Unsupported or corrupted image format: {image_path}")
             return
 
-        # 使用当前模型进行检测
         annotated_frame, _ = self.model_manager.get_current_engine().detect(frame)
 
         window_name = "YOLO Detection Result"
@@ -212,46 +228,115 @@ class UIHandler:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-        # 智能保留原扩展名（JPG/PNG）
-        ext = ".jpg" if image_path.lower().endswith(".jpg") else ".png"
-        save_path = image_path.replace(ext, f"_detected{ext}")
+        if output_path:
+            save_path = output_path
+        else:
+            ext = ".jpg" if image_path.lower().endswith(".jpg") else ".png"
+            save_path = image_path.replace(ext, f"_detected{ext}")
+
         try:
             success = cv2.imwrite(save_path, annotated_frame)
             if success:
                 print(f"✅ Result saved to: {save_path}")
             else:
-                print("❌ Failed to save result (OpenCV write error)")
+                print("❌ Failed to save result")
         except Exception as e:
             print(f"⚠️ Failed to save result: {e}")
 
-    def _run_camera_detection(self):
-        """
-        启动实时摄像头检测。
-        动态创建 CameraDetector 实例并运行。
-        捕获摄像头专属异常和其他未预期错误。
-        """
+    def _run_camera_detection(self, camera_index=None, output_interval=None):
+        """Run camera detection."""
         try:
             from camera_detector import CameraDetector
+            idx = camera_index if camera_index is not None else self.config.camera_index
+            interval = output_interval if output_interval is not None else self.config.output_interval
+
             detector = CameraDetector(
                 detection_engine=self.model_manager.get_current_engine(),
-                output_interval=self.config.output_interval
+                output_interval=interval
             )
-            detector.start_detection(camera_index=self.config.camera_index)
+            detector.start_detection(camera_index=idx)
         except CameraOpenError as e:
             print(f"❌ Camera error: {e}")
         except Exception as e:
             print(f"💥 Camera detection failed: {e}")
             traceback.print_exc()
 
-    def _run_batch_detection_interactive(self):
-        """
-        交互式批量检测：用户输入输入目录，自动将结果保存到同级 test_picture/ 目录。
-        """
+    def _run_video_detection(self, video_path, output_path=None):
+        """Run video file detection."""
+        if not os.path.exists(video_path):
+            print(f"❌ Video file not found: {video_path}")
+            return
+
+        print(f"\nProcessing video: {video_path}")
+        print("Press 'q' to quit...")
+        self.video_detector.process_video_file(video_path, output_path)
+
+        if output_path:
+            print(f"\n✅ Video processing completed. Result saved to: {output_path}")
+        else:
+            print("\n✅ Video processing completed.")
+
+    def _run_model_comparison(self, models=None):
+        """Run multi-model comparison."""
         try:
-            input_dir = input("Enter input directory path (e.g., ../data): ").strip()
+            from model_comparison import ModelComparison
+
+            if not models:
+                models = ['yolov8n.pt', 'yolov8s.pt']
+                print(f"⚠️ No models specified, using defaults: {models}")
+
+            print(f"🔄 Loading models for comparison: {models}")
+            comparison = ModelComparison(models, conf_threshold=self.config.confidence_threshold)
+
+            available_models = comparison.get_available_models()
+            if not available_models:
+                print("❌ No models loaded successfully")
+                return
+
+            test_image_path = self.config.default_image_path
+            if os.path.exists(test_image_path):
+                print(f"\n📊 Running comparison on: {test_image_path}")
+                comparison.compare_on_image(test_image_path)
+            else:
+                print(f"⚠️ Test image not found, skipping image comparison")
+
+            print("\n" + "=" * 70)
+            print("📊 Multi-Model Comparison Report")
+            print("=" * 70)
+            print(comparison.get_comparison_summary())
+
+            comparison.export_to_json("model_comparison_report.json")
+            print("\n✅ Comparison report saved to: model_comparison_report.json")
+
+        except Exception as e:
+            print(f"❌ Model comparison failed: {e}")
+            traceback.print_exc()
+
+    def _generate_statistics(self, export_path=None):
+        """Generate statistics report."""
+        try:
+            from stats_analyzer import DetectionStatsAnalyzer
+
+            analyzer = DetectionStatsAnalyzer()
+            print("\n📊 Generating statistics report...")
+            print(analyzer.generate_report())
+
+            if export_path:
+                analyzer.export_to_json(export_path)
+                print(f"✅ Statistics exported to: {export_path}")
+            else:
+                analyzer.export_to_json("detection_stats.json")
+                print("✅ Statistics exported to: detection_stats.json")
+
+        except Exception as e:
+            print(f"❌ Statistics generation failed: {e}")
+            traceback.print_exc()
+
+    def _run_batch_detection_interactive(self):
+        """Interactive batch detection."""
+        try:
+            input_dir = input("Enter input directory path: ").strip()
             input_dir = os.path.expanduser(input_dir)
-            # 清理不可见字符（如从 Windows 资源管理器复制的路径）
-            input_dir = ''.join(ch for ch in input_dir if ord(ch) != 0x202A)
         except KeyboardInterrupt:
             return
 
@@ -259,17 +344,11 @@ class UIHandler:
             print(f"❌ Directory not found: {input_dir}")
             return
 
-        # 默认输出目录：与输入目录同级的 test_picture/
         output_dir = os.path.join(input_dir, "test_picture")
         self._run_batch_detection(input_dir, output_dir)
 
     def _run_batch_detection(self, input_dir, output_dir=None):
-        """
-        执行批量图像检测。
-        参数:
-            input_dir (str): 输入图像目录
-            output_dir (str, optional): 输出目录，默认为 input_dir/test_picture
-        """
+        """Run batch detection."""
         if output_dir is None:
             output_dir = os.path.join(input_dir, "test_picture")
 
@@ -288,17 +367,13 @@ class UIHandler:
             traceback.print_exc()
 
     def _switch_model_interactive(self):
-        """
-        交互式切换检测模型。
-        允许用户输入新模型路径（本地文件或官方名称），尝试热加载。
-        成功后，所有后续检测将使用新模型。
-        """
+        """Interactive model switching."""
         print("\n--- Switch Detection Model ---")
         print("Examples:")
         print("  • yolov8n.pt   (smallest, fastest)")
         print("  • yolov8s.pt   (balanced)")
         print("  • yolov8m.pt   (more accurate)")
-        print("  • ./models/custom.pt  (your own model)")
+        print("  • ./models/custom.pt  (custom model)")
         try:
             new_model = input("Enter new model path or name: ").strip()
         except KeyboardInterrupt:
