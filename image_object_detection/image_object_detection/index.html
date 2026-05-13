@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>图像目标检测系统 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u56fe\u50cf\u76ee\u6807\u68c0\u6d4b\u7cfb\u7edf";
+        var mkdocs_page_input_path = "image_object_detection/image_object_detection.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">图像目标检测系统</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/image_object_detection/image_object_detection.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="_1">图像目标检测系统</h1>
+<h2 id="_2">项目概述</h2>
+<p>本项目基于深度学习目标检测算法，在 <a href="https://github.com/OpenHUTB/nn.git">OpenHUTB/nn</a> 开源仓库基础上进行迭代开发，构建了一套<strong>多功能、高性能的图像目标检测系统</strong>。系统集成<strong>单图像检测、批量图像检测、视频检测、摄像头实时检测</strong>等全场景能力，同时提供<strong>检测结果统计分析、多模型对比测试、结果保存与导出</strong>等增强功能，为自动驾驶环境感知、智能监控等场景提供完整的解决方案。</p>
+<h2 id="_3">相关算法与理论基础</h2>
+<h3 id="1-yolov8">1. YOLOv8 目标检测算法</h3>
+<p>项目采用 YOLOv8 作为核心检测模型，其核心架构包含：</p>
+<ul>
+<li><strong>骨干网络（Backbone）</strong>：采用 CSPDarknet 结构，通过跨阶段局部网络（CSP）实现高效的特征提取</li>
+<li><strong>颈部网络（Neck）</strong>：采用 PAN（Path Aggregation Network）结构，实现多尺度特征融合</li>
+<li><strong>头部网络（Head）</strong>：采用解耦头设计，分别处理分类和回归任务</li>
+</ul>
+<p>YOLOv8 的核心优势包括：</p>
+<ul>
+<li>更高的检测精度与速度平衡</li>
+<li>支持多种模型尺寸（n/s/m/l/x）</li>
+<li>原生支持 PyTorch 生态</li>
+</ul>
+<h3 id="2">2. 单目视觉距离估算</h3>
+<p>基于相机成像原理，利用目标检测框尺寸估算目标距离：</p>
+<p>[
+Z = \frac{H \times f}{h}
+]</p>
+<p>其中：</p>
+<ul>
+<li>Z：目标与相机的实际距离（m）</li>
+<li>H：目标真实物理高度（m）</li>
+<li>f：相机等效焦距（像素）</li>
+<li>h：目标检测框高度（像素）</li>
+</ul>
+<h3 id="3">3. 危险等级评估</h3>
+<p>根据距离阈值划分危险等级：</p>
+<p>[
+\text{危险等级} =
+<script type="math/tex; mode=display">\begin{cases}
+\text{DANGER}, & Z < 10m \\
+\text{WARNING}, & 10m \leq Z < 20m \\
+\text{SAFE}, & Z \geq 20m
+\end{cases}</script>
+]</p>
+<h2 id="_4">功能模块</h2>
+<h3 id="1">1. 核心检测引擎</h3>
+<p><code>detection_engine.py</code> 封装 YOLOv8 模型加载与推理逻辑，提供：</p>
+<ul>
+<li>模型静默加载（抑制冗余输出）</li>
+<li>置信度阈值配置</li>
+<li>距离估算与危险等级标注</li>
+<li>检测结果可视化</li>
+</ul>
+<h3 id="2_1">2. 批量检测模块</h3>
+<p><code>batch_detector.py</code> 支持批量处理图像文件夹：</p>
+<ul>
+<li>自动遍历支持的图像格式（jpg、png、bmp等）</li>
+<li>并行处理与进度追踪</li>
+<li>结果统一保存到输出目录</li>
+</ul>
+<h3 id="3_1">3. 多模型对比测试</h3>
+<p><code>model_comparison.py</code> 实现多模型对比分析：</p>
+<ul>
+<li>同时加载多个 YOLOv8 模型</li>
+<li>单图像/批量图像对比测试</li>
+<li>推理速度基准测试</li>
+<li>检测性能统计报告生成</li>
+</ul>
+<h3 id="4">4. 统计分析模块</h3>
+<p><code>stats_analyzer.py</code> 提供检测结果深度分析：</p>
+<ul>
+<li>类别分布统计</li>
+<li>置信度分布分析</li>
+<li>空间分布统计</li>
+<li>报告生成与导出</li>
+</ul>
+<h3 id="5">5. 用户交互界面</h3>
+<p><code>ui_handler.py</code> 提供友好的命令行交互：</p>
+<ul>
+<li>菜单式功能选择</li>
+<li>命令行参数支持</li>
+<li>实时检测预览</li>
+<li>配置文件管理</li>
+</ul>
+<h2 id="_5">功能实现与开发详情</h2>
+<h3 id="1_1">1. 多模型对比测试功能</h3>
+<p>新增 <code>model_comparison.py</code> 模块，核心实现包括：</p>
+<ul>
+<li><strong>模型管理器</strong>：支持同时加载多个模型，自动处理加载失败情况</li>
+<li><strong>对比测试接口</strong>：<code>compare_on_image()</code> 和 <code>compare_on_batch()</code> 方法实现单图和批量对比</li>
+<li><strong>基准测试</strong>：<code>benchmark_models()</code> 方法支持多次运行取平均，输出统计数据</li>
+<li><strong>报告生成</strong>：自动生成格式化对比报告，包含检测性能、类别分布、置信度分布等</li>
+</ul>
+<h3 id="2_2">2. 检测结果统计分析</h3>
+<p><code>stats_analyzer.py</code> 实现全面的统计分析：</p>
+<ul>
+<li><strong>类别分布</strong>：统计各目标类别的检测数量与占比</li>
+<li><strong>置信度统计</strong>：计算均值、最大值、最小值、中位数</li>
+<li><strong>空间分布</strong>：分析目标尺寸与位置分布</li>
+<li><strong>多格式导出</strong>：支持文本报告和 JSON 格式导出</li>
+</ul>
+<h3 id="3_2">3. 配置文件管理</h3>
+<p><code>config.py</code> 实现灵活的配置管理：</p>
+<ul>
+<li>支持外部 YAML 配置文件</li>
+<li>内置默认配置参数</li>
+<li>配置验证与错误处理</li>
+</ul>
+<h2 id="_6">测试环境与验证结果</h2>
+<h3 id="_7">测试环境</h3>
+<ul>
+<li>操作系统：Windows 11 / Linux</li>
+<li>Python 版本：3.10+</li>
+<li>依赖库：ultralytics、opencv-python、numpy</li>
+</ul>
+<h3 id="_8">测试方式</h3>
+<pre><code class="language-bash"># 运行主程序
+python main.py
+
+# 或使用命令行参数
+python main.py --mode batch --input ./images --output ./results --model yolov8n.pt
+</code></pre>
+<h3 id="_9">验证结果</h3>
+<table>
+<thead>
+<tr>
+<th>功能模块</th>
+<th>测试结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单图像检测</td>
+<td>✅ 正常输出检测框、距离、危险等级</td>
+</tr>
+<tr>
+<td>批量检测</td>
+<td>✅ 成功处理多图像并保存结果</td>
+</tr>
+<tr>
+<td>视频检测</td>
+<td>✅ 支持视频文件读取与逐帧检测</td>
+</tr>
+<tr>
+<td>多模型对比</td>
+<td>✅ 成功加载并对比多个模型</td>
+</tr>
+<tr>
+<td>统计分析</td>
+<td>✅ 生成完整统计报告</td>
+</tr>
+<tr>
+<td>结果导出</td>
+<td>✅ 支持文本和 JSON 格式</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_10">系统运行效果</h2>
+<h3 id="_11">检测可视化</h3>
+<p>系统输出包含以下信息的标注图像：</p>
+<ul>
+<li>目标检测框（彩色边框）</li>
+<li>类别标签与置信度</li>
+<li>距离估算值</li>
+<li>危险等级标识（红色/黄色/绿色）</li>
+</ul>
+<h3 id="_12">多模型对比报告示例</h3>
+<pre><code>📊 多模型对比测试报告
+========================================
+
+模型 | 检测总数 | 每图平均 | 平均耗时(ms)
+-----|---------|---------|-------------
+yolov8n | 156 | 5.2 | 23.5
+yolov8s | 168 | 5.6 | 45.2
+yolov8m | 172 | 5.7 | 89.1
+</code></pre>
+<h2 id="_13">系统特性</h2>
+<ol>
+<li><strong>多场景支持</strong>：覆盖静态图片、批量图片、视频文件、摄像头实时检测</li>
+<li><strong>多模型对比</strong>：支持同时加载多个 YOLOv8 模型进行性能对比</li>
+<li><strong>智能分析</strong>：内置统计分析模块，提供深度检测结果分析</li>
+<li><strong>灵活配置</strong>：支持配置文件和命令行参数双重配置方式</li>
+<li><strong>易用性强</strong>：友好的命令行交互界面，降低使用门槛</li>
+<li><strong>结果导出</strong>：支持多种格式的结果导出，便于后续分析</li>
+</ol>
+<h2 id="_14">应用场景</h2>
+<ul>
+<li><strong>自动驾驶环境感知</strong>：实时检测道路目标，提供距离与危险等级信息</li>
+<li><strong>智能监控系统</strong>：批量处理监控视频，分析目标分布与行为</li>
+<li><strong>工业质检</strong>：检测生产线上的产品缺陷与异常</li>
+<li><strong>无人机巡检</strong>：处理航拍图像，识别地面目标</li>
+<li><strong>教学实验</strong>：作为深度学习目标检测的教学演示平台</li>
+</ul>
+<h2 id="_15">总结</h2>
+<p>本项目在 <a href="https://github.com/OpenHUTB/nn.git">OpenHUTB/nn</a> 开源仓库基础上，构建了一套功能完整、性能优异的图像目标检测系统。系统集成了多模型对比测试、统计分析、结果导出等增强功能，为自动驾驶、智能监控等场景提供了全面的解决方案。</p>
+<h2 id="_16">未来工作与进阶方向</h2>
+<ol>
+<li><strong>多模态感知融合</strong>：融合激光雷达、毫米波雷达数据，提升感知鲁棒性</li>
+<li><strong>实时目标跟踪</strong>：引入目标跟踪算法，实现视频中目标的连续追踪</li>
+<li><strong>模型优化</strong>：探索量化、剪枝等模型压缩技术，提升推理速度</li>
+<li><strong>云端部署</strong>：支持模型云端部署，提供 API 服务</li>
+<li><strong>可视化界面</strong>：开发 Web 可视化界面，提升交互体验</li>
+</ol>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
