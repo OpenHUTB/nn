@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo） - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u57fa\u4e8e CPG + PD \u7684\u4eba\u5f62\u673a\u5668\u4eba\u7a33\u5b9a\u7ad9\u7acb\u4e0e\u884c\u8d70\u4eff\u771f\uff08MuJoCo\uff09";
+        var mkdocs_page_input_path = "mujoco_man/mujoco_manrun.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/mujoco_man/mujoco_manrun.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="cpg-pd-mujoco">基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）</h1>
+<h2 id="1">1.项目概述</h2>
+<h3 id="11">1.1 项目简介</h3>
+<p>本项目面向简化人形机器人在 MuJoCo 物理仿真中的稳定站立与基础行走控制需求，采用 <strong>"CPG 步态生成 + 基于 IMU 的姿态稳定（PD/PID）+ 足底接触反馈 + 初始化落地支撑"</strong> 的组合式控制框架，在不依赖深度学习模型的前提下实现可交互的站立/行走演示，并支持键盘与 ROS <code>/cmd_vel</code> 实时控制。</p>
+<p>项目在"关节索引映射、力矩到执行器控制映射、足底接触力计算、初始化落地支撑、跌倒恢复机制、输入兼容性与日志节流"等关键工程点上形成了稳定可运行的基线，最终实现 <strong>"可运行、可复现、可继续向强化学习扩展"</strong> 的最小闭环控制系统。</p>
+<h3 id="12">1.2 项目整体流程</h3>
+<pre><code class="language-mermaid">flowchart TD
+  Input[输入层&lt;br/&gt;键盘/ROS] --&gt; FSM[状态机&lt;br/&gt;状态切换] --&gt; CPG[CPG步态生成器] --&gt; Target[关节目标生成]
+  Target --&gt; Torque[力矩计算] --&gt; PID[PD/PID控制器] --&gt; Act[执行器映射] --&gt; Sim[MuJoCo&lt;br/&gt;物理仿真]
+  Sim --&gt;|传感器反馈| Torque
+</code></pre>
+<p>该系统形成完整的机器人控制闭环：
+输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈</p>
+<h3 id="13">1.3 项目组成</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>类/函数</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输入处理模块</td>
+<td><code>ROSCmdVelHandler</code>, <code>KeyboardInputHandler</code></td>
+<td>键盘与 ROS 指令接收</td>
+</tr>
+<tr>
+<td>状态机模块</td>
+<td><code>HumanoidStabilizer.state_map</code></td>
+<td>STAND/WALK/STOP/EMERGENCY 状态管理</td>
+</tr>
+<tr>
+<td>步态生成模块</td>
+<td><code>CPGOscillator</code></td>
+<td>Van der Pol 振荡器步态生成</td>
+</tr>
+<tr>
+<td>控制计算模块</td>
+<td><code>_calculate_stabilizing_torques</code></td>
+<td>姿态 PID + 关节 PD 控制</td>
+</tr>
+<tr>
+<td>执行器映射</td>
+<td><code>_torques_to_ctrl</code></td>
+<td>力矩 → actuator ctrl 转换</td>
+</tr>
+<tr>
+<td>仿真主循环</td>
+<td><code>simulate_stable_standing</code></td>
+<td>MuJoCo 仿真与可视化</td>
+</tr>
+</tbody>
+</table>
+<p>本项目的核心价值在于：<strong>形成完整的人形机器人控制闭环，而非单一功能脚本</strong>。</p>
+<h3 id="14">1.4 核心技术特点</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">特点</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>控制闭环</strong></td>
+<td style="text-align: left;">状态机 → CPG 关节目标 → PD 力矩 → actuator ctrl → MuJoCo step</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>步态生成</strong></td>
+<td style="text-align: left;">Van der Pol 振荡器 + 左右腿相位耦合</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>姿态稳定</strong></td>
+<td style="text-align: left;">基于 IMU 的 Roll/Pitch PID + Yaw PD</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>足底接触</strong></td>
+<td style="text-align: left;">实时接触力计算 + 自适应阈值</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>交互方式</strong></td>
+<td style="text-align: left;">键盘（W/A/S/D/1-4）+ ROS <code>/cmd_vel</code> 双通道</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>跌倒处理</strong></td>
+<td style="text-align: left;">自动检测 + 恢复锁 + 冷却机制</td>
+</tr>
+</tbody>
+</table>
+<h3 id="15">1.5 运行环境与使用方式</h3>
+<h4 id="_1">环境准备</h4>
+<pre><code class="language-bash">pip install mujoco numpy
+</code></pre>
+<h4 id="_2">运行演示（推荐入口）</h4>
+<pre><code class="language-bash">python src/mujoco_manrun/main.py
+</code></pre>
+<h4 id="ros">ROS 接入（可选）</h4>
+<p>在 ROS 环境启动后发布 <code>/cmd_vel</code>：</p>
+<pre><code class="language-bash">rostopic pub /cmd_vel geometry_msgs/Twist &quot;{linear: {x: 0.5}, angular: {z: 0.0}}&quot;
+</code></pre>
+<h3 id="16">1.6 项目核心目标</h3>
+<ul>
+<li><strong>可运行性</strong>：在 Windows 下无需 ROS 也能直接运行仿真；在 ROS 环境下支持 <code>/cmd_vel</code> 输入。</li>
+<li><strong>控制闭环完整性</strong>：实现 “状态机 → CPG 关节目标 → PD 力矩 → actuator ctrl → MuJoCo step” 的端到端闭环。</li>
+<li><strong>稳定性工程化</strong>：加入 IMU 滤波、足底接触力计算、初始化落地对齐、跌倒判定与恢复锁，降低开局瞬间摔倒概率。</li>
+<li><strong>可扩展性</strong>：为后续“深度学习/强化学习（Residual RL / RL+CPG / RL+MPC）”提供清晰接口与观测-动作定义。</li>
+</ul>
+<h2 id="2">2. 项目背景与问题定义</h2>
+<h3 id="21">2.1 背景</h3>
+<p>人形机器人具有高自由度、欠驱动、非线性强耦合特性，稳定站立与自然行走是机器人控制的基础难点。传统纯手工调参控制存在调试难、泛化差、易倾倒等问题，亟需在仿真环境搭建一套规则控制基线，为后续算法迭代与迁移奠定基础。</p>
+<h3 id="22">2.2 现存痛点</h3>
+<ul>
+<li>人形自由度高，关节耦合强，人工调参难度大；</li>
+<li>MuJoCo 关节 qpos/qvel 固定切片取值易发生索引错位；</li>
+<li>关节力矩不能直接赋值给 ctrl，受 gear、ctrlrange 约束；</li>
+<li>仿真初始接触未建立，机器人极易开局秒摔；</li>
+<li>跌倒后无冷却锁，容易连续重复摔倒。
+  基于这些问题，本项目选择使用 MuJoCo 物理仿真平台，采用 <strong>CPG + PD</strong> 的组合控制方案，通过程序自动生成步态，并通过迭代优化逐步提升稳定性。</li>
+</ul>
+<h3 id="23">2.3 项目建设目标</h3>
+<ul>
+<li><strong>稳定站立</strong>：机器人能够在仿真环境中自主保持平衡</li>
+<li><strong>基础行走</strong>：支持多步态模式的周期性行走</li>
+<li><strong>实时交互</strong>：支持键盘和 ROS 指令动态控制</li>
+<li><strong>工程化稳定性</strong>：具备跌倒检测、自动恢复等鲁棒性机制</li>
+<li><strong>RL 扩展性</strong>：为后续强化学习提供清晰接口</li>
+</ul>
+<h2 id="3">3. 核心技术栈与理论基础</h2>
+<p>本项目的技术栈比较清晰，可以分为仿真层、控制层、算法层和交互层四部分。</p>
+<h3 id="31">3.1 核心技术栈</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">技术类别</th>
+<th style="text-align: left;">具体选型</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">物理仿真引擎</td>
+<td style="text-align: left;">MuJoCo 2.3+</td>
+<td style="text-align: left;">连续动力学 + 刚体接触</td>
+</tr>
+<tr>
+<td style="text-align: left;">数值计算</td>
+<td style="text-align: left;">NumPy</td>
+<td style="text-align: left;">控制/滤波/向量化计算</td>
+</tr>
+<tr>
+<td style="text-align: left;">交互输入</td>
+<td style="text-align: left;">Keyboard / ROS</td>
+<td style="text-align: left;">本地键盘 + 可选 ROS 接入</td>
+</tr>
+<tr>
+<td style="text-align: left;">开发语言</td>
+<td style="text-align: left;">Python 3.8+</td>
+<td style="text-align: left;">快速迭代与调试</td>
+</tr>
+<tr>
+<td style="text-align: left;">人形模型</td>
+<td style="text-align: left;">21自由度 XML</td>
+<td style="text-align: left;">含腰部/双腿/双臂</td>
+</tr>
+</tbody>
+</table>
+<p>上表概括了本项目最核心的开发与运行基础。围绕这些技术，项目进一步形成了 <strong>"输入-控制-仿真"</strong> 三段式工程闭环。</p>
+<h3 id="32-mujoco">3.2 仿真层：MuJoCo</h3>
+<p>MuJoCo（Multi-Joint Dynamics with Contact）是一个面向机器人控制的物理仿真引擎，支持：</p>
+<ul>
+<li>刚体动力学与接触建模</li>
+<li>高精度物理仿真</li>
+<li>Python API 脚本控制</li>
+<li>被动式可视化 Viewer</li>
+</ul>
+<p>在本项目中，MuJoCo 主要承担三个作用：</p>
+<ul>
+<li>提供人形机器人的物理仿真环境</li>
+<li>提供关节状态（qpos/qvel）和接触力反馈</li>
+<li>执行控制指令（ctrl）并更新世界状态</li>
+</ul>
+<p>相关代码位置：</p>
+<ul>
+<li>MuJoCo 模型加载：HumanoidStabilizer.<strong>init</strong>(main.py#L234-L242)</li>
+<li>仿真主循环：simulate_stable_standing(main.py#L856-L928)</li>
+<li>物理步进：mujoco.mj_step（见 (main.py#L883)、(main.py#L904)）</li>
+</ul>
+<h3 id="33">3.3 控制层：状态机与执行器映射</h3>
+<p><code>HumanoidStabilizer</code> 实现了完整的状态机控制逻辑：</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>触发条件</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>STAND</td>
+<td>初始化 / 复位 / 跌倒恢复</td>
+<td>保持直立姿态</td>
+</tr>
+<tr>
+<td>WALK</td>
+<td>按 w / ROS 速度指令</td>
+<td>CPG 步态生成 + 行走</td>
+</tr>
+<tr>
+<td>STOP</td>
+<td>按 s / 低速停止</td>
+<td>减速停稳</td>
+</tr>
+<tr>
+<td>EMERGENCY</td>
+<td>按 e</td>
+<td>立即停止，清空控制</td>
+</tr>
+</tbody>
+</table>
+<p>执行器映射是控制层的核心难点。MuJoCo 的 actuator ctrl 受 <code>gear</code> 和 <code>ctrlrange</code> 约束，不能直接写入力矩。解决方案如下：</p>
+<pre><code class="language-python">def _torques_to_ctrl(self, joint_torques):
+    ctrl = np.zeros(self.model.nu, dtype=np.float64)
+    for joint_name in self.joint_names:
+        joint_idx = self.joint_name_to_idx[joint_name]
+        actuator_id = self._actuator_id_by_joint[joint_name]
+        gear = float(self._actuator_gear_by_joint[joint_name])
+        ctrl_min, ctrl_max = self._actuator_ctrlrange_by_joint[joint_name]
+        max_torque = max(abs(ctrl_min), abs(ctrl_max)) * max(gear, 1e-9)
+        torque = float(np.clip(joint_torques[joint_idx], -max_torque, max_torque))
+        ctrl_val = torque / max(gear, 1e-9)
+        ctrl[actuator_id] = float(np.clip(ctrl_val, ctrl_min, ctrl_max))
+    return ctrl
+</code></pre>
+<p>对应代码：HumanoidStabilizer._torques_to_ctrl(main.py#L400-L411)</p>
+<h3 id="34">3.4 控制算法与运动学基础</h3>
+<p>本项目采用 <strong>CPG 步态生成 + 姿态 PID + 关节 PD + 足底接触反馈</strong> 的分层控制架构，整体分为三层：
+<strong>高层状态机 → 步态生成 → 低层稳定控制</strong>，形成完整控制闭环。</p>
+<h4 id="341">3.4.1 高层状态机</h4>
+<p>状态机负责控制模式切换，决定机器人执行站立、行走、停止或紧急停机行为，是整个系统的调度核心。</p>
+<pre><code class="language-python">self.state = &quot;STAND&quot;
+self.state_map = {
+    &quot;STAND&quot;: self._state_stand,
+    &quot;WALK&quot;: self._state_walk,
+    &quot;STOP&quot;: self._state_stop,
+    &quot;EMERGENCY&quot;: self._state_emergency
+}
+</code></pre>
+<p>对应代码：HumanoidStabilizer.state_map(main.py#L352-L357)。</p>
+<h4 id="342-cpg-van-der-pol">3.4.2 CPG 振荡器（Van der Pol + 相位耦合）</h4>
+<p>CPG（Central Pattern Generator）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
+数学模型：</p>
+<pre><code class="language-text">x\_dot = 2π f · y + k · sin(φ\_tar - φ)
+y\_dot = 2π f · ( μ(1 - x^2) · y - x )
+</code></pre>
+<p><strong>参数说明：</strong>
+- $\phi = \text{atan2}(x, y)$：当前相位
+- $k$：左右腿相位耦合强度
+- 输出步态信号：$u = A \cdot x$</p>
+<p><strong>双腿相位耦合规则：</strong>
+- 右腿初始相位：$0$
+- 左腿初始相位：$\pi$（反相交替迈步）</p>
+<p>系统可根据行走速度与转向角度，自适应调节步态振幅与相位耦合强度。
+对应代码：CPGOscillator.update(main.py#L207-L217)</p>
+<h4 id="343">3.4.3 步态耦合策略</h4>
+<p>由 CPG 输出髋关节偏移，通过固定比例耦合生成膝关节与踝关节目标角度：</p>
+<pre><code class="language-python">self.joint_targets[&quot;hip_y_right&quot;] = 0.0 + right_hip_offset
+self.joint_targets[&quot;knee_right&quot;] = 0.0 - right_hip_offset * 1.2
+self.joint_targets[&quot;ankle_y_right&quot;] = 0.0 + right_hip_offset * 0.5
+</code></pre>
+<p>实现自然交替迈步的步态联动。
+对应代码：HumanoidStabilizer._state_walk(main.py#L588-L642)</p>
+<h4 id="344-pd">3.4.4 关节空间 PD 跟踪控制</h4>
+<p>对每个关节执行独立的位置闭环，实现关节目标跟踪：
+实现关节目标跟踪：</p>
+<p>
+<script type="math/tex; mode=display">
+\tau_i = K_{p,i} \cdot (q_{des,i} - q_i) - K_{d,i} \cdot \dot{q}_i
+</script>
+</p>
+<p>系统根据足...
+系统根据足底接触力动态调整 PD 增益：
+- 支撑相：增大刚度，提升稳定性
+- 摆动相：降低刚度，使动作更柔顺
+对应代码：HumanoidStabilizer._calculate_stabilizing_torques(main.py#L743-L755)</p>
+<h4 id="345-pid-rollpitch">3.4.5 躯干姿态 PID 控制（Roll/Pitch）</h4>
+<p>以 IMU 欧拉角与角速度为反馈，对躯干姿态进行闭环稳定，Roll/Pitch 加入积分项抑制漂移：</p>
+<p>
+<script type="math/tex; mode=display">
+\begin{aligned}
+\tau_{roll} &= K_p \cdot e_{roll} + K_d \cdot (-\omega_{roll}) + K_i \int e_{roll} \, dt \\
+\tau_{pitch} &= K_p \cdot e_{pitch} + K_d \cdot (-\omega_{pitch}) + K_i \int e_{pitch} \, dt
+\end{aligned}
+</script>
+</p>
+<p>保证机器人在站立与行走过程中不倾倒。</p>
+<p>对应代码：HumanoidStabilizer._calculate_stabilizing_torques(main.py#L743-L755)</p>
+<h4 id="346">3.4.6 足底接触力计算</h4>
+<p>遍历 MuJoCo 接触队列，筛选足底几何并累加接触力，用于支撑相判断与刚度自适应：</p>
+<p>
+<script type="math/tex; mode=display">
+F_{foot} = \sum_{c \in \mathcal{C}_{foot}} \lVert \mathbf{f}_c \rVert_2
+</script>
+</p>
+<p>其中 $\mathbf{f}_c$ 为接触点三维力。</p>
+<p>对应代码：HumanoidStabilizer._compute_foot_forces(main.py#L701-L718)：</p>
+<h3 id="35">3.5 工程化机制</h3>
+<h4 id="_3">初始化落地支撑</h4>
+<p>仿真开局时，机器人接触未建立，容易瞬间跌落。解决方案是对躯干施加短时辅助力：</p>
+<p>
+<script type="math/tex; mode=display">
+\begin{aligned}
+F_z &= \mathrm{clip}\Big(F_{base} + 2000 \cdot (z_{ref} - z) - 200 \cdot \dot{z}, \; 0, \; 1.2 \cdot W \Big) \\
+\tau_x &= -120 \cdot roll - 30 \cdot \omega_{roll} \\
+\tau_y &= -120 \cdot pitch - 30 \cdot \omega_{pitch}
+\end{aligned}
+</script>
+</p>
+<p>对应代码：main.py:L760-L772</p>
+<h4 id="_4">跌倒检测与恢复</h4>
+<p>跌倒检测恢复：通过重心高度与躯干倾角判定摔倒，触发复位并设置冷却时间，防止连续摔倒。</p>
+<pre><code class="language-python">if com[2] &lt; 0.25 or (com[2] &lt; 0.4 and tilt &gt; 0.6):
+    self.set_state(&quot;STAND&quot;)
+    self._fall_cooldown_until = time + 2.0
+    self._recovery_until = time + 2.0
+</code></pre>
+<p>对应代码：main.py:L906-L921</p>
+<h3 id="36">3.6 关键优化手段（工程化）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">优化手段</th>
+<th style="text-align: left;">实现逻辑</th>
+<th style="text-align: left;">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">初始化落地对齐</td>
+<td style="text-align: left;">复位时把关节目标写入 <code>qpos</code> 并 <code>mj_forward</code></td>
+<td style="text-align: left;">降低初始误差与大冲击</td>
+</tr>
+<tr>
+<td style="text-align: left;">起步软启动</td>
+<td style="text-align: left;">逐步放大 torque_scale</td>
+<td style="text-align: left;">降低首秒冲击与摔倒</td>
+</tr>
+<tr>
+<td style="text-align: left;">IMU 低通滤波</td>
+<td style="text-align: left;">一阶滤波 + 角速度限幅</td>
+<td style="text-align: left;">降低噪声引发的抖动</td>
+</tr>
+<tr>
+<td style="text-align: left;">外力支撑</td>
+<td style="text-align: left;"><code>xfrc_applied</code> 高度 PD + 扶正力矩</td>
+<td style="text-align: left;">度过接触未建立阶段</td>
+</tr>
+<tr>
+<td style="text-align: left;">跌倒恢复锁</td>
+<td style="text-align: left;">cooldown + recovery window</td>
+<td style="text-align: left;">抑制连摔与状态抖动</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4">4. 系统整体架构</h2>
+<p>图 1 人形机器人控制整体架构图
+<img width="980" height="540" alt="mujoco_manrun_arch" src="assets/mujoco_manrun_arch.png" /></p>
+<p>本项目的控制闭环包含输入层、高层状态机、CPG 步态生成、低阶 PD/PID 控制、执行器映射、MuJoCo 仿真与传感器反馈七大模块，形成完整的状态机 - 步态 - 控制 - 仿真闭环。</p>
+<h2 id="5">5 系统优化</h2>
+<h3 id="51-ros">5.1 优化一：异步交互优化：引入键盘与 ROS 双线程，提升交互性</h3>
+<p>在原始版本中，输入与仿真线程冲突，且无 ROS 时无法运行。项目通过双线程解决：</p>
+<pre><code class="language-python"># ROS 线程
+class ROSCmdVelHandler(threading.Thread):
+    def __init__(self, stabilizer):
+        self.sub = self.rospy.Subscriber(&quot;/cmd_vel&quot;, Twist, self._cmd_vel_callback)
+
+# 键盘线程
+class KeyboardInputHandler(threading.Thread):
+    def __init__(self, stabilizer):
+        # 读取键盘输入
+</code></pre>
+<p>对应代码：ROSCmdVelHandler(main.py#L12-L88)、KeyboardInputHandler(main.py#L91-L193)</p>
+<p>优化作用：</p>
+<ul>
+<li>支持 Windows/Linux 跨平台</li>
+<li>ROS 环境自动启用，无 ROS 时降级为键盘控制</li>
+<li>输入与仿真解耦，不阻塞主循环</li>
+</ul>
+<h3 id="52-actuator-ctrl">5.2 优化二：控制映射优化：力矩 → actuator ctrl 正确映射</h3>
+<p>原始版本直接将力矩写入 data.ctrl，导致控制无效。这是因为 MuJoCo 的 actuator 受 gear 和 ctrlrange 约束。</p>
+<p>核心代码：</p>
+<pre><code class="language-python">def _torques_to_ctrl(self, joint_torques):
+    for joint_name in self.joint_names:
+        gear = self._actuator_gear_by_joint[joint_name]
+        ctrl_min, ctrl_max = self._actuator_ctrlrange_by_joint[joint_name]
+        max_torque = max(abs(ctrl_min), abs(ctrl_max)) * max(gear, 1e-9)
+        torque = np.clip(joint_torques[idx], -max_torque, max_torque)
+        ctrl_val = torque / max(gear, 1e-9)
+        ctrl[actuator_id] = np.clip(ctrl_val, ctrl_min, ctrl_max)
+</code></pre>
+<p>对应代码：HumanoidStabilizer._torques_to_ctrl(main.py#L400-L411)</p>
+<p>优化作用：</p>
+<ul>
+<li>力矩能正确传递到执行器</li>
+<li>避免控制饱和或无效</li>
+<li>保证关节有足够驱动力</li>
+</ul>
+<h3 id="53-qposqvel">5.3 优化三：按关节名映射 qpos/qvel 地址</h3>
+<p>原始版本使用固定切片读取关节状态，在不同模型中容易错位。项目通过 jnt_qposadr/jnt_dofadr 建立地址映射：</p>
+<pre><code class="language-python">for joint_name in self.joint_names:
+    joint_id = mujoco.mj_name2id(self.model, mjtObj.mjOBJ_JOINT, joint_name)
+    self._qpos_adr[joint_idx] = int(self.model.jnt_qposadr[joint_id])
+    self._qvel_adr[joint_idx] = int(self.model.jnt_dofadr[joint_id])
+
+def _get_joint_positions(self):
+    return self.data.qpos[self._qpos_adr].astype(np.float64, copy=True)
+</code></pre>
+<p>对应代码：main.py:L276-L285、main.py:L394-L399</p>
+<p>优化作用：</p>
+<ul>
+<li>彻底解决关节索引错位问题</li>
+<li>模型修改后无需调整代码</li>
+<li>控制发散大幅减少</li>
+</ul>
+<h3 id="54">5.4 优化四：笔挺站姿纠正</h3>
+<p>原始版本膝盖弯曲 -0.4 rad，导致重心严重偏前。项目改为完全直立：</p>
+<pre><code class="language-python"># 原先：膝盖弯曲
+self.joint_targets[&quot;knee_right&quot;] = -0.4
+
+# 优化后：笔挺站姿
+self.joint_targets[&quot;knee_right&quot;] = 0.0
+self.joint_targets[&quot;ankle_y_right&quot;] = 0.0
+</code></pre>
+<p>对应代码：main.py:L431-L475</p>
+<p>优化作用：</p>
+<ul>
+<li>重力自然贯穿腿骨</li>
+<li>站立稳定性大幅提升</li>
+</ul>
+<h3 id="55">5.5 优化五：初始化落地支撑</h3>
+<p>开局时足底接触未建立，机器人容易瞬间跌落。项目添加了短时辅助力：</p>
+<pre><code class="language-python">if now_t &lt; self._support_until:
+    scale = clip((self._support_until - now_t) / self._support_duration, 0, 1)
+    z_error = self._support_com_z - com_z
+    up_force = clip(baseline + 2000*z_error - 200*z_vel, 0, self.weight*1.2)
+    self.data.xfrc_applied[self._support_body_id, 2] = up_force * (scale * scale)
+</code></pre>
+<p>对应代码：main.py:L760-L772</p>
+<p>优化作用：</p>
+<ul>
+<li>平稳度过接触未建立阶段</li>
+<li>辅助力随时间平滑衰减，不干扰正常控制</li>
+</ul>
+<h3 id="56">5.6 优化六：多步态模式配置</h3>
+<p>项目支持 4 种步态模式，通过按键 1-4 切换：</p>
+<pre><code class="language-python">self.gait_config = {
+    &quot;SLOW&quot;: {&quot;freq&quot;: 0.3, &quot;amp&quot;: 0.3, &quot;speed_freq_gain&quot;: 0.2, &quot;speed_amp_gain&quot;: 0.1},
+    &quot;NORMAL&quot;: {&quot;freq&quot;: 0.5, &quot;amp&quot;: 0.4, &quot;speed_freq_gain&quot;: 0.4, &quot;speed_amp_gain&quot;: 0.2},
+    &quot;TROT&quot;: {&quot;freq&quot;: 0.8, &quot;amp&quot;: 0.5, &quot;speed_freq_gain&quot;: 0.5, &quot;speed_amp_gain&quot;: 0.3},
+    &quot;STEP_IN_PLACE&quot;: {&quot;freq&quot;: 0.4, &quot;amp&quot;: 0.2, &quot;speed_freq_gain&quot;: 0.0, &quot;speed_amp_gain&quot;: 0.0}
+}
+</code></pre>
+<p>对应代码：main.py:L319-L326、main.py:L413-L428</p>
+<p>优化作用：</p>
+<ul>
+<li>支持不同行走速度与风格</li>
+<li>便于步态参数对比实验</li>
+<li>为后续 RL 提供动作空间参考</li>
+</ul>
+<h3 id="57">5.7 优化七：足底力反馈与刚度调节</h3>
+<p>基于足底力动态调节关节 PD 增益，支撑相增加刚度，摆动相降低刚度：</p>
+<pre><code class="language-python">force_factor = clip(foot_force / (0.5 * weight), 0.4, 1.1)
+kp = base_kp * force_factor
+kd = base_kd * force_factor
+
+# 摆动相降低刚度
+if foot_contact == 0:
+    kp *= 0.8
+    kd *= 0.9
+</code></pre>
+<p>对应代码：main.py:L795-L812</p>
+<p>优化作用：</p>
+<ul>
+<li>支撑相更稳定，摆动相更柔顺</li>
+<li>减少足底冲击</li>
+<li>提升复杂地形适应性</li>
+</ul>
+<h3 id="58">5.8 优化八：跌倒检测与恢复锁</h3>
+<p>添加跌倒自动检测和恢复机制，防止连摔：</p>
+<pre><code class="language-python">if com[2] &lt; 0.25 or (com[2] &lt; 0.4 and tilt &gt; 0.6):
+    self._fall_count += 1
+    self.set_state(&quot;STAND&quot;)
+    self._fall_cooldown_until = time + 2.0
+    self._recovery_until = time + 2.0
+
+# 冷却期间禁止进入 WALK
+if state == &quot;WALK&quot; and self.data.time &lt; self._recovery_until:
+    return
+</code></pre>
+<p>对应代码：main.py:L906-L921、main.py:L652-L659</p>
+<p>优化作用：</p>
+<ul>
+<li>摔倒后自动恢复</li>
+<li>冷却窗口防止连摔</li>
+</ul>
+<h3 id="59">5.9 优化九：扭矩软启动</h3>
+<p>起步阶段扭矩从 0.5 平滑提升至 1.0，减少冲击：</p>
+<pre><code class="language-python">alpha = min(1.0, elapsed / 1.0)
+torque_scale = 0.5 + 0.5 * alpha
+torques = self._calculate_stabilizing_torques() * torque_scale
+</code></pre>
+<p>对应代码：main.py:L875-L887</p>
+<p>优化作用：</p>
+<ul>
+<li>减少起步冲击</li>
+<li>降低起步摔倒概率</li>
+<li>动作更平滑自然</li>
+</ul>
+<h3 id="510">5.10 优化十：日志节流与观测优化</h3>
+<p>高频调试输出改为时间间隔触发，避免刷屏：</p>
+<pre><code class="language-python">def _should_log(self, key, interval_s):
+    now = float(self.data.time)
+    last = float(self._log_last.get(key, -1e9))
+    if (now - last) &gt;= float(interval_s):
+        self._log_last[key] = now
+        return True
+    return False
+</code></pre>
+<p>对应代码：main.py:L386-L392</p>
+<p>优化作用：</p>
+<ul>
+<li>控制台可读性提升</li>
+<li>降低 I/O 开销</li>
+<li>便于长时间运行观测</li>
+</ul>
+<h2 id="6">6. 核心技术难点与解决历程</h2>
+<h3 id="61-qposqvel">6.1 qpos/qvel 索引错位导致控制发散</h3>
+<ul>
+<li><strong>问题本质</strong>：MuJoCo 的关节在 <code>qpos/qvel</code> 中的布局依赖模型定义，不能用固定切片假设。</li>
+<li><strong>解决方案</strong>：通过 <code>jnt_qposadr/jnt_dofadr</code> 建立地址表并统一访问 HumanoidStabilizer.<strong>init</strong>(main.py#L276-L285)。</li>
+</ul>
+<h3 id="62-ctrl">6.2 力矩直接写 ctrl 导致控制无效</h3>
+<ul>
+<li><strong>问题本质</strong>：actuator 的 <code>ctrl</code> 受 gear、ctrlrange 限制，需进行反解与限幅。</li>
+<li><strong>解决方案</strong>：实现 torque→ctrl 映射 HumanoidStabilizer._torques_to_ctrl(main.py#L400-L411)。</li>
+</ul>
+<h3 id="63-0">6.3 足底接触误判与“偶发为 0”</h3>
+<ul>
+<li><strong>问题本质</strong>：接触需要遍历 <code>data.ncon</code> 并使用 <code>mj_contactForce</code> 才能得到每个接触对的力。</li>
+<li><strong>解决方案</strong>：以足底 geom 集合筛选接触并累加力范数 HumanoidStabilizer._compute_foot_forces(main.py#L701-L718)；在初始化支撑期直接输出 true force，避免延迟缓冲造成的“零值” HumanoidStabilizer._simulate_foot_force_data(main.py#L518-L548)。</li>
+</ul>
+<h3 id="64">6.4 开局“秒摔”与复位后连摔</h3>
+<ul>
+<li><strong>问题本质</strong>：落地接触未建立时系统处于欠约束；复位后立刻切 WALK 容易重复摔倒。</li>
+<li><strong>解决方案</strong>：外力支撑窗口 + 跌倒恢复锁 HumanoidStabilizer._calculate_stabilizing_torques(main.py#L760-L772)、<a href="main.py#L906-L921">simulate_stable_standing</a>。</li>
+</ul>
+<h2 id="7">7. 系统运行效果</h2>
+<h3 id="71">7.1 运行环境配置</h3>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>系统</td>
+<td>Windows 11 / Ubuntu 20.04</td>
+</tr>
+<tr>
+<td>仿真</td>
+<td>MuJoCo 2.3+</td>
+</tr>
+<tr>
+<td>依赖</td>
+<td>Python3.8、NumPy、threading</td>
+</tr>
+<tr>
+<td>可选</td>
+<td>ROS 环境支持 /cmd_vel</td>
+</tr>
+</tbody>
+</table>
+<h3 id="72">7.2 键盘控制说明</h3>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>W</td>
+<td>开始行走</td>
+</tr>
+<tr>
+<td>S</td>
+<td>停止站立</td>
+</tr>
+<tr>
+<td>A/D</td>
+<td>左右转向</td>
+</tr>
+<tr>
+<td>Z/X</td>
+<td>加减速</td>
+</tr>
+<tr>
+<td>1-4</td>
+<td>切换步态</td>
+</tr>
+<tr>
+<td>E</td>
+<td>紧急停止</td>
+</tr>
+<tr>
+<td>R</td>
+<td>复位直立</td>
+</tr>
+<tr>
+<td>M</td>
+<td>传感器噪声开关</td>
+</tr>
+</tbody>
+</table>
+<h3 id="73">7.3 运行结果图片</h3>
+<p>图 2 机器人稳定站立仿真效果
+<img width="1280" height="720" alt="standing" src="assets/stand.png" />
+图 3 机器人周期行走仿真效果
+<img width="1280" height="720" alt="walking" src="assets/walk.png" /></p>
+<h2 id="8">8. 现存不足与后续优化方向</h2>
+<h3 id="81">8.1 现存不足</h3>
+<ul>
+<li><strong>步态仍依赖手工参数</strong>：CPG 振幅、耦合、髋-膝-踝比例需要人工调参，泛化性有限。</li>
+<li><strong>稳定性边界仍较窄</strong>：较大扰动或高速度下仍可能前倾/侧倒。</li>
+<li><strong>观测与奖励尚未体系化</strong>：若要引入 RL，需要系统化定义观测向量、奖励函数与训练课程。</li>
+</ul>
+<h3 id="82">8.2 后续优化方向</h3>
+<ul>
+<li><strong>残差强化学习 Residual RL</strong>：保留现有 CPG+PD 稳定基线，RL 学习关节目标残差修正量，不用从零训练，收敛更快、鲁棒性更强。</li>
+<li><strong>端到端 PPO/SAC</strong>：强化学习设计速度跟踪、姿态稳定、能耗惩罚、足底接触合理性多维度奖励，采用站立→小步→行走→扰动对抗课程学习。</li>
+<li><strong>模仿学习初始化</strong>：以现有规则控制器生成高质量轨迹，行为克隆初始化策略，再 RL 微调。</li>
+<li><strong>域随机化与 Sim2Real</strong>：随机化摩擦、质量、关节阻尼、IMU 噪声与延迟，提升仿真策略泛化性，为迁移真实机器人做准备。</li>
+</ul>
+<h2 id="9">9. 总结</h2>
+<p>本项目基于 MuJoCo 搭建CPG+PD/PID人形机器人控制框架，完成从输入交互、状态调度、步态生成、姿态稳定到仿真闭环的全链路实现。解决了关节索引、执行器映射、开局摔倒、跌倒自恢复等关键工程问题，实现稳定站立与多模式可交互行走。
+系统具备良好工程可复现性与算法扩展性，既可以作为规则控制基线，也可直接对接残差强化学习、模仿学习与 Sim2Real 迁移研究，为人形机器人后续高级运动控制奠定完整基础。</p>
+<p>项目代码位置：src/mujoco_manrun/main.py
+模型文件位置：src/mujoco_manrun/models/humanoid.xml</p>
+<h2 id="_5">参考文献</h2>
+<p>[1] 刘成举。基于自学习 CPG 的仿人机器人自适应行走控制 [J]. 自动化学报，2021, 47 (8): 1652-1661.
+[2] Todorov E, Erez T, Tassa Y. MuJoCo: A physics engine for model-based control[C]//2012 IEEE/RSJ International Conference on Intelligent Robots and Systems. IEEE, 2012: 5026-5033.</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
