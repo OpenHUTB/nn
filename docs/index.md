@@ -70,6 +70,8 @@ title: 主页
 
 [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
 
+[__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) - # 基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
+
 ## 规划 <span id="planning"></span>
 
 [__导航__](#navigation)
