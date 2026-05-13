@@ -215,6 +215,31 @@ print(f&quot;最佳成分数量: {best_gmm.n_components}&quot;)
 <td>❌</td>
 <td>✅</td>
 </tr>
+<tr>
+<td>完整协方差 (full)</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>共享协方差 (tied)</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>对角协方差 (diagonal)</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>球面协方差 (spherical)</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>异常检测功能</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -320,6 +345,100 @@ print(f&quot;最佳成分数量: {best_gmm.n_components}&quot;)
 - 当成分数量较多（如 k &gt; 8）时，并行优势明显
 - 在多核 CPU 上可获得近线性加速比
 - 特别适合大规模数据和多成分场景</p>
+<h3 id="46">4.6 协方差类型扩展</h3>
+<p>支持四种协方差类型，适用于不同的数据分布特性：</p>
+<table>
+<thead>
+<tr>
+<th>协方差类型</th>
+<th>参数化形式</th>
+<th>参数数量</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>full</code></td>
+<td>每个成分独立的完整协方差矩阵</td>
+<td>k * d*(d+1)/2</td>
+<td>数据各维度有复杂相关性</td>
+</tr>
+<tr>
+<td><code>tied</code></td>
+<td>所有成分共享同一个协方差矩阵</td>
+<td>d*(d+1)/2</td>
+<td>各类别分布形状相似</td>
+</tr>
+<tr>
+<td><code>diagonal</code></td>
+<td>每个成分独立的对角协方差</td>
+<td>k * d</td>
+<td>维度间独立，计算高效</td>
+</tr>
+<tr>
+<td><code>spherical</code></td>
+<td>每个成分只有一个标量方差</td>
+<td>k</td>
+<td>球形分布，参数最少</td>
+</tr>
+</tbody>
+</table>
+<p><strong>协方差类型选择建议</strong>：
+- 数据维度高、样本量有限 → <code>diagonal</code> 或 <code>spherical</code>（减少过拟合）
+- 各类别分布相似 → <code>tied</code>（共享协方差）
+- 需要捕捉复杂相关性 → <code>full</code>（完整协方差）</p>
+<h3 id="47">4.7 异常检测扩展</h3>
+<p>基于密度估计的异常检测功能，可识别远离聚类中心的离群点：</p>
+<p><strong>核心方法</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>predict_proba(X)</code></td>
+<td>预测样本属于各高斯成分的后验概率</td>
+</tr>
+<tr>
+<td><code>score_samples(X)</code></td>
+<td>计算样本的对数概率密度（异常分数）</td>
+</tr>
+<tr>
+<td><code>detect_anomalies(X, contamination=0.05)</code></td>
+<td>检测异常样本</td>
+</tr>
+<tr>
+<td><code>plot_anomaly_score(X)</code></td>
+<td>可视化异常检测结果</td>
+</tr>
+</tbody>
+</table>
+<p><strong>使用示例</strong>：</p>
+<pre><code class="language-python"># 训练模型
+gmm = GaussianMixtureModel(n_components=3)
+gmm.fit(X)
+
+# 检测异常（5%异常比例）
+is_anomaly, scores, threshold = gmm.detect_anomalies(X_test, contamination=0.05)
+
+# 可视化结果
+gmm.plot_anomaly_score(X_test, save_path='anomaly.png')
+</code></pre>
+<p><strong>异常检测原理</strong>：
+- 利用 GMM 拟合数据的概率密度分布
+- 对数概率密度低的样本被判定为异常
+- 通过 <code>contamination</code> 参数控制异常比例</p>
+<p><strong>测试结果</strong>：</p>
+<pre><code>异常检测结果:
+  真实异常数: 25
+  检测异常数: 27
+  精确率: 0.8519
+  召回率: 0.9200
+  F1分数: 0.8846
+</code></pre>
 <hr />
 <h2 id="5">5. 系统运行效果</h2>
 <h3 id="51">5.1 运行环境</h3>
@@ -399,6 +518,18 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 <td>对比实验重复次数</td>
 </tr>
 <tr>
+<td><code>--n-jobs</code></td>
+<td>int</td>
+<td>1</td>
+<td>并行计算线程数（-1表示使用所有CPU核心）</td>
+</tr>
+<tr>
+<td><code>--covariance-type</code></td>
+<td>str</td>
+<td>full</td>
+<td>协方差类型：full/tied/diagonal/spherical</td>
+</tr>
+<tr>
 <td><code>--out-dir</code></td>
 <td>str</td>
 <td>outputs</td>
@@ -437,6 +568,10 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 <tr>
 <td><code>bic_model_selection.png</code></td>
 <td>BIC/AIC 模型选择曲线</td>
+</tr>
+<tr>
+<td><code>anomaly_detection.png</code></td>
+<td>异常检测结果可视化</td>
 </tr>
 <tr>
 <td><code>iteration_log.csv</code></td>
