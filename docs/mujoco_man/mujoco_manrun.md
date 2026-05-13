@@ -10,7 +10,7 @@
 
 ### 1.2 项目整体流程
 
-<img width="1280" height="720" alt="standing" src="docs/mujoco_man/assets/mujoco_man.png" />
+<img width="1280" height="720" alt="standing" src="./assets/mujoco_man.png" />
 
 该系统形成完整的机器人控制闭环：
 输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈
@@ -295,7 +295,7 @@ if com[2] < 0.25 or (com[2] < 0.4 and tilt > 0.6):
 
 ## 4. 系统整体架构
 图 1 人形机器人控制整体架构图
-<img width="980" height="540" alt="mujoco_manrun_arch" src="assets/mujoco_manrun_arch.png" />
+<img width="980" height="540" alt="mujoco_manrun_arch" src="./assets/mujoco_manrun_arch.png" />
 
 本项目的控制闭环包含输入层、高层状态机、CPG 步态生成、低阶 PD/PID 控制、执行器映射、MuJoCo 仿真与传感器反馈七大模块，形成完整的状态机 - 步态 - 控制 - 仿真闭环。
 
@@ -566,9 +566,10 @@ def _should_log(self, key, interval_s):
 
 ### 7.3 运行结果图片
 图 2 机器人稳定站立仿真效果
-<img width="1280" height="720" alt="standing" src="docs/mujoco_man/assets/stand.png" /
+<img width="1280" height="720" alt="standing" src="./assets/stand.png" />
+
 图 3 机器人周期行走仿真效果
-<img width="1280" height="720" alt="walking" src="docs/mujoco_man/assets/walk.png" />
+<img width="1280" height="720" alt="walking" src="./assets/walk.png" />
 
 ## 8. 现存不足与后续优化方向
 
