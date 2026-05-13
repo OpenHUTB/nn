@@ -1,6 +1,10 @@
 # 多场景仿真与控制优化项目 
 # 一、项目概述
 本项目围绕机器人仿真、车辆仿真、工程化规范、测试体系搭建四大方向，完成 14 项关键 PR 修改。覆盖了 CARLA 多模态导航、MuJoCo 机器人仿真、机械臂控制、车辆竞速、AirSim 仿真测试等多场景，解决了硬编码、参数不适配、运动抖动、环境不兼容、测试体系缺失、行走轨迹不自然等问题，提升了代码鲁棒性、可维护性、可测试性与仿真效果的真实性。
+### 核心技术总览：
+
+<img width="2136" height="177" alt="image" src="https://github.com/user-attachments/assets/20a15834-ddef-48d8-aa9b-218ff17d8013" />
+
 # 二、 修改明细
 ## 2.1 机器人仿真优化（MuJoCo / 机械臂 ）
 ###  2.1.1 添加人形机器人行走轨迹特性，增强模拟逻辑：
@@ -27,15 +31,15 @@
     r_knee_angle = -amp_rad * 0.8 * np.cos(2 * np.pi * freq * t)
     
     return np.array([l_hip_angle, r_hip_angle, l_knee_angle, r_knee_angle])
-
- ### 设置相机视角
-            viewer.cam.distance = 3.0
-            viewer.cam.elevation = -20
-            viewer.cam.azimuth = 45
-            viewer.cam.lookat = [0, 0, 0.8]
- ### 使用预定义的运动轨迹
-                trajectory = generate_walking_trajectory(data.time, freq=1.5, amplitude=20.0)
-                data.ctrl[:] = trajectory
+    
+### 设置相机视角
+    viewer.cam.distance = 3.0
+    viewer.cam.elevation = -20
+    viewer.cam.azimuth = 45
+    viewer.cam.lookat = [0, 0, 0.8]
+### 使用预定义的运动轨迹
+    trajectory = generate_walking_trajectory(data.time, freq=1.5, amplitude=20.0)
+    data.ctrl[:] = trajectory
                 
   <img width="1727" height="1121" alt="9924763740b2e1d8cf69ffac65ff0432" src="https://github.com/user-attachments/assets/965450fd-87f2-4a6c-946f-c5e39cb833f1" />
 
@@ -51,8 +55,8 @@
 
 ### 2.1.3 优化观测维度补零逻辑：
 修改 TransformObservation.observation() 方法中观测维度补零逻辑，将硬编码的 np.zeros(332) 改为动态计算补零长度，兼容不同版本 MuJoCo 环境。
- ### 显式定义新的观察空间维度 
-     def __init__(self, env):
+### 显式定义新的观察空间维度 
+    def __init__(self, env):
         super(TransformObservation, self).__init__(env)
         # 显式定义新的观察空间维度 (44 + 332 = 376)
         self.target_obs_dim = 376  
@@ -66,17 +70,17 @@
 
 ### 2.1.4 提升机械臂 PD 控制稳定性：
 给机械臂的电机力矩加上限制：肩关节力矩限制在±500、肘关节力矩限制在±800。避免动作太大导致疯狂抖动，控制更平稳、更精准。
- ### 肩关节控制
-            shoulder_error = shoulder_target - data.qpos[shoulder_joint_id]
-            shoulder_vel = data.qvel[shoulder_joint_id]
-            data.ctrl[shoulder_act_id] = kp * shoulder_error - kd * shoulder_vel
+### 肩关节控制
+    shoulder_error = shoulder_target - data.qpos[shoulder_joint_id]
+    shoulder_vel = data.qvel[shoulder_joint_id]
+    data.ctrl[shoulder_act_id] = kp * shoulder_error - kd * shoulder_vel
 
-            data.ctrl[shoulder_act_id] = np.clip(data.ctrl[shoulder_act_id], -500, 500) 
- ### 肘关节控制
-            elbow_error = elbow_target - data.qpos[elbow_joint_id]
-            elbow_vel = data.qvel[elbow_joint_id]
-            data.ctrl[elbow_act_id] = kp * elbow_error - kd * elbow_vel
-            data.ctrl[elbow_act_id] = np.clip(data.ctrl[elbow_act_id], -800, 800)
+    data.ctrl[shoulder_act_id] = np.clip(data.ctrl[shoulder_act_id], -500, 500) 
+### 肘关节控制
+    elbow_error = elbow_target - data.qpos[elbow_joint_id]
+    elbow_vel = data.qvel[elbow_joint_id]
+    data.ctrl[elbow_act_id] = kp * elbow_error - kd * elbow_vel
+    data.ctrl[elbow_act_id] = np.clip(data.ctrl[elbow_act_id], -800, 800)
 
 
 <img width="1727" height="1121" alt="dc1edb16f9a672397cdf42a7d1755cac" src="https://github.com/user-attachments/assets/fd62d840-7cb4-421d-8746-243a4ad5d872" />
@@ -85,9 +89,9 @@
 ## 2.2 车辆与仿真环境优化（CARLA/AirSim）
 ### 2.2.1 改进车速计算方式：
 将车速直接赋值逻辑替换为一阶低通滤波公式（speed = 0.8×旧速度 + 0.2×新速度），解决车速数据跳变、面板显示抖动、车辆控制不稳定问题，实现车速值平滑无跳变，油门或刹车控制响应更线性。
-   ### 专用速度传感器
-                velocity = data.velocity
-                self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
+### 专用速度传感器
+    velocity = data.velocity
+    self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
 
 ### 2.2.2 增强 CARLA 强雨天仿真效果：
 调整 CARLA 仿真环境的 WeatherParameters 配置，新增 rain_intensity=100.0 参数，解决雨天效果不明显问题，让仿真环境更真实，增强雨天视觉效果，满足恶劣天气导航测试需求。
@@ -312,9 +316,6 @@
 ## 3.4 仿真效果优化升级
 新增人形机器人行走轨迹生成器，基于正弦函数实现交替迈步动作，模拟自然行走步态；统一 MuJoCo 机器人关节旋转轴方向，提升运动轨迹一致性；优化相机视角配置，提供清晰的行走状态观测视角；增强 CARLA 强雨天视觉效果，提升多模态导航场景的仿真真实性。
 
-### 核心技术总览：
-
-<img width="2136" height="177" alt="image" src="https://github.com/user-attachments/assets/20a15834-ddef-48d8-aa9b-218ff17d8013" />
 
 # 四、后续规划
 ## 控制算法迭代：
