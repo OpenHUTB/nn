@@ -137,10 +137,10 @@ print(f&quot;最佳成分数量: {best_gmm.n_components}&quot;)
 <script type="math/tex; mode=display">\mu_k = \frac{\sum_{i=1}^n \gamma_{ik} x_i}{\sum_{i=1}^n \gamma_{ik}}, \quad \Sigma_k = \frac{\sum_{i=1}^n \gamma_{ik} (x_i-\mu_k)(x_i-\mu_k)^T}{\sum_{i=1}^n \gamma_{ik}}</script>
 </p>
 <h4 id="222">2.2.2 模型选择准则</h4>
-<p><strong>AIC（Akaike Information Criterion）</strong>：
+<p><strong>AIC（赤池信息准则）</strong>：
 <script type="math/tex; mode=display">AIC = 2k - 2\ln(L)</script>
 </p>
-<p><strong>BIC（Bayesian Information Criterion）</strong>：
+<p><strong>BIC（贝叶斯信息准则）</strong>：
 <script type="math/tex; mode=display">BIC = k \cdot \ln(n) - 2\ln(L)</script>
 </p>
 <p>其中 $k$ 为模型参数数量，$n$ 为样本数量，$L$ 为模型似然值。</p>
@@ -181,12 +181,12 @@ print(f&quot;最佳成分数量: {best_gmm.n_components}&quot;)
 <td>✅</td>
 </tr>
 <tr>
-<td>AIC 准则</td>
+<td>AIC准则</td>
 <td>❌</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>BIC 准则</td>
+<td>BIC准则</td>
 <td>❌</td>
 <td>✅</td>
 </tr>
@@ -201,12 +201,12 @@ print(f&quot;最佳成分数量: {best_gmm.n_components}&quot;)
 <td>✅</td>
 </tr>
 <tr>
-<td>向量化 E 步计算</td>
+<td>向量化E步计算</td>
 <td>❌</td>
 <td>✅</td>
 </tr>
 <tr>
-<td>向量化 M 步计算</td>
+<td>向量化M步计算</td>
 <td>❌</td>
 <td>✅</td>
 </tr>
@@ -601,29 +601,17 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
   成分数=3: BIC=-3892.15, AIC=-3928.34, 迭代=18
   成分数=4: BIC=-3845.67, AIC=-3895.92, 迭代=22
   ...
-最佳成分数量: 3 (BIC=-3892.15)
+最佳成分数量：3（BIC=-3892.15）
 </code></pre>
 <hr />
 <h2 id="6">6. 功能扩展与未来规划</h2>
 <ul>
 <li><strong>在线学习</strong>：支持增量学习，动态更新模型参数</li>
-<li><strong>变分贝叶斯 GMM</strong>：实现基于变分推断的贝叶斯 GMM</li>
+<li><strong>变分贝叶斯高斯混合模型</strong>：实现基于变分推断的贝叶斯高斯混合模型</li>
 <li><strong>并行加速</strong>：使用多线程或 GPU 加速大规模数据训练</li>
 <li><strong>可视化工具</strong>：添加交互式聚类结果可视化</li>
 </ul>
 <hr />
-<h2 id="7">7. 总结</h2>
-<p>本次优化主要完成了以下工作：</p>
-<ol>
-<li>实现了数值稳定的 GMM EM 算法，支持随机初始化和 k-means++ 初始化</li>
-<li>添加了 AIC/BIC 模型选择准则，支持自动确定最佳聚类数量</li>
-<li>设计了完整的对比实验框架，验证不同初始化策略的效果</li>
-<li><strong>实现了向量化 EM 算法，消除 Python 循环，利用 NumPy 广播机制提升大规模数据处理效率</strong></li>
-<li>生成丰富的可视化结果，便于分析和展示实验结果</li>
-<li><strong>实现了向量化 EM 算法，消除 Python 循环，利用 NumPy 广播机制提升大规模数据处理效率</strong></li>
-<li>生成丰富的可视化结果，便于分析和展示实验结果</li>
-</ol>
-<p>模块已具备完整的工程化能力，可直接运行并产生可复现的实验结果。</p>
               
             </div>
           </div><footer>
