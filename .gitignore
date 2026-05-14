@@ -115,6 +115,14 @@ screenshots/
 !docs/carla_CAM/images/
 !docs/carla_CAM/images/*.png
 !docs/dqn_*.png
+!docs/rain_sensor_fusion/
+!docs/rain_sensor_fusion/image/
+!docs/rain_sensor_fusion/image/*.png
+!docs/rain_sensor_fusion/image/*.csv
+!src/rain_sensor_fusion/
+!src/rain_sensor_fusion/visualization_results/
+!src/rain_sensor_fusion/visualization_results/*.png
+!src/rain_sensor_fusion/visualization_results/*.csv
 # ========================================
 # Jupyter Notebook
 # ========================================
