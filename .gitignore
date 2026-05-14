@@ -59,6 +59,8 @@ env/
 *.pkl
 *.pickle
 *.ckpt
+!src/robot_navigation_system/*.pt
+!src/robot_navigation_system/*.pth
 models/
 !src/yolo12_object_detection/scripts/ultralytics/models/
 !src/yolo12_object_detection/scripts/ultralytics/cfg/models/
@@ -110,6 +112,9 @@ screenshots/
 *.jpg
 *.jpeg
 !docs/images/
+!src/robot_navigation_system/*.png
+!src/robot_navigation_system/*.jpg
+!src/robot_navigation_system/*.jpeg
 
 # ========================================
 # Jupyter Notebook
