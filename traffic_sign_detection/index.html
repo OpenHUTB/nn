@@ -192,14 +192,8 @@
 <li>提供交通标志的三维几何信息。</li>
 <li>提供多天气、多交通流条件下的数据采集能力。</li>
 </ul>
-<p>相关代码位置：</p>
-<ul>
-<li>CARLA 接入与地图加载：<code>main.py:17-41</code>, <code>main.py:94</code></li>
-<li>同步模式配置：<code>main.py:97-105</code></li>
-<li>背景交通流生成：<code>main.py:48-62</code>, <code>main.py:113-118</code></li>
-</ul>
 <h3 id="33-xml-yolo">3.3 数据层：XML 标注与 YOLO 数据格式</h3>
-<p><code>main.py</code> 生成的是接近 Pascal VOC 风格的 XML 标注，其中包含：</p>
+<p><a href="https://github.com/OpenHUTB/nn/blob/main/src/driving_violation_detection/main.py">main.py</a> 生成的是接近 Pascal VOC 风格的 XML 标注，其中包含：</p>
 <ul>
 <li>图像名</li>
 <li>图像尺寸</li>
@@ -207,7 +201,7 @@
 <li>边界框坐标</li>
 <li>天气标签</li>
 </ul>
-<p><code>xml_to_yolo_dataset.py</code> 再将 VOC 风格边界框转换成 YOLO 所需的归一化格式：</p>
+<p><a href="https://github.com/OpenHUTB/nn/blob/main/src/driving_violation_detection/xml_to_yolo_dataset.py">xml_to_yolo_dataset.py</a> 中再将 VOC 风格边界框转换成 YOLO 所需的归一化格式：</p>
 <pre><code class="language-text">class_id x_center y_center width height
 </code></pre>
 <p>转换公式如下：</p>
@@ -216,7 +210,6 @@ y_center = ((ymin + ymax) / 2.0) / height
 box_width = (xmax - xmin) / width
 box_height = (ymax - ymin) / height
 </code></pre>
-<p>对应代码：<code>xml_to_yolo_dataset.py:28-36</code></p>
 <p>这里的理论基础是目标检测任务中最常用的矩形框表示与归一化编码方式，便于神经网络在不同尺寸图像上学习目标位置。</p>
 <h3 id="34-yolo">3.4 模型层：YOLO 检测思想</h3>
 <p>虽然当前仓库里没有训练脚本，但从 <code>xml_to_yolo_dataset.py</code> 和 <code>detector_onnx.py</code> 可以看出项目的模型路线是 YOLO 系列检测器。</p>
@@ -226,7 +219,7 @@ box_height = (ymax - ymin) / height
 <li>直接预测目标类别和边界框。</li>
 <li>以较高速度完成端到端检测。</li>
 </ul>
-<p>在 <a href="../../src/driving_violation_detection/detector_onnx.py">detector_onnx.py</a> 中，ONNX 推理流程包括：</p>
+<p>在 <a href="https://github.com/OpenHUTB/nn/blob/main/src/driving_violation_detection/detector_onnx.py">detector_onnx.py</a> 中，ONNX 推理流程包括：</p>
 <ul>
 <li>图像缩放与填充 <code>letterbox</code></li>
 <li><code>blobFromImage</code> 预处理</li>
@@ -234,12 +227,6 @@ box_height = (ymax - ymin) / height
 <li>置信度过滤</li>
 <li>NMS 去重</li>
 <li>可视化绘制</li>
-</ul>
-<p>相关代码位置：</p>
-<ul>
-<li>预处理：<code>detector_onnx.py:37-60</code></li>
-<li>输出适配：<code>detector_onnx.py:62-79</code></li>
-<li>后处理与 NMS：<code>detector_onnx.py:80-143</code></li>
 </ul>
 <h3 id="35-3d-2d">3.5 几何投影理论：3D 到 2D 映射</h3>
 <p><code>main.py</code> 的关键优势在于它并不是人工标框，而是根据 CARLA 场景的三维几何信息投影生成二维框。</p>
@@ -252,9 +239,9 @@ box_height = (ymax - ymin) / height
 </ol>
 <p>核心代码：</p>
 <ul>
-<li>相机内参构建：<code>main.py:205-217</code></li>
-<li>点投影函数：<code>main.py:219-226</code></li>
-<li>交通标志框提取：<code>main.py:247-295</code></li>
+<li>相机内参构建</li>
+<li>点投影函数</li>
+<li>交通标志框提取</li>
 </ul>
 <hr />
 <h2 id="4">4.系统优化设计</h2>
@@ -269,7 +256,6 @@ world.apply_settings(settings)
 traffic_manager = client.get_trafficmanager(8000)
 traffic_manager.set_synchronous_mode(True)
 </code></pre>
-<p>对应代码：<code>main.py:97-105</code></p>
 <p>优化作用：</p>
 <ul>
 <li>让 <code>world.tick()</code> 成为统一调度节拍。</li>
@@ -284,7 +270,6 @@ vehicles = spawn_vehicles(num_vehicles, world, spawn_points)
 for v in vehicles:
     v.set_autopilot(True, traffic_manager.get_port())
 </code></pre>
-<p>对应代码：<code>main.py:113-118</code></p>
 <p>优化作用：</p>
 <ul>
 <li>避免采集场景过于理想化。</li>
@@ -316,7 +301,6 @@ for v in vehicles:
             xmin, xmax = int(min(x_coords)), int(max(x_coords))
             ymin, ymax = int(min(y_coords)), int(max(y_coords))
 </code></pre>
-<p>对应代码：<code>main.py:255-287</code></p>
 <p>优化作用：</p>
 <ul>
 <li>明显减少误标与无效样本。</li>
@@ -335,7 +319,6 @@ if current_time - last_capture_time &gt; capture_cooldown:
     captured_sign_locations.add(sign_location_tuple)
     last_capture_time = current_time
 </code></pre>
-<p>对应代码：<code>main.py:240-245</code>, <code>main.py:289-293</code></p>
 <p>优化作用：</p>
 <ul>
 <li>降低重复样本比例。</li>
@@ -362,7 +345,6 @@ if current_time - last_capture_time &gt; capture_cooldown:
 
     return final_bboxes
 </code></pre>
-<p>对应代码：<code>main.py:471-486</code></p>
 <p>优化作用：</p>
 <ul>
 <li>控制重复标注。</li>
@@ -386,7 +368,6 @@ if current_time - last_capture_time &gt; capture_cooldown:
     current_condition_index = (current_condition_index + 1) % len(weather_conditions)
     last_weather_change_time = current_time
 </code></pre>
-<p>对应代码：<code>main.py:345-350</code>, <code>main.py:506-515</code></p>
 <p>优化作用：</p>
 <ul>
 <li>提高数据集的天气多样性。</li>
@@ -412,13 +393,11 @@ if current_time - last_capture_time &gt; capture_cooldown:
         f&quot;{class_id} {x_center:.6f} {y_center:.6f} {box_width:.6f} {box_height:.6f}&quot;
     )
 </code></pre>
-<p>对应代码：<code>xml_to_yolo_dataset.py:134-150</code></p>
 <p>同时它还加入了随机种子和比例切分：</p>
 <pre><code class="language-python">random.seed(args.seed)
 random.shuffle(dataset_items)
 split_index = int(len(dataset_items) * args.train_ratio)
 </code></pre>
-<p>对应代码：<code>xml_to_yolo_dataset.py:122-132</code></p>
 <p>优化作用：</p>
 <ul>
 <li>打通采集与训练之间的数据格式障碍。</li>
@@ -445,7 +424,6 @@ if preds.ndim != 2:
 if preds.shape[0] &lt; preds.shape[1] and preds.shape[0] &lt;= 128:
     preds = preds.T
 </code></pre>
-<p>对应代码：<code>detector_onnx.py:62-78</code></p>
 <h4 id="3-nms">3）推理后处理与 NMS</h4>
 <pre><code class="language-python">indices = cv2.dnn.NMSBoxes(
     boxes,
@@ -454,14 +432,12 @@ if preds.shape[0] &lt; preds.shape[1] and preds.shape[0] &lt;= 128:
     self.iou_threshold
 )
 </code></pre>
-<p>对应代码：<code>detector_onnx.py:114-137</code></p>
 <h4 id="4_1">4）图像和视频双模式验证</h4>
 <p>项目支持：</p>
 <ul>
 <li><code>--image</code> 单图检测</li>
 <li><code>--video</code> 视频或摄像头检测</li>
 </ul>
-<p>对应代码：<code>detector_onnx.py:165-222</code>, <code>detector_onnx.py:225-260</code></p>
 <p>优化作用：</p>
 <ul>
 <li>让模型可以快速在本地完成部署级验证。</li>
