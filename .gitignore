@@ -61,6 +61,8 @@ env/
 *.ckpt
 *.bin
 *.safetensors
+!src/robot_navigation_system/*.pt
+!src/robot_navigation_system/*.pth
 models/
 !src/yolo12_object_detection/scripts/ultralytics/models/
 !src/yolo12_object_detection/scripts/ultralytics/cfg/models/
@@ -125,6 +127,9 @@ screenshots/
 !src/rain_sensor_fusion/visualization_results/
 !src/rain_sensor_fusion/visualization_results/*.png
 !src/rain_sensor_fusion/visualization_results/*.csv
+!src/robot_navigation_system/*.png
+!src/robot_navigation_system/*.jpg
+!src/robot_navigation_system/*.jpeg
 # ========================================
 # Jupyter Notebook
 # ========================================
