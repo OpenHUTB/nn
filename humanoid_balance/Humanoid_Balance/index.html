@@ -73,27 +73,89 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="_1">基于强化学习的人形机器人平衡控制仿真</h1>
-<h2 id="_2">项目概述</h2>
+<h2 id="1">1 项目概述</h2>
 <p>本项目面向高自由度人形机器人的动态平衡与行走控制需求，基于软演员 - 评论家（SAC）深度强化学习算法，在 MuJoCo 高精度物理仿真环境中完成核心策略的训练与部署。针对人形机器人控制场景下的核心痛点 ——376 维高维观测空间的策略学习效率、MuJoCo 跨版本（v3/v4）环境兼容性、预训练权重跨环境加载适配 —— 进行系统性工程化攻关。最终实现机器人从 “原地高频抖动” 到稳定站立，并具备初步行走能力的核心目标，为复杂运动控制（如跑步、上下台阶）奠定可复现、可扩展的技术基础。</p>
-<h2 id="_3">项目目标</h2>
+<h2 id="2">2 项目目标</h2>
 <ul>
 <li><strong>仿真环境搭建</strong>：完成 MuJoCo 物理引擎的环境配置，解决跨版本 API 不兼容、渲染卡顿、参数传递冲突等工程问题，保证环境稳定运行。</li>
 <li><strong>策略模型部署</strong>：实现预训练 SAC 模型的自动化解压、跨版本权重兼容加载、实时推理与动作输出，打通 “模型→环境→物理交互” 全流程。</li>
 <li><strong>稳定性优化</strong>：通过动作平滑、确定性推理等手段，抑制机器人高频抖动，实现从 “原地扭动” 到稳定站立 + 初步行走的性能跨越。</li>
 </ul>
-<p><strong>核心任务</strong>：在维持全身关节动力学平衡的前提下，实现人形机器人在平面场景下的稳定步态行走，兼顾运动流畅性与物理仿真真实性。</p>
-<h2 id="_4">一、主要改进与技术突破</h2>
-<h3 id="1">1. 代码架构模块化重构</h3>
+<p>#### 核心任务：在维持全身关节动力学平衡的前提下，实现人形机器人在平面场景下的稳定步态行走，兼顾运动流畅性与物理仿真真实性。</p>
+<h2 id="3-sac">3 核心算法原理（SAC）</h2>
+<p>软演员-评论家算法（Soft Actor-Critic, <strong>SAC</strong>）是一种基于<strong>最大熵强化学习</strong>的离线策略算法，专为高维连续动作空间设计。本项目采用 SAC 作为核心控制算法，使人形机器人在 376 维高维观测空间中实现稳定的力矩控制与平衡行走。</p>
+<h3 id="31">3.1 算法核心思想</h3>
+<p>SAC 的核心目标不只是最大化累积奖励，同时<strong>最大化策略熵</strong>，让机器人在保证任务目标的同时保持足够的探索性，从而提升鲁棒性，非常适合人形机器人这种复杂动力学系统。</p>
+<p><strong>核心特点：</strong>
+- <strong>最大熵强化学习框架</strong>：在优化累积奖励的同时最大化策略熵，平衡探索与利用，提升策略鲁棒性；
+- <strong>双 Critic 网络结构</strong>：采用两个独立的价值网络，缓解单 Critic 的过估计问题，提升价值评估稳定性；
+- <strong>重参数化策略</strong>：通过对策略分布进行重参数化，实现可微采样，解决连续动作空间下的梯度估计问题；
+- <strong>自动温度系数 α 调整</strong>：通过动态调整熵权重，自动平衡奖励与探索，无需手动调参。</p>
+<h3 id="32">3.2 关键数学公式</h3>
+<h4 id="321">3.2.1 最大熵目标函数</h4>
+<p>SAC 的核心优化目标为最大化累积折扣奖励与策略熵的加权和，目标函数定义如下：</p>
+<p>
+<script type="math/tex; mode=display">
+J(\pi) = \mathbb{E}_{(s_t,a_t)\sim\mathcal{D}} \left[ r(s_t,a_t) + \gamma \mathbb{E}_{s_{t+1}} \left[ V^\pi(s_{t+1}) \right] - \alpha \log \pi(a_t|s_t) \right]
+</script>
+</p>
+<p><strong>符号说明：</strong>
+- $r(s_t,a_t)$：智能体在状态 $s_t$ 执行动作 $a_t$ 获得的即时奖励；
+- $\gamma$：折扣因子，用于平衡即时奖励与远期奖励，本项目取 $\gamma=0.99$；
+- $V^\pi(s)$：状态值函数，表示从状态 $s$ 出发、遵循策略 $\pi$ 的累积折扣奖励期望；
+- $\alpha$：熵温度系数，控制策略熵项的权重，用于平衡探索与利用；
+- $\pi(a_t|s_t)$：策略网络在状态 $s_t$ 下输出动作 $a_t$ 的条件概率；
+- $\mathcal{D}$：经验回放池，存储历史交互数据。</p>
+<h4 id="322">3.2.2 状态值函数</h4>
+<p>状态值函数 $V^\pi(s)$ 定义为在策略 $\pi$ 下，从状态 $s$ 出发，所有可能动作对应的动作值函数与策略熵项之差的期望，即：</p>
+<p>
+<script type="math/tex; mode=display">
+V^\pi(s) = \mathbb{E}_{a \sim \pi} \left[ Q^\pi(s,a) - \alpha \log \pi(a|s) \right]
+</script>
+</p>
+<p>该函数将动作值函数与策略熵结合，反映了在考虑探索性（熵项）的前提下，状态 $s$ 的综合价值。</p>
+<h4 id="323-q">3.2.3 动作值函数（Q 函数）</h4>
+<p>动作值函数 $Q^\pi(s,a)$ 表示在状态 $s$ 执行动作 $a$，并遵循策略 $\pi$ 后续动作的累积折扣奖励期望，其递推关系为：</p>
+<p>
+<script type="math/tex; mode=display">
+Q^\pi(s,a) = r(s,a) + \gamma \mathbb{E}_{s' \sim p} \left[ V^\pi(s') \right]
+</script>
+</p>
+<p>其中，$r(s,a)$ 为即时奖励，$\gamma$ 为折扣因子，$V^\pi(s')$ 为下一状态的状态值函数。</p>
+<h4 id="324">3.2.4 策略网络（重参数化）</h4>
+<p>SAC 采用重参数化技巧实现连续动作的可微采样，避免直接对策略梯度估计带来的高方差问题。策略网络通过对高斯分布采样实现动作生成：</p>
+<p>
+<script type="math/tex; mode=display">
+a_t = f_\phi(\epsilon_t; s_t), \quad \epsilon_t \sim \mathcal{N}(0, I)
+</script>
+</p>
+<p>其中，$f_\phi$ 为参数化策略网络，$\epsilon_t$ 为从标准正态分布中采样的噪声变量。该方法将随机采样过程转化为确定性函数，从而保证梯度能够通过采样过程反向传播，实现端到端优化。</p>
+<h3 id="33-sac">3.3 SAC 网络结构</h3>
+<p>本项目采用经典的 <strong>Actor-Critic 双网络架构</strong>，核心包含三类网络：
+1.  <strong>Actor 策略网络</strong>：输入环境状态，输出动作的概率分布，负责学习策略；
+2.  <strong>双 Critic 价值网络</strong>：以状态和动作为输入，输出动作价值 Q 值，通过双网络结构缓解单 Critic 的过估计问题；
+3.  <strong>Target 目标网络</strong>：为 Critic 网络提供稳定的训练目标，通过延迟更新减少目标网络的波动，提升训练稳定性。</p>
+<h3 id="34-sac">3.4 SAC算法对人形机器人控制优势</h3>
+<p>SAC 算法的设计特性与人形机器人高维、连续、复杂的控制场景高度适配，核心优势如下：
+1.  <strong>高维观测空间友好</strong>：针对人形机器人 376 维高维状态输入，仍能保持稳定收敛；
+2.  <strong>连续动作空间适配</strong>：可直接输出关节力矩等连续控制信号，无需对动作空间进行离散化；
+3.  <strong>鲁棒性与抗扰动能力强</strong>：最大熵框架下的策略具有更强的探索性，机器人在遇到外部扰动时恢复能力更优；
+4.  <strong>训练稳定性高</strong>：相比 PPO 等其他算法，SAC 在复杂物理仿真环境中更不易出现训练崩溃，适合长时间迭代训练。</p>
+<h2 id="4">4 主要改进与技术突破</h2>
+<p>本项目针对原始代码在工程化部署、环境兼容性、模型加载与运动稳定性等方面存在的缺陷，开展了系统性的改进工作。通过模块化重构、跨版本适配、鲁棒性优化等手段，打通了从模型训练到仿真部署的全流程，使机器人运动性能与系统可复现性得到显著提升。</p>
+<h3 id="41">4.1 代码架构模块化重构</h3>
 <ul>
-<li>针对原始单脚本臃肿、职责混乱的问题，进行分层模块化设计：</li>
+<li>原始代码为单文件结构，逻辑耦合严重、职责不清，导致难以维护、调试和跨环境迁移。本项目对整体架构进行了<strong>分层解耦与模块化重构</strong>，明确各模块职责，提升代码的可扩展性与可复现性。</li>
 </ul>
+<p>重构后的三大核心模块：</p>
 <p><strong><code>env_mujoco.py</code>（环境定义与补丁）</strong> :专注 MuJoCo 环境适配、跨版本 API 补丁、渲染参数配置，解耦环境逻辑与业务逻辑。</p>
 <p><strong><code>train.py</code>（强化学习训练）</strong>:封装 SAC 算法训练流程，包含超参数配置、日志记录、断点续训，支持多轮次对比实验。</p>
 <p><strong><code>humanoid_walk.py</code>（演示部署）</strong>:作为演示部署入口，集成模型解压、权重加载、推理循环、实时渲染，一键启动仿真。</p>
 <ul>
 <li>引入 <strong><code>zipfile</code> 动态解压机制</strong>，直接从 <code>.zip</code> 加载 <code>.pth</code> 权重，避免手动解压的路径混乱，提升模型分发与部署效率。</li>
 </ul>
-<h3 id="2-mujoco">2. MuJoCo 跨版本环境适配</h3>
+<h3 id="42">4.2 核心技术难点与针对性解决方案</h3>
+<h4 id="421-mujoco">4.2.1 MuJoCo 跨版本环境适配</h4>
 <table>
 <thead>
 <tr>
@@ -120,22 +182,93 @@
 </tr>
 </tbody>
 </table>
-<h3 id="3">3. 权重加载与数值稳定性优化（鲁棒性提升）</h3>
+<h4 id="422-permissionerror">4.2.2 权重加载失败（PermissionError/路径错误）</h4>
 <ul>
-<li><strong>非严格权重加载（strict=False）</strong>：采用torch.load(weights_path, strict=False)，忽略跨训练环境导致的权重键名不匹配问题，仅保留 Actor/Critic 核心网络权重，解决Missing key(s)加载失败报错。</li>
-<li><strong>动作限幅与平滑</strong>：引入action_scale缩放因子（默认 0.8），限制关节力矩输出幅值，抑制初期控制过冲导致的物理仿真崩溃，减少高频抖动。</li>
-<li><strong>推理确定性控制</strong>：测试阶段开启deterministic=True，关闭策略探索噪声，提升动作序列的连贯性，从 “随机抽动” 过渡到 “平滑运动”。</li>
+<li><strong>问题本质</strong>：</li>
+<li>权重文件路径硬编码，跨机器运行时路径不存在；</li>
+<li>
+<p>直接读取压缩包目录而非解压后的 .pth 文件，触发权限拒绝。</p>
+</li>
+<li>
+<p><strong>解决方案</strong>：</p>
+</li>
+<li><strong>路径归一化</strong>：使用 <code>os.path.abspath()</code> + <code>os.path.join()</code> 构建绝对路径；</li>
+<li><strong>自动解压</strong>：通过 <code>zipfile.ZipFile</code> 解压权重包至临时目录，加载完成后清理；</li>
+<li><strong>权限兼容</strong>：添加 <code>try-except</code> 捕获权限错误，提升跨环境鲁棒性。</li>
 </ul>
-<h2 id="_5">二、学习成果</h2>
+<h4 id="423-missing-keys">4.2.3 模型参数不匹配（Missing key(s)）</h4>
 <ul>
-<li>全链路自动化：实现 “模型解压→权重加载→环境初始化→物理渲染→策略推理” 端到端自动化，无人工干预即可启动仿真。</li>
-<li>兼容性全覆盖：解决权限拒绝（PermissionError）、路径错误、参数不匹配、属性缺失等 10 + 类典型部署问题，代码可在 Windows/Linux 双系统运行。</li>
-<li>性能达标：仿真帧率（FPS）稳定 60+，实时可视化机器人物理交互过程，满足算法调优的观测需求。</li>
-<li>运动状态跨越：机器人从 “无法站立、原地高频抖动” 优化为 “稳定站立≥30s，可完成前向小步行走（单次仿真前移≥1.5m）”。</li>
-<li>策略鲁棒性提升：面对轻微外部扰动（如仿真环境随机力），仍能维持平衡，无瞬间倾倒现象。</li>
+<li>
+<p><strong>问题本质</strong>：训练环境与部署环境的网络分支命名不一致，导致权重键名不匹配。</p>
+</li>
+<li>
+<p><strong>解决方案</strong>：</p>
+</li>
+<li><strong>非严格加载</strong>：使用 <code>torch.load(weights_path, map_location="cpu", strict=False)</code>；</li>
+<li><strong>权重键名映射</strong>：手动对齐核心网络（actor/critic）的键名，忽略辅助分支；</li>
+<li><strong>参数校验</strong>：加载后打印网络参数形状，确认核心层有效匹配。</li>
 </ul>
-<h2 id="_6">三、技术栈与快速开始</h2>
-<h3 id="31">3.1 核心技术栈</h3>
+<pre><code class="language-python"># 权重加载核心代码
+model_weights = torch.load(weights_path, map_location=&quot;cpu&quot;)
+actor.load_state_dict(model_weights[&quot;actor&quot;], strict=False)
+critic.load_state_dict(model_weights[&quot;critic&quot;], strict=False)
+</code></pre>
+<h3 id="424">4.2.4 机器人原地高频抖动</h3>
+<ul>
+<li><strong>问题根源</strong>：</li>
+<li>动作输出幅值过大，策略输出的关节力矩超出物理仿真稳定范围；</li>
+<li>策略探索噪声未关闭，测试阶段动作随机性高；</li>
+<li>
+<p>奖励函数单一，仅关注前移距离，未惩罚关节高频变化。</p>
+</li>
+<li>
+<p><strong>分层解决方案</strong>：</p>
+</li>
+<li><strong>短期修复</strong>：通过 <code>action_scale</code> 进行动作限幅，同时开启 <code>deterministic=True</code> 关闭探索噪声；</li>
+<li><strong>中期优化</strong>：奖励函数加入关节平滑惩罚项，抑制高频抖动；</li>
+<li><strong>长期规划</strong>：采用课程学习，先训练站立平衡，再逐步训练行走。</li>
+</ul>
+<h2 id="5">5 系统技术架构</h2>
+<h3 id="51">5.1整体架构（三层闭环）</h3>
+<p>本项目采用典型的“环境-模型-部署”三层架构：</p>
+<div align="center">
+  <img width="626" height="1093" alt="image" src="https://github.com/user-attachments/assets/7c587cf0-e835-461b-8bbd-6d80d5e27578" /><p>图1 系统整体三层架构图</p>
+</div>
+
+<h3 id="52">5.2 核心模块职责</h3>
+<table>
+<thead>
+<tr>
+<th>模块名</th>
+<th>核心输入</th>
+<th>核心输出</th>
+<th>关键功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>env_mujoco.py</code></td>
+<td>Gymnasium 环境实例</td>
+<td>适配后的 MuJoCo 环境</td>
+<td>跨版本 API 补丁、渲染配置、观测归一化</td>
+</tr>
+<tr>
+<td><code>train.py</code></td>
+<td>环境实例、超参数</td>
+<td>预训练权重文件</td>
+<td>SAC 算法训练、断点续训、日志记录（TensorBoard）</td>
+</tr>
+<tr>
+<td><code>humanoid_walk.py</code></td>
+<td>权重压缩包路径</td>
+<td>仿真渲染窗口</td>
+<td>自动解压、权重加载、推理循环、动作平滑</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6">6 实验结果与分析</h2>
+<h3 id="61">6.1 实验环境</h3>
+<p>实验技术栈选型及理由如下：</p>
 <table>
 <thead>
 <tr>
@@ -172,187 +305,8 @@
 </tr>
 </tbody>
 </table>
-<h3 id="32">3.2 快速开始（一键运行）</h3>
-<h4 id="_7">环境准备</h4>
-<pre><code class="language-bash"># 创建并激活conda环境
-conda create -n mujoco_env python=3.12
-conda activate mujoco_env
-# 安装核心依赖
-pip install mujoco==3.1.0 gymnasium==0.29.1 stable-baselines3[extra]==2.0.0 torch==2.1.0
-</code></pre>
-<h4 id="_8">运行演示</h4>
-<pre><code class="language-bash"># 克隆项目后进入根目录
-cd Humanoid_Balance
-# 启动仿真演示
-python src/humanoid_walk.py
-</code></pre>
-<h4 id="_9">参数调优指引</h4>
-<ul>
-<li><strong>降低抖动</strong>：减小humanoid_walk.py中action_scale（如 0.7），增强动作限幅效果；</li>
-<li><strong>提升探索性</strong>（训练阶段）：在train.py中增大learning_rate（如 3e-4）、降低gamma（如 0.98）；</li>
-<li><strong>增强稳定性</strong>：确认deterministic=True开启，关闭策略探索噪声。</li>
-</ul>
-<h2 id="_10">四、项目结构</h2>
-<pre><code class="language-plaintext">Humanoid_Balance/
-├── src/                      # 核心源码目录
-│   ├── humanoid_walk.py       # 仿真演示入口（一键启动）
-│   ├── env_mujoco.py          # MuJoCo环境适配+跨版本补丁
-│   ├── train.py               # SAC训练脚本（含超参数/日志）
-│   └── models/                # 本地权重存储目录（可选）
-├── humanoid_final_walking.zip # 预训练权重压缩包（核心资产）
-├── temp_model_extract/        # 权重临时解压目录（自动创建/清理）
-├── requirements.txt           # 依赖清单（新增）
-└── README.md                  # 项目说明（本文件）
-</code></pre>
-<h2 id="_11">五、算法方法与后续规划</h2>
-<h3 id="51-sac">5.1 核心算法原理（SAC）</h3>
-<p>Soft Actor-Critic（SAC）是基于最大熵强化学习的离线策略算法（本项目采用双 Critic 网络 + 重参数化 Actor 网络的经典 SAC 架构，折扣因子 γ=0.99，学习率 1e-4，保证策略收敛性），核心优势在于：</p>
-<ol>
-<li>
-<p><strong>最大熵目标</strong>：在优化累积奖励的同时最大化策略熵，SAC 的最大熵目标函数可平衡探索与利用，适配人形机器人 376 维高维观测 + 连续关节力矩控制的特性，相比 PPO 降低约 20% 的样本采集量，保证探索性的同时提升策略鲁棒性；</p>
-</li>
-<li>
-<p><strong>双Critic网络</strong>：缓解过估计问题，提升价值函数评估精度；</p>
-</li>
-<li>
-<p><strong>自动熵调整</strong>：自适应平衡探索（熵）与利用（奖励），无需手动调参。</p>
-</li>
-</ol>
-<h3 id="52">5.2 关键优化手段</h3>
-<table>
-<thead>
-<tr>
-<th style="text-align: left;">优化手段</th>
-<th style="text-align: left;">实现逻辑</th>
-<th style="text-align: left;">效果</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: left;">动作平滑处理</td>
-<td style="text-align: left;">推理阶段对动作输出乘以 <code>action_scale</code> 因子，限制关节力矩范围</td>
-<td style="text-align: left;">关节运动幅值降低30%，抖动频率从50Hz降至10Hz以内</td>
-</tr>
-<tr>
-<td style="text-align: left;">确定性策略推理</td>
-<td style="text-align: left;">测试阶段关闭随机探索，输出固定策略的动作</td>
-<td style="text-align: left;">动作序列连贯性提升，无随机抽动</td>
-</tr>
-<tr>
-<td style="text-align: left;">观测空间归一化</td>
-<td style="text-align: left;">对376维观测向量（关节角度、速度、质心位置等）做标准化</td>
-<td style="text-align: left;">策略收敛速度提升20%</td>
-</tr>
-</tbody>
-</table>
-<h3 id="53">5.3 后续进阶规划</h3>
-<ol>
-<li>
-<p><strong>课程学习（Curriculum Learning）</strong>：</p>
-<ul>
-<li>阶段1：训练纯站立平衡（奖励函数聚焦质心高度、关节角度偏差）；</li>
-<li>阶段2：训练小步原地行走（限制步长，奖励前移距离）；</li>
-<li>阶段3：训练长距离行走（放开步长限制，加入速度奖励）。</li>
-</ul>
-</li>
-<li>
-<p><strong>奖励函数精修</strong>：</p>
-<ul>
-<li>新增足端压力（Foot Pressure）反馈项，惩罚“脚尖点地/悬空”；</li>
-<li>新增关节平滑项，惩罚相邻步动作差值过大，进一步抑制抖动。</li>
-<li>未来奖励：计划引入对称性奖励（鼓励左右腿交替）和足端接触力平稳项，以抑制目前在视频中观察到的高频震荡。(当前奖励：$Reward = f(前向速度) - f(控制能耗)$)</li>
-</ul>
-</li>
-</ol>
-<h2 id="_12">六、核心技术难点与解决历程</h2>
-<h3 id="61-solver_iter">6.1 环境属性冲突（solver_iter 报错）</h3>
-<ul>
-<li><strong>问题本质</strong>：MuJoCo v4 版本移除了旧版属性 <code>solver_iter</code>，改用 <code>solver_niter</code>，直接运行会导致环境初始化失败。</li>
-<li><strong>解决方案</strong>：通过动态属性判断实现版本兼容，自动适配新旧环境。</li>
-</ul>
-<pre><code class="language-python"># 版本兼容核心代码
-def set_solver_iter(env, n_iter):
-    if hasattr(env.unwrapped, &quot;solver_iter&quot;):
-        env.unwrapped.solver_iter = n_iter
-    elif hasattr(env.unwrapped, &quot;solver_niter&quot;):
-        env.unwrapped.solver_niter = n_iter
-</code></pre>
-<h3 id="62-permissionerror">6.2 权重加载失败（PermissionError / 路径错误）</h3>
-<ul>
-<li><strong>问题本质</strong>：</li>
-</ul>
-<p>1.权重文件路径硬编码（如/root/models/），跨机器运行时路径不存在；</p>
-<p>2.直接读取压缩包目录而非解压后的.pth文件，触发权限拒绝。</p>
-<ul>
-<li><strong>解决思路</strong>：</li>
-</ul>
-<p>1.路径归一化：使用os.path.abspath()+os.path.join()构建绝对路径；</p>
-<p>2.自动解压：通过zipfile.ZipFile解压权重包至临时目录，加载完成后清理；</p>
-<p>3.权限兼容：添加try-except捕获权限错误，提示用户以非管理员 / 管理员模式运行。</p>
-<h3 id="63-missing-keys">6.3 模型参数不匹配（Missing key(s)）</h3>
-<ul>
-<li><strong>问题本质</strong>：</li>
-</ul>
-<p>训练环境与部署环境的网络分支命名不一致（如训练时加了v2后缀，部署时无），导致权重键名不匹配。</p>
-<ul>
-<li><strong>解决思路</strong>：</li>
-</ul>
-<p>1.非严格加载：torch.load(weights_path, map_location="cpu", strict=False)；</p>
-<p>2.权重键名映射：手动对齐核心网络（actor/critic）的键名，忽略辅助分支（如日志记录分支）；</p>
-<p>3.验证：加载后打印网络参数形状，确认核心层参数匹配。</p>
-<h3 id="64">6.4 机器人原地高频抖动</h3>
-<ul>
-<li><strong>问题根源分析</strong>：</li>
-</ul>
-<p>1.动作输出幅值过大：策略输出的关节力矩超出物理仿真稳定范围；</p>
-<p>2.策略探索噪声：测试阶段未关闭探索，动作随机性高；</p>
-<p>3.奖励函数单一：仅关注前移距离，未惩罚关节高频变化。</p>
-<ul>
-<li><strong>分层解决</strong>：</li>
-</ul>
-<p>1.短期：动作限幅（action_scale）+ 确定性推理（deterministic=True）；</p>
-<p>2.中期：奖励函数加入关节平滑项；</p>
-<p>3.长期：课程学习先训练平衡，再训练行走。</p>
-<h2 id="_13">七、系统技术架构与核心模块说明</h2>
-<h3 id="71">7.1 整体架构（三层闭环）</h3>
-<p>本项目采用典型的“环境-模型-部署”三层架构：</p>
-<p><img width="626" height="1093" alt="image" src="https://github.com/user-attachments/assets/7c587cf0-e835-461b-8bbd-6d80d5e27578" /></p>
-<h3 id="72">7.2 核心模块职责</h3>
-<table>
-<thead>
-<tr>
-<th>模块名</th>
-<th>核心输入</th>
-<th>核心输出</th>
-<th>关键功能</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>env_mujoco.py</code></td>
-<td>Gymnasium 环境实例</td>
-<td>适配后的 MuJoCo 环境</td>
-<td>跨版本 API 补丁、渲染配置、观测归一化</td>
-</tr>
-<tr>
-<td><code>train.py</code></td>
-<td>环境实例、超参数</td>
-<td>预训练权重文件</td>
-<td>SAC 算法训练、断点续训、日志记录（TensorBoard）</td>
-</tr>
-<tr>
-<td><code>humanoid_walk.py</code></td>
-<td>权重压缩包路径</td>
-<td>仿真渲染窗口</td>
-<td>自动解压、权重加载、推理循环、动作平滑</td>
-</tr>
-</tbody>
-</table>
-<h2 id="_14">八、运行结果、不足与优化方向</h2>
-<h3 id="81">8.1 运行结果图片</h3>
-<p><img width="1439" height="980" alt="image" src="https://github.com/user-attachments/assets/22c0ee59-d417-4261-8d4c-78411e7c126f" />
-<img width="1084" height="846" alt="image" src="https://github.com/user-attachments/assets/53c4f874-4fff-4e93-9824-364c316a64a6" /></p>
-<h3 id="82">8.2 量化运行结果</h3>
+<h3 id="62">6.2 量化实验结果</h3>
+<p>通过模块化重构、跨版本适配、稳定性优化等手段，机器人运动性能与系统鲁棒性显著提升，核心指标对比如下：</p>
 <table>
 <thead>
 <tr>
@@ -395,22 +349,101 @@ def set_solver_iter(env, n_iter):
 </tr>
 </tbody>
 </table>
-<h3 id="83">8.3 现存不足</h3>
+<h3 id="63">6.3 可视化结果</h3>
+<p>优化前后机器人运动状态对比图如下：</p>
+<div align="center">
+<img width="1439" height="980" alt="image" src="https://github.com/user-attachments/assets/22c0ee59-d417-4261-8d4c-78411e7c126f" /><p>图2 优化前：机器人无法稳定站立，原地高频抖动</p> 
+
+<img width="1084" height="846" alt="image" src="https://github.com/user-attachments/assets/53c4f874-4fff-4e93-9824-364c316a64a6" /><p>图3 优化后：机器人稳定站立并完成小步行走</p>
+</div>
+
+<h3 id="64">6.4 关键优化手段效果</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">优化手段</th>
+<th style="text-align: left;">实现逻辑</th>
+<th style="text-align: left;">效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">动作平滑处理</td>
+<td style="text-align: left;">推理阶段对动作输出乘以 <code>action_scale</code> 因子，限制关节力矩范围</td>
+<td style="text-align: left;">关节运动幅值降低30%，抖动频率从50Hz降至10Hz以内</td>
+</tr>
+<tr>
+<td style="text-align: left;">确定性策略推理</td>
+<td style="text-align: left;">测试阶段关闭随机探索，输出固定策略的动作</td>
+<td style="text-align: left;">动作序列连贯性提升，无随机抽动</td>
+</tr>
+<tr>
+<td style="text-align: left;">观测空间归一化</td>
+<td style="text-align: left;">对376维观测向量（关节角度、速度、质心位置等）做标准化</td>
+<td style="text-align: left;">策略收敛速度提升20%</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7">7 快速开始指南</h2>
+<h3 id="71">7.1 环境准备</h3>
+<pre><code class="language-bash"># 创建并激活conda环境
+conda create -n mujoco_env python=3.12
+conda activate mujoco_env
+# 安装核心依赖
+pip install mujoco==3.1.0 gymnasium==0.29.1 stable-baselines3[extra]==2.0.0 torch==2.1.0
+</code></pre>
+<h3 id="72">7.2 运行演示</h3>
+<pre><code class="language-bash"># 克隆项目后进入根目录
+cd Humanoid_Balance
+# 启动仿真演示
+python src/humanoid_walk.py
+</code></pre>
+<h3 id="73">7.3 参数调优指引</h3>
+<ul>
+<li><strong>降低抖动</strong>：减小humanoid_walk.py中action_scale（如 0.7），增强动作限幅效果；</li>
+<li><strong>提升探索性</strong>（训练阶段）：在train.py中增大learning_rate（如 3e-4）、降低gamma（如 0.98）；</li>
+<li><strong>增强稳定性</strong>：确认deterministic=True开启，关闭策略探索噪声。</li>
+</ul>
+<h3 id="74">7.4 项目结构</h3>
+<pre><code class="language-plaintext">Humanoid_Balance/
+├── src/                      # 核心源码目录
+│   ├── humanoid_walk.py       # 仿真演示入口（一键启动）
+│   ├── env_mujoco.py          # MuJoCo环境适配+跨版本补丁
+│   ├── train.py               # SAC训练脚本（含超参数/日志）
+│   └── models/                # 本地权重存储目录（可选）
+├── humanoid_final_walking.zip # 预训练权重压缩包（核心资产）
+├── temp_model_extract/        # 权重临时解压目录（自动创建/清理）
+├── requirements.txt           # 依赖清单（新增）
+└── README.md                  # 项目说明（本文件）
+</code></pre>
+<h2 id="8">8 现存不足与后续规划</h2>
+<h3 id="81">8.1 现存不足</h3>
 <ul>
 <li><strong>步态稳定性有限</strong>：受跨版本权重差异影响，机器人行走时仍有低频小幅度抖动，未实现长距离（≥5m）稳定行走；</li>
 <li><strong>权重完整性不足</strong>：辅助网络（如价值网络分支）因键名不匹配未加载，策略未达到理论最优性能；</li>
 <li><strong>奖励函数单一</strong>：仅依赖前移距离，未引入足端压力、质心偏移等物理反馈，易出现 “踮脚行走” 现象；</li>
 <li><strong>仿真与现实差距</strong>：仅在理想平面环境训练，未考虑地面摩擦、关节阻尼等真实物理特性。</li>
 </ul>
-<h3 id="84">8.4 后续优化方向</h3>
-<ul>
-<li><strong>在线微调（Fine-tuning）</strong>：基于当前权重在 <code>Humanoid-v4</code> 继续训练 100k 步，对齐参数并适应新版物理特性。</li>
-<li><strong>课程学习（Curriculum Learning）</strong>：先训练平衡，再逐步过渡到行走、跑步等复杂运动。</li>
-<li><strong>奖励函数优化</strong>：在前移奖励基础上加入足端压力、关节平滑项，抑制原地抽动。</li>
-<li><strong>位置控制引入</strong>：从力矩控制升级为准直接位置控制，提升关节刚度与运动精度。</li>
-</ul>
-<h2 id="_15">九、总结</h2>
-<p>本项目通过<strong>模块化重构、跨版本适配、兼容权重加载与动作平滑</strong>，系统性解决了人形机器人强化学习部署中的关键工程问题。尽管当前步态仍有优化空间，但技术架构已完全验证，为后续大规模训练与复杂运动控制提供了可靠基础。实践表明，工程化适配、分层优化与算法 - 仿真协同，是强化学习策略从理论走向落地的核心保障。</p>
+<h3 id="82">8.2后续优化方向</h3>
+<ol>
+<li>
+<p><strong>课程学习（Curriculum Learning）</strong>：
+     阶段1：训练纯站立平衡（奖励函数聚焦质心高度、关节角度偏差）；
+     阶段2：训练小步原地行走（限制步长，奖励前移距离）；
+     阶段3：训练长距离行走（放开步长限制，加入速度奖励）。</p>
+</li>
+<li>
+<p><strong>奖励函数精修</strong>：
+     新增足端压力（Foot Pressure）反馈项，惩罚“脚尖点地/悬空”；
+     新增关节平滑项，惩罚相邻步动作差值过大，进一步抑制抖动。
+     未来奖励：计划引入对称性奖励（鼓励左右腿交替）和足端接触力平稳项，以抑制目前在视频中观察到的高频震荡。(当前奖励：$Reward = f(前向速度) - f(控制能耗)$)</p>
+</li>
+<li><strong>技术升级</strong>：
+      在线微调：基于当前权重在Humanoid-v4继续训练 100k 步，对齐参数并适应新版物理特性；
+      控制方式升级：从力矩控制升级为准直接位置控制，提升关节刚度与运动精度。</li>
+</ol>
+<h2 id="9">9 总结</h2>
+<p>本项目通过模块化重构、MuJoCo 跨版本适配、兼容式权重加载与动作平滑优化，系统性解决了人形机器人强化学习策略部署中的核心工程问题。实验验证，优化后的系统可实现 “模型解压→权重加载→环境初始化→策略推理” 端到端自动化，机器人运动状态从 “无法站立、高频抖动” 提升至 “稳定站立≥30s、单次前移≥1.5m”。尽管当前步态仍存在优化空间，但已验证的技术架构为后续复杂运动控制（跑步、上下台阶）提供了可复现、可扩展的基础。本项目实践表明，工程化适配、分层优化与算法-仿真协同，是强化学习策略从理论走向落地的核心保障。</p>
               
             </div>
           </div><footer>
