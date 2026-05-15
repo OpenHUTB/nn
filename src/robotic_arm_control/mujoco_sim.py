@@ -5,9 +5,6 @@
 """
 import os
 
-# 获取脚本目录作为基准路径
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 # 禁用MuJoCo日志（设置空路径）
 os.environ['MUJOCO_LOG_DIR'] = os.devnull
 
@@ -18,6 +15,7 @@ import time
 import logging
 import threading
 import sys
+import psutil  # 性能监控
 import queue
 import json
 from dataclasses import dataclass
@@ -218,13 +216,18 @@ class TargetVisualizer:
 
     def render(self, viewer) -> None:
         """渲染目标点（MuJoCo 3.x兼容）"""
+        if self._is_rendered:
+            return
         try:
-            self.geom.pos[:] = self.target_pos
-            mujoco.mjv_addGeoms(viewer.model, viewer.data, viewer.user_scn, [self.geom])
-            self._is_rendered = True
-        except Exception as e:
-            if not self._is_rendered:
-                logger.warning(f"首次渲染目标点失败：{e}")
+            self.geom.pos[:] = self.target_pos.astype(np.float32)
+            # MuJoCo 3.x: 尝试多种方式获取 scene
+            scene = getattr(viewer, 'scn', None) or getattr(viewer, 'user_scn', None)
+            if scene is not None and hasattr(scene, 'geoms') and scene.ngeom < len(scene.geoms):
+                scene.geoms[scene.ngeom] = self.geom
+                scene.ngeom += 1
+                self._is_rendered = True
+        except Exception:
+            pass  # 静默失败，避免频繁警告
 
 
 # ======================== 主仿真类（深度优化） ========================
@@ -530,6 +533,10 @@ class ArmSimulator:
                 target_vis_render = self.target_vis.render
                 viewer_sync = viewer.sync
 
+                # 性能监控
+                frame_times = []
+                last_print_time = start_time
+
                 while self.running and (time.time() - start_time) < self.config.sim_duration:
                     frame_start = time.time()
 
@@ -546,12 +553,17 @@ class ArmSimulator:
                     target_vis_render(viewer)
                     viewer_sync()
 
+                    # 帧时间记录
+                    frame_elapsed = time.time() - frame_start
+                    frame_times.append(1.0 / frame_elapsed if frame_elapsed > 0 else 0)
+
                     # 状态打印（每5帧一次，减少IO）
-                    if frame_count % 5 == 0:
-                        self._print_sim_status(start_time)
+                    current_time = time.time()
+                    if current_time - last_print_time >= 1.0:
+                        self._print_sim_status(start_time, frame_times)
+                        last_print_time = current_time
 
                     # 帧率控制（精准）
-                    frame_elapsed = time.time() - frame_start
                     if frame_elapsed < dt:
                         time.sleep(dt - frame_elapsed)
 
@@ -560,7 +572,9 @@ class ArmSimulator:
             # 资源清理（优雅退出）
             self.running = False
             self.pid.reset()
-            logger.info(f"仿真结束 | 总帧数：{frame_count} | 平均帧率：{frame_count / (time.time() - start_time):.1f}FPS")
+            total_time = time.time() - start_time
+            avg_fps = frame_count / total_time if total_time > 0 else 0
+            logger.info(f"仿真结束 | 总帧数：{frame_count} | 平均帧率：{avg_fps:.1f}FPS")
 
     def _init_viewer(self, viewer) -> None:
         """初始化Viewer视角（集中配置）"""
@@ -569,18 +583,25 @@ class ArmSimulator:
         viewer.cam.elevation = -15.0
         viewer.cam.lookat = np.array([0.2, 0.0, 0.5], dtype=np.float64)
 
-    def _print_sim_status(self, start_time: float) -> None:
-        """打印仿真状态（格式化输出）"""
+    def _print_sim_status(self, start_time: float, frame_times: list = None) -> None:
+        """打印仿真状态（包含性能监控）"""
         try:
             elapsed = time.time() - start_time
             current_joints = self.get_joint_angles()
             current_pose = self.kinematics.forward_kinematics(current_joints)
 
+            # 获取当前进程
+            process = psutil.Process()
+            mem_info = process.memory_info()
+            mem_mb = mem_info.rss / 1024 / 1024  # MB
+
+            # 计算帧率
+            fps = frame_times[-1] if frame_times else 0
+
             # 格式化输出（减少换行）
             status_str = (
-                f"\r仿真时长：{elapsed:.1f}s | "
-                f"关节角：{current_joints} | "
-                f"末端位姿：{current_pose}"
+                f"\r{elapsed:6.1f}s | FPS:{fps:5.1f} | Mem:{mem_mb:6.1f}MB | "
+                f"Joints:{[f'{j:.1f}' for j in current_joints[:3]]}..."
             )
             print(status_str, end="", flush=True)
         except Exception as e:

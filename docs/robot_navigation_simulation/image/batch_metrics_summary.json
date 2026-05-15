@@ -1,0 +1,413 @@
+{
+  "batch_summary": [
+    {
+      "planner_name": "A*",
+      "success_rate": 1.0,
+      "avg_travel_cost": 44.0,
+      "avg_replans": 1.0,
+      "avg_expanded_nodes": 341.25,
+      "avg_runtime_ms": 0.69125,
+      "best_map_wins": 4
+    },
+    {
+      "planner_name": "Dijkstra",
+      "success_rate": 1.0,
+      "avg_travel_cost": 44.0,
+      "avg_replans": 1.0,
+      "avg_expanded_nodes": 813.25,
+      "avg_runtime_ms": 1.5757499999999998,
+      "best_map_wins": 0
+    },
+    {
+      "planner_name": "Greedy Best-First",
+      "success_rate": 1.0,
+      "avg_travel_cost": 49.5,
+      "avg_replans": 1.0,
+      "avg_expanded_nodes": 100.75,
+      "avg_runtime_ms": 0.35350000000000004,
+      "best_map_wins": 0
+    }
+  ],
+  "batch_reports": [
+    [
+      {
+        "planner_name": "A*",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 353,
+        "runtime_ms": 0.579,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          5,
+          7
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Dijkstra",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 850,
+        "runtime_ms": 1.591,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          5,
+          7
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Greedy Best-First",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 53,
+        "visited_nodes": 51,
+        "travel_cost": 50.0,
+        "initial_path_cost": 52.0,
+        "replanned_path_cost": 42.0,
+        "replans": 1,
+        "expanded_nodes_total": 102,
+        "runtime_ms": 0.364,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          11,
+          1
+        ],
+        "replanned_paths_count": 1
+      }
+    ],
+    [
+      {
+        "planner_name": "A*",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 343,
+        "runtime_ms": 0.731,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          9,
+          3
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Dijkstra",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 859,
+        "runtime_ms": 1.703,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          9,
+          3
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Greedy Best-First",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 49,
+        "visited_nodes": 49,
+        "travel_cost": 48.0,
+        "initial_path_cost": 48.0,
+        "replanned_path_cost": 40.0,
+        "replans": 1,
+        "expanded_nodes_total": 90,
+        "runtime_ms": 0.321,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          9,
+          3
+        ],
+        "replanned_paths_count": 1
+      }
+    ],
+    [
+      {
+        "planner_name": "A*",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 345,
+        "runtime_ms": 0.79,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          8,
+          4
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Dijkstra",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 771,
+        "runtime_ms": 1.492,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          8,
+          4
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Greedy Best-First",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 55,
+        "visited_nodes": 55,
+        "travel_cost": 54.0,
+        "initial_path_cost": 54.0,
+        "replanned_path_cost": 46.0,
+        "replans": 1,
+        "expanded_nodes_total": 114,
+        "runtime_ms": 0.377,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          10,
+          2
+        ],
+        "replanned_paths_count": 1
+      }
+    ],
+    [
+      {
+        "planner_name": "A*",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 324,
+        "runtime_ms": 0.665,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          7,
+          5
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Dijkstra",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 45,
+        "visited_nodes": 45,
+        "travel_cost": 44.0,
+        "initial_path_cost": 44.0,
+        "replanned_path_cost": 36.0,
+        "replans": 1,
+        "expanded_nodes_total": 773,
+        "runtime_ms": 1.517,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          6,
+          6
+        ],
+        "replanned_paths_count": 1
+      },
+      {
+        "planner_name": "Greedy Best-First",
+        "grid_shape": [
+          25,
+          25
+        ],
+        "obstacle_density": 0.22,
+        "initial_path_length": 47,
+        "visited_nodes": 47,
+        "travel_cost": 46.0,
+        "initial_path_cost": 46.0,
+        "replanned_path_cost": 38.0,
+        "replans": 1,
+        "expanded_nodes_total": 97,
+        "runtime_ms": 0.352,
+        "success": true,
+        "final_status": "Arrived",
+        "goal": [
+          23,
+          23
+        ],
+        "start": [
+          1,
+          1
+        ],
+        "dynamic_obstacle": [
+          7,
+          5
+        ],
+        "replanned_paths_count": 1
+      }
+    ]
+  ]
+}
