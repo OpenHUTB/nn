@@ -3,8 +3,8 @@ import numpy as np
 import os
 
 def main():
-    # 1. 先检查图片文件是否存在
-    img_path = 'test.jpg'
+    # 1. 这里改成 CARLA 测试图片！！！
+    img_path = 'carla_test.jpg'
     if not os.path.exists(img_path):
         print(f"错误：找不到文件 {img_path}！请把图片和代码放在同一个文件夹里。")
         return
