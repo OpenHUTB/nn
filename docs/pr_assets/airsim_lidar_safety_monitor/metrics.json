@@ -1,0 +1,19 @@
+{
+  "source": "AirSim LiDAR and flight-state log",
+  "frames": 20,
+  "critical_frames": 1,
+  "warning_frames": 6,
+  "avoidance_actions": {
+    "brake_and_climb": 2,
+    "keep_course": 13,
+    "shift_right": 5
+  },
+  "max_risk": 0.6758,
+  "min_clearance_m": 0.9,
+  "generated_files": [
+    "airsim_clearance_risk.png",
+    "airsim_altitude_attitude.png",
+    "airsim_action_distribution.png",
+    "airsim_safety_scores.csv"
+  ]
+}

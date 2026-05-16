@@ -14,6 +14,8 @@ import csv
 from pathlib import Path
 #添加类型提示支持
 from typing import Tuple, List 
+# 导入多线程并行计算支持
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 生成混合高斯分布数据
 def generate_data(n_samples = 1000, random_state = 42):
@@ -113,15 +115,19 @@ def logsumexp(log_p, axis=1, keepdims=False):
     # 计算修正后的指数和（处理-inf输入）
     # 安全计算指数和：先减去最大值，再计算指数
     safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)     # 安全调整对数概率
-    sum_exp = np.sum(np.exp(safe_log_p), axis = axis, keepdims = keepdims)  # 计算调整后的指数和
+    sum_exp = np.sum(np.exp(safe_log_p), axis = axis, keepdims = True)      # 始终保持维度，便于后续计算
     
     # 计算最终结果
     result = max_val + np.log(sum_exp)
     
+    # 根据keepdims参数调整形状
+    if not keepdims:
+        result = result.squeeze(axis=axis)
+    
     # 处理全-inf输入的特殊case
-    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):       # 判断是否所有有效值都是-inf
-        result = max_val.copy() if keepdims else max_val.squeeze(axis = axis) # 根据keepdims参数的值返回max_val的适当形式
-    return result                                                           # 返回处理后的结果，保持与正常情况相同的接口
+    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):
+        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis)
+    return result
 
 # 高斯混合模型类
 class GaussianMixtureModel:
@@ -132,20 +138,55 @@ class GaussianMixtureModel:
         max_iter: int, EM算法最大迭代次数 (默认=100)
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
+        init: str, 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
+        n_jobs: int, 并行计算使用的线程数 (默认=1，即不并行；-1表示使用所有CPU核心)
+        covariance_type: str, 协方差类型：'full'（完整协方差）、'tied'（共享协方差）、
+                         'diagonal'（对角协方差）、'spherical'（球面协方差）(默认='full')
     """
-    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, init = 'random'):
+    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, 
+                 init = 'random', n_jobs = 1, covariance_type = 'full'):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
         self.init = init                  # 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
+        self.n_jobs = n_jobs              # 并行线程数
+        self.covariance_type = covariance_type.lower()  # 协方差类型
         self.log_likelihoods = []         # 存储每轮迭代的对数似然值
         self.n_iters_ = 0                 # 实际收敛所用的迭代次数
         self.aic_ = None                  # AIC 值（训练后计算）
         self.bic_ = None                  # BIC 值（训练后计算）
 
+        # 验证协方差类型
+        if self.covariance_type not in ['full', 'tied', 'diagonal', 'spherical']:
+            raise ValueError(f"无效的协方差类型: {covariance_type}，可选值: 'full', 'tied', 'diagonal', 'spherical'")
+
         # 初始化随机数生成器（使用 numpy 新式 Generator，线程安全且可重复）
         self.rng = np.random.default_rng(random_state)
+
+    def _init_covariance(self, n_features):
+        """根据协方差类型初始化协方差矩阵
+        
+        参数:
+            n_features: 特征维度
+            
+        返回:
+            sigma: 初始化的协方差矩阵，根据类型有不同的形状
+        """
+        if self.covariance_type == 'full':
+            # 完整协方差：每个成分独立的 dxd 协方差矩阵
+            return np.array([np.eye(n_features) for _ in range(self.n_components)])
+        elif self.covariance_type == 'tied':
+            # 共享协方差：所有成分共享一个 dxd 协方差矩阵
+            return np.eye(n_features)
+        elif self.covariance_type == 'diagonal':
+            # 对角协方差：每个成分独立的 d 维方差向量
+            return np.ones((self.n_components, n_features))
+        elif self.covariance_type == 'spherical':
+            # 球面协方差：每个成分只有一个标量方差
+            return np.ones(self.n_components)
+        else:
+            raise ValueError(f"无效的协方差类型: {self.covariance_type}")
 
     def fit(self, X):
         """使用EM算法训练模型
@@ -169,88 +210,45 @@ class GaussianMixtureModel:
             indices = self.rng.choice(n_samples, self.n_components, replace=False)
             self.mu = X[indices].copy()
         
-        # 初始化协方差矩阵为单位矩阵
-        self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
+        # 根据协方差类型初始化协方差矩阵
+        self.sigma = self._init_covariance(n_features)
 
-        log_likelihood = -np.inf  # 初始化对数似然值为负无穷
-        
-        # EM算法主循环：交替执行E步(期望)和M步(最大化)
-        for iter in range(self.max_iter):
-            # E步：计算后验概率（每个样本属于各个高斯成分的概率）
-            log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵
-            
-            # 对每个高斯成分，计算样本的对数概率密度
-            for k in range(self.n_components):
-                # 对数概率 = log(混合权重) + log(高斯概率密度)
-                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯混合成分的对数概率密度，并存储在log_prob的第k列
-            
-            # 使用logsumexp计算归一化因子，确保数值稳定性
-            log_prob_sum = logsumexp(log_prob, axis = 1, keepdims = True)
-            
-            # 计算后验概率（responsibility）：gamma_{ik} = P(z_i=k|x_i)
+        log_likelihood = -np.inf
+
+        log_pi = np.log(self.pi)
+
+        for iteration in range(self.max_iter):
+            if self.n_jobs != 1:
+                log_prob = self._log_gaussian_parallel(X, self.mu, self.sigma)
+            else:
+                log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
+            log_prob += log_pi[np.newaxis, :]
+
+            log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
+
             gamma = np.exp(log_prob - log_prob_sum)
 
-            # M步：更新模型参数（基于后验概率）
-            Nk = np.sum(gamma, axis=0) # 每个高斯成分的"有效样本数"
-            
-            # 更新混合权重
-            # 计算类别先验概率（class prior），即每个类别在样本中的比例
-            # Nk: 当前类别k的样本数量
-            # n_samples: 总样本数量
-           # 结果self.pi表示类别k在总体中的出现频率，用于后续的概率计算
+            Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
+
             self.pi = Nk / n_samples
-            
-            # 初始化新均值和新协方差矩阵
-            new_mu = np.zeros_like(self.mu)# 创建一个与 self.mu 形状相同且全为零的数组，作为新的均值向量
-            new_sigma = np.zeros_like(self.sigma)# 创建一个与 self.sigma 形状相同且全为零的数组，作为新的协方差矩阵
+            log_pi = np.log(self.pi)
 
-            # 对每个高斯成分更新参数
-            for k in range(self.n_components):
-                # 更新均值：加权平均
-                new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
+            current_log_likelihood = np.sum(log_prob_sum)
+            self.log_likelihoods.append(current_log_likelihood)
 
-                # 更新协方差矩阵
-                X_centered = X - new_mu[k]  # 中心化数据
-                weighted_X = gamma[:, k, None] * X_centered  # 加权中心化数据
-                
-                # 使用einsum高效计算协方差矩阵
-                # 等价于: new_sigma_k = (X_centered.T @ diag(gamma[:,k]) @ X_centered) / Nk[k]
-                # 更稳定的协方差计算方式
-                new_sigma_k = np.einsum('ki,kj->ij', gamma[:, k, None] * X_centered, X_centered) / Nk[k]
-
-                # 统一正则化处理，确保协方差矩阵正定
-                new_sigma_k += np.eye(n_features) * 1e-6
-                
-                new_sigma[k] = new_sigma_k  # 存储更新后的协方差矩阵
-
-            # 计算对数似然（模型对数据的拟合程度）
-            current_log_likelihood = np.sum(log_prob_sum)  # 所有样本的对数似然之和
-            self.log_likelihoods.append(current_log_likelihood)  # 记录当前对数似然
-            
-            # 检查收敛条件：如果对数似然变化小于阈值，则停止迭代
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
+            if iteration > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
-                
-            log_likelihood = current_log_likelihood   # 更新记录的上一次迭代的对数似然值
-            
-            # 更新模型参数
 
-            # 更新模型的均值参数（self.mu）为计算得到的新均值（new_mu）
-            # new_mu通常是通过优化算法（如EM算法、梯度下降）得到的当前最优估计值
+            log_likelihood = current_log_likelihood
+
             self.mu = new_mu
-            # 更新模型的协方差参数（self.sigma）为计算得到的新协方差（new_sigma）
-            # new_sigma需保证为正定矩阵，常见实现中会通过Cholesky分解等方法确保数值稳定性
             self.sigma = new_sigma
-        
-        # 记录实际收敛所用的迭代次数（for 循环结束后 iter 保留最后一次值）
-        self.n_iters_ = iter + 1
-        # 最终聚类结果：每个样本分配到概率最大的高斯成分
+
+        self.n_iters_ = iteration + 1
         self.labels_ = np.argmax(gamma, axis=1)
         
-        # 计算 AIC 和 BIC 准则
         self._compute_aic_bic(X)
         
-        # 基于软聚类结果确定最终的硬聚类标签
         return self
 
     def _compute_aic_bic(self, X):
@@ -360,7 +358,7 @@ class GaussianMixtureModel:
         if sign <= 0:  # 行列式非正（理论上协方差矩阵应是正定的）
             # 添加一个小的对角扰动项（单位矩阵乘以1e-6）
             # 确保矩阵可逆且正定，提高数值稳定性
-            sigma += np.eye(n_features) * 1e-6  # 正则化处理
+            sigma = sigma + np.eye(n_features) * 1e-6  # 正则化处理
             
             # 重新计算调整后的协方差矩阵的行列式
             sign, logdet = np.linalg.slogdet(sigma)
@@ -381,29 +379,287 @@ class GaussianMixtureModel:
             exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered) #计算指数部分（二次型）
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent #组合对数概率密度
         
+    def _log_gaussian_batch(self, X, mu, sigma):
+        """向量化计算多个高斯成分的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 所有成分的均值，形状为(n_components, n_features)
+            sigma: 所有成分的协方差矩阵（根据类型有不同形状）
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        
+        if self.covariance_type == 'diagonal':
+            return self._log_gaussian_diagonal(X, mu, sigma)
+        elif self.covariance_type == 'spherical':
+            return self._log_gaussian_spherical(X, mu, sigma)
+        else:
+            # full 或 tied 协方差
+            n_components = mu.shape[0]
+            log_prob = np.zeros((n_samples, n_components))
+            
+            if self.covariance_type == 'full':
+                for k in range(n_components):
+                    log_prob[:, k] = self._log_gaussian(X, mu[k], sigma[k])
+            elif self.covariance_type == 'tied':
+                for k in range(n_components):
+                    log_prob[:, k] = self._log_gaussian(X, mu[k], sigma)
+            
+            return log_prob
+
+    def _log_gaussian_diagonal(self, X, mu, sigma):
+        """向量化计算对角协方差高斯分布的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 所有成分的均值，形状为(n_components, n_features)
+            sigma: 对角协方差（方差向量），形状为(n_components, n_features)
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        
+        X_centered = X[:, np.newaxis, :] - mu[np.newaxis, :, :]  # (n, k, f)
+        log_det = np.sum(np.log(sigma), axis=1)                   # (k,)
+        inv_sigma = 1.0 / sigma                                   # (k, f)
+        
+        exponent = -0.5 * np.sum(X_centered ** 2 * inv_sigma[np.newaxis, :, :], axis=2)  # (n, k)
+        
+        return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * log_det[np.newaxis, :] + exponent
+
+    def _log_gaussian_spherical(self, X, mu, sigma):
+        """向量化计算球面协方差高斯分布的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 所有成分的均值，形状为(n_components, n_features)
+            sigma: 球面方差（标量），形状为(n_components,)
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        
+        X_centered = X[:, np.newaxis, :] - mu[np.newaxis, :, :]  # (n, k, f)
+        sq_dist = np.sum(X_centered ** 2, axis=2)                # (n, k)
+        log_det = n_features * np.log(sigma)                     # (k,)
+        inv_sigma = 1.0 / sigma                                  # (k,)
+        
+        exponent = -0.5 * sq_dist * inv_sigma[np.newaxis, :]     # (n, k)
+        
+        return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * log_det[np.newaxis, :] + exponent
+
+    def _log_gaussian_parallel(self, X, mu, sigma):
+        """并行计算多个高斯成分的对数概率密度
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            mu: 所有成分的均值，形状为(n_components, n_features)
+            sigma: 所有成分的协方差矩阵（根据类型有不同形状）
+            
+        返回:
+            log_prob: 每个样本在每个成分下的对数概率密度，形状为(n_samples, n_components)
+        """
+        n_samples, n_features = X.shape
+        
+        if self.covariance_type == 'diagonal':
+            return self._log_gaussian_diagonal(X, mu, sigma)
+        elif self.covariance_type == 'spherical':
+            return self._log_gaussian_spherical(X, mu, sigma)
+        else:
+            n_components = mu.shape[0]
+            n_jobs = self.n_jobs if self.n_jobs > 0 else min(n_components, 4)
+            
+            log_prob = np.zeros((n_samples, n_components))
+            
+            def compute_component(k):
+                if self.covariance_type == 'full':
+                    return k, self._log_gaussian(X, mu[k], sigma[k])
+                else:  # tied
+                    return k, self._log_gaussian(X, mu[k], sigma)
+            
+            with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+                futures = [executor.submit(compute_component, k) for k in range(n_components)]
+                
+                for future in as_completed(futures):
+                    k, result = future.result()
+                    log_prob[:, k] = result
+            
+            return log_prob
+
+    def _compute_statistics_vectorized(self, X, gamma):
+        """向量化计算 M 步的统计量
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            gamma: 后验概率，形状为(n_samples, n_components)
+            
+        返回:
+            Nk: 每个成分的有效样本数，形状为(n_components,)
+            new_mu: 新均值，形状为(n_components, n_features)
+            new_sigma: 新协方差矩阵（根据类型有不同形状）
+        """
+        n_samples, n_features = X.shape
+        n_components = gamma.shape[1]
+        
+        Nk = np.sum(gamma, axis=0)
+        
+        gamma_X = gamma[:, :, np.newaxis] * X[:, np.newaxis, :]
+        new_mu = np.sum(gamma_X, axis=0) / Nk[:, np.newaxis]
+        
+        X_centered = X[:, np.newaxis, :] - new_mu[np.newaxis, :, :]
+        gamma_X_centered = gamma[:, :, np.newaxis] * X_centered
+        
+        if self.covariance_type == 'full':
+            new_sigma = np.einsum('nki,nkj->kij', gamma_X_centered, X_centered) / Nk[:, np.newaxis, np.newaxis]
+            regularization = np.eye(n_features) * 1e-6
+            new_sigma += regularization
+        elif self.covariance_type == 'tied':
+            new_sigma = np.einsum('nki,nkj->ij', gamma_X_centered, X_centered) / np.sum(gamma)
+            regularization = np.eye(n_features) * 1e-6
+            new_sigma += regularization
+        elif self.covariance_type == 'diagonal':
+            new_sigma = np.sum(gamma_X_centered ** 2, axis=0) / Nk[:, np.newaxis]
+            new_sigma = np.maximum(new_sigma, 1e-6)
+        elif self.covariance_type == 'spherical':
+            new_sigma = np.sum(gamma_X_centered ** 2) / np.sum(Nk * n_features)
+            new_sigma = np.maximum(new_sigma, 1e-6)
+        
+        return Nk, new_mu, new_sigma
+        
     def plot_convergence(self, save_path = None, show = True):
         """可视化对数似然的收敛过程"""
-        # 检查是否有对数似然值记录
         if not self.log_likelihoods:
             raise ValueError("请先调用fit方法训练模型")
 
-        # 创建一个图形窗口，设置大小为10x6英寸
         plt.figure(figsize=(10, 6))
-        # 绘制对数似然值随迭代次数的变化曲线
-        # 使用蓝色实线绘制，范围从1到len(self.log_likelihoods)
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
-        # 设置x轴的标签为“迭代次数”
         plt.xlabel('迭代次数')
-        # 设置y轴的标签为“对数似然值”
         plt.ylabel('对数似然值')
-        # 设置图表的标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
-        # 启用网格线，增强可读性
         plt.grid(True, alpha=0.5) 
-        # 如提供保存路径，则写入文件
         if save_path is not None:
             plt.savefig(save_path, dpi=140, bbox_inches='tight')
-        # 是否显示窗口
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+    def predict_proba(self, X):
+        """预测样本属于各高斯成分的后验概率
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            
+        返回:
+            probs: 后验概率矩阵，形状为(n_samples, n_components)
+        """
+        X = np.asarray(X)
+        
+        if self.n_jobs != 1:
+            log_prob = self._log_gaussian_parallel(X, self.mu, self.sigma)
+        else:
+            log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
+        
+        log_prob += np.log(self.pi)[np.newaxis, :]
+        log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
+        
+        return np.exp(log_prob - log_prob_sum)
+
+    def score_samples(self, X):
+        """计算样本的对数概率密度（用于异常检测评分）
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            
+        返回:
+            scores: 每个样本的对数概率密度，形状为(n_samples,)
+                    值越小表示样本越可能是异常值
+        """
+        X = np.asarray(X)
+        
+        if self.n_jobs != 1:
+            log_prob = self._log_gaussian_parallel(X, self.mu, self.sigma)
+        else:
+            log_prob = self._log_gaussian_batch(X, self.mu, self.sigma)
+        
+        log_prob += np.log(self.pi)[np.newaxis, :]
+        scores = logsumexp(log_prob, axis=1)
+        return scores.ravel()  # 确保返回一维数组
+
+    def detect_anomalies(self, X, contamination=0.05, threshold=None):
+        """基于密度估计检测异常样本
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            contamination: 异常样本比例（默认0.05，即5%）
+            threshold: 异常检测阈值（可选，若不提供则根据contamination自动计算）
+            
+        返回:
+            is_anomaly: 异常标记数组，形状为(n_samples,)
+                        True表示异常样本，False表示正常样本
+            scores: 每个样本的异常分数（对数概率密度），形状为(n_samples,)
+        """
+        X = np.asarray(X)
+        n_samples = X.shape[0]
+        scores = self.score_samples(X).ravel()  # 确保是一维数组
+        
+        if threshold is None:
+            threshold = np.percentile(scores, contamination * 100)
+        
+        is_anomaly = (scores < threshold).ravel()  # 确保是一维数组
+        # 确保形状正确
+        if len(is_anomaly) != n_samples:
+            raise ValueError(f"异常检测结果形状错误: 预期 {n_samples}，实际 {len(is_anomaly)}")
+        
+        return is_anomaly, scores, threshold
+
+    def plot_anomaly_score(self, X, y_true=None, save_path=None, show=True):
+        """可视化异常检测结果
+        
+        参数:
+            X: 输入数据，形状为(n_samples, n_features)
+            y_true: 真实标签（可选，用于对比）
+            save_path: 保存路径（可选）
+            show: 是否显示（默认True）
+        """
+        X = np.asarray(X)
+        scores = self.score_samples(X).ravel()  # 确保是一维数组
+        
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # 子图1：异常分数分布直方图
+        ax = axes[0]
+        ax.hist(scores.flatten(), bins=30, alpha=0.7, color='#3498DB', edgecolor='black')
+        ax.set_xlabel('对数概率密度（异常分数）')
+        ax.set_ylabel('频次')
+        ax.set_title('异常分数分布直方图\n（值越小越可能是异常）')
+        ax.grid(True, alpha=0.3)
+        
+        # 子图2：2D数据散点图（颜色表示异常分数）
+        ax = axes[1]
+        if X.shape[1] >= 2:
+            scatter = ax.scatter(X[:, 0], X[:, 1], c=scores, cmap='viridis', 
+                                alpha=0.7, edgecolors='black')
+            ax.set_xlabel('特征1')
+            ax.set_ylabel('特征2')
+            ax.set_title('数据散点图（颜色表示异常分数）')
+            plt.colorbar(scatter, ax=ax, label='对数概率密度')
+        else:
+            ax.scatter(range(len(scores)), scores, alpha=0.7, color='#E74C3C')
+            ax.set_xlabel('样本索引')
+            ax.set_ylabel('异常分数')
+            ax.set_title('异常分数分布图')
+        
+        plt.tight_layout()
+        
+        if save_path is not None:
+            plt.savefig(save_path, dpi=140, bbox_inches='tight')
+        
         if show:
             plt.show()
         else:
@@ -429,7 +685,7 @@ def _cluster_accuracy(y_true, y_pred, n_classes):
 # ============================================================
 # 模型选择工具：基于 BIC 自动选择最佳成分数量
 # ============================================================
-def select_best_components(X, min_components=2, max_components=10, random_state=42):
+def select_best_components(X, min_components=2, max_components=10, random_state=42, n_jobs=1):
     """基于 BIC 准则自动选择 GMM 的最佳高斯成分数量
     
     参数:
@@ -437,6 +693,7 @@ def select_best_components(X, min_components=2, max_components=10, random_state=
         min_components: 最小成分数量（默认=2）
         max_components: 最大成分数量（默认=10）
         random_state: 随机种子
+        n_jobs: 并行计算线程数（默认=1）
     
     返回:
         best_gmm: 最佳成分数量的 GMM 模型
@@ -454,7 +711,8 @@ def select_best_components(X, min_components=2, max_components=10, random_state=
             max_iter=100,
             tol=1e-6,
             random_state=random_state,
-            init='kmeans++'
+            init='kmeans++',
+            n_jobs=n_jobs
         )
         gmm.fit(X)
         bic = gmm.bic()
@@ -491,6 +749,9 @@ if __name__ == "__main__":
     parser.add_argument("--max-iter",     type=int,   default=100,     help="EM最大迭代次数")
     parser.add_argument("--tol",          type=float, default=1e-6,    help="收敛阈值")
     parser.add_argument("--n-trials",     type=int,   default=50,      help="对比实验重复次数")
+    parser.add_argument("--n-jobs",       type=int,   default=1,       help="并行计算线程数（-1表示使用所有CPU核心）")
+    parser.add_argument("--covariance-type", type=str, default="full", 
+                        help="协方差类型：full（完整协方差）、tied（共享协方差）、diagonal（对角协方差）、spherical（球面协方差）")
     parser.add_argument("--out-dir",      type=str,   default="outputs", help="输出目录")
     parser.add_argument("--no-show",      action="store_true",         help="不弹出图像窗口，仅保存文件")
     args = parser.parse_args()
@@ -519,6 +780,7 @@ if __name__ == "__main__":
                 tol=args.tol,
                 random_state=seed,
                 init=init_method,
+                n_jobs=args.n_jobs,
             )
             gmm.fit(X)
             iters_list.append(gmm.n_iters_)
@@ -612,12 +874,12 @@ if __name__ == "__main__":
     # ============================================================
     gmm_rand = GaussianMixtureModel(
         n_components=args.n_components, max_iter=args.max_iter,
-        tol=args.tol, random_state=42, init='random')
+        tol=args.tol, random_state=42, init='random', n_jobs=args.n_jobs)
     gmm_rand.fit(X)
 
     gmm_kpp = GaussianMixtureModel(
         n_components=args.n_components, max_iter=args.max_iter,
-        tol=args.tol, random_state=42, init='kmeans++')
+        tol=args.tol, random_state=42, init='kmeans++', n_jobs=args.n_jobs)
     gmm_kpp.fit(X)
 
     acc_rand = _cluster_accuracy(y_true, gmm_rand.labels_, args.n_components)
@@ -688,7 +950,7 @@ if __name__ == "__main__":
     # 图4：BIC/AIC 模型选择曲线
     # ============================================================
     print("\n--- 基于 BIC 的模型选择 ---")
-    best_gmm, bic_results = select_best_components(X, min_components=2, max_components=8, random_state=42)
+    best_gmm, bic_results = select_best_components(X, min_components=2, max_components=8, random_state=42, n_jobs=args.n_jobs)
 
     n_components_list = [r['n_components'] for r in bic_results]
     bic_values = [r['bic'] for r in bic_results]
@@ -727,6 +989,57 @@ if __name__ == "__main__":
             writer.writerow([r['n_components'], r['bic'], r['aic'], r['n_iters']])
 
     print(f"\n所有输出已保存至: {out_dir.resolve()}")
+
+    # ============================================================
+    # 异常检测功能演示
+    # ============================================================
+    print("\n--- 异常检测功能演示 ---")
+    
+    # 使用最佳模型进行异常检测
+    gmm_anomaly = GaussianMixtureModel(
+        n_components=best_gmm.n_components,
+        max_iter=100,
+        tol=1e-6,
+        random_state=42,
+        init='kmeans++',
+        n_jobs=args.n_jobs,
+        covariance_type=args.covariance_type
+    )
+    gmm_anomaly.fit(X)
+    
+    # 生成带异常值的测试数据
+    np.random.seed(42)
+    # 添加异常值（远离聚类中心的点）
+    n_anomalies = int(len(X) * 0.05)
+    anomalies = np.random.uniform(low=-15, high=15, size=(n_anomalies, X.shape[1]))
+    X_with_anomalies = np.vstack([X, anomalies])
+    y_anomaly_true = np.array([False] * len(X) + [True] * n_anomalies)
+    
+    # 检测异常
+    is_anomaly, scores, threshold = gmm_anomaly.detect_anomalies(X_with_anomalies, contamination=0.05)
+    
+    # 计算检测指标
+    tp = np.sum(is_anomaly & y_anomaly_true)
+    fn = np.sum(~is_anomaly & y_anomaly_true)
+    fp = np.sum(is_anomaly & ~y_anomaly_true)
+    tn = np.sum(~is_anomaly & ~y_anomaly_true)
+    
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    
+    print(f"异常检测结果:")
+    print(f"  真实异常数: {n_anomalies}")
+    print(f"  检测异常数: {np.sum(is_anomaly)}")
+    print(f"  精确率: {precision:.4f}")
+    print(f"  召回率: {recall:.4f}")
+    print(f"  F1分数: {f1:.4f}")
+    
+    # 保存异常检测可视化图
+    anomaly_path = out_dir / "anomaly_detection.png"
+    gmm_anomaly.plot_anomaly_score(X_with_anomalies, y_true=y_anomaly_true, 
+                                   save_path=anomaly_path, show=not args.no_show)
+    print(f"[已保存] 异常检测图: {anomaly_path}")
 
 
 

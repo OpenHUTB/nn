@@ -218,6 +218,10 @@ class KeyboardControl(object):
                 if event.key == pygame.K_r:      # 新增
                     self.reroute_requested = True
                     self.world.hud.notification("Reroute requested", seconds=1.5)
+                if event.key == pygame.K_v:      # 新增截图功能
+                    if self.world.camera_manager is not None:
+                        self.world.camera_manager.request_screenshot = True
+                        self.world.hud.notification("Screenshot requested", seconds=1.0)
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
@@ -253,6 +257,7 @@ class HUD(object):
         self._info_text = []
         self._server_clock = pygame.time.Clock()
         self.last_waypoint = None
+        self.current_obstacle = None
 
     def on_world_tick(self, timestamp):
         """Gets informations from the world at every tick"""
@@ -364,7 +369,11 @@ class HUD(object):
             self._info_text.append('Obstacle: % 5.1f m' % obstacle_distance)
         else:
             self._info_text.append('Obstacle: None')
+        
+        # 将当前障碍物距离保存到实例变量，供 AEB 使用
+        self.current_obstacle = obstacle_distance
 
+        
         # 新增：显示下一个路径点的距离，并在到达新路径点时提示
         if hasattr(world, 'agent') and world.agent is not None:
             try:
@@ -637,6 +646,7 @@ class CameraManager(object):
         self._parent = parent_actor
         self.hud = hud
         self.recording = False
+        self.request_screenshot = False   # 新增：截图请求标志
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         attachment = carla.AttachmentType
         self._camera_transforms = [
@@ -741,6 +751,20 @@ class CameraManager(object):
             array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        
+        # 截图请求处理
+        if self.request_screenshot:
+            self.request_screenshot = False
+            # 生成时间戳文件名
+            import datetime
+            import os
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 创建 _screenshots 目录（如果不存在）
+            os.makedirs("_screenshots", exist_ok=True)
+            filename = f"_screenshots/screenshot_{timestamp}.png"
+            pygame.image.save(self.surface, filename)
+            self.hud.notification(f"Screenshot saved: {filename}", seconds=2.0)
+
         if self.recording:
             image.save_to_disk('_out/%08d' % image.frame)
 
@@ -768,6 +792,7 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
+        world.aeb_triggered = False   # 初始化自动紧急制动触发标志
         controller = KeyboardControl(world)
 
         if args.agent == "Roaming":
@@ -826,6 +851,20 @@ def game_loop(args):
                         control.throttle = 0.0
                         overshoot = (current_speed - args.max_speed) / args.max_speed
                         control.brake = min(1.0, overshoot)
+                
+                # ===== 自动紧急制动 (AEB) 开始 =====
+                if hasattr(world.hud, 'current_obstacle') and world.hud.current_obstacle is not None:
+                    if world.hud.current_obstacle < args.aeb_distance:
+                        # 强制刹车
+                        control.throttle = 0.0
+                        control.brake = 1.0
+                        control.reverse = False
+                        if not world.aeb_triggered:
+                            world.hud.notification("AEB engaged!", seconds=1.0)
+                            world.aeb_triggered = True
+                    else:
+                        world.aeb_triggered = False
+                # ===== AEB 结束 =====
 
                 world.player.apply_control(control)
             else:
@@ -897,6 +936,20 @@ def game_loop(args):
                     else:
                         control.throttle = 0.0
                         control.brake = max(0.0, min(-Kp * error, 1.0))
+                
+                # ===== 自动紧急制动 (AEB) 开始 =====
+                if hasattr(world.hud, 'current_obstacle') and world.hud.current_obstacle is not None:
+                    if world.hud.current_obstacle < args.aeb_distance:
+                        # 强制刹车
+                        control.throttle = 0.0
+                        control.brake = 1.0
+                        control.reverse = False
+                        if not world.aeb_triggered:
+                            world.hud.notification("AEB engaged!", seconds=3.0)
+                            world.aeb_triggered = True
+                    else:
+                        world.aeb_triggered = False
+                # ===== AEB 结束 =====
 
                 world.player.apply_control(control)
 
@@ -972,6 +1025,9 @@ def main():
         '--max_speed', type=float, default=100.0,
         help='Maximum speed in km/h for the autonomous agent (default: 100.0)')
 
+    argparser.add_argument(
+        '--aeb_distance', type=float, default=5.0,
+        help='Distance in meters to trigger Automatic Emergency Braking (default: 5.0)')
     args = argparser.parse_args()
 
     args.width, args.height = [int(x) for x in args.res.split('x')]
