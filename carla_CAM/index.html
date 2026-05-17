@@ -78,7 +78,7 @@
 <h2 id="1-cam">1. CAM可视化核心原理与数学表达</h2>
 <p>在我们的项目中可以选择多种CAM算法，比如Grad CAM、Score CAM、Ablation CAM等。为了理解模型是如何产生热力图的，我们以最经典的Grad-CAM为例做解释：  </p>
 <h3 id="11">1.1 核心数学公式</h3>
-<p>Grad-CAM 的目的是计算出图像中哪些区域对网络预测某个特定类别 $c$（例如“汽车”或“高铁”）的贡献最大。  </p>
+<p>Grad-CAM 的目的是计算出图像中哪些区域对网络预测某个特定类别 <script type="math/tex">c</script>（例如“汽车”或“高铁”）的贡献最大。  </p>
 <p><strong>步骤1：计算特征图权重</strong><br />
 假设网络最后一个卷积层输出的特征图为 $A$，其中第 $k$ 个通道的特征图记为 $A^k$。我们首先求目标类别分数 $y^c$（Softmax 激活前的值）对特征图 $A^k$ 中每个像素点 $(i, j)$ 的梯度，并进行全局平均池化（Global Average Pooling），得到神经元权重 $\alpha_k^c$：<br />
 <script type="math/tex; mode=display">\alpha_k^c = \frac{1}{Z} \sum_i \sum_j \frac{\partial y^c}{\partial A_{i,j}^k}</script>
