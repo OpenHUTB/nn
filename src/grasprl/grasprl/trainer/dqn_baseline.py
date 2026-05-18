@@ -34,8 +34,8 @@ class VisualFeatureEnhancer(nn.Module):
         return torch.clamp(x, -1.0, 1.0)
 
 class DQN_Trainer(object):
-    def __init__(self, learning_rate=0.0005, mem_size=10000, eps_start=1.0, eps_end=0.01,
-                 eps_decay=8000, seed=20, log_dir="test", render_mode=None):
+    def __init__(self, learning_rate=0.001, mem_size=10000, eps_start=1.0, eps_end=0.01,
+                 eps_decay=5000, seed=20, log_dir="test", render_mode=None):
         self.writer = SummaryWriter(f"grasprl/log/DQN/{log_dir}")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.env = GraspRobot(render_mode=render_mode)
@@ -171,17 +171,15 @@ def main():
     trainer = DQN_Trainer(log_dir="resnet_dqn_insne_v2", render_mode="human")
     state = trainer.env.reset_without_random()
     state = trainer.transform_state(state)
-    loop = tqdm(range(1, max_iter + 1))
     grasp_success = 0
     recent_successes = []
 
-    for i_iter in loop:
+    for i_iter in range(1, max_iter + 1):
         max_idx = trainer.select_action_by_instruction(state)
         action = trainer.transform_action(max_idx)
         action = trainer.limit_action(action)
         next_state, reward, done, info = trainer.env.step(action)
-        loop.set_description(f"iter [{i_iter}]/[{max_iter}]")
-        loop.set_postfix(grasp_info=info['grasp'], reward=reward, action=trainer.last_action)
+        print(f"iter [{i_iter}]/[{max_iter}]  grasp_info={info['grasp']}  reward={reward:.3f}  action={trainer.last_action}")
         
         if info["grasp"] == "Success":
             grasp_success += 1
