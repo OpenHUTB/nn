@@ -69,7 +69,6 @@ def _parse_args():
     parser.add_argument("--treat-truncated-as-terminal", type=int, default=-1, choices=[-1, 0, 1])
     parser.add_argument("--learn-start", type=int, default=-1)
     parser.add_argument("--torch-compile", type=int, default=0, choices=[0, 1])
-    parser.add_argument("--summary", type=int, default=1, choices=[0, 1])
     return parser.parse_args()
 
 

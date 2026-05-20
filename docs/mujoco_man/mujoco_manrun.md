@@ -10,7 +10,7 @@
 
 ### 1.2 项目整体流程
 
-![项目流程](./assets/mujoco_man.png)
+<img src="assets/mujoco_man.png" alt="项目流程" width="40%">
 
 该系统形成完整的机器人控制闭环：
 输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈
@@ -183,20 +183,27 @@ self.state_map = {
 
 CPG（Central Pattern Generator）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
 数学模型：
-```text
-x\_dot = 2π f · y + k · sin(φ\_tar - φ)
-y\_dot = 2π f · ( μ(1 - x^2) · y - x )
-```
-**参数说明：**
-- $\phi = \text{atan2}(x, y)$：当前相位
-- $k$：左右腿相位耦合强度
-- 输出步态信号：$u = A \cdot x$
 
-**双腿相位耦合规则：**
-- 右腿初始相位：$0$
-- 左腿初始相位：$\pi$（反相交替迈步）
+$$
+\dot{x} = 2\pi f \cdot y + k \cdot \sin(\phi_{tar} - \phi)
+$$
+
+$$
+\dot{y} = 2\pi f \cdot \left( \mu(1 - x^2) \cdot y - x \right)
+$$
+
+**参数说明**：
+
+当前相位：`φ = atan2(x, y)`；左右腿相位耦合强度：`k`；输出步态信号：`u = A * x`
+
+
+**双腿相位耦合规则**：
+
+右腿初始相位：`0`；左腿初始相位（反相交替迈步）：`π`
+
 
 系统可根据行走速度与转向角度，自适应调节步态振幅与相位耦合强度。
+
 对应代码：CPGOscillator.update(main.py#L207-L217)
 
 #### 3.4.3 步态耦合策略
@@ -210,6 +217,7 @@ self.joint_targets["ankle_y_right"] = 0.0 + right_hip_offset * 0.5
 ```
 
 实现自然交替迈步的步态联动。
+
 对应代码：HumanoidStabilizer.\_state\_walk(main.py#L588-L642)
 
 #### 3.4.4 关节空间 PD 跟踪控制
@@ -221,10 +229,13 @@ $$
 \tau_i = K_{p,i} \cdot (q_{des,i} - q_i) - K_{d,i} \cdot \dot{q}_i
 $$
 
-系统根据足...
+
 系统根据足底接触力动态调整 PD 增益：
+
 - 支撑相：增大刚度，提升稳定性
+  
 - 摆动相：降低刚度，使动作更柔顺
+  
 对应代码：HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L743-L755)
 
 #### 3.4.5 躯干姿态 PID 控制（Roll/Pitch）
@@ -250,7 +261,7 @@ $$
 F_{foot} = \sum_{c \in \mathcal{C}_{foot}} \lVert \mathbf{f}_c \rVert_2
 $$
 
-其中 $\mathbf{f}_c$ 为接触点三维力。
+其中 `f_c` 为接触点三维力。
 
 对应代码：HumanoidStabilizer.\_compute\_foot\_forces(main.py#L701-L718)：
 
@@ -589,9 +600,10 @@ def _should_log(self, key, interval_s):
 ## 9. 总结
 
 本项目基于 MuJoCo 搭建CPG+PD/PID人形机器人控制框架，完成从输入交互、状态调度、步态生成、姿态稳定到仿真闭环的全链路实现。解决了关节索引、执行器映射、开局摔倒、跌倒自恢复等关键工程问题，实现稳定站立与多模式可交互行走。
-系统具备良好工程可复现性与算法扩展性，既可以作为规则控制基线，也可直接对接残差强化学习、模仿学习与 Sim2Real 迁移研究，为人形机器人后续高级运动控制奠定完整基础。
+系统具备良好工程可复现性与算法扩展性，既可以作为规则控制基线，也可直接对接残差强化学习、模仿学习与 Sim2Real 迁移研究，为人形机器人后续高级运动控制奠定完整基础。 
 
 项目代码位置：src/mujoco\_manrun/main.py
+
 模型文件位置：src/mujoco\_manrun/models/humanoid.xml
 
 ## 参考文献

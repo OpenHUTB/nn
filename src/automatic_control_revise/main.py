@@ -256,6 +256,8 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
+        self.speed_history = []          # 存储最近的速度值 (km/h)
+        self.max_speed_points = 60       # 最多保存60个点
         self.last_waypoint = None
         self.current_obstacle = None
 
@@ -299,6 +301,13 @@ class HUD(object):
             'Height:  % 18.0f m' % transform.location.z,
             'Speed limit: % 10.0f km/h' % world.player.get_speed_limit(),
             '']
+        
+        # 记录速度历史（用于速度曲线）
+        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        self.speed_history.append(current_speed)
+        if len(self.speed_history) > self.max_speed_points:
+            self.speed_history.pop(0)
+
         if isinstance(control, carla.VehicleControl):
             self._info_text += [
                 ('Throttle:', control.throttle, 0.0, 1.0),
@@ -458,6 +467,37 @@ class HUD(object):
                 v_offset += 18
         self._notifications.render(display)
         self.help.render(display)
+        
+        # 绘制速度曲线（右下角）
+        if len(self.speed_history) > 1:
+            graph_width = 200
+            graph_height = 80
+            graph_x = self.dim[0] - graph_width - 10
+            graph_y = self.dim[1] - graph_height - 10
+            # 背景框
+            bg_rect = pygame.Rect(graph_x, graph_y, graph_width, graph_height)
+            pygame.draw.rect(display, (0, 0, 0, 100), bg_rect)
+            # 显示当前速度数值（曲线图左上角）
+            font = pygame.font.Font(None, 20)
+            speed_text = f"{self.speed_history[-1]:.0f} km/h"
+            text_surface = font.render(speed_text, True, (255, 255, 255))
+            display.blit(text_surface, (graph_x + 5, graph_y + 5))
+            # 边框
+            pygame.draw.rect(display, (255, 255, 255), bg_rect, 1)
+
+            # 计算纵坐标比例
+            max_speed = max(self.speed_history)
+            if max_speed < 1:
+                max_speed = 1
+            x_step = graph_width / (len(self.speed_history) - 1)
+            points = []
+            for i, speed in enumerate(self.speed_history):
+                x = graph_x + i * x_step
+                y = graph_y + graph_height - (speed / max_speed) * graph_height
+                points.append((x, y))
+            # 绘制折线（黄色）
+            pygame.draw.lines(display, (255, 255, 0), False, points, 2)
+
 
 # ==============================================================================
 # -- FadingText ----------------------------------------------------------------
