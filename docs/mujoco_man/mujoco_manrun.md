@@ -577,9 +577,11 @@ def _should_log(self, key, interval_s):
 
 ### 7.3 运行结果图片
 图 2 机器人稳定站立仿真效果
+
 <img width="640" height="360" alt="stand" src="./assets/stand.png" />
 
 图 3 机器人周期行走仿真效果
+
 <img width="640" height="360" alt="walk" src="./assets/walk.png" />
 
 ## 8. 现存不足与后续优化方向
