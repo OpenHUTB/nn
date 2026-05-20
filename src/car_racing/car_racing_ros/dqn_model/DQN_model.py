@@ -87,12 +87,14 @@ class Agent:
         self.hyperparameters.setdefault('lr', 0.0001)
         self.hyperparameters.setdefault('buffer_size', 100000)
         self.hyperparameters.setdefault('treat_truncated_as_terminal', False)
+        self.hyperparameters.setdefault('normalize_obs', True)
         
         # Initialize components using hyperparameters
         self.gamma = self.hyperparameters['gamma']
         self.epsilon = self.hyperparameters['epsilon_start']
         self.epsilon_decay = self.hyperparameters['epsilon_decay']
         self.epsilon_min = self.hyperparameters['epsilon_min']
+        self.normalize_obs = bool(self.hyperparameters.get('normalize_obs', True))
         self.state_shape = state_space_shape
         self.action_n = action_n
         
@@ -148,8 +150,16 @@ class Agent:
     def get_samples(self, batch_size):
         batch = self.buffer.sample(
             batch_size)
-        states = batch.get('state').to(self.device, dtype=torch.float32)
-        new_states = batch.get('new_state').to(self.device, dtype=torch.float32)
+        states_t = batch.get('state').to(self.device)
+        new_states_t = batch.get('new_state').to(self.device)
+        if self.normalize_obs and states_t.dtype == torch.uint8:
+            states = states_t.to(dtype=torch.float32).mul_(1.0 / 255.0)
+        else:
+            states = states_t.to(dtype=torch.float32)
+        if self.normalize_obs and new_states_t.dtype == torch.uint8:
+            new_states = new_states_t.to(dtype=torch.float32).mul_(1.0 / 255.0)
+        else:
+            new_states = new_states_t.to(dtype=torch.float32)
         actions = batch.get('action').to(self.device, dtype=torch.int64).squeeze()
         rewards = batch.get('reward').to(self.device, dtype=torch.float32).squeeze()
         terminateds = batch.get('terminated').to(self.device, dtype=torch.bool).squeeze()
@@ -165,7 +175,11 @@ class Agent:
         if np.random.rand() < self.epsilon:
             action_idx = np.random.randint(self.action_n)
         else:
-            state_tensor = torch.as_tensor(np.asarray(state), dtype=torch.float32, device=self.device).unsqueeze(0)
+            state_arr = np.asarray(state)
+            state_tensor = torch.as_tensor(state_arr, dtype=torch.float32, device=self.device)
+            if self.normalize_obs and state_arr.dtype == np.uint8:
+                state_tensor = state_tensor.mul_(1.0 / 255.0)
+            state_tensor = state_tensor.unsqueeze(0)
             with torch.inference_mode():
                 action_values = self.updating_net(state_tensor)
                 action_idx = torch.argmax(action_values, axis=1).item()
