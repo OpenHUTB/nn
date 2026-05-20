@@ -63,6 +63,9 @@ title: 主页
 [__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
 
 [__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
+
+[__危险判断逻辑优化与CARLA测试报告__](./risk_logic_carla_report/) - 基于 PR #6254 的课程汇报页面
+
 [__无人机飞行控制__](./UVA_flight_control_system.md) - 基于AirSim的无人机飞行控制系统
 [__人形机器人平衡控制__](./humanoid_balance/Humanoid_Balance.md) - 基于强化学习的人形机器人平衡控制仿真
 
