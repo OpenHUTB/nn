@@ -190,7 +190,8 @@ class DoubleDQNAgent(BaseAgent):
         # 软更新公式: Q_target = τ * Q_policy + (1 - τ) * Q_target
         # 其中 τ 是很小的值 (如 0.005)
         # 这比硬更新 (每N步完全复制) 更平滑稳定
-        if self.n_updates % self.update_target_every == 0:
+        update_every = int(self.update_target_every) if self.update_target_every is not None else 1
+        if update_every <= 1 or (self.act_taken % update_every) == 0:
             for target_param, policy_param in zip(
                 self.frozen_net.parameters(), self.policy_net.parameters()
             ):
