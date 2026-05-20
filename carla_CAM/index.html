@@ -80,12 +80,12 @@
 <h3 id="11">1.1 核心数学公式</h3>
 <p>Grad-CAM 的目的是计算出图像中哪些区域对网络预测某个特定类别 <script type="math/tex">c</script>（例如“汽车”或“高铁”）的贡献最大。  </p>
 <p><strong>步骤1：计算特征图权重</strong><br />
-假设网络最后一个卷积层输出的特征图为 $A$，其中第 $k$ 个通道的特征图记为 $A^k$。我们首先求目标类别分数 $y^c$（Softmax 激活前的值）对特征图 $A^k$ 中每个像素点 $(i, j)$ 的梯度，并进行全局平均池化（Global Average Pooling），得到神经元权重 $\alpha_k^c$：<br />
+假设网络最后一个卷积层输出的特征图为 <script type="math/tex">A</script>，其中第 <script type="math/tex">k</script> 个通道的特征图记为 <script type="math/tex">A^k</script>。我们首先求目标类别分数 <script type="math/tex">y^c</script>（Softmax 激活前的值）对特征图 <script type="math/tex">A^k</script> 中每个像素点 <script type="math/tex">(i, j)</script> 的梯度，并进行全局平均池化（Global Average Pooling），得到神经元权重 <script type="math/tex">\alpha_k^c</script>：<br />
 <script type="math/tex; mode=display">\alpha_k^c = \frac{1}{Z} \sum_i \sum_j \frac{\partial y^c}{\partial A_{i,j}^k}</script>
 </p>
 <hr />
 <p><strong>步骤2：生成类激活热力图</strong><br />
-将求得的权重 $\alpha_k^c$ 与对应的特征图 $A^k$ 进行线性加权求和，并通过 ReLU 激活函数过滤掉负向影响（我们只关心哪些特征正向促进了该类别的识别）：
+将求得的权重 <script type="math/tex">\alpha_k^c</script> 与对应的特征图 <script type="math/tex">A^k</script> 进行线性加权求和，并通过 ReLU 激活函数过滤掉负向影响（我们只关心哪些特征正向促进了该类别的识别）：
 <script type="math/tex; mode=display">L_{Grad-CAM}^c = ReLU \left( \sum_k \alpha_k^c A^k \right)</script>
 </p>
 <p>这一步你就可以看到生成的冷暖色调热力图。  </p>
@@ -158,8 +158,8 @@
 </tr>
 <tr>
 <td style="text-align: left;"><strong>初始感受野设计</strong></td>
-<td style="text-align: left;"><strong>极端的空间缩减：</strong> 首层采用巨大的 $11 \times 11$ 卷积核和步长 4，导致极其强烈的局部几何结构提取偏置（对宏观边缘、纹理极敏感）。</td>
-<td style="text-align: left;"><strong>温和的特征抽象：</strong> 首层通常采用 $7 \times 7$ 卷积，随后大量依赖 $3 \times 3$ 微小卷积核的堆叠来逐步扩大感受野。</td>
+<td style="text-align: left;"><strong>极端的空间缩减：</strong> 首层采用巨大的 <script type="math/tex">11 \times 11</script> 卷积核和步长 4，导致极其强烈的局部几何结构提取偏置（对宏观边缘、纹理极敏感）。</td>
+<td style="text-align: left;"><strong>温和的特征抽象：</strong> 首层通常采用 <script type="math/tex">7 \times 7</script> 卷积，随后大量依赖 <script type="math/tex">3 \times 3</script> 微小卷积核的堆叠来逐步扩大感受野。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>特征表征特征</strong></td>
