@@ -77,7 +77,7 @@ class AppConfig:
     def __post_init__(self):
         if self.lane_detection_methods is None:
             self.lane_detection_methods = ['canny', 'sobel', 'gradient']
-    
+
     def to_dict(self) -> dict:
         """转换为字典"""
         return {
@@ -86,15 +86,30 @@ class AppConfig:
             'batch_size': self.batch_size,
             'adaptive_clip_limit': self.adaptive_clip_limit,
             'adaptive_grid_size': self.adaptive_grid_size,
+            'gaussian_kernel': self.gaussian_kernel,
             'canny_threshold1': self.canny_threshold1,
             'canny_threshold2': self.canny_threshold2,
             'hough_threshold': self.hough_threshold,
+            'hough_min_length': self.hough_min_length,
+            'hough_max_gap': self.hough_max_gap,
+            'min_contour_area': self.min_contour_area,
+            'deviation_threshold': self.deviation_threshold,
+            'width_ratio_threshold': self.width_ratio_threshold,
             'confidence_threshold': self.confidence_threshold,
+            'min_confidence_for_direction': self.min_confidence_for_direction,
             'prediction_steps': self.prediction_steps,
             'prediction_distance': self.prediction_distance,
+            'min_prediction_points': self.min_prediction_points,
             'video_frame_skip': self.video_frame_skip,
             'video_fps': self.video_fps,
             'camera_id': self.camera_id,
+            'confidence_smoothing_factor': self.confidence_smoothing_factor,
+            'quality_weight_lane': self.quality_weight_lane,
+            'quality_weight_road': self.quality_weight_road,
+            'quality_weight_consistency': self.quality_weight_consistency,
+            'ui_refresh_rate': self.ui_refresh_rate,
+            'animation_duration': self.animation_duration,
+            'lane_detection_methods': self.lane_detection_methods,
             'enable_frame_buffer': self.enable_frame_buffer,
             'frame_buffer_size': self.frame_buffer_size,
             'adaptive_skip_frames': self.adaptive_skip_frames,
@@ -104,7 +119,7 @@ class AppConfig:
             'recovery_timeout': self.recovery_timeout,
             'auto_recovery': self.auto_recovery
         }
-    
+
     def save(self, filepath: str):
         """保存配置到文件"""
         with open(filepath, 'w', encoding='utf-8') as f:

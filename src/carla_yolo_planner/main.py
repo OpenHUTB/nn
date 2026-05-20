@@ -161,21 +161,21 @@ def main():
                         velocity = client.vehicle.get_velocity()
                         speed_kmh = velocity.length() * 3.6
                     
-                    # 创建小型 HUD 窗口，固定显示在屏幕左上角
-                    hud_frame = np.zeros((150, 300, 3), dtype=np.uint8)
-                    cv2.putText(hud_frame, f"Speed: {speed_kmh:.1f} km/h", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                    cv2.putText(hud_frame, f"FPS: {fps:.1f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-                    cv2.putText(hud_frame, f"Detections: {len(results)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                    cv2.putText(hud_frame, f"View: {client.get_current_camera_name()}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 128, 0), 2)
-                    
-                    if is_brake:
-                        cv2.putText(hud_frame, "!!! BRAKING !!!", (10, 145), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-                    
-                    # 设置窗口位置到屏幕左上角
-                    cv2.namedWindow("HUD", cv2.WINDOW_NORMAL)
-                    cv2.resizeWindow("HUD", 300, 150)
-                    cv2.moveWindow("HUD", 0, 0)
-                    cv2.imshow("HUD", hud_frame)
+                    # 获取主视角画面（车内摄像头）并显示
+                    if frame is not None:
+                        display_frame = draw_results(draw_safe_zone(frame.copy()), results, detector.classes)
+                        
+                        # 添加 HUD 信息到左上角
+                        cv2.putText(display_frame, f"Speed: {speed_kmh:.1f} km/h", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                        cv2.putText(display_frame, f"FPS: {fps:.1f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+                        cv2.putText(display_frame, f"Detections: {len(results)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                        cv2.putText(display_frame, f"View: {client.get_current_camera_name()}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 128, 0), 2)
+                        cv2.putText(display_frame, "Press Q to Quit", (display_frame.shape[1] - 180, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (128, 128, 128), 1)
+                        
+                        if is_brake:
+                            cv2.putText(display_frame, "!!! EMERGENCY BRAKING !!!", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                        
+                        cv2.imshow("CARLA Object Detection", display_frame)
                     
                     # 处理键盘输入
                     key = cv2.waitKey(1) & 0xFF

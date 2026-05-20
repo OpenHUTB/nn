@@ -76,6 +76,20 @@ from agents.navigation.basic_agent import BasicAgent  # pylint: disable=import-e
 # -- Global functions ----------------------------------------------------------
 # ==============================================================================
 
+# ===================== 新增函数 开始 =====================
+# 封装成工具函数，避免重复逻辑+处理边界
+def get_random_destination(current_location, spawn_points):
+    """获取非当前位置的随机生成点作为目的地"""
+    if not spawn_points:
+        raise ValueError("无可用的生成点！")
+    # 过滤掉当前位置的生成点
+    valid_spawn_points = [p for p in spawn_points if p.location != current_location]
+    # 如果所有生成点都是当前位置（仅1个），则用该点
+    if not valid_spawn_points:
+        return spawn_points[0].location
+    # 随机选一个
+    return random.choice(valid_spawn_points).location
+# ===================== 新增函数 结束 =====================
 
 def find_weather_presets():
     """Method to find weather presets"""
@@ -720,7 +734,7 @@ def game_loop(args):
                  destination = spawn_points[0].location
              else:
                   destination = spawn_points[1].location
-        agent.set_destination(current_location, destination)
+        agent.set_destination(destination, current_location)
         clock = pygame.time.Clock()
 
         while True:
@@ -754,30 +768,20 @@ def game_loop(args):
 
                 # Set new destination when target has been reached
                 if len(agent.get_local_planner()._waypoints_queue) < num_min_waypoints and args.loop:
-                    # 重新获取并打乱生成点，选择新的随机目的地
-                    spawn_points = world.map.get_spawn_points()
-                    random.shuffle(spawn_points)
-                    current_location = world.player.get_location()
-                    if spawn_points[0].location != current_location:
-                     new_destination = spawn_points[0].location
-                    else:
-                         new_destination = spawn_points[1].location
-                         agent.set_destination(current_location, new_destination)
-                         # 重新获取并打乱生成点，选择新的随机目的地
-                         spawn_points = world.map.get_spawn_points()
-                         random.shuffle(spawn_points)
-                         current_location = world.player.get_location()
-                         if spawn_points[0].location != current_location:
-                            new_destination = spawn_points[0].location
-                         else:
-                              new_destination = spawn_points[1].location
-                         agent.set_destination(current_location, new_destination)
-
-# 加上这一行！手动调用一次run_step()初始化内部状态
-                         agent.run_step()
-                    tot_target_reached += 1
-                    world.hud.notification("The target has been reached " +
-                                           str(tot_target_reached) + " times.", seconds=4.0)
+    # 重新获取并打乱生成点
+                  spawn_points = world.map.get_spawn_points()
+                  random.shuffle(spawn_points)
+                  current_location = world.player.get_location()
+    
+    # 用工具函数获取安全的目的地（自动处理边界+避免重复位置）
+                  new_destination = get_random_destination(current_location, spawn_points)
+    
+    # 只调用一次，避免重复设置
+                  agent.set_destination(current_location, new_destination)
+                  agent.run_step()  # 必须加这行，初始化智能体内部状态
+    
+                  tot_target_reached += 1
+                  world.hud.notification(f"目标已到达 {tot_target_reached} 次", seconds=4.0)
 
                 elif len(agent.get_local_planner()._waypoints_queue) == 0 and not args.loop:
                     print("Target reached, mission accomplished...")

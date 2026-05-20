@@ -1,8 +1,6 @@
 
 # CARLA 自动驾驶基础场景实践
 
-🌍 [English Version](README_EN.md) | 🇨🇳 [中文](README.md)
-
 > 实践项目 | 基于CARLA仿真平台的自动驾驶基础场景实现
 
 ## 项目概述
@@ -53,8 +51,8 @@
 ## 使用说明
 
 ### 环境要求
-- CARLA 0.9.16
-- Python 3.13
+- CARLA 0.9.15
+- Python 3.7
 
 ### 快速开始
 ```bash
@@ -67,27 +65,3 @@ python carla_da_dynamic.py
 # 动态障碍场景（多摄像头版）
 python carla_da_dynamic_with_camera.py
 ```
-
-## 场景演示
-### 🚗 静态障碍绕行
-![静态障碍绕行](videos/carla_a_static.gif)
-
-### 🚗 动态障碍绕行
-![动态障碍处理](videos/carla_a_dynamic.gif)
-
-### 🎥 动态多视角演示
-![动态多视角演示](videos/carla_a_dynamic_cam.gif)
-
-## 后续改进
-本项目可通过以下方式改进增强实用性：
-- 添加数据记录模块（`/data`目录存储运行日志）
-- 落实配置文件使用（`config.yaml`统一管理参数）
-- 实现简易控制面板（使用PySimpleGUI）
-
-## 版权声明
-MIT License | 本项目仅供学习交流，不保证实际场景的适用性
-
-## 致谢
-本项目在实现过程中参考了以下资源：
-- 纯跟踪算法原理与实现：[Bilibili UP主@志豪科研猿的视频教程](https://www.bilibili.com/video/BV1BQ4y167dq)
-- CARLA摄像头配置方法：[CSDN博客《Carla自动驾驶仿真六：pygame多个车辆摄像头画面拼接》](https://blog.csdn.net/zataji/article/details/134897903)

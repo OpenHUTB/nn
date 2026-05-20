@@ -250,7 +250,7 @@ class CarlaClient:
             self.image_queue.put(img)
         except:
             pass
-
+    
     def draw_detection_in_carla(self, detections, classes):
         """
         在 CARLA 模拟器中绘制检测结果

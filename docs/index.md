@@ -44,6 +44,8 @@ title: 主页
 
 [__高斯混合__](gaussian_mixture.md)
 
+[__高斯混合改进__](./chap11_gaussian_mixture/README.md)
+
 [__受限玻尔兹曼机__](RBM.md)
 
 [__强化学习__](RL.md)
@@ -73,6 +75,10 @@ title: 主页
 [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
 
 [__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) -  基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
+
+[__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
+
+[__机械臂自动抓取__](./robot_arm/README.md) - 基于Franka Panda的机械臂自动抓取仿真项目
 
 ## 规划 <span id="planning"></span>
 

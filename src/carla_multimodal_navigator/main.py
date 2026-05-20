@@ -178,6 +178,16 @@ class SimpleDrivingSystem:
         self.current_model_index = 0  # 当前车型索引
         self.current_model_name = 'tesla.model3'  # 当前车型ID
         self.available_models = []  # 可用车型列表（连接后初始化）
+        
+        # 自动泊车相关
+        self.auto_parking_enabled = False  # 自动泊车开关
+        self.parking_state = 'IDLE'  # IDLE/SEARCHING/FOUND/REVERSING/ADJUSTING/COMPLETE
+        self.parking_progress = 0.0  # 泊车进度 0-1
+        self.parking_target_x = 0.0  # 目标停车位X
+        self.parking_target_y = 0.0  # 目标停车位Y
+        self.parking_target_angle = 0.0  # 目标停车角度
+        self.parking_step = 0  # 当前泊车步骤
+        self.parking_timer = 0.0  # 泊车计时器
 
     def init_available_models(self):
         """初始化可用车型列表（检查哪些车型在CARLA中存在）"""
@@ -221,6 +231,154 @@ class SimpleDrivingSystem:
         if self.current_model_name not in self.available_models and self.available_models:
             self.current_model_name = self.available_models[0]
             self.current_model_index = 0
+
+    def auto_parking_control(self, vehicle):
+        """完整倒车入库控制逻辑 - 模拟真实倒车入库动作"""
+        if not self.auto_parking_enabled:
+            return 0.0, 0.0, 0.0
+        
+        location = vehicle.get_location()
+        
+        if self.parking_state == 'IDLE':
+            # 阶段0: 开始，记录初始状态
+            self.parking_state = 'BRAKE'
+            self.parking_progress = 0.0
+            self.parking_timer = 0.0
+            # 记录起始位置
+            self.parking_start_x = location.x
+            self.parking_start_y = location.y
+            print("倒车入库: 开始刹车...")
+        
+        elif self.parking_state == 'BRAKE':
+            # 阶段1: 刹车停止 (约1秒)
+            self.parking_timer += 0.1
+            self.parking_progress = min(0.1, self.parking_timer / 1.0)
+            
+            if self.parking_timer > 1.0:
+                self.parking_state = 'REVERSE_1'
+                self.parking_timer = 0.0
+                print("倒车入库: 开始倒车，向右打死...")
+            
+            return 0.0, 1.0, 0.0
+        
+        elif self.parking_state == 'REVERSE_1':
+            # 阶段2: 倒车并向右打死方向盘 (约2.5秒)
+            self.parking_timer += 0.1
+            self.parking_progress = 0.1 + min(0.25, self.parking_timer / 2.5)
+            
+            if self.parking_timer > 2.5:
+                self.parking_state = 'REVERSE_2'
+                self.parking_timer = 0.0
+                print("倒车入库: 回正方向盘继续倒车...")
+            else:
+                # 倒车时向右打死
+                throttle = 0.4
+                brake = 0.0
+                steer = 0.5  # 向右打死
+                return throttle, brake, steer
+        
+        elif self.parking_state == 'REVERSE_2':
+            # 阶段3: 回正方向盘继续倒车 (约2秒)
+            self.parking_timer += 0.1
+            self.parking_progress = 0.35 + min(0.2, self.parking_timer / 2.0)
+            
+            if self.parking_timer > 2.0:
+                self.parking_state = 'REVERSE_3'
+                self.parking_timer = 0.0
+                print("倒车入库: 向左打死调整...")
+            else:
+                # 回正方向盘倒车
+                throttle = 0.35
+                brake = 0.0
+                steer = 0.0  # 回正
+                return throttle, brake, steer
+        
+        elif self.parking_state == 'REVERSE_3':
+            # 阶段4: 向左打死调整车身 (约2秒)
+            self.parking_timer += 0.1
+            self.parking_progress = 0.55 + min(0.2, self.parking_timer / 2.0)
+            
+            if self.parking_timer > 2.0:
+                self.parking_state = 'REVERSE_4'
+                self.parking_timer = 0.0
+                print("倒车入库: 回正并微调...")
+            else:
+                # 向左打死调整
+                throttle = 0.3
+                brake = 0.0
+                steer = -0.5  # 向左打死
+                return throttle, brake, steer
+        
+        elif self.parking_state == 'REVERSE_4':
+            # 阶段5: 回正并微调位置 (约2秒)
+            self.parking_timer += 0.1
+            self.parking_progress = 0.75 + min(0.15, self.parking_timer / 2.0)
+            
+            if self.parking_timer > 2.0:
+                self.parking_state = 'STOP'
+                self.parking_timer = 0.0
+                print("倒车入库: 停车...")
+            else:
+                # 回正微调
+                throttle = 0.2
+                brake = 0.0
+                steer = 0.1  # 轻微向右调整
+                return throttle, brake, steer
+        
+        elif self.parking_state == 'STOP':
+            # 阶段6: 最终停车 (约1秒)
+            self.parking_timer += 0.1
+            self.parking_progress = 0.9 + min(0.1, self.parking_timer / 1.0)
+            
+            if self.parking_timer > 1.0:
+                self.parking_state = 'COMPLETE'
+                self.parking_progress = 1.0
+                print("倒车入库: 完成!")
+            
+            return 0.0, 1.0, 0.0
+        
+        elif self.parking_state == 'COMPLETE':
+            # 完成阶段 - 持续刹车保持静止
+            return 0.0, 1.0, 0.0
+        
+        return 0.0, 0.0, 0.0
+
+    def draw_parking_overlay(self, image):
+        """在画面上绘制倒车入库信息"""
+        if not self.auto_parking_enabled:
+            return
+        
+        height, width = image.shape[:2]
+        
+        # 倒车状态文字 - 更友好的显示
+        state_display = {
+            'IDLE': 'READY',
+            'BRAKE': 'BRAKING',
+            'REVERSE_1': 'REVERSE RIGHT',
+            'REVERSE_2': 'REVERSE STRAIGHT',
+            'REVERSE_3': 'REVERSE LEFT',
+            'REVERSE_4': 'REVERSE ADJUST',
+            'STOP': 'STOPPING',
+            'COMPLETE': 'COMPLETE'
+        }
+        state_text = f"PARKING: {state_display.get(self.parking_state, self.parking_state)}"
+        cv2.putText(image, state_text, (10, height - 60), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        
+        # 泊车进度条
+        progress_width = 200
+        progress_height = 15
+        progress_x = 10
+        progress_y = height - 30
+        cv2.rectangle(image, (progress_x, progress_y), 
+                      (progress_x + progress_width, progress_y + progress_height), 
+                      (200, 200, 200), 2)
+        cv2.rectangle(image, (progress_x, progress_y), 
+                      (progress_x + int(progress_width * self.parking_progress), progress_y + progress_height), 
+                      (0, 255, 0), -1)
+        cv2.putText(image, f"{int(self.parking_progress * 100)}%", 
+                    (progress_x + 80, progress_y + 12), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -899,6 +1057,18 @@ class SimpleDrivingSystem:
                                 (20, 310), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.6, (255, 255, 0), 2)
                 
+                # 添加自动泊车状态
+                if self.auto_parking_enabled:
+                    parking_color = (0, 255, 255)
+                    cv2.putText(display_img, f"PARKING: {self.parking_state}",
+                                (20, 350), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, parking_color, 2)
+                    # 泊车进度条
+                    progress_width = 200
+                    progress_height = 12
+                    cv2.rectangle(display_img, (20, 365), (20 + progress_width, 365 + progress_height), (200, 200, 200), 2)
+                    cv2.rectangle(display_img, (20, 365), (20 + int(progress_width * self.parking_progress), 365 + progress_height), (0, 255, 0), -1)
+                
                 return display_img
         else:
             # 全部视角模式 - 2x3网格
@@ -1053,22 +1223,38 @@ class SimpleDrivingSystem:
                 # 检测交通标志
                 self.detect_traffic_signs()
 
-                # 获取控制指令（包含LKA辅助）
-                throttle, brake, steer = self.controller.get_control(
-                    speed, 
-                    lka_enabled=self.lka_enabled, 
-                    lane_offset=self.lane_offset
-                )
-
-                # 应用控制
-                control = carla.VehicleControl(
-                    throttle=float(throttle),
-                    brake=float(brake),
-                    steer=float(steer),
-                    hand_brake=False,
-                    reverse=False
-                )
-                self.vehicle.apply_control(control)
+                # 检查自动泊车状态
+                if self.auto_parking_enabled:
+                    # 自动泊车模式（包括COMPLETE状态，持续刹车）
+                    park_throttle, park_brake, park_steer = self.auto_parking_control(self.vehicle)
+                    throttle, brake, steer = park_throttle, park_brake, park_steer
+                    
+                    # 判断是否需要倒车模式
+                    is_reversing = self.parking_state in ['REVERSE_1', 'REVERSE_2', 'REVERSE_3', 'REVERSE_4']
+                    
+                    control = carla.VehicleControl(
+                        throttle=float(throttle),
+                        brake=float(brake),
+                        steer=float(steer),
+                        hand_brake=False,
+                        reverse=is_reversing  # 只有倒车阶段设置为True
+                    )
+                    self.vehicle.apply_control(control)
+                else:
+                    # 正常驾驶模式
+                    throttle, brake, steer = self.controller.get_control(
+                        speed, 
+                        lka_enabled=self.lka_enabled, 
+                        lane_offset=self.lane_offset
+                    )
+                    control = carla.VehicleControl(
+                        throttle=float(throttle),
+                        brake=float(brake),
+                        steer=float(steer),
+                        hand_brake=False,
+                        reverse=False
+                    )
+                    self.vehicle.apply_control(control)
 
                 # 创建多视角显示
                 display_img = self.create_multi_view_display(speed, throttle, steer)
@@ -1100,6 +1286,18 @@ class SimpleDrivingSystem:
                     self.tsr_enabled = not self.tsr_enabled
                     status = "开启" if self.tsr_enabled else "关闭"
                     print(f"交通标志识别(TSR)已{status}")
+                elif key == ord('p'):
+                    # 切换倒车入库
+                    self.auto_parking_enabled = not self.auto_parking_enabled
+                    if self.auto_parking_enabled:
+                        self.parking_state = 'IDLE'
+                        self.parking_progress = 0.0
+                        print("倒车入库已开启 - 开始刹车...")
+                    else:
+                        # 重置状态
+                        self.parking_state = 'IDLE'
+                        self.parking_progress = 0.0
+                        print("倒车入库已关闭")
                 elif key == ord('w'):
                     # 切换自动天气变化
                     self.auto_weather_change = not self.auto_weather_change
