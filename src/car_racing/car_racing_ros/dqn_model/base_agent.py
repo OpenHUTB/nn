@@ -211,6 +211,13 @@ class BaseAgent:
             torch.backends.cudnn.allow_tf32 = True
 
         self.normalize_obs = bool(self.hyperparameters.get('normalize_obs', True))
+        self.reward_scale = float(self.hyperparameters.get("reward_scale", 1.0))
+        reward_clip = self.hyperparameters.get("reward_clip", None)
+        try:
+            reward_clip_f = None if reward_clip is None else float(reward_clip)
+        except (TypeError, ValueError):
+            reward_clip_f = None
+        self.reward_clip = reward_clip_f if (reward_clip_f is not None and reward_clip_f > 0) else None
         self.use_amp = bool(self.hyperparameters.get('amp', True)) and self.device == "cuda"
         if self.use_amp:
             from torch.cuda.amp import GradScaler
@@ -279,12 +286,15 @@ class BaseAgent:
         """
         state_arr = np.asarray(state)
         new_state_arr = np.asarray(new_state)
+        reward_f = float(reward) * self.reward_scale
+        if self.reward_clip is not None:
+            reward_f = float(np.clip(reward_f, -self.reward_clip, self.reward_clip))
         if truncated is None:
             truncated = False
         self.buffer.add(TensorDict({
             "state": torch.as_tensor(state_arr),
             "action": torch.as_tensor(action, dtype=torch.int64),
-            "reward": torch.as_tensor(reward, dtype=torch.float32),
+            "reward": torch.as_tensor(reward_f, dtype=torch.float32),
             "new_state": torch.as_tensor(new_state_arr),
             "terminated": torch.as_tensor(terminated, dtype=torch.bool),
             "truncated": torch.as_tensor(truncated, dtype=torch.bool),
@@ -355,6 +365,11 @@ class BaseAgent:
     def sync_target_net(self):
         """同步目标网络 - 将策略网络的权重复制到目标网络"""
         self.frozen_net.load_state_dict(self.policy_net.state_dict())
+
+    def soft_update_target_net(self, tau: float):
+        tau_f = float(tau)
+        for target_param, policy_param in zip(self.frozen_net.parameters(), self.policy_net.parameters()):
+            target_param.data.mul_(1.0 - tau_f).add_(policy_param.data, alpha=tau_f)
 
     def save(self, save_dir, filename):
         """保存模型到文件"""

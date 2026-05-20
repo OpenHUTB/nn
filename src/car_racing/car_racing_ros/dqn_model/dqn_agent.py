@@ -72,6 +72,18 @@ class DQNAgent(BaseAgent):
         states, actions, rewards, new_states, dones = self.get_samples(batch_size)
         use_double_q = bool(self.hyperparameters.get("double_q", False))
         max_grad_norm = self.hyperparameters.get("max_grad_norm", None)
+        target_q_clip = self.hyperparameters.get("target_q_clip", None)
+        try:
+            target_q_clip_f = None if target_q_clip is None else float(target_q_clip)
+        except (TypeError, ValueError):
+            target_q_clip_f = None
+        tau = self.hyperparameters.get("tau", None)
+        try:
+            tau_f = None if tau is None else float(tau)
+        except (TypeError, ValueError):
+            tau_f = None
+        update_target_every = int(self.hyperparameters.get("update_target_every", 0) or 0)
+        target_update = int(self.hyperparameters.get("target_update", 5000) or 5000)
 
         if self.use_amp:
             from torch.cuda.amp import autocast
@@ -82,6 +94,8 @@ class DQNAgent(BaseAgent):
                 else:
                     next_q = self.frozen_net(new_states).max(1)[0]
                 target_q = rewards + (1 - dones.float()) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
 
             self.optimizer.zero_grad(set_to_none=True)
             with autocast():
@@ -103,6 +117,8 @@ class DQNAgent(BaseAgent):
                 else:
                     next_q = self.frozen_net(new_states).max(1)[0]
                 target_q = rewards + (1 - dones.float()) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
             loss = self.loss_fn(current_q, target_q)
             self.optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -113,8 +129,12 @@ class DQNAgent(BaseAgent):
         # -------------------------------------------------------------------------
         # 步骤4: 定期同步目标网络
         # -------------------------------------------------------------------------
-        if self.n_updates % self.hyperparameters.get('target_update', 5000) == 0:
-            self.sync_target_net()
+        if tau_f is not None and tau_f > 0 and tau_f <= 1 and update_target_every > 0:
+            if self.n_updates % update_target_every == 0:
+                self.soft_update_target_net(tau_f)
+        else:
+            if self.n_updates % target_update == 0:
+                self.sync_target_net()
         
         return current_q.mean().item(), float(loss.item())
 

@@ -140,6 +140,11 @@ class DoubleDQNAgent(BaseAgent):
         """
         self.n_updates += 1
         states, actions, rewards, new_states, dones = self.get_samples(batch_size)
+        target_q_clip = self.hyperparameters.get("target_q_clip", None)
+        try:
+            target_q_clip_f = None if target_q_clip is None else float(target_q_clip)
+        except (TypeError, ValueError):
+            target_q_clip_f = None
 
         if self.use_amp:
             from torch.cuda.amp import autocast
@@ -147,6 +152,8 @@ class DoubleDQNAgent(BaseAgent):
                 next_actions = self.policy_net(new_states).argmax(1, keepdim=True)
                 next_q = self.frozen_net(new_states).gather(1, next_actions)
                 target_q = rewards.unsqueeze(1) + (1 - dones.float().unsqueeze(1)) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
 
             self.optimizer.zero_grad(set_to_none=True)
             with autocast():
@@ -163,6 +170,8 @@ class DoubleDQNAgent(BaseAgent):
                 next_actions = self.policy_net(new_states).argmax(1, keepdim=True)
                 next_q = self.frozen_net(new_states).gather(1, next_actions)
                 target_q = rewards.unsqueeze(1) + (1 - dones.float().unsqueeze(1)) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
             loss = self.loss_fn(current_q, target_q)
             self.optimizer.zero_grad(set_to_none=True)
             loss.backward()
