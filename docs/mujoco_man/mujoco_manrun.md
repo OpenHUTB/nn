@@ -183,13 +183,15 @@ self.state_map = {
 
 CPG（Central Pattern Generator）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
 数学模型：
-```text
-x\_dot = 2π f · y + k · sin(φ\_tar - φ)
-y\_dot = 2π f · ( μ(1 - x^2) · y - x )
-```
+$$
+\begin{aligned}
+\dot{x} &= 2\pi f \cdot y + k \cdot \sin(\phi_{\text{tar}} - \phi) \\
+\dot{y} &= 2\pi f \cdot \left( \mu(1 - x^2) \cdot y - x \right)
+\end{aligned}
+$$
 **参数说明：**
-- $\phi = \text{atan2}(x, y)$：当前相位
-- $k$：左右腿相位耦合强度
+-  相位计算：$\phi = \text{atan2}(x, y)$
+-  $k$：左右腿相位耦合强度
 - 输出步态信号：$u = A \cdot x$
 
 **双腿相位耦合规则：**
