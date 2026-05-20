@@ -46,6 +46,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 nav:
 - 首页: 'index.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
+- 四自由度机械臂可视化与控制: 'mechanical_arm/README.md'
 
 
 # - mdx_math 用于行内公式显示
