@@ -193,24 +193,16 @@ $$
 $$
 
 **参数说明：**
-$$
-\phi = \text{atan2}(x, y)
-$$：当前相位
-$$
-k
-$$：左右腿相位耦合强度
-
-输出步态信号：
-$$
-u = A \cdot x
-$$
-
+- 当前相位：$\phi = \text{atan2}(x, y)$
+- 左右腿相位耦合强度：$k$
+- 输出步态信号：$u = A \cdot x$
 
 **双腿相位耦合规则：**
-- 右腿初始相位：$$0$$
-- 左腿初始相位：$$\pi$$（反相交替迈步）
+- 右腿初始相位：$0$
+- 左腿初始相位：$\pi$（反相交替迈步）
 
 系统可根据行走速度与转向角度，自适应调节步态振幅与相位耦合强度。
+
 对应代码：CPGOscillator.update(main.py#L207-L217)
 
 #### 3.4.3 步态耦合策略
@@ -224,6 +216,7 @@ self.joint_targets["ankle_y_right"] = 0.0 + right_hip_offset * 0.5
 ```
 
 实现自然交替迈步的步态联动。
+
 对应代码：HumanoidStabilizer.\_state\_walk(main.py#L588-L642)
 
 #### 3.4.4 关节空间 PD 跟踪控制
@@ -239,6 +232,7 @@ $$
 系统根据足底接触力动态调整 PD 增益：
 - 支撑相：增大刚度，提升稳定性
 - 摆动相：降低刚度，使动作更柔顺
+  
 对应代码：HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L743-L755)
 
 #### 3.4.5 躯干姿态 PID 控制（Roll/Pitch）
