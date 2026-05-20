@@ -577,10 +577,10 @@ def _should_log(self, key, interval_s):
 
 ### 7.3 运行结果图片
 图 2 机器人稳定站立仿真效果
-<img width="1280" height="720" alt="stand" src="./assets/stand.png" />
+<img width="640" height="360" alt="stand" src="./assets/stand.png" />
 
 图 3 机器人周期行走仿真效果
-<img width="1280" height="720" alt="walk" src="./assets/walk.png" />
+<img width="640" height="360" alt="walk" src="./assets/walk.png" />
 
 ## 8. 现存不足与后续优化方向
 
@@ -600,7 +600,7 @@ def _should_log(self, key, interval_s):
 ## 9. 总结
 
 本项目基于 MuJoCo 搭建CPG+PD/PID人形机器人控制框架，完成从输入交互、状态调度、步态生成、姿态稳定到仿真闭环的全链路实现。解决了关节索引、执行器映射、开局摔倒、跌倒自恢复等关键工程问题，实现稳定站立与多模式可交互行走。
-系统具备良好工程可复现性与算法扩展性，既可以作为规则控制基线，也可直接对接残差强化学习、模仿学习与 Sim2Real 迁移研究，为人形机器人后续高级运动控制奠定完整基础。
+系统具备良好工程可复现性与算法扩展性，既可以作为规则控制基线，也可直接对接残差强化学习、模仿学习与 Sim2Real 迁移研究，为人形机器人后续高级运动控制奠定完整基础。 
 
 项目代码位置：src/mujoco\_manrun/main.py
 
