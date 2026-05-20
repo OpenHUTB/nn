@@ -10,7 +10,7 @@
 
 ### 1.2 项目整体流程
 
-<img width="522" height="1271" alt="mujoco" src="./assets/mujoco_man.png" />
+<img width="261" height="635" alt="mujoco" src="./assets/mujoco_man.png" />
 
 该系统形成完整的机器人控制闭环：
 输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈
