@@ -1,9 +1,6 @@
 # 多场景仿真与控制优化项目 
 # 一、项目概述
 本项目围绕机器人仿真、车辆仿真、工程化规范、测试体系搭建四大方向，完成 14 项关键 PR 修改。覆盖了 CARLA 多模态导航、MuJoCo 机器人仿真、机械臂控制、车辆竞速、AirSim 仿真测试等多场景，解决了硬编码、参数不适配、运动抖动、环境不兼容、测试体系缺失、行走轨迹不自然等问题，提升了代码鲁棒性、可维护性、可测试性与仿真效果的真实性。
-### 核心技术总览：
-
-<img width="2136" height="177" alt="image" src="https://github.com/user-attachments/assets/20a15834-ddef-48d8-aa9b-218ff17d8013" />
 
 # 二、 修改明细
 ## 2.1 机器人仿真优化（MuJoCo / 机械臂 ）
@@ -12,25 +9,25 @@
 
 ### 运动轨迹生成器
     def generate_walking_trajectory(t, freq=1.0, amplitude=15.0):
-    """
-    生成行走运动轨迹
-    :param t: 当前时间
-    :param freq: 行走频率
-    :param amplitude: 关节运动幅度（度）
-    :return: 四个关节的目标角度 [l_hip, r_hip, l_knee, r_knee]
-    """
-    # 将角度转换为弧度
-    amp_rad = np.deg2rad(amplitude)
+        """
+        生成行走运动轨迹
+        :param t: 当前时间
+        :param freq: 行走频率
+        :param amplitude: 关节运动幅度（度）
+        :return: 四个关节的目标角度 [l_hip, r_hip, l_knee, r_knee]
+        """
+        # 将角度转换为弧度
+        amp_rad = np.deg2rad(amplitude)
     
-    # 左腿和右腿交替运动
-    l_hip_angle = amp_rad * np.sin(2 * np.pi * freq * t)
-    r_hip_angle = -amp_rad * np.sin(2 * np.pi * freq * t)
+        # 左腿和右腿交替运动
+        l_hip_angle = amp_rad * np.sin(2 * np.pi * freq * t)
+        r_hip_angle = -amp_rad * np.sin(2 * np.pi * freq * t)
     
-    # 膝盖跟随臀部运动，产生自然的迈步效果
-    l_knee_angle = amp_rad * 0.8 * np.cos(2 * np.pi * freq * t)
-    r_knee_angle = -amp_rad * 0.8 * np.cos(2 * np.pi * freq * t)
+        # 膝盖跟随臀部运动，产生自然的迈步效果
+        l_knee_angle = amp_rad * 0.8 * np.cos(2 * np.pi * freq * t)
+        r_knee_angle = -amp_rad * 0.8 * np.cos(2 * np.pi * freq * t)
     
-    return np.array([l_hip_angle, r_hip_angle, l_knee_angle, r_knee_angle])
+        return np.array([l_hip_angle, r_hip_angle, l_knee_angle, r_knee_angle])
     
 ### 设置相机视角
     viewer.cam.distance = 3.0
