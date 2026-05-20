@@ -64,6 +64,9 @@ def _parse_args():
     parser.add_argument("--dueling", type=int, default=1, choices=[0, 1])
     parser.add_argument("--amp", type=int, default=1, choices=[0, 1])
     parser.add_argument("--normalize-obs", type=int, default=1, choices=[0, 1])
+    parser.add_argument("--treat-truncated-as-terminal", type=int, default=-1, choices=[-1, 0, 1])
+    parser.add_argument("--learn-start", type=int, default=-1)
+    parser.add_argument("--torch-compile", type=int, default=0, choices=[0, 1])
     return parser.parse_args()
 
 
@@ -125,10 +128,13 @@ driver = Agent(
         "dueling": bool(args.dueling),
         "amp": bool(args.amp),
         "normalize_obs": bool(args.normalize_obs),
+        **({} if args.treat_truncated_as_terminal < 0 else {"treat_truncated_as_terminal": bool(args.treat_truncated_as_terminal)}),
     }
 )
 
 print(f"使用设备: {driver.device}")
+if hasattr(torch, "set_float32_matmul_precision"):
+    torch.set_float32_matmul_precision("high")
 print(f"折扣因子 (gamma): {driver.gamma}")
 print(f"软更新系数 (tau): {driver.tau}")
 print(f"目标网络更新间隔: {driver.update_target_every}")
@@ -140,11 +146,16 @@ if driver.scheduler:
 
 print("智能体创建完成！")
 
+if args.torch_compile == 1 and hasattr(torch, "compile"):
+    try:
+        driver.policy_net = torch.compile(driver.policy_net)
+    except Exception:
+        pass
+
 
 # ================================================================================
 # 3. 训练参数
 # ================================================================================
-batch_n = 32
 batch_n = args.batch_size
 play_n_episodes = args.episodes
 
@@ -161,6 +172,9 @@ episode = 0
 timestep_n = 0
 when2learn = int(driver.hyperparameters.get("train_freq", 4))
 when2log = args.log_every
+learn_start = int(driver.hyperparameters.get("warmup_steps", 0))
+if args.learn_start is not None and args.learn_start >= 0:
+    learn_start = int(args.learn_start)
 
 report_type = None if args.report == "none" else args.report
 max_timesteps = args.max_timesteps if args.max_timesteps and args.max_timesteps > 0 else None
@@ -195,17 +209,17 @@ while episode < play_n_episodes and (max_timesteps is None or timestep_n < max_t
         # 与环境交互
         new_state, reward, terminated, truncated, info = env.step(action)
         episode_reward += reward
+        done = terminated or truncated
         
         # 存储经验
-        driver.store(state, action, reward, new_state, terminated)
+        driver.store(state, action, reward, new_state, terminated, truncated)
         
         state = new_state
-        done = terminated or truncated
         if max_timesteps is not None and timestep_n >= max_timesteps:
             break
         
         # 训练网络
-        if timestep_n % when2learn == 0 and len(driver.buffer) >= batch_n:
+        if timestep_n >= learn_start and timestep_n % when2learn == 0 and len(driver.buffer) >= batch_n:
             q_value, loss = driver.update_net(batch_n)
             loss_list.append(loss)
             update_count += 1
