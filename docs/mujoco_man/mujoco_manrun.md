@@ -183,20 +183,21 @@ self.state_map = {
 
 CPG（Central Pattern Generator）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
 数学模型：
-$$
-\begin{aligned}
-\dot{x} &= 2\pi f \cdot y + k \cdot \sin(\phi_{\text{tar}} - \phi) \\
-\dot{y} &= 2\pi f \cdot \left( \mu(1 - x^2) \cdot y - x \right)
-\end{aligned}
-$$
+
+$$\dot{x} = 2\pi f \cdot y + k \cdot \sin(\phi_{tar} - \phi)$$
+
+$$\dot{y} = 2\pi f \cdot \left( \mu(1 - x^2) \cdot y - x \right)$$
+
 **参数说明：**
--  相位计算：$\phi = \text{atan2}(x, y)$
--  $k$：左右腿相位耦合强度
-- 输出步态信号：$u = A \cdot x$
+$$\phi = \text{atan2}(x, y)$$：当前相位
+$$k$$：左右腿相位耦合强度
+
+输出步态信号：$$u = A \cdot x$$
+
 
 **双腿相位耦合规则：**
-- 右腿初始相位：$0$
-- 左腿初始相位：$\pi$（反相交替迈步）
+- 右腿初始相位：$$0$$
+- 左腿初始相位：$$\pi$$（反相交替迈步）
 
 系统可根据行走速度与转向角度，自适应调节步态振幅与相位耦合强度。
 对应代码：CPGOscillator.update(main.py#L207-L217)
@@ -252,7 +253,7 @@ $$
 F_{foot} = \sum_{c \in \mathcal{C}_{foot}} \lVert \mathbf{f}_c \rVert_2
 $$
 
-其中 $\mathbf{f}_c$ 为接触点三维力。
+其中 $$\mathbf{f}_c$$ 为接触点三维力。
 
 对应代码：HumanoidStabilizer.\_compute\_foot\_forces(main.py#L701-L718)：
 
