@@ -261,7 +261,7 @@ $$
 F_{foot} = \sum_{c \in \mathcal{C}_{foot}} \lVert \mathbf{f}_c \rVert_2
 $$
 
-其中 $$\mathbf{f}_c$$ 为接触点三维力。
+其中 `f_c` 为接触点三维力。
 
 对应代码：HumanoidStabilizer.\_compute\_foot\_forces(main.py#L701-L718)：
 
