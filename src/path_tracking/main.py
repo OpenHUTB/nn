@@ -174,7 +174,7 @@ def main():
 
     # 轨迹记录
     actual_x, actual_y = [], []
-
+    error_list = []
     try:
         print("\n🚗 开始路径跟踪...")
         start_time = time.time()
