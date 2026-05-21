@@ -228,6 +228,7 @@ def main():
 
         # 保存 CSV
         csv_path = os.path.join(SAVE_DIR, "trajectory_data.csv")
+    try:
         with open(csv_path, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(['ref_x', 'ref_y', 'actual_x', 'actual_y'])
@@ -240,6 +241,8 @@ def main():
                     actual_y[i]
                 ])
         print(f"📈 数据已保存：{csv_path}")
+    except Exception as e:
+        print(f"❌ 数据保存失败：{str(e)}")
 
     print("\n🎉 路径跟踪任务全部完成！")
 
