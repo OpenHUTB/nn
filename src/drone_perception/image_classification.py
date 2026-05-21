@@ -284,7 +284,7 @@ plt.ylabel('Accuracy')
 
 plt.tight_layout()
 plt.savefig(os.path.join(base_dir, "training_plot.png"))
-plt.show()
+plt.close()
 
 print("模型训练完成！")
 
