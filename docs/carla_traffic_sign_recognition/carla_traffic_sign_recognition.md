@@ -28,7 +28,7 @@
 
 ## 2. 系统架构与通信机制
 
-本模块严格遵循 Carla 官方推荐的 **Client-Server 异步架构**。图 2.1 展示了系统内部的数据流转闭环。
+本模块严格遵循 Carla 官方推荐的 **Client-Server 异步架构**。下图展示了系统内部的数据流转闭环。
 
 ![数据流转闭环](assets/1.png)
 
@@ -36,7 +36,7 @@
 
 ### 2.1 Server 端：Carla 物理模拟核心
 
-Carla 服务端（通常通过 `CarlaUE4.exe` 运行）承担高负载的物理计算与图形渲染任务。它独立于 Python 进程运行，通过本地 **2000 端口** 对外暴露 RPC（Remote Procedure Call）服务。服务端负责：
+Carla 服务端（通常通过 `CarlaUE4.exe` 启动）承担高负载的物理计算与图形渲染任务。它独立于 Python 进程运行，通过本地 **2000 端口** 对外暴露 RPC（Remote Procedure Call）服务。服务端负责：
 
 - 维护 Ego Vehicle 的刚体动力学解算。
 - 生成高动态范围（HDR）的天空光照与城市街景。
