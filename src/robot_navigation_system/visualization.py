@@ -5,6 +5,24 @@ import os
 from config import Config
 
 class NavigationVisualizer:
+    """导航可视化类，用于实时显示机器人路径规划仿真结果。
+
+    Attributes:
+        config: 配置对象，包含地图宽度、高度等参数
+        fig: matplotlib 图形对象
+        ax: matplotlib 坐标轴对象
+        path_x: 机器人已走过路径的 X 坐标列表
+        path_y: 机器人已走过路径的 Y 坐标列表
+        rewards: 每步奖励记录
+        distances: 每步距离目标的路程距离
+        episode_rewards: 每个回合的总奖励
+
+    Methods:
+        init_plot(): 初始化绘图窗口和障碍物
+        update_plot(): 更新机器人、目标和路径显示
+        add_waypoint(): 添加路径点
+        save_animation(): 保存动画为 GIF
+    """
     def __init__(self):
         self.config = Config()
         self.fig, self.ax = plt.subplots(figsize=(12, 8))
@@ -120,7 +138,7 @@ class NavigationVisualizer:
         if not os.path.exists(self.config.RESULT_DIR):
             os.makedirs(self.config.RESULT_DIR)
         plt.savefig(os.path.join(self.config.RESULT_DIR, 'training_history.png'), dpi=150)
-        plt.show()
+        plt.close()
     
     def plot_lidar_heatmap(self, lidar_data):
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
@@ -132,7 +150,7 @@ class NavigationVisualizer:
         if not os.path.exists(self.config.RESULT_DIR):
             os.makedirs(self.config.RESULT_DIR)
         plt.savefig(os.path.join(self.config.RESULT_DIR, 'lidar_heatmap.png'), dpi=150)
-        plt.show()
+        plt.close()
     
     def reset_path(self):
         self.path_x = []

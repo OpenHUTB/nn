@@ -6,6 +6,19 @@ import matplotlib.animation as animation
 
 
 class RoboticArmWithGripper:
+    """机械臂仿真类，支持4自由度机械臂的正向运动学和可视化。
+
+    Attributes:
+        JOINT_LIMITS: 各关节角度范围限制（弧度）
+        GRIPPER_OPENING_RANGE: 夹爪开口大小范围
+        GRIPPER_ANGLE_RANGE: 夹爪旋转角度范围
+        link_lengths: 四个连杆的长度
+        joint_angles: 四个关节的角度（弧度）
+        gripper_length: 夹爪手指长度
+        gripper_width: 夹爪宽度
+        gripper_opening: 夹爪当前开口大小
+        gripper_angle: 夹爪当前旋转角度
+    """
     # 关节角度范围限制（弧度）
     JOINT_LIMITS = [
         (-np.pi, np.pi),        # Joint 1: 底座旋转
@@ -498,8 +511,8 @@ def main():
     # 创建机械臂实例
     arm = RoboticArmWithGripper()
 
-    # 显示交互式界面
-    plt.show()
+    # 关闭图形窗口
+    plt.close()
 
 
 if __name__ == "__main__":
