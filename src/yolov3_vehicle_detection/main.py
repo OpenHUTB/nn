@@ -4,13 +4,20 @@ import queue
 import numpy as np
 import carla
 import argparse  # [新增] 引入命令行参数解析库
+import sys
+import os
 
-from .config import config
-from .utils.carla_client import CarlaClient
-from .models.yolo_detector import YOLODetector
-from .utils.visualization import draw_results, draw_safe_zone
-from .utils.planner import SimplePlanner
-from .utils.logger import PerformanceLogger
+# 添加当前目录到路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+from config import config
+from utils.carla_client import CarlaClient
+from models.yolo_detector import YOLODetector
+from utils.visualization import draw_results, draw_safe_zone
+from utils.planner import SimplePlanner
+from utils.logger import PerformanceLogger
 
 
 # [新增] 参数解析函数
@@ -174,6 +181,9 @@ def main():
                         if frame_count % 100 == 0:  # 每100帧打印一次
                             print(f"[DEBUG] 检测到 {len(results)} 个目标")
                 
+                # --- 智能绕行避让控制（状态机持续运行）---
+                client.apply_smart_avoidance()
+                
                 # --- 规划 ---
                 is_brake, warning_msg = planner.plan(results)
 
@@ -207,6 +217,10 @@ def main():
                             break
                     except queue.Empty:
                         pass
+                
+                # --- 在 CARLA 模拟器中绘制调试信息 ---
+                if args.in_carla and not args.no_render:
+                    client.draw_debug_info_in_carla()
 
                 frame_count += 1
                 time.sleep(0.05)

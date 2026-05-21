@@ -1,0 +1,12 @@
+torch>=1.8.0
+torchvision
+torchaudio
+numpy>=1.18.5
+opencv-python>=4.1.1
+ultralytics>=8.0.0
+seaborn>=0.11.0
+pandas>=1.1.4
+tqdm
+matplotlib
+scipy
+gitpython>=3.1.30

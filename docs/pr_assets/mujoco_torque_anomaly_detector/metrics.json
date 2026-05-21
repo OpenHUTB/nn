@@ -1,0 +1,11 @@
+{
+  "source": "MuJoCo robotic arm torque log",
+  "records": 18,
+  "max_anomaly_score": 1.0735,
+  "critical_frames": 4,
+  "generated_files": [
+    "mujoco_torque_anomaly_curve.png",
+    "mujoco_torque_error_map.png",
+    "mujoco_torque_anomaly_scores.csv"
+  ]
+}
