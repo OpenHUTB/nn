@@ -188,6 +188,11 @@ def main():
             actual_x.append(loc.x)
             actual_y.append(loc.y)
 
+            # 计算跟踪误差
+            dx = ref_path[min(len(ref_path)-1, len(actual_x)-1)][0] - loc.x
+            dy = ref_path[min(len(ref_path)-1, len(actual_x)-1)][1] - loc.y
+            error_list.append(np.hypot(dx, dy))
+
             # 绘制可视化
             draw_path(world, ref_path)
             goal = controller.get_goal_point(loc)
@@ -208,6 +213,9 @@ def main():
         if vehicle.is_alive:
             vehicle.destroy()
             print("\n✅ 车辆已安全销毁")
+
+        # 输出跟踪误差
+        print(f"\n📊 平均跟踪误差: {np.mean(error_list):.2f} m")
 
         # 保存轨迹图
         plt.rcParams['font.sans-serif'] = ['SimHei']
