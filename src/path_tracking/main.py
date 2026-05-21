@@ -176,7 +176,7 @@ def main():
     actual_x, actual_y = [], []
     error_list = []
     try:
-        print("\n🚗 开始路径跟踪...")
+        print(f"\n🚗 开始路径跟踪，总时长：{RUN_DURATION} 秒...")
         start_time = time.time()
 
         while time.time() - start_time < RUN_DURATION:
