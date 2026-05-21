@@ -28,12 +28,32 @@
 
 **机器学习**: TensorFlow, scikit-learn
 
-**3D图形**: PyGame, Pyglet.
+**3D图形**: PyGame, Pyglet
 
 **数据处理**: Pandas, Matplotlib
 
 ## 快速开始
 
-1. 克隆项目到PyCharm
-2. 安装依赖: `pip install -r requirements.txt`
-3. 运行主程序: `python main.py`
+1. 克隆项目到 PyCharm
+2. 安装依赖：
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. 运行主程序：
+   ```bash
+   python main.py
+   ```
+
+## 项目结构
+
+```
+driving_car/
+├── main.py            # 主程序入口
+├── requirements.txt   # 项目依赖
+└── README.md          # 项目说明文档
+```
+
+## 常见问题
+
+1. **CARLA 连接失败**：确保 CARLA 模拟器已启动
+2. **依赖安装失败**：建议使用虚拟环境安装依赖
