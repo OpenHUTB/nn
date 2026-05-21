@@ -27,11 +27,17 @@ PLOT_DPI = 300
 
 # ====================== 工具函数 ======================
 def ensure_dir(path: str) -> None:
-    """确保文件夹存在"""
+    """
+    校验并创建文件夹
+    :param path: 文件夹路径
+    """
     os.makedirs(path, exist_ok=True)
 
 def cleanup_vehicles(world: carla.World) -> None:
-    """销毁所有已存在车辆"""
+    """
+    清空场景内所有车辆模型
+    :param world: CARLA世界实例
+    """
     vehicles = world.get_actors().filter('vehicle.*')
     for veh in vehicles:
         if veh.is_alive:
@@ -43,7 +49,14 @@ def generate_ref_path(
     num_points: int,
     step: float = 3.0
 ) -> List[Tuple[float, float]]:
-    """生成参考路径（沿车道中心线）"""
+    """
+    沿车道中心线生成参考行驶路径
+    :param world: CARLA世界实例
+    :param start_wp: 起始路点
+    :param num_points: 路径采样点数
+    :param step: 路点步进距离
+    :return: 坐标点列表
+    """
     path = []
     current = start_wp
     for _ in range(num_points):
@@ -55,7 +68,11 @@ def generate_ref_path(
     return path
 
 def draw_path(world: carla.World, path: List[Tuple[float, float]]) -> None:
-    """在模拟器中绘制绿色参考路径"""
+    """
+    在仿真界面绘制参考路径线条
+    :param world: CARLA世界实例
+    :param path: 参考路径坐标集合
+    """
     for i in range(len(path) - 1):
         x1, y1 = path[i]
         x2, y2 = path[i+1]
@@ -68,7 +85,11 @@ def draw_path(world: carla.World, path: List[Tuple[float, float]]) -> None:
         )
 
 def draw_goal(world: carla.World, goal: Tuple[float, float]) -> None:
-    """绘制蓝色预瞄点"""
+    """
+    绘制路径预瞄目标点
+    :param world: CARLA世界实例
+    :param goal: 目标点坐标
+    """
     x, y = goal
     world.debug.draw_point(
         carla.Location(x, y, 1.0),
@@ -76,7 +97,6 @@ def draw_goal(world: carla.World, goal: Tuple[float, float]) -> None:
         color=carla.Color(0, 0, 255),
         life_time=0.5
     )
-
 # ====================== 纯追踪控制器（类优化） ======================
 class PurePursuit:
     def __init__(self, path: List[Tuple[float, float]], lookahead: float, wheelbase: float):
