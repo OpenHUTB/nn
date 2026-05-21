@@ -166,7 +166,7 @@ def main():
 
     # 生成参考路径
     start_wp = world.get_map().get_waypoint(spawn_point.location)
-    ref_path = generate_ref_path(world, start_wp, PATH_POINTS)
+    ref_path = generate_ref_path(world, start_wp, PATH_POINTS, step=PATH_STEP)
     print(f"✅ 参考路径已生成，共 {len(ref_path)} 个点")
 
     # 初始化控制器
