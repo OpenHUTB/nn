@@ -169,7 +169,6 @@ class FeaturePyramidNet(nn.Module):
 
     @staticmethod
     def _helper(x):
-        # TODO remove this hard coded 56
         return F.interpolate(x, 56, mode="bilinear", align_corners=False).unsqueeze(-1)
 
     def make_clusterer(self, in_channels):

@@ -29,12 +29,9 @@ def plot_training_history(results, save_path='training_comparison.png'):
         elif 'accuracy' in data:
             axes[1].axhline(y=data['accuracy'], label=model_name, color=colors[i % len(colors)], linestyle='--')
     
-    axes[0].legend()
-    axes[1].legend()
-    
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
+    plt.close()
 
 def main():
     parser = argparse.ArgumentParser(description='训练深度学习手势识别模型')
@@ -139,7 +136,7 @@ def main():
         plt.tight_layout()
         plot_path = os.path.join(args.output_dir, f'training_{args.model_type}.png')
         plt.savefig(plot_path, dpi=150)
-        plt.show()
+        plt.close()
         
         print(f"\n训练完成!")
         print(f"模型类型: Deep {args.model_type}")
