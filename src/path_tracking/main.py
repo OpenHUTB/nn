@@ -7,24 +7,30 @@ import os
 from typing import List, Tuple
 
 # ====================== 配置区（统一管理，方便修改） ======================
+# 仿真连接参数
 HOST = '127.0.0.1'
 PORT = 2000
 TIMEOUT = 20.0
 PROJECT_ROOT = r"D:\github\nn"
 SAVE_DIR = os.path.join(PROJECT_ROOT, "src", "path_tracking")
 
-# 路径与控制参数
-PATH_POINTS = 80          # 参考路径点数
-LOOKAHEAD_DIST = 8.0      # 预瞄距离
-WHEELBASE = 2.5           # 车辆轴距
-THROTTLE = 0.3            # 油门
-RUN_DURATION = 46         # 运行时长（秒）
-CONTROL_FREQ = 0.05       # 控制周期（秒）
+# 路径生成参数
+PATH_POINTS = 80
+PATH_STEP = 3.0
 
-# 绘图参数
+# 车辆控制参数
+LOOKAHEAD_DIST = 8.0
+WHEELBASE = 2.5
+THROTTLE = 0.3
+RUN_DURATION = 46
+CONTROL_FREQ = 0.05
+STEER_LIMIT_MAX = 0.5
+STEER_LIMIT_MIN = -0.5
+STEER_SCALE = 0.8
+
+# 绘图输出参数
 PLOT_FIGSIZE = (8, 6)
 PLOT_DPI = 300
-
 # ====================== 工具函数 ======================
 def ensure_dir(path: str) -> None:
     """
