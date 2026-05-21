@@ -110,14 +110,18 @@ class PurePursuit:
         self.Ld = lookahead
         self.wheelbase = wheelbase
 
-    def get_goal_point(self, veh_loc: carla.Location) -> Tuple[float, float]:
-        """找到最近点 + 偏移，返回目标点"""
-        dx = self.path[:, 0] - veh_loc.x
-        dy = self.path[:, 1] - veh_loc.y
-        dists = np.hypot(dx, dy)
-        idx = np.argmin(dists)
-        target_idx = min(idx + 3, len(self.path) - 1)
-        return tuple(self.path[target_idx])
+def get_goal_point(self, veh_loc: carla.Location) -> Tuple[float, float]:
+    """找到最近点 + 偏移，返回目标点"""
+    dx = self.path[:, 0] - veh_loc.x
+    dy = self.path[:, 1] - veh_loc.y
+    dists = np.hypot(dx, dy)
+    idx = np.argmin(dists)
+    # 边界防护，防止超出路径范围
+    offset = 3
+    target_idx = idx + offset
+    if target_idx >= len(self.path):
+        target_idx = len(self.path) - 1
+    return tuple(self.path[target_idx])
 
     def calculate_steer(self, trans: carla.Transform, goal: Tuple[float, float]) -> float:
         """计算转向角（带安全限幅）"""
