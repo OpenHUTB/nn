@@ -405,6 +405,7 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 | `anomaly_detection.png` | 异常检测结果可视化 |
 | `iteration_log.csv` | 迭代对数似然日志 |
 | `bic_aic_log.csv` | BIC/AIC 模型选择日志 |
+![Uploading convergence_comparison.png…]()
 
 ### 5.5 实验结果示例
 
