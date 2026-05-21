@@ -126,12 +126,7 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 
 ------
 
-<<<<<<< HEAD
 ## 4. 棘手环境问题排查与修复记录
-=======
-## 4. 棘手环境问题排查与修复记录
-
->>>>>>> main
 
 在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有极高的教学参考价值。
 
