@@ -1,6 +1,16 @@
 from stable_baselines3 import SAC
+from stable_baselines3.common.utils import set_random_seed
 from env_mujoco import make_env
+import random
+import numpy as np
+import torch
 import os
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+set_random_seed(SEED)
 
 # 1. 初始化环境
 env = make_env()
