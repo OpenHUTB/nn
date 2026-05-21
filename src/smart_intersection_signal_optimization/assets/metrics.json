@@ -1,0 +1,73 @@
+{
+  "scenario": {
+    "horizon_seconds": 1800,
+    "approaches": [
+      {
+        "name": "north_south_through",
+        "demand_vph": 1120,
+        "saturation_vph": 1850,
+        "priority": 1.15
+      },
+      {
+        "name": "east_west_through",
+        "demand_vph": 860,
+        "saturation_vph": 1800,
+        "priority": 1.0
+      },
+      {
+        "name": "north_south_left",
+        "demand_vph": 310,
+        "saturation_vph": 1450,
+        "priority": 1.3
+      },
+      {
+        "name": "east_west_left",
+        "demand_vph": 240,
+        "saturation_vph": 1400,
+        "priority": 1.1
+      }
+    ]
+  },
+  "optimizer": {
+    "algorithm": "elitist genetic algorithm",
+    "population_size": 42,
+    "generations": 36
+  },
+  "baseline": {
+    "cycle_length": 150,
+    "average_delay": 434.538,
+    "max_queue": 272.205,
+    "throughput": 0.5789,
+    "stops": 5530.0,
+    "fairness": 0.3829,
+    "score": 650.959
+  },
+  "optimized": {
+    "cycle_length": 149,
+    "average_delay": 421.7,
+    "max_queue": 166.705,
+    "throughput": 0.5984,
+    "stops": 5530.0,
+    "fairness": 0.7568,
+    "score": 558.684
+  },
+  "improvements": {
+    "delay_reduction_percent": 2.954,
+    "max_queue_reduction_percent": 38.758,
+    "score_reduction_percent": 14.175,
+    "throughput_gain_percent": 1.95
+  },
+  "optimized_greens": {
+    "north_south_through": 74,
+    "east_west_through": 47,
+    "north_south_left": 8,
+    "east_west_left": 8
+  },
+  "outputs": {
+    "queue_profiles": "assets\\optimized_queue_profiles.png",
+    "green_split_comparison": "assets\\green_split_comparison.png",
+    "metric_comparison": "assets\\metric_comparison.png",
+    "ga_convergence": "assets\\ga_convergence.png",
+    "animation": "assets\\intersection_signal_optimization.gif"
+  }
+}

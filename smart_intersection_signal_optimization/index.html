@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://monkey404.github.io/nn/smart_intersection_signal_optimization/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>城市交叉口信号配时智能优化 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u57ce\u5e02\u4ea4\u53c9\u53e3\u4fe1\u53f7\u914d\u65f6\u667a\u80fd\u4f18\u5316";
+        var mkdocs_page_input_path = "smart_intersection_signal_optimization.md";
+        var mkdocs_page_url = "/nn/smart_intersection_signal_optimization/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">城市交叉口信号配时智能优化</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#_2">项目简介</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_3">项目目标</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_4">应用背景</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_5">项目特点</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_6">文件结构</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_7">模块说明</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#scenariopy">scenario.py</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#simulatorpy">simulator.py</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#optimizerpy">optimizer.py</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#visualizationpy">visualization.py</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#mainpy">main.py</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_8">运行方法</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_9">核心流程</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_10">交通流模型设计</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_11">信号相位设计</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#webster">Webster 基线方案</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_12">遗传算法设计</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_13">个体编码方式</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_14">目标函数设计</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_15">动态演示</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_16">实验结果</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_17">绿信比分配对比</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_18">指标对比</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_19">优化后排队曲线</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_20">遗传算法收敛曲线</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_21">运行结果示例</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_22">输出数据说明</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#metricsjson">metrics.json</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#optimized_greenscsv">optimized_greens.csv</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#convergencecsv">convergence.csv</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_23">测试设计</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_24">与普通演示项目的区别</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_25">局限性分析</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_26">后续可扩展方向</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_27">总结</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">城市交叉口信号配时智能优化</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/smart_intersection_signal_optimization.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="_1">城市交叉口信号配时智能优化</h1>
+<p>本项目面向城市道路交叉口高峰期拥堵问题，构建四相位交通信号仿真环境，并使用遗传算法优化信号周期和各相位绿灯时间。项目以 Webster 固定配时作为基线方案，通过平均延误、最大排队长度、通行率、停车次数和综合评分等指标，对优化效果进行量化分析。</p>
+<h2 id="_2">项目简介</h2>
+<p>城市交叉口在早晚高峰中常出现周期固定、绿灯分配不均、车辆排队增长和进口道通行能力不平衡等问题。传统固定配时方案通常依赖历史流量和人工经验，当路口某一方向需求突然增大时，固定周期和固定绿信比很难及时响应，从而造成车辆排队、等待时间增加和通行效率下降。</p>
+<p>本项目通过建立简化但可运行的交通流仿真模型，对不同进口方向的车辆到达、排队和放行过程进行模拟。在此基础上，项目使用精英保留遗传算法搜索更优的信号周期和绿信比分配，使信号控制方案能够更贴近实际交通需求。</p>
+<p>项目重点不只是展示一个信号灯动画，而是形成完整的工程链路：交通场景建模、基线方案生成、队列仿真、优化算法搜索、指标评估、图表生成、GIF 动图展示和 MkDocs 汇报页面发布。这样的结构便于复现实验，也便于后续扩展到 SUMO、CARLA 或真实交通检测器数据。</p>
+<h2 id="_3">项目目标</h2>
+<p>本项目希望解决的问题可以概括为：在一个固定高峰期交通需求场景下，如何自动寻找一组比传统固定配时更合理的信号周期和绿灯时间分配。</p>
+<p>具体目标包括：</p>
+<ul>
+<li>建立四进口、四相位交叉口交通流模型。</li>
+<li>以 Webster 固定配时方法作为可解释的基线方案。</li>
+<li>设计队列演化仿真器，按秒模拟车辆到达、等待和放行。</li>
+<li>构建综合评价指标，衡量延误、排队、停车和通行效率。</li>
+<li>使用遗传算法自动优化信号周期和绿信比分配。</li>
+<li>生成图片、动图和数据文件，用于课程汇报和结果分析。</li>
+<li>将项目说明整理为 MkDocs 文档站，形成可访问的 GitHub Pages 链接。</li>
+</ul>
+<h2 id="_4">应用背景</h2>
+<p>在城市道路交通系统中，交叉口往往是通行效率最低、冲突最多的位置。车辆在交叉口处需要根据信号灯周期性停车和启动，如果某一方向绿灯时间不足，会迅速形成排队；如果某一方向绿灯时间过长，又会浪费其他方向的通行机会。</p>
+<p>现实交通控制中，常见的固定信号配时存在以下局限：</p>
+<ul>
+<li>不同时间段交通流量差异明显，固定配时难以适应动态变化。</li>
+<li>主干道和支路车流强度不同，平均分配绿灯会造成资源浪费。</li>
+<li>左转相位需求与直行相位需求不同，需要独立考虑。</li>
+<li>只看总通行量容易忽略某个方向排队过长的问题。</li>
+<li>只看平均延误容易忽略最大排队长度和停车次数。</li>
+</ul>
+<p>因此，一个更合理的信号优化系统需要同时考虑多个指标。本项目采用的综合评分函数将平均延误、最大排队、通行率和停车次数结合起来，避免只优化单一指标导致方案偏向某一方向。</p>
+<h2 id="_5">项目特点</h2>
+<ul>
+<li>构建四进口交叉口交通仿真场景。</li>
+<li>包含南北直行、东西直行、南北左转、东西左转四个信号相位。</li>
+<li>使用 Webster 固定配时作为基线方案。</li>
+<li>使用遗传算法优化周期长度和绿信比分配。</li>
+<li>统计平均延误、最大排队、通行率、停车次数和综合评分。</li>
+<li>自动生成对比图片、收敛曲线、队列曲线和 GIF 动图。</li>
+<li>提供完整源码、测试文件、运行结果和 MkDocs 汇报页面。</li>
+</ul>
+<h2 id="_6">文件结构</h2>
+<pre><code class="language-text">src/smart_intersection_signal_optimization/
+|-- main.py                  # 命令行入口
+|-- scenario.py              # 交叉口场景、相位和 Webster 基线
+|-- simulator.py             # 队列演化仿真与指标计算
+|-- optimizer.py             # 遗传算法配时优化
+|-- visualization.py         # 图片、图表和 GIF 生成
+|-- requirements.txt         # 依赖说明
+|-- README.md                # 项目说明
+|-- assets/                  # 运行结果图片、动图和数据
+`-- tests/                   # 单元测试
+</code></pre>
+<h2 id="_7">模块说明</h2>
+<h3 id="scenariopy">scenario.py</h3>
+<p><code>scenario.py</code> 负责定义交叉口场景。项目将一个路口拆分为四个相位，每个相位都有交通需求、饱和流率和优先级。交通需求表示单位小时到达车辆数，饱和流率表示该相位在绿灯期间的最大放行能力，优先级用于区分某些相位的重要程度。</p>
+<p>该文件还实现了 Webster 固定配时基线。Webster 方法是交通工程中常见的固定信号配时方法，主要根据交通流率与饱和流率的比例计算周期长度和绿灯分配。将它作为基线，可以让优化算法的效果有一个清晰对照。</p>
+<h3 id="simulatorpy">simulator.py</h3>
+<p><code>simulator.py</code> 是项目的仿真核心。它按秒推进整个路口的运行状态，每一秒会计算车辆到达、当前绿灯相位、可放行车辆数和剩余排队长度。</p>
+<p>仿真器输出的结果包括：</p>
+<ul>
+<li>每个相位在每个时刻的排队长度。</li>
+<li>每个相位在每个时刻的到达车辆数。</li>
+<li>每个相位在每个时刻的放行车辆数。</li>
+<li>当前激活的信号相位。</li>
+<li>平均延误、最大排队、通行率、停车次数和综合评分。</li>
+</ul>
+<h3 id="optimizerpy">optimizer.py</h3>
+<p><code>optimizer.py</code> 实现遗传算法。项目将一个信号配时方案编码为一个个体，其中包含周期长度和四个相位的绿灯权重。算法通过多代迭代，不断保留较优方案，并通过交叉和变异生成新的候选方案。</p>
+<p>遗传算法相比穷举搜索更适合本项目，因为周期长度和绿信比分配组合较多，完全枚举会增加计算成本。遗传算法能够在有限代数内快速找到较优方案，并保留一定随机探索能力。</p>
+<h3 id="visualizationpy">visualization.py</h3>
+<p><code>visualization.py</code> 负责生成所有展示材料，包括绿信比分配对比图、指标对比图、队列曲线图、遗传算法收敛曲线和交叉口运行 GIF 动图。</p>
+<p>这些可视化结果可以帮助读者直观看到优化方案的效果。例如，绿信比分配图可以显示算法是否给高需求方向分配了更多绿灯时间；队列曲线可以展示排队长度是否随时间持续增长；收敛曲线可以说明遗传算法是否稳定下降。</p>
+<h3 id="mainpy">main.py</h3>
+<p><code>main.py</code> 是命令行入口。运行该文件后，程序会依次创建场景、运行基线方案、执行遗传算法优化、生成图表、保存指标文件并打印实验摘要。</p>
+<h2 id="_8">运行方法</h2>
+<pre><code class="language-bash">cd src/smart_intersection_signal_optimization
+python main.py
+</code></pre>
+<p>运行后会在 <code>assets/</code> 目录下生成：</p>
+<pre><code class="language-text">optimized_queue_profiles.png          # 优化后各进口排队曲线
+green_split_comparison.png            # 基线与优化绿信比分配对比
+metric_comparison.png                 # 延误、排队、停车、综合评分对比
+ga_convergence.png                    # 遗传算法收敛曲线
+intersection_signal_optimization.gif  # 信号控制与排队动态演示
+metrics.json                          # 汇总指标
+optimized_greens.csv                  # 优化绿灯时间表
+convergence.csv                       # 每代优化过程
+</code></pre>
+<h2 id="_9">核心流程</h2>
+<ol>
+<li>构建四相位交叉口交通需求场景。</li>
+<li>根据 Webster 方法生成固定配时基线。</li>
+<li>使用队列演化模型模拟车辆到达、排队和放行。</li>
+<li>将信号周期和绿信比分配编码为遗传算法个体。</li>
+<li>通过选择、交叉、变异和精英保留迭代搜索更优方案。</li>
+<li>对比基线方案和优化方案的交通运行指标。</li>
+<li>输出图片、GIF、CSV、JSON 和文档汇报页面。</li>
+</ol>
+<h2 id="_10">交通流模型设计</h2>
+<p>本项目采用离散时间队列模型。仿真时间被划分为一秒一个时间步，在每个时间步内，每个相位都会根据设定的交通需求生成到达车辆。为了使交通流更接近实际情况，车辆到达并不是完全固定的，而是加入了周期波动和轻微随机扰动。</p>
+<p>每个相位的排队长度按照下面的思路更新：</p>
+<pre><code class="language-text">当前排队 = 上一秒排队 + 当前到达车辆 - 当前放行车辆
+</code></pre>
+<p>如果当前相位处于绿灯，则可以按照饱和流率放行车辆；如果当前相位不是绿灯，则放行能力为零。为了避免出现负数排队，最终排队长度会被限制为非负值。</p>
+<p>这种模型虽然比专业交通仿真平台简单，但具备三个优点：</p>
+<ul>
+<li>可以直接在普通 Python 环境运行，便于课程提交。</li>
+<li>指标计算过程透明，便于解释优化效果。</li>
+<li>与遗传算法结合方便，适合快速评估大量候选方案。</li>
+</ul>
+<h2 id="_11">信号相位设计</h2>
+<p>项目使用四相位信号控制：</p>
+<table>
+<thead>
+<tr>
+<th>相位名称</th>
+<th>含义</th>
+<th>设计目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>north_south_through</td>
+<td>南北直行</td>
+<td>服务主方向直行交通</td>
+</tr>
+<tr>
+<td>east_west_through</td>
+<td>东西直行</td>
+<td>服务次方向直行交通</td>
+</tr>
+<tr>
+<td>north_south_left</td>
+<td>南北左转</td>
+<td>单独处理左转冲突</td>
+</tr>
+<tr>
+<td>east_west_left</td>
+<td>东西左转</td>
+<td>单独处理东西向左转需求</td>
+</tr>
+</tbody>
+</table>
+<p>相位拆分的意义在于：直行和左转的交通需求、饱和流率和冲突关系并不相同。如果将所有方向简单合并，会掩盖左转车辆排队问题。单独设置左转相位可以使优化算法更细致地分配绿灯资源。</p>
+<h2 id="webster">Webster 基线方案</h2>
+<p>Webster 固定配时方法根据交通流率和饱和流率的比例计算周期与绿灯时间。它的优点是简单、可解释、工程上常见，适合作为基线方案。</p>
+<p>本项目使用 Webster 方案的目的不是证明它不好，而是提供一个合理参照。如果遗传算法方案能够在相同交通需求下获得更低综合评分，就说明智能优化具有一定价值。</p>
+<p>基线方案的作用包括：</p>
+<ul>
+<li>提供固定配时下的平均延误。</li>
+<li>提供固定配时下的最大排队长度。</li>
+<li>提供优化前后绿信比分配差异。</li>
+<li>避免只展示优化方案而缺少对照。</li>
+</ul>
+<h2 id="_12">遗传算法设计</h2>
+<p>遗传算法模拟自然选择过程。每个个体代表一个信号配时方案，包含周期长度和各相位绿灯权重。算法会先生成一组初始方案，然后重复执行评估、选择、交叉和变异。</p>
+<p>项目中的遗传算法具有以下步骤：</p>
+<ol>
+<li>初始化种群，其中包含 Webster 基线附近的方案和随机方案。</li>
+<li>将每个个体转换为实际信号计划。</li>
+<li>调用仿真器计算每个计划的综合评分。</li>
+<li>按评分排序，保留表现较好的精英个体。</li>
+<li>从精英个体中选择父代，通过交叉生成子代。</li>
+<li>对子代进行小幅随机变异，扩大搜索空间。</li>
+<li>重复多代，记录每一代的最佳评分。</li>
+</ol>
+<p>遗传算法的优势在于它不要求目标函数可导，也不需要复杂数学推导。只要仿真器能够给出评分，算法就可以不断搜索更好的方案。</p>
+<h2 id="_13">个体编码方式</h2>
+<p>每个个体可以理解为一个长度为 5 的向量：</p>
+<pre><code class="language-text">[cycle_length, g1, g2, g3, g4]
+</code></pre>
+<p>其中 <code>cycle_length</code> 表示信号周期长度，<code>g1</code> 到 <code>g4</code> 表示四个相位的绿灯权重。程序会将这些权重归一化，使各相位绿灯时间之和满足周期约束。</p>
+<p>例如，一个候选方案可能表示为：</p>
+<pre><code class="language-text">cycle_length = 120
+north_south_through = 0.45
+east_west_through = 0.30
+north_south_left = 0.15
+east_west_left = 0.10
+</code></pre>
+<p>这表示在 120 秒周期内，南北直行获得更多绿灯资源，东西左转获得较少绿灯资源。最终绿灯秒数会根据总可用绿灯时间进行换算。</p>
+<h2 id="_14">目标函数设计</h2>
+<p>本项目的目标函数不是单纯最小化某一个指标，而是综合多个交通运行指标：</p>
+<pre><code class="language-text">score = average_delay + 0.75 * max_queue + 16 * (1 - throughput) + 1.8 * stops_per_step
+</code></pre>
+<p>各项含义如下：</p>
+<ul>
+<li><code>average_delay</code>：平均延误，表示车辆等待成本。</li>
+<li><code>max_queue</code>：最大排队长度，表示拥堵峰值和溢出风险。</li>
+<li><code>throughput</code>：通行率，表示车辆通过能力。</li>
+<li><code>stops_per_step</code>：单位时间停车强度，表示驾驶舒适性和能耗影响。</li>
+</ul>
+<p>综合目标函数的好处是平衡不同目标。如果只优化平均延误，算法可能让某个低流量方向长期等待；如果只优化最大排队，又可能牺牲整体通行效率。综合评分能够让结果更加稳健。</p>
+<h2 id="_15">动态演示</h2>
+<p>下图展示了优化配时下交叉口各方向车辆排队随信号相位变化的过程。</p>
+<p><img alt="intersection signal optimization animation" src="../smart_intersection_signal_optimization_assets/intersection_signal_optimization.gif" /></p>
+<p>动图中的道路和车辆队列用于直观呈现信号切换过程。不同颜色表示不同方向或相位，车辆条带数量反映当前排队压力。通过动图可以看到，当某一方向获得绿灯时，该方向排队会逐渐减少；当方向处于红灯时，排队会继续增长。</p>
+<h2 id="_16">实验结果</h2>
+<h3 id="_17">绿信比分配对比</h3>
+<p><img alt="green split comparison" src="../smart_intersection_signal_optimization_assets/green_split_comparison.png" /></p>
+<p>绿信比对比图展示了基线方案和优化方案在各个相位上的绿灯时间差异。通常情况下，高需求方向会获得更长绿灯时间，而低需求方向会保持最低可接受绿灯。该图可以说明遗传算法不是随机给出结果，而是根据交通压力重新分配通行资源。</p>
+<h3 id="_18">指标对比</h3>
+<p><img alt="metric comparison" src="../smart_intersection_signal_optimization_assets/metric_comparison.png" /></p>
+<p>指标对比图展示了优化前后的平均延误、最大排队、停车次数和综合评分。若优化方案的综合评分下降，说明算法在多个指标之间取得了更好的平衡。</p>
+<h3 id="_19">优化后排队曲线</h3>
+<p><img alt="optimized queue profiles" src="../smart_intersection_signal_optimization_assets/optimized_queue_profiles.png" /></p>
+<p>排队曲线展示各进口方向随时间变化的排队长度。如果某条曲线持续上升，说明该方向绿灯时间不足；如果曲线在一定范围内波动，说明信号控制基本能够消化车辆到达。通过曲线可以观察优化方案是否存在明显短板。</p>
+<h3 id="_20">遗传算法收敛曲线</h3>
+<p><img alt="genetic algorithm convergence" src="../smart_intersection_signal_optimization_assets/ga_convergence.png" /></p>
+<p>收敛曲线展示遗传算法在多代搜索中的最佳评分变化。若曲线逐步下降并趋于稳定，说明搜索过程有效。该图也能体现项目并非只运行一次固定公式，而是进行了迭代优化。</p>
+<h2 id="_21">运行结果示例</h2>
+<pre><code class="language-text">Smart intersection signal optimization finished
+Algorithm: elitist genetic algorithm
+Baseline delay: 434.538
+Optimized delay: 421.7
+Delay reduction: 2.954%
+Score reduction: 14.175%
+Optimized cycle: 149s
+</code></pre>
+<p>从示例结果可以看到，优化后的平均延误有所下降，综合评分下降更加明显。这说明遗传算法不只是在一个指标上做微小调整，而是在排队峰值、停车次数和通行效率之间做了综合权衡。</p>
+<h2 id="_22">输出数据说明</h2>
+<p>项目除了图片和 GIF，还会生成结构化数据文件，便于复查和二次分析。</p>
+<h3 id="metricsjson">metrics.json</h3>
+<p><code>metrics.json</code> 保存最终汇总指标，包括基线方案、优化方案、提升比例、优化后绿灯时间和输出文件路径。它适合用于自动检查项目结果，也可以作为后续网页展示的数据来源。</p>
+<h3 id="optimized_greenscsv">optimized_greens.csv</h3>
+<p><code>optimized_greens.csv</code> 保存每个相位的优化绿灯秒数。该文件可以直接用于表格展示，也便于和人工配时方案进行对比。</p>
+<h3 id="convergencecsv">convergence.csv</h3>
+<p><code>convergence.csv</code> 保存遗传算法每一代的最佳评分、平均延误和最大排队长度。该文件可以用于绘制收敛曲线，也可以用于分析算法是否过早收敛。</p>
+<h2 id="_23">测试设计</h2>
+<p>项目包含基础单元测试，用于验证关键逻辑是否正确。测试重点包括：</p>
+<ul>
+<li>场景是否包含四个相位。</li>
+<li>信号计划归一化后是否满足周期约束。</li>
+<li>Webster 基线方案是否可以正常仿真。</li>
+<li>基因编码能否转换为合法信号计划。</li>
+<li>小规模遗传算法优化结果是否不差于基线评分。</li>
+</ul>
+<p>测试文件位于：</p>
+<pre><code class="language-text">src/smart_intersection_signal_optimization/tests/test_signal_optimization.py
+</code></pre>
+<p>测试的意义在于保证项目不是只有展示页面，而是包含可验证的工程逻辑。即使后续调整算法参数，也可以通过测试快速发现基本功能是否被破坏。</p>
+<h2 id="_24">与普通演示项目的区别</h2>
+<p>很多交通灯演示项目只展示红绿灯切换动画，缺少真实优化过程。本项目的区别在于：</p>
+<ul>
+<li>有交通流需求建模。</li>
+<li>有固定配时基线作为对照。</li>
+<li>有可运行的队列仿真器。</li>
+<li>有智能优化算法搜索过程。</li>
+<li>有量化指标和图表输出。</li>
+<li>有测试文件和结构化数据文件。</li>
+<li>有 GitHub Pages / MkDocs 汇报页面。</li>
+</ul>
+<p>因此，本项目更接近一个完整的小型智能交通优化系统，而不是单纯的页面展示。</p>
+<h2 id="_25">局限性分析</h2>
+<p>由于课程项目需要保证可运行性和可复现性，本项目没有直接接入大型交通仿真平台，因此仍存在一些简化：</p>
+<ul>
+<li>车辆到达过程采用简化随机模型，没有使用真实检测器数据。</li>
+<li>交叉口只包含四个相位，没有加入行人和非机动车。</li>
+<li>车辆排队模型未考虑车道长度和溢出阻塞。</li>
+<li>放行能力用饱和流率近似，没有模拟车辆跟驰细节。</li>
+<li>遗传算法参数未进行大规模调参。</li>
+</ul>
+<p>这些简化不会影响项目展示优化思想，但如果用于真实交通控制，还需要引入更复杂的交通流模型和实测数据。</p>
+<h2 id="_26">后续可扩展方向</h2>
+<ul>
+<li>将遗传算法替换为 DQN、PPO 或多智能体强化学习。</li>
+<li>接入 SUMO、CARLA 或真实交通检测器数据。</li>
+<li>增加行人相位、公交优先和应急车辆优先策略。</li>
+<li>从单路口扩展到多路口区域协调控制。</li>
+<li>加入早晚高峰动态需求变化，实现自适应信号控制。</li>
+<li>引入排队溢出惩罚，避免某一进口道排队超过路段容量。</li>
+<li>对比粒子群算法、模拟退火算法和贝叶斯优化算法。</li>
+<li>在网页中加入交互式参数调节，使用户可以改变交通需求并重新观察结果。</li>
+</ul>
+<h2 id="_27">总结</h2>
+<p>本项目围绕城市交叉口信号配时优化，完成了从问题建模到网页汇报的完整流程。项目首先构建四相位交通流仿真环境，然后使用 Webster 方法生成固定配时基线，再通过遗传算法搜索更优信号周期和绿信比分配。最后，项目生成多种可视化结果，并通过 MkDocs 文档站进行展示。</p>
+<p>从工程角度看，项目包含多个独立模块，覆盖场景定义、仿真计算、智能优化、结果分析、可视化生成和测试验证。从汇报角度看，项目提供了图片、动图、指标表和文字说明，能够较完整地展示优化思路与实验结果。</p>
+<p>该项目后续可以继续扩展为强化学习信号控制、多路口协调优化或基于真实交通数据的自适应信号控制系统。</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="首页"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../car_racing_dqn_improvements/" class="btn btn-neutral float-right" title="CarRacing DQN/DoubleDQN：训练改进与可视化对比">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../car_racing_dqn_improvements/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,3 @@
+[submodule "src/humantest/tutorial_for_mujoco"]
+    path = src/humantest/tutorial_for_mujoco
+    url = https://github.com/VincentXun/tutorial_for_mujoco.git
