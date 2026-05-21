@@ -28,7 +28,7 @@
 | 工具/环境 | 版本/说明 |
 |----------|----------|
 | Carla 模拟器 | 0.9.13（支持Python API交互与车辆动力学模拟） |
-| Python | 3.8.10（推荐Anac|
+| Python | 3.8.10（推荐Anaconda）|
 | 核心依赖库 | carla、numpy、matplotlib、csv（用于数据处理与可视化） |
 | 开发平台 | Windows 10/11（需配置好Python环境变量与Carla路径） |
 
@@ -146,14 +146,16 @@ class PurePursuit:
 系统实现效果图如下
 
 
-![起始图](images/1.png)
+![起始图](pure_pursuit_image/1.png)
 
 
-![结尾图](images/2.png)
+![结尾图](pure_pursuit_image/2.png)
 
 ### 4.3 轨迹跟踪结果可视化分析
 轨迹对比图如下：
-![轨迹对比图](images/result.png)
+
+
+![轨迹对比图](pure_pursuit_image/3.png)
 
 
 - 直线路段：实际轨迹与参考路径高度重合，跟踪误差小于0.5m，无明显偏移。
