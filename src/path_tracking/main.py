@@ -110,18 +110,18 @@ class PurePursuit:
         self.Ld = lookahead
         self.wheelbase = wheelbase
 
-def get_goal_point(self, veh_loc: carla.Location) -> Tuple[float, float]:
-    """找到最近点 + 偏移，返回目标点"""
-    dx = self.path[:, 0] - veh_loc.x
-    dy = self.path[:, 1] - veh_loc.y
-    dists = np.hypot(dx, dy)
-    idx = np.argmin(dists)
-    # 边界防护，防止超出路径范围
-    offset = 3
-    target_idx = idx + offset
-    if target_idx >= len(self.path):
-        target_idx = len(self.path) - 1
-    return tuple(self.path[target_idx])
+    def get_goal_point(self, veh_loc: carla.Location) -> Tuple[float, float]:
+        """找到最近点 + 偏移，返回目标点"""
+        dx = self.path[:, 0] - veh_loc.x
+        dy = self.path[:, 1] - veh_loc.y
+        dists = np.hypot(dx, dy)
+        idx = np.argmin(dists)
+        # 边界防护，防止超出路径范围
+        offset = 3
+        target_idx = idx + offset
+        if target_idx >= len(self.path):
+            target_idx = len(self.path) - 1
+        return tuple(self.path[target_idx])
 
     def calculate_steer(self, trans: carla.Transform, goal: Tuple[float, float]) -> float:
         """计算转向角（带安全限幅）"""
@@ -141,7 +141,7 @@ def get_goal_point(self, veh_loc: carla.Location) -> Tuple[float, float]:
 
         alpha = np.arctan2(ly, lx)
         steer = np.arctan2(2 * self.wheelbase * np.sin(alpha), self.Ld)
-        return np.clip(steer / 0.8, -0.5, 0.5)
+        return np.clip(steer / STEER_SCALE, STEER_LIMIT_MIN, STEER_LIMIT_MAX)
 
 # ====================== 主流程 ======================
 def main():
@@ -228,23 +228,23 @@ def main():
 
         # 保存 CSV
         csv_path = os.path.join(SAVE_DIR, "trajectory_data.csv")
-    try:
-        with open(csv_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['ref_x', 'ref_y', 'actual_x', 'actual_y'])
-            for i in range(len(actual_x)):
-                ref_idx = i % len(ref_path)
-                writer.writerow([
-                    ref_path[ref_idx][0],
-                    ref_path[ref_idx][1],
-                    actual_x[i],
-                    actual_y[i]
-                ])
-        print(f"📈 数据已保存：{csv_path}")
-    except Exception as e:
-        print(f"❌ 数据保存失败：{str(e)}")
+        try:
+            with open(csv_path, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['ref_x', 'ref_y', 'actual_x', 'actual_y'])
+                for i in range(len(actual_x)):
+                    ref_idx = i % len(ref_path)
+                    writer.writerow([
+                        ref_path[ref_idx][0],
+                        ref_path[ref_idx][1],
+                        actual_x[i],
+                        actual_y[i]
+                    ])
+            print(f"📈 数据已保存：{csv_path}")
+        except Exception as e:
+            print(f"❌ 数据保存失败：{str(e)}")
 
-    print("\n🎉 路径跟踪任务全部完成！")
+        print("\n🎉 路径跟踪任务全部完成！")
 
 if __name__ == "__main__":
     main()
