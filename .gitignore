@@ -114,6 +114,7 @@ screenshots/
 !docs/carla_CAM/
 !docs/carla_CAM/images/
 !docs/carla_CAM/images/*.png
+!docs/dqn_*.png
 # ========================================
 # Jupyter Notebook
 # ========================================
