@@ -128,7 +128,7 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 
 ## 4. 棘手环境问题排查与修复记录
 
-在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有极高的教学参考价值。
+在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有较高的教学参考价值。
 
 **故障 1：幽灵文件 `nul` 索引错误**
 
@@ -142,7 +142,7 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 **故障 2：GitHub 连接重置（Connection Reset）**
 
 - **现象**：`git push` 长时间阻塞后报错 `fatal: unable to access ... Recv failure: Connection was reset`。
-- **根因分析**：国内网络环境访问境外 Amazon AWS 服务器（GitHub 托管地）存在间歇性丢包或 DNS 污染。
+- **根因分析**：国内网络环境访问境外 Amazon Web Services 服务器（GitHub 托管地）存在间歇性丢包或 DNS 污染。
 - **解决方案**：
   1. 配置 Git 全局代理（HTTP/HTTPS Proxy）指向本地科学上网端口（如 7890）。
   2. 修改 `~/.ssh/config` 使用 SSH over HTTPS 的 443 端口进行隧道穿透。
