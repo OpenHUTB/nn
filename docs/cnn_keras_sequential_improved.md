@@ -5,7 +5,7 @@
 本次改进基于原 `tutorial_mnist_conv-keras-sequential.py` 代码，针对其存在的多个问题进行了系统性优化。
 
 核心改进涵盖以下六个方面：
-
+   
 1. 数据利用效率（使用全部训练样本）
 2. 模型架构（添加 BatchNormalization）
 3. 正则化策略（添加 Dropout）

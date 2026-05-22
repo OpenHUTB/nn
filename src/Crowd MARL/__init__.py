@@ -4,7 +4,8 @@ def normalize(v):
     norm = np.linalg.norm(v)
     if norm == 0:
        return v
-    return v / norm
+    return v / norm   
+import numpy as np  
 
 def rotationMatrix2D(theta):
    rad = np.radians(theta)

@@ -10,6 +10,17 @@
 - 输出 normal / smooth_control / relocalize 三类建议。
 - 生成 AirSim 飞行轨迹漂移图和 IMU 健康曲线图。
 
+## 环境要求
+
+- Python 3.7+
+- NumPy
+- pandas
+- matplotlib
+
+## 数据格式
+
+样例数据包含 AirSim 多旋翼飞行遥测数据：位置、速度、加速度、陀螺仪和 GPS 估计位置。
+
 ## 运行
 
 ```bash

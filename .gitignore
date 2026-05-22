@@ -59,6 +59,8 @@ env/
 *.pkl
 *.pickle
 *.ckpt
+*.bin
+*.safetensors
 models/
 !src/yolo12_object_detection/scripts/ultralytics/models/
 !src/yolo12_object_detection/scripts/ultralytics/cfg/models/
@@ -158,3 +160,8 @@ site/
 # =========================================
 .env.local
 .env.*.local
+# ========================================
+# 临时 Python 文件
+# ========================================
+*.pyo
+*.pyd
