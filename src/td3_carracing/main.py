@@ -29,44 +29,84 @@ def train():
         use_cnn=True
     )
 
-    max_episodes = 1000
-    max_timesteps = 1000
+    max_episodes = 2500
+    max_timesteps = 1200
+    warmup_episodes = 80  # 增加预热回合数，让策略更好地收敛
 
-    # 进一步降低转向探索噪声
-    expl_noise_steer = 0.01  # 转向探索噪声（原0.02）
-    expl_noise_throttle = 0.04  # 油门/刹车噪声（原0.05）
+    # 探索噪声设置 - 优化转向探索
+    expl_noise_steer = 0.12  # 稍微增加转向探索
+    expl_noise_throttle = 0.12  # 降低油门探索
+    expl_noise_brake = 0.05
+    min_noise_steer = 0.01
+    min_noise_throttle = 0.02
+    min_noise_brake = 0.005
+
     best_reward = -float('inf')
+    reward_history = []
 
     print("开始训练...")
     for episode in range(max_episodes):
         state, _ = env.reset()
         episode_reward = 0
-        agent.last_action = None  # 重置动作历史
+        agent.last_action = None
 
-        spin_counter = 0  # 原地转圈计数器
+        spin_counter = 0
+
+        # 学习率调整
+        if episode % 500 == 0 and episode > 0:
+            for param_group in agent.actor_optimizer.param_groups:
+                param_group['lr'] = param_group['lr'] * 0.8
+            for param_group in agent.critic_optimizer.param_groups:
+                param_group['lr'] = param_group['lr'] * 0.8
+
+        # 记录出赛道状态
+        off_track_counter = 0
+        on_track_counter = 0
 
         for t in range(max_timesteps):
-            action = agent.select_action(state, smooth=True)  # 启用平滑
+            # 预热期：增加转向探索，让智能体学习转弯
+            if episode < warmup_episodes:
+                action = agent.select_action(state, smooth=True)
+                noise = np.zeros_like(action)
+                noise[0] = np.random.normal(0, expl_noise_steer * 0.6)
+                noise[1] = np.random.normal(0, expl_noise_throttle * 0.5)
+                noise[2] = np.random.normal(0, expl_noise_brake * 0.3)
+            else:
+                action = agent.select_action(state, smooth=True)
+                noise = np.zeros_like(action)
+                noise[0] = np.random.normal(0, expl_noise_steer)
+                noise[1] = np.random.normal(0, expl_noise_throttle)
+                noise[2] = np.random.normal(0, expl_noise_brake)
 
-            # 差异化添加探索噪声：转向噪声单独降低
-            noise = np.zeros_like(action)
-            noise[0] = np.random.normal(0, expl_noise_steer)  # 转向噪声
-            noise[1:] = np.random.normal(0, expl_noise_throttle, size=2)  # 油门/刹车噪声
+            # 如果刚出赛道，降低转向探索
+            if off_track_counter > 0 and off_track_counter < 5:
+                noise[0] *= 0.3
+                noise[1] *= 1.2  # 稍微增加油门，鼓励回到赛道
+
             action = (action + noise).clip(-max_action, max_action)
 
             next_state, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
 
-            # 检测原地转圈：速度极低且转向角大
-            speed = info.get('speed', 0.0)
-            if abs(speed) < 0.2 and abs(action[0]) > 0.3:
-                spin_counter += 1
-                reward -= 0.5  # 原地转圈惩罚
-                if spin_counter > 10:  # 持续转圈超过10帧
-                    reward -= 2.0  # 加重惩罚
-                    truncated = True  # 强制结束回合
+            # 更新赛道状态计数
+            on_track = info.get('on_track', True)
+            if not on_track:
+                off_track_counter += 1
+                on_track_counter = 0
             else:
-                spin_counter = 0  # 重置计数器
+                on_track_counter += 1
+                if on_track_counter > 3:
+                    off_track_counter = 0
+
+            speed = info.get('speed', 0.0)
+            if abs(speed) < 0.2 and abs(action[0]) > 0.4:
+                spin_counter += 1
+                reward -= 0.3
+                if spin_counter > 15:
+                    reward -= 5.0
+                    truncated = True
+            else:
+                spin_counter = 0
 
             agent.replay_buffer.add((state, action, reward, next_state, done))
             state = next_state
@@ -77,23 +117,28 @@ def train():
             if done:
                 break
 
-        # 保存最佳模型
+        reward_history.append(episode_reward)
+
         if episode_reward > best_reward:
             best_reward = episode_reward
             os.makedirs("models", exist_ok=True)
             agent.save(f"models/td3_car_best")
             print(f"★ 新最佳模型！奖励: {episode_reward:.1f}")
 
+        # 动态噪声衰减
+        if episode > warmup_episodes:
+            expl_noise_steer = max(min_noise_steer, expl_noise_steer * 0.999)
+            expl_noise_throttle = max(min_noise_throttle, expl_noise_throttle * 0.9995)
+            expl_noise_brake = max(min_noise_brake, expl_noise_brake * 0.9995)
 
-        # 噪声衰减：转向噪声衰减更快
-        expl_noise_steer = max(0.001, expl_noise_steer * 0.99)  # 更快衰减
-        expl_noise_throttle = max(0.01, expl_noise_throttle * 0.995)
+        avg_reward = np.mean(reward_history[-10:]) if len(reward_history) >= 10 else episode_reward
 
         print(
-            f"回合: {episode + 1}, 奖励: {episode_reward:.1f}, 转向噪声: {expl_noise_steer:.4f}, "
-            f"油门噪声: {expl_noise_throttle:.3f}, 缓冲区: {len(agent.replay_buffer)}")
+            f"回合: {episode + 1}, 奖励: {episode_reward:.1f}, 平均奖励(10): {avg_reward:.1f}, "
+            f"转向噪声: {expl_noise_steer:.4f}, 油门噪声: {expl_noise_throttle:.3f}, "
+            f"缓冲区: {len(agent.replay_buffer)}")
 
-        if (episode + 1) % 50 == 0:
+        if (episode + 1) % 100 == 0:
             os.makedirs("models", exist_ok=True)
             agent.save(f"models/td3_car_{episode + 1}")
             print(f"模型已保存: models/td3_car_{episode + 1}")

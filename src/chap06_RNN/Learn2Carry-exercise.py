@@ -17,6 +17,22 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers
+import os
+import json
+from pathlib import Path
+
+# 运行参数（支持环境变量覆盖）
+RANDOM_SEED = int(os.getenv("LEARN2CARRY_SEED", "42"))
+TRAIN_STEPS = int(os.getenv("LEARN2CARRY_TRAIN_STEPS", "3000"))
+TRAIN_BATCH = int(os.getenv("LEARN2CARRY_TRAIN_BATCH", "200"))
+EVAL_BATCH = int(os.getenv("LEARN2CARRY_EVAL_BATCH", "2000"))
+MAXLEN = int(os.getenv("LEARN2CARRY_MAXLEN", "11"))
+LOG_INTERVAL = int(os.getenv("LEARN2CARRY_LOG_INTERVAL", "50"))
+REPORT_OUT = os.getenv("LEARN2CARRY_REPORT_OUT", "outputs/learn2carry_report.json")
+
+# 固定随机种子，保证结果可复现
+np.random.seed(RANDOM_SEED)
+tf.random.set_seed(RANDOM_SEED)
 
 
 # ======================================================
@@ -148,28 +164,31 @@ def train_step(model, optimizer, num1, num2, labels):
     return loss
 
 
-def train(model, optimizer, steps=1000):
+def train(model, optimizer, steps=1000, batch_size=200, log_interval=50, maxlen=11):
     """训练过程"""
+    final_loss = None
     for step in range(steps):
         # 生成训练数据
-        data = gen_data_batch(200, 0, 555_555_555)
-        nums1, nums2, results = batch_prepare(*data, maxlen=11)
+        data = gen_data_batch(batch_size, 0, 555_555_555)
+        nums1, nums2, results = batch_prepare(*data, maxlen=maxlen)
 
         # 单步训练
         loss = train_step(model, optimizer,
                           tf.constant(nums1, dtype=tf.int32),
                           tf.constant(nums2, dtype=tf.int32),
                           tf.constant(results, dtype=tf.int32))
+        final_loss = float(loss.numpy())
 
-        if step % 50 == 0:
-            print(f"Step {step:04d}: Loss = {loss.numpy():.4f}")
+        if step == 0 or (step + 1) % log_interval == 0:
+            print(f"Step {step + 1:04d}: Loss = {loss.numpy():.4f}")
+    return final_loss
 
 
-def evaluate(model):
+def evaluate(model, batch_size=2000, maxlen=11, preview_count=20):
     """评估模型精度"""
     # 生成测试数据（更大范围）
-    data = gen_data_batch(2000, 555_555_555, 999_999_999)
-    nums1, nums2, results = batch_prepare(*data, maxlen=11)
+    data = gen_data_batch(batch_size, 555_555_555, 999_999_999)
+    nums1, nums2, results = batch_prepare(*data, maxlen=maxlen)
 
     # 预测
     logits = model(tf.constant(nums1, dtype=tf.int32),
@@ -180,7 +199,7 @@ def evaluate(model):
     pred_nums = digits_batch_to_numlist(preds)
 
     # 打印部分预测
-    for truth, pred in list(zip(data[2], pred_nums))[:20]:
+    for truth, pred in list(zip(data[2], pred_nums))[:preview_count]:
         print(f"真实值: {truth:<12} 预测值: {pred:<12} 正确吗: {truth == pred}")
 
     # 计算准确率
@@ -194,11 +213,40 @@ def evaluate(model):
 # ======================================================
 
 if __name__ == "__main__":
+    if TRAIN_STEPS <= 0 or TRAIN_BATCH <= 0 or EVAL_BATCH <= 0 or LOG_INTERVAL <= 0 or MAXLEN <= 0:
+        raise ValueError("配置参数必须为正整数（steps/batch/log_interval/maxlen）")
+
     model = RNNAdder()
     optimizer = optimizers.Adam(0.001)
 
     print("开始训练...")
-    train(model, optimizer, steps=3000)
+    final_loss = train(
+        model,
+        optimizer,
+        steps=TRAIN_STEPS,
+        batch_size=TRAIN_BATCH,
+        log_interval=LOG_INTERVAL,
+        maxlen=MAXLEN,
+    )
 
     print("\n模型评估：")
-    evaluate(model)
+    acc = evaluate(model, batch_size=EVAL_BATCH, maxlen=MAXLEN)
+
+    # 保存实验报告（便于提交与复现）
+    report_path = Path(REPORT_OUT)
+    if not report_path.is_absolute():
+        report_path = Path(__file__).resolve().parent / report_path
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report = {
+        "seed": RANDOM_SEED,
+        "train_steps": TRAIN_STEPS,
+        "train_batch": TRAIN_BATCH,
+        "eval_batch": EVAL_BATCH,
+        "maxlen": MAXLEN,
+        "log_interval": LOG_INTERVAL,
+        "final_loss": final_loss,
+        "accuracy": float(acc),
+    }
+    with report_path.open("w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    print("评估报告已保存:", report_path.resolve())

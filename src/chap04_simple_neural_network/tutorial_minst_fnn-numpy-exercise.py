@@ -3,23 +3,23 @@
 # ## 准备数据
 # In[1]:
 
+# 导入操作系统接口模块，用于设置环境变量
+import os
 # 导入 NumPy 数值计算库，用于高效处理多维数组和矩阵运算
 import numpy as np
 # 导入 TensorFlow 深度学习框架
 import tensorflow as tf
 # 从 tqdm 库中导入 tqdm 函数
 from tqdm import tqdm
-# 从 TensorFlow 中导入 Keras 高级 API
-from tensorflow import keras
-# 从 Keras 中导入常用模块
-from tensorflow.keras import layers, optimizers, datasets
+# 通过 tf.keras 访问 Keras，兼容所有 TensorFlow 版本
+keras = tf.keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
 # 定义了一个函数 mnist_dataset()，用于加载并预处理 MNIST 数据集
 def mnist_dataset():
-    (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    (x, y), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
     # normalize 归一化：将像素值从 [0, 255] 缩放到 [0, 1] 范围内
     x = x / 255.0
     x_test = x_test / 255.0
@@ -110,13 +110,18 @@ class Softmax:
     def forward(self, x):
         '''
         x: shape(N, c)
+        使用 log-sum-exp trick 保证数值稳定性：
+        先减去每行最大值再做 exp，避免大输入时指数溢出为 inf。
+        数学上等价：softmax(x) = softmax(x - max(x))，结果不变。
         '''
-        # 对输入数据应用指数函数，确保所有值为正
-        x_exp = np.exp(x)
+        # 减去每行最大值，防止 exp 数值上溢（log-sum-exp trick）
+        x_shifted = x - np.max(x, axis=1, keepdims=True)
+        # 对偏移后的数据应用指数函数，此时最大值为 exp(0)=1，不会溢出
+        x_exp = np.exp(x_shifted)
         # 计算每个样本的归一化分母（分区函数）
         partition = np.sum(x_exp, axis=1, keepdims=True)
         # 计算 softmax 输出：指数值 / 分区函数
-        # 添加 epsilon 防止除零错误（数值稳定性）
+        # 添加 epsilon 防止除零错误
         out = x_exp / (partition + self.epsilon)
 
         # 将计算结果存入内存字典，用于反向传播
@@ -335,8 +340,14 @@ with tf.GradientTape() as tape:
 class myModel:
     def __init__(self):# 初始化模型参数，使用随机正态分布初始化权重矩阵
         # 权重矩阵包含偏置项，通过增加输入特征维度实现
-        self.W1 = np.random.normal(size=[28 * 28 + 1, 100])  # 输入层到隐藏层，增加偏置项，W1: 连接输入层(784+1)和隐藏层(100)的权重矩阵
-        self.W2 = np.random.normal(size=[100, 10])           # 输入层到隐藏层，增加偏置项，W2: 连接隐藏层(100)和输出层(10)的权重矩阵
+        # He 初始化：std = sqrt(2 / fan_in)，专为 ReLU 激活函数设计
+        # 相比默认 std=1.0，能避免激活值方差过大导致 softmax 极端化
+        self.W1 = np.random.normal(scale=np.sqrt(2.0 / (28 * 28 + 1)), size=[28 * 28 + 1, 100])  # W1: 连接输入层(784+1)和隐藏层(100)
+        self.W2 = np.random.normal(scale=np.sqrt(2.0 / 100), size=[100, 10])                      # W2: 连接隐藏层(100)和输出层(10)
+        # 动量 SGD：初始化速度向量（与权重形状相同，初始为0）
+        # 动量项累积历史梯度方向，使更新更平滑，加速收敛
+        self.v_W1 = np.zeros_like(self.W1)  # W1 的速度变量
+        self.v_W2 = np.zeros_like(self.W2)  # W2 的速度变量
         # 初始化各层操作对象
         self.mul_h1 = Matmul()      # 第一个矩阵乘法层(输入到隐藏层)
         self.mul_h2 = Matmul()      # 第二个矩阵乘法层(隐藏层到输出层)
@@ -417,15 +428,24 @@ def compute_accuracy(log_prob, labels):
     return np.mean(predictions == truth)
 
 
-# 单步训练函数
-def train_one_step(model, x, y):
+# 单步训练函数（动量 SGD）
+def train_one_step(model, x, y, lr=1e-5, momentum=0.9):
+    """
+    使用动量 SGD 更新权重。
+    动量公式：v = momentum * v - lr * grad
+               W = W + v
+    相比朴素梯度下降，动量项能累积历史方向，加速收敛、减少震荡。
+    """
     # 前向传播：计算模型的输出
     model.forward(x)
     # 反向传播：计算梯度
     model.backward(y)
-    # 使用梯度下降法更新权重，学习率为 1e-5
-    model.W1 -= 1e-5 * model.W1_grad
-    model.W2 -= 1e-5 * model.W2_grad
+    # 动量更新 W1：速度 = 动量 * 旧速度 - 学习率 * 梯度
+    model.v_W1 = momentum * model.v_W1 - lr * model.W1_grad
+    model.W1 += model.v_W1
+    # 动量更新 W2
+    model.v_W2 = momentum * model.v_W2 - lr * model.W2_grad
+    model.W2 += model.v_W2
     # 计算损失值
     loss = compute_loss(model.h2_log, y)
     # 计算准确率
@@ -454,12 +474,21 @@ def prepare_data():
     return train_data[0], train_label, test_data[0], test_label
 
 
-def train(model, train_data, train_label, epochs=50, batch_size=128):
+def train(model, train_data, train_label, epochs=50, batch_size=128,
+          lr_init=1e-5, lr_decay=0.95, momentum=0.9):
+    """
+    训练循环，支持学习率指数衰减和动量 SGD。
+    学习率衰减公式：lr = lr_init * (lr_decay ^ epoch)
+    每个 epoch 结束后学习率乘以 lr_decay，使后期训练更精细。
+    """
     losses = []
     accuracies = []
     num_samples = train_data.shape[0]
 
     for epoch in tqdm(range(epochs), desc="Training"):
+        # 学习率指数衰减：随 epoch 增大，学习率逐渐降低
+        lr = lr_init * (lr_decay ** epoch)
+
         # 打乱数据顺序
         indices = np.random.permutation(num_samples)
         shuffled_data = train_data[indices]
@@ -472,8 +501,9 @@ def train(model, train_data, train_label, epochs=50, batch_size=128):
             # 获取当前批次数据
             batch_data = shuffled_data[i:i + batch_size]
             batch_labels = shuffled_labels[i:i + batch_size]
-            # 执行单步训练
-            loss, accuracy = train_one_step(model, batch_data, batch_labels)
+            # 执行单步训练（传入当前 epoch 的学习率和动量系数）
+            loss, accuracy = train_one_step(model, batch_data, batch_labels,
+                                            lr=lr, momentum=momentum)
             # 累计统计量
             epoch_loss += loss * batch_data.shape[0]
             epoch_accuracy += accuracy * batch_data.shape[0]
@@ -483,7 +513,7 @@ def train(model, train_data, train_label, epochs=50, batch_size=128):
         epoch_accuracy /= num_samples
         losses.append(epoch_loss)
         accuracies.append(epoch_accuracy)
-        print(f'Epoch {epoch}: Loss {epoch_loss:.4f}; Accuracy {epoch_accuracy:.4f}')
+        print(f'Epoch {epoch} (lr={lr:.2e}): Loss {epoch_loss:.4f}; Accuracy {epoch_accuracy:.4f}')
     return losses, accuracies
 
 if __name__ == "__main__":

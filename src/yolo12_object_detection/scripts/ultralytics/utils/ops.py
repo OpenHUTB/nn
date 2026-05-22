@@ -289,6 +289,32 @@ def soft_nms(bboxes, scores, iou_thresh=0.5, sigma=0.5,score_threshold=0.25):
     
     return torch.LongTensor(keep)
 
+def diou_nms(boxes, scores, iou_threshold=0.5):
+    """DIoU-based NMS: 保留高召回率，尤其适合前后遮挡场景"""
+    x1, y1, x2, y2 = boxes.unbind(dim=-1)
+    areas = (x2 - x1) * (y2 - y1)
+    order = scores.argsort(descending=True)
+    keep = []
+    while order.numel():
+        i = order[0]
+        keep.append(i)
+        if order.numel() == 1:
+            break
+        xx1 = torch.max(x1[i], x1[order[1:]])
+        yy1 = torch.max(y1[i], y1[order[1:]])
+        xx2 = torch.min(x2[i], x2[order[1:]])
+        yy2 = torch.min(y2[i], y2[order[1:]])
+        inter = torch.clamp(xx2-xx1,0)*torch.clamp(yy2-yy1,0)
+        iou = inter / (areas[i] + areas[order[1:]] - inter)
+        cw = torch.max(x2[i], x2[order[1:]]) - torch.min(x1[i], x1[order[1:]])
+        ch = torch.max(y2[i], y2[order[1:]]) - torch.min(y1[i], y1[order[1:]])
+        diag2 = cw**2 + ch**2 + 1e-7
+        d2 = ((x1[i]+x2[i])/2 - (x1[order[1:]]+x2[order[1:]])/2)**2 + \
+             ((y1[i]+y2[i])/2 - (y1[order[1:]]+y2[order[1:]])/2)**2
+        diou = iou - d2/diag2
+        order = order[1:][diou < iou_threshold]
+    return torch.tensor(keep, device=boxes.device)
+
 def non_max_suppression(
     prediction,
     conf_thres=0.25,
@@ -418,7 +444,7 @@ def non_max_suppression(
             i = nms_rotated(boxes, scores, iou_thres)
         else:
             boxes = x[:, :4] + c  # boxes (offset by class)
-            i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+            i = diou_nms(boxes, scores, iou_thres)  # NMS
             # i = soft_nms(boxes, scores, iou_thres) $ Soft-NMS
         i = i[:max_det]  # limit detections
 

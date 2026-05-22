@@ -208,5 +208,61 @@ git config --global --unset https.proxy
 📝 许可证
 本项目仅供研究和教育用途。
 
+## 🎬 运行效果
+
+### 终端运行日志
+以下为 `main.py` 成功运行时的终端输出，证明程序已正确连接 CARLA 服务器并初始化所有模块：
+
+CARLA 0.9.15 connected at 127.0.0.1:2000.
+INFO:  Found the required file in cache!  Carla/Maps/Nav/Town10HD_Opt.bin
+INFO:  Found the required file in cache!  Carla/Maps/TM/Town10HD.bin
+Initializing sensor: RGBCamera
+
+AUTONOMOUS DRIVING DATA RECORDING SYSTEM
+============================================================
+Controls:
+  R - Toggle data recording ON/OFF
+  S - Show recording status
+  ESC - Exit simulation
+
+Data being recorded:
+  - RGB camera images (400x224)
+  - Control signals (steer, throttle, brake)
+  - Vehicle speed and transform
+  - Timestamps and frame IDs
+  - Sampling rate: 10.0 Hz
+  - Output directory: dataset
+============================================================
+
+## 🔧 修复记录
+
+本项目基于原 `Carla-Project` 进行了以下修复和优化：
+
+| 问题 | 修复方案 |
+|------|----------|
+| `EgoVehicleController` 缺少 `controller` 属性 | 在 `__init__` 中初始化 `self.controller = None`，并在 `setup_ego_vehicle` 中正确赋值 |
+| YOLOPv2 模型缺失 | 添加 `yolopv2.pt` 预训练模型文件 |
+| 入口文件名不符合规范 | 将 `Main.py` 重命名为 `main.py` |
+
+## ⚠️ 硬件要求
+
+- **最低要求**：独立显卡（6GB+ 显存）
+- **集成显卡**：只能运行无渲染模式（`-RenderOffScreen`），无法显示 3D 画面
+
+## 📝 已知问题
+
+- 集成显卡环境下，CARLA 3D 城市窗口无法正常显示
+- 建议在独立显卡环境下运行以获得完整可视化体验
+
+## 🚀 一键启动
+
+### Windows
+双击 `main.bat` 即可启动
+
+### Linux/Mac
+```bash
+chmod +x main.sh
+./main.sh
+
 🤝 贡献
 欢迎提交 Issue 和 Pull Request。
