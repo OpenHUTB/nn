@@ -44,8 +44,8 @@ class DoubleDQNAgent(BaseAgent):
     4. 学习率调度: 自动学习率衰减
     """
     
-    def __init__(self, state_space_shape, action_n, config_path=None, 
-                 load_state=False, load_model=None, **kwargs):
+    def __init__(self, state_space_shape, action_n, config_path=None,
+                 load_state=False, load_model=None, hyperparameter_overrides=None, **kwargs):
         """
         初始化 DoubleDQN 智能体
         
@@ -95,7 +95,8 @@ class DoubleDQNAgent(BaseAgent):
             config=self.config,
             config_path=None,
             load_state=load_state,
-            load_model=load_model
+            load_model=load_model,
+            hyperparameter_overrides=hyperparameter_overrides
         )
         
         # -------------------------------------------------------------------------
@@ -114,8 +115,9 @@ class DoubleDQNAgent(BaseAgent):
     
     def _build_networks(self):
         """构建策略网络和目标网络"""
-        self.policy_net = BaseDQNNetwork(self.state_shape, self.action_n).float()
-        self.frozen_net = BaseDQNNetwork(self.state_shape, self.action_n).float()
+        dueling = bool(self.hyperparameters.get('dueling', True))
+        self.policy_net = BaseDQNNetwork(self.state_shape, self.action_n, dueling=dueling).float()
+        self.frozen_net = BaseDQNNetwork(self.state_shape, self.action_n, dueling=dueling).float()
         self.frozen_net.load_state_dict(self.policy_net.state_dict())
         self.policy_net = self.policy_net.to(self.device)
         self.frozen_net = self.frozen_net.to(self.device)
@@ -137,39 +139,44 @@ class DoubleDQNAgent(BaseAgent):
         4. 应用软更新到目标网络
         """
         self.n_updates += 1
-        states, actions, rewards, new_states, terminateds = self.get_samples(batch_size)
-        
-        # -------------------------------------------------------------------------
-        # 步骤1: 计算当前Q值
-        # -------------------------------------------------------------------------
-        current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
-        
-        # -------------------------------------------------------------------------
-        # 步骤2: Double DQN 目标Q值计算
-        # -------------------------------------------------------------------------
-        with torch.no_grad():
-            # 【关键区别】先用策略网络选择最优动作
-            next_actions = self.policy_net(new_states).argmax(1, keepdim=True)
-            
-            # 再用目标网络评估该动作的Q值
-            next_q = self.frozen_net(new_states).gather(1, next_actions)
-            
-            # 计算最终目标Q值
-            # target = r + γ * Q_target(s', argmax(Q_policy(s', :)))
-            target_q = rewards.unsqueeze(1) + (1 - terminateds.float().unsqueeze(1)) * \
-                      self.gamma * next_q
-        
-        # -------------------------------------------------------------------------
-        # 步骤3: 计算损失并更新
-        # -------------------------------------------------------------------------
-        loss = self.loss_fn(current_q, target_q)
-        self.optimizer.zero_grad()
-        loss.backward()
-        
-        # 【改进】梯度裁剪: 防止梯度爆炸
-        # 将梯度的L2范数裁剪到指定阈值
-        torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), self.max_grad_norm)
-        self.optimizer.step()
+        states, actions, rewards, new_states, dones = self.get_samples(batch_size)
+        target_q_clip = self.hyperparameters.get("target_q_clip", None)
+        try:
+            target_q_clip_f = None if target_q_clip is None else float(target_q_clip)
+        except (TypeError, ValueError):
+            target_q_clip_f = None
+
+        if self.use_amp:
+            from torch.cuda.amp import autocast
+            with torch.no_grad(), autocast():
+                next_actions = self.policy_net(new_states).argmax(1, keepdim=True)
+                next_q = self.frozen_net(new_states).gather(1, next_actions)
+                target_q = rewards.unsqueeze(1) + (1 - dones.float().unsqueeze(1)) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
+
+            self.optimizer.zero_grad(set_to_none=True)
+            with autocast():
+                current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
+                loss = self.loss_fn(current_q, target_q)
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), self.max_grad_norm)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
+            with torch.no_grad():
+                next_actions = self.policy_net(new_states).argmax(1, keepdim=True)
+                next_q = self.frozen_net(new_states).gather(1, next_actions)
+                target_q = rewards.unsqueeze(1) + (1 - dones.float().unsqueeze(1)) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
+            loss = self.loss_fn(current_q, target_q)
+            self.optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), self.max_grad_norm)
+            self.optimizer.step()
         
         # -------------------------------------------------------------------------
         # 步骤4: 更新学习率
@@ -183,7 +190,8 @@ class DoubleDQNAgent(BaseAgent):
         # 软更新公式: Q_target = τ * Q_policy + (1 - τ) * Q_target
         # 其中 τ 是很小的值 (如 0.005)
         # 这比硬更新 (每N步完全复制) 更平滑稳定
-        if self.n_updates % self.update_target_every == 0:
+        update_every = int(self.update_target_every) if self.update_target_every is not None else 1
+        if update_every <= 1 or (self.act_taken % update_every) == 0:
             for target_param, policy_param in zip(
                 self.frozen_net.parameters(), self.policy_net.parameters()
             ):
@@ -191,7 +199,7 @@ class DoubleDQNAgent(BaseAgent):
                     self.tau * policy_param.data + (1.0 - self.tau) * target_param.data
                 )
         
-        return current_q.mean().item(), loss.item()
+        return current_q.mean().item(), float(loss.item())
     
     def save(self, save_dir, filename):
         """

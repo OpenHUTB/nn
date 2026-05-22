@@ -1,0 +1,42 @@
+---
+turn_tgt_speeds: 6.0
+lane_tgt_speeds: 6.5
+min_speeds: 0.0
+max_speeds: 8.0
+num_speeds: 4
+min_orient: -95
+max_orient: 95
+num_orient: 5
+max_steers: 1.
+max_throts: 1.
+num_steers: 9
+num_throts: 3
+
+num_repeat: 4
+num_ignore_first: 50
+num_per_flush: 9000
+
+num_plan: 5
+thro_rew: 1.0
+brak_rew: 5.0
+stop_rew: 0.1
+temperature: 0.01
+
+camera_x: 1.5
+camera_z: 2.4
+
+log_wandb: True
+noise_collect: True
+
+# Resolution of captured video feed
+width: 1024
+height: 512
+
+# Information for data collection (script: rails/data_phase1.py, agent model: autoagents/collector_agents/collector.py):
+
+# Location of pre-trained ego model used for data collection
+ego_model_dir: autoagents/collector_agents/ego_model_data_collection.th
+
+# Where data collected with q collector relying on pre-trained ego model is saved (rails.data_phase1.py)
+main_data_dir: /storage/felix/Afstudeerproject/final_training_dataset512_256
+

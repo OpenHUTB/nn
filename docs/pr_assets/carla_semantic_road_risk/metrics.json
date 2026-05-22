@@ -1,0 +1,18 @@
+{
+  "source": "CARLA SemanticSegmentation camera label grid",
+  "image_shape": [
+    18,
+    28
+  ],
+  "road_pixels": 318,
+  "vehicle_pixels": 16,
+  "pedestrian_pixels": 2,
+  "near_hazard_pixels": 17,
+  "drivable_ratio": 0.631,
+  "risk_score": 0.7144,
+  "recommended_action": "slow_down",
+  "generated_files": [
+    "carla_semantic_camera_view.png",
+    "carla_semantic_risk_heatmap.png"
+  ]
+}

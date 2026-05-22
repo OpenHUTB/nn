@@ -1,6 +1,29 @@
 # carla-simulator-CAM
 用于在 Carla 模拟器中使用类激活映射（Class Activation Mapping, CAM）技术测试卷积神经网络（CNN）的应用。  
-该项目旨在提高自动驾驶背景下深度学习模型的透明度。
+该项目旨在提高自动驾驶背景下深度学习模型的透明度。  
+  
+## 项目结构
+```text
+.
+├── carlacomms
+│   ├── __init__.py
+│   ├── carla_sensor_platform.py
+│   ├── config.py
+│   └── generate_traffic.py
+├── diagrams
+│   └── menu_logic.drawio
+├── visualizer
+│   ├── __init__.py
+│   ├── gui_CAM.py
+│   ├── parameters.py
+│   └── roc_functions.py
+├── Dockerfile
+├── LICENSE
+├── main.py
+├── notes.txt
+├── README.md
+└── requirements.txt
+```
 
 ## 使用方法
 运行主脚本前，保证hutb模拟器在运行
@@ -63,6 +86,9 @@
 - **Python 版本**：python 3.8
 - **HUTB 模拟器**：本应用基于HUTB（定制版 CARLA）运行。请选择：
   - HUTB 模拟器（版本需与提供的 `.whl` 文件匹配）
+  
+
+
 
 ### 注意项
 由于是在hutb模拟器上进行测试，不要将原生的python API 与hutb 提供的专用python API 混乱，不然导致无法运行

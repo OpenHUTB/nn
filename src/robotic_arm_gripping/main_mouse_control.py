@@ -65,11 +65,12 @@ def main():
             shoulder_error = shoulder_target - data.qpos[shoulder_joint_id]
             shoulder_vel = data.qvel[shoulder_joint_id]
             data.ctrl[shoulder_act_id] = kp * shoulder_error - kd * shoulder_vel
-
+            data.ctrl[shoulder_act_id] = np.clip(data.ctrl[shoulder_act_id], -500, 500) 
             # 肘关节控制
             elbow_error = elbow_target - data.qpos[elbow_joint_id]
             elbow_vel = data.qvel[elbow_joint_id]
             data.ctrl[elbow_act_id] = kp * elbow_error - kd * elbow_vel
+            data.ctrl[elbow_act_id] = np.clip(data.ctrl[elbow_act_id], -800, 800)
 
             # 夹爪保持张开状态
             data.ctrl[model.actuator("left").id] = 0.0
