@@ -35,17 +35,17 @@
 
 ```text
 日、红、山、夜、湖、海、月
-4. 参考资料
+### 4. 参考资料
 Xingxing Zhang and Mirella Lapata. 2014. Chinese Poetry Generation with Recurrent Neural Networks. Proceedings of EMNLP 2014.
 参考博客：https://blog.csdn.net/Irving_zhang/article/details/76664998
-三、实验任务二：Learn2Carry 大数加法预测
-1. 项目概述
+## 三、实验任务二：Learn2Carry 大数加法预测
+### 1. 项目概述
 
 Learn2Carry-exercise.py 使用 TensorFlow 构建循环神经网络模型，实现对大数加法结果的预测。
 
 该任务将整数拆分为数位序列，并将数位顺序反转，使模型可以从低位到高位依次学习加法中的进位规律。通过训练，RNN 可以逐位预测两个整数相加后的结果。
 
-四、环境依赖
+## 四、环境依赖
 
 运行本项目需要安装以下依赖：
 
@@ -63,8 +63,8 @@ Python >= 3.8
 TensorFlow >= 2.x
 NumPy
 tqdm
-五、核心模块说明
-1. 数据生成
+## 五、核心模块说明
+### 1. 数据生成
 
 通过随机生成两个整数及其求和结果，构造训练数据。
 
@@ -74,7 +74,7 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
-2. 数据预处理
+### 2. 数据预处理
 
 为了让 RNN 更容易学习加法中的进位规律，需要对整数进行如下处理：
 
@@ -103,7 +103,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     results = [pad2len(o, maxlen) for o in results]
 
     return np.array(Nums1), np.array(Nums2), np.array(results)
-3. RNN 模型结构
+### 3. RNN 模型结构
 
 模型主要由以下部分组成：
 
@@ -128,7 +128,7 @@ class myRNNModel(keras.Model):
         logits = self.dense(rnn_out)
 
         return logits
-4. 模型设计说明
+### 4. 模型设计说明
 Embedding 层
 
 将单个数字映射为高维向量，使模型能够学习数字之间的表示关系。
@@ -141,8 +141,8 @@ RNN 层
 
 两个加数的数位嵌入会在最后一个维度进行拼接，使模型能够同时学习两个数当前位之间的关系。
 
-六、训练与评估
-1. 训练流程
+## 六、训练与评估
+### 1. 训练流程
 
 训练过程中，每一步都会随机生成一批整数对，并将其转换为数位序列输入模型。
 
@@ -155,7 +155,7 @@ def train(steps, model, optimizer):
 
         if step % 50 == 0:
             print(f"Step {step}: Loss = {loss.numpy():.4f}")
-2. 模型评估
+### 2. 模型评估
 
 评估阶段会在更大的数值范围上测试模型泛化能力。
 
@@ -171,7 +171,7 @@ def evaluate(model):
     accuracy = np.mean([gt == pred for gt, pred in zip(datas[2], pred_nums)])
 
     print(f"Accuracy: {accuracy * 100:.2f}%")
-七、运行方法
+## 七、运行方法
 1. 安装依赖
 
 请先确保已安装 TensorFlow 2.x 及相关依赖：
@@ -191,7 +191,7 @@ $env:LEARN2CARRY_LOG_INTERVAL=10
 $env:LEARN2CARRY_REPORT_OUT="outputs/learn2carry_report.json"
 
 python .\Learn2Carry-exercise.py
-八、工程化改进说明
+## 八、工程化改进说明
 
 在不改变 RNN 加法核心逻辑的前提下，对 Learn2Carry-exercise.py 进行了小幅工程化优化。
 
@@ -219,14 +219,14 @@ outputs/learn2carry_report.json
 
 报告中可记录训练参数、评估准确率等信息，方便后续查看和对比实验结果。
 
-九、参数调整建议
+## 九、参数调整建议
 参数	说明	建议
 maxlen	最大数位长度	根据加法数字位数调整
 batch_size	批量大小	增大可提升训练稳定性，但会增加内存占用
 train_steps	训练步数	步数越多通常效果越好
 RNN hidden size	RNN 隐藏层维度	可尝试从 64 调整为 128
 learning_rate	学习率	可根据 loss 变化情况适当调整
-十、实验结果示例
+## 十、实验结果示例
 
 训练过程中可能输出如下日志：
 
@@ -239,14 +239,14 @@ Accuracy: 98.75%
 
 实际结果会受到训练步数、batch size、随机种子和运行环境影响。
 
-十一、项目文件说明
+## 十一、项目文件说明
 .
 ├── Learn2Carry-exercise.py       # RNN 大数加法实验代码
 ├── rnn.py                        # PyTorch 版本 RNN 相关代码
 ├── outputs/                      # 实验结果输出目录
 │   └── learn2carry_report.json   # 自动生成的实验报告
 └── README.md                     # 项目说明文档
-十二、总结
+## 十二、总结
 
 本项目通过唐诗生成和大数加法预测两个任务，展示了循环神经网络在序列建模任务中的应用。
 
