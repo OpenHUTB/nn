@@ -224,6 +224,14 @@ class KeyboardControl(object):
                 elif event.key == pygame.K_h:
                     # 显示帮助
                     self.world.hud.help.toggle()
+                elif event.key == pygame.K_n:
+                    # 切换下一种天气
+                    self.world.next_weather(reverse=False)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
+                elif event.key == pygame.K_m:
+                    # 切换上一种天气
+                    self.world.next_weather(reverse=True)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
 
     @staticmethod
     def _is_quit_shortcut(key):
@@ -256,6 +264,8 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
+        self.total_distance = 0.0
+        self.last_location = None
 
     def on_world_tick(self, timestamp):
         """Gets informations from the world at every tick"""
@@ -266,6 +276,14 @@ class HUD(object):
 
     def tick(self, world, clock):
         """HUD method for every tick"""
+        # 计算行驶里程
+        current_location = world.player.get_location()
+        if self.last_location is not None:
+            # 计算移动距离（米）
+            delta = current_location.distance(self.last_location)
+            self.total_distance += delta
+        self.last_location = current_location
+
         self._notifications.tick(world, clock)
         if not self._show_info:
             return
@@ -295,6 +313,7 @@ class HUD(object):
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % transform.location.z,
+            'Odometer: % 10.2f km' % (self.total_distance / 1000.0),
             '']
         if isinstance(control, carla.VehicleControl):
             self._info_text += [
@@ -431,6 +450,8 @@ class HelpText(object):
             "",
             "C        - Switch Camera View",
             "H        - Show/Hide Help",
+            "N        - Next Weather",
+            "M        - Previous Weather",
             "Ctrl+Q   - Quit",
             "ESC      - Quit",
             "",

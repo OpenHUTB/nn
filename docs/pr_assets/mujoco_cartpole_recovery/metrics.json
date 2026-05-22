@@ -1,0 +1,13 @@
+{
+  "source": "MuJoCo cart-pole recovery rollout",
+  "records": 260,
+  "initial_angle_rad": 0.241479,
+  "final_angle_rad": 1.47253,
+  "max_control_force": 8.0,
+  "control_effort": 20.178872,
+  "stable_time_s": 1.53,
+  "generated_files": [
+    "mujoco_cartpole_recovery_curve.png",
+    "mujoco_cartpole_control_force.png"
+  ]
+}
