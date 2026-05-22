@@ -1,11 +1,13 @@
 import cv2
 import gym
+import gym.spaces as spaces
 import time
 import math
 import carla
 import imutils
 import numpy as np
 from min_carla_env.matrix_world import MatrixWorld
+from min_carla_env.rewards import RewardCalculator
 
 import logging
 from typing import Optional
@@ -43,12 +45,12 @@ CONFIG = {
     "width": 480,
     "height": 480,
     "max_step": 90000,
-    "render": True
+    "render": True,
+    "continuous": True,
+    "target_speed": 30.0,
 }
 
 
-# only three actions for simplicty
-# stable, left, right
 ACTIONS = {
     0: [0.0, 0.0],    # Coast
     1: [0.0, -0.5],   # Turn Left
@@ -61,7 +63,8 @@ class CarlaEnv(gym.Env):
     Unfortunately it only uses the gym environment interface.
     Its not that much compatible with gym."""
 
-    def __init__(self, client, config, world_config={}, debug=False, demo=False):
+    def __init__(self, client, config, world_config={}, debug=False, demo=False,
+                 reward_weights=None):
         self.debug = debug
         self.done = False
         self.rgb_data = None
@@ -74,8 +77,10 @@ class CarlaEnv(gym.Env):
         self.config = config
         self.max_step = config["max_step"]
         self.demo = demo
-        self.client = client  # 保存客户端引用
-        self.mw = None  # 初始化MatrixWorld为None
+        self.continuous = config.get("continuous", False)
+        self.target_speed = config.get("target_speed", 30.0)
+        self.client = client
+        self.mw = None
         self.world = None
         self.vehicle = None
         self.rgb_sensor = None
@@ -87,6 +92,23 @@ class CarlaEnv(gym.Env):
             "prev_loc": None
         }
         self.hist_wp = None
+        self._last_steer = 0.0
+
+        obs_shape = (config["height"], config["width"])
+        self.observation_space = spaces.Box(
+            low=0, high=5, shape=obs_shape, dtype=np.uint8
+        )
+
+        if self.continuous:
+            self.action_space = spaces.Box(
+                low=np.array([-1.0, -1.0], dtype=np.float32),
+                high=np.array([1.0, 1.0], dtype=np.float32),
+                dtype=np.float32,
+            )
+        else:
+            self.action_space = spaces.Discrete(3)
+
+        self.reward_calc = RewardCalculator(weights=reward_weights)
 
         try:
             # 初始化MatrixWorld（增加重连机制）
@@ -235,6 +257,8 @@ class CarlaEnv(gym.Env):
         self.crossed_lane_hist = []
         self.hist_wp = None
         self.stuck_count = 0
+        self._last_steer = 0.0
+        self.reward_calc.reset()
 
         try:
             self.mw.clean_world()
@@ -315,13 +339,33 @@ class CarlaEnv(gym.Env):
                 return True
         return False
 
+    def _apply_action(self, action):
+        if self.continuous:
+            steer = float(np.clip(action[0], -1.0, 1.0))
+            throttle_brake = float(np.clip(action[1], -1.0, 1.0))
+            if throttle_brake >= 0:
+                throttle = throttle_brake
+                brake = 0.0
+            else:
+                throttle = 0.0
+                brake = -throttle_brake
+        else:
+            action = ACTIONS[int(action)]
+            steer = float(np.clip(action[1], -1, 1))
+            throttle = 0.3
+            brake = 0.0
+            kmh = self.measurements.get("kmh", 0)
+            if kmh >= 20:
+                brake = 0.2
+                throttle = 0.0
+
+        self._last_steer = steer
+        self.vehicle.apply_control(carla.VehicleControl(
+            throttle=throttle, brake=brake, steer=steer,
+            reverse=False, hand_brake=False))
+
     def step(self, action):
-        """Apply action, calculate reward, return observation."""
-        # interpret actions
-        action = ACTIONS[int(action)]
-        steer = float(np.clip(action[1], -1, 1))
-        reverse = False
-        hand_brake = False
+        self._apply_action(action)
 
         measurements = self.get_measurements()
         kmh = measurements["kmh"]
@@ -330,58 +374,69 @@ class CarlaEnv(gym.Env):
         else:
             self.collision_hist = []
 
-        # make the car always in stable velocity
-        brake = 0.0
-        throttle = 0.3
-        if kmh >= 20:
-            brake = 0.2
-            throttle = 0.0
-        self.vehicle.apply_control(carla.VehicleControl(
-            throttle=throttle, brake=brake, steer=steer,
-            reverse=reverse, hand_brake=hand_brake))
-
-        # calculate reward
-        reward = 0.0
         vehicle_location = self.vehicle.get_transform().location
-        reward += self.simple_loc_reward(self.mw.world.get_map(), vehicle_location)
+        world_map = self.mw.world.get_map()
 
-        # count stuck to be able to stop running
+        has_collision = len(self.collision_hist) > 0
+        crossed_types = list(self.crossed_lane_hist)
+        is_stuck = self.is_stuck(vehicle_location)
+
+        reward, reward_info = self.reward_calc.compute(
+            world_map=world_map,
+            location=vehicle_location,
+            kmh=kmh,
+            has_collision=has_collision,
+            crossed_types=crossed_types,
+            is_stuck=is_stuck,
+            steer=self._last_steer,
+        )
+
         self.steps += 1
-        if self.is_stuck(vehicle_location):
+        if is_stuck:
             self.stuck_count += 1
         else:
             self.stuck_count = 0
 
         self.measurements = measurements
+        self.crossed_lane_hist = []
+
         if self.steps >= self.max_step:
             self.done = True
 
-        current_w = self.mw.world.get_map().get_waypoint(vehicle_location)
-        if reward <= -1000.0:   # limit the reward
+        current_w = world_map.get_waypoint(vehicle_location)
+
+        if reward <= -1000.0:
             self.done = True
-        if len(self.collision_hist) != 0:   # stop on collision
+        if has_collision:
             self.done = True
-            reward *= 2
-        if len(self.crossed_lane_hist) != 0:    # stop on crossed lane
-            for lane_marking in self.crossed_lane_hist:
-                if lane_marking == carla.LaneMarkingType.Solid or\
+            reward -= 20.0
+        if crossed_types:
+            for lane_marking in crossed_types:
+                if lane_marking == carla.LaneMarkingType.Solid or \
                         lane_marking == carla.LaneMarkingType.NONE:
                     self.done = True
-                    reward *= 2
+                    reward -= 10.0
                     break
-            self.crossed_lane_hist = []
-        if current_w.lane_type == carla.LaneType.Sidewalk:  # stop on out of road
+        if current_w.lane_type == carla.LaneType.Sidewalk:
             self.done = True
-            reward *= 2
-        if self.stuck_count > 20:   # stop on stuck
+            reward -= 10.0
+        if self.stuck_count > 20:
             self.done = True
             reward -= 100.0
-        
+
         if self.demo and self.stuck_count < 20:
             self.done = False
 
-        return self.semantic_data, reward, self.done, {}
-        # return (self.rgb_data, self.semantic_data), reward, self.done, {}
+        info = {
+            "kmh": kmh,
+            "collision": has_collision,
+            "lane_invasion": len(crossed_types) > 0,
+            "stuck": is_stuck,
+            "stuck_count": self.stuck_count,
+            "reward_breakdown": reward_info,
+        }
+
+        return self.semantic_data, reward, self.done, info
 
     def close(self):
         """手动关闭环境，释放所有资源"""
