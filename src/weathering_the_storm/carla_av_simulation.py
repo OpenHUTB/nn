@@ -16,6 +16,13 @@ import traceback
 from matplotlib import pyplot as plt
 from pathlib import Path
 
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+    logging.warning("PyYAML not installed. Config file loading will use fallback defaults.")
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +32,220 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+
+
+class ConfigLoader:
+    """
+    Configuration loader for CARLA AV Simulation.
+    
+    Loads settings from carla_settings.ini (YAML format) and provides
+    easy access to all configuration parameters with fallback defaults.
+    
+    Features:
+    - Load from YAML config file (carla_settings.ini)
+    - Provide default values if config missing
+    - Validate parameter ranges
+    - Support runtime config updates
+    """
+    
+    DEFAULT_CONFIG = {
+        'simulation': {
+            'version': '0.9.15',
+            'tick_rate': 30,
+            'duration': 600,
+            'random_seed': 42,
+            'synchronous_mode': True
+        },
+        'world': {
+            'weather': {
+                'rain_intensity': 100.0,
+                'puddles': 100.0,
+                'wetness': 100.0,
+                'fog_density': 20.0,
+                'wind_intensity': 50.0,
+                'cloudiness': 100.0,
+                'sun_altitude_angle': 45.0,
+                'precipitation_deposits': 100.0
+            }
+        },
+        'traffic': {
+            'max_vehicles': 50,
+            'min_vehicles': 30,
+            'spawn_spacing': 2.0,
+            'speed_variance': [-20, 10],
+            'safe_distance': 0.5,
+            'respect_traffic_lights': True,
+            'ignore_lights_percentage': 0.0,
+            'max_retry_attempts': 10
+        },
+        'pedestrians': {
+            'max_pedestrians': 30,
+            'min_pedestrians': 15,
+            'speed_range': [0.8, 1.8],
+            'crossing_percentage': 0.7,
+            'max_spawn_attempts': 5,
+            'safe_spawn_distance': 2.0
+        }
+    }
+    
+    def __init__(self, config_path='carla_settings.ini'):
+        """
+        Initialize config loader.
+        
+        Args:
+            config_path (str): Path to configuration file (YAML format)
+        """
+        self.config_path = Path(config_path)
+        self.config = None
+        self._load_config()
+        
+    def _load_config(self):
+        """Load configuration from YAML file with fallback to defaults."""
+        try:
+            if self.config_path.exists() and YAML_AVAILABLE:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    self.config = yaml.safe_load(f)
+                logging.info(f"✅ Configuration loaded from {self.config_path}")
+            else:
+                if not YAML_AVAILABLE:
+                    logging.warning("⚠️  PyYAML not available, using default configuration")
+                else:
+                    logging.warning(f"⚠️  Config file not found: {self.config_path}, using defaults")
+                self.config = self.DEFAULT_CONFIG
+        except Exception as e:
+            logging.error(f"❌ Failed to load config: {str(e)}. Using defaults.")
+            self.config = self.DEFAULT_CONFIG
+            
+    def reload(self):
+        """Reload configuration from file (hot reload)."""
+        self._load_config()
+        logging.info("🔄 Configuration reloaded")
+        
+    def get(self, key_path, default=None):
+        """
+        Get configuration value by dotted path.
+        
+        Args:
+            key_path (str): Dotted path to config value (e.g., 'world.weather.rain_intensity')
+            default: Default value if not found
+            
+        Returns:
+            Configuration value or default
+        """
+        keys = key_path.split('.')
+        value = self.config
+        
+        try:
+            for key in keys:
+                if isinstance(value, dict):
+                    value = value[key]
+                else:
+                    return default
+            return value
+        except (KeyError, TypeError):
+            return default
+    
+    def get_weather_params(self):
+        """
+        Get weather parameters from config.
+        
+        Returns:
+            dict: Weather parameters dictionary
+        """
+        weather_config = self.get('world.weather', self.DEFAULT_CONFIG['world']['weather'])
+        return {
+            'cloudiness': float(weather_config.get('cloudiness', 100.0)),
+            'precipitation': float(weather_config.get('rain_intensity', 100.0)),
+            'precipitation_deposits': float(weather_config.get('precipitation_deposits', 100.0)),
+            'wind_intensity': float(weather_config.get('wind_intensity', 50.0)),
+            'fog_density': float(weather_config.get('fog_density', 20.0)),
+            'wetness': float(weather_config.get('wetness', 100.0)),
+            'sun_altitude_angle': float(weather_config.get('sun_altitude_angle', 45.0))
+        }
+    
+    def get_traffic_params(self):
+        """
+        Get traffic parameters from config.
+        
+        Returns:
+            dict: Traffic parameters with max_vehicles, max_pedestrians, etc.
+        """
+        traffic = self.get('traffic', self.DEFAULT_CONFIG['traffic'])
+        pedestrians = self.get('pedestrians', self.DEFAULT_CONFIG['pedestrians'])
+        
+        return {
+            'max_vehicles': int(traffic.get('max_vehicles', 50)),
+            'min_vehicles': int(traffic.get('min_vehicles', 30)),
+            'spawn_spacing': float(traffic.get('spawn_spacing', 2.0)),
+            'safe_distance': float(traffic.get('safe_distance', 0.5)),
+            'respect_traffic_lights': bool(traffic.get('respect_traffic_lights', True)),
+            'max_pedestrians': int(pedestrians.get('max_pedestrians', 30)),
+            'min_pedestrians': int(pedestrians.get('min_pedestrians', 15))
+        }
+    
+    def get_sensor_config(self, config_name='minimal'):
+        """
+        Get sensor configuration by name.
+        
+        Args:
+            config_name (str): Name of sensor config ('minimal', 'standard', 'advanced')
+            
+        Returns:
+            dict: Sensor configuration or None if not found
+        """
+        sensor_configs = self.get('sensor_configurations', {})
+        return sensor_configs.get(config_name, None)
+    
+    def validate_weather_params(self, params):
+        """
+        Validate weather parameters are within valid ranges.
+        
+        Args:
+            params (dict): Weather parameters dictionary
+            
+        Returns:
+            tuple: (is_valid: bool, errors: list)
+        """
+        errors = []
+        ranges = {
+            'cloudiness': (0, 100),
+            'precipitation': (0, 100),
+            'precipitation_deposits': (0, 100),
+            'wind_intensity': (0, 100),
+            'fog_density': (0, 100),
+            'wetness': (0, 100),
+            'sun_altitude_angle': (-90, 90)
+        }
+        
+        for param, (min_val, max_val) in ranges.items():
+            value = params.get(param)
+            if value is not None:
+                if not (min_val <= value <= max_val):
+                    errors.append(f"{param}: {value} out of range [{min_val}, {max_val}]")
+                    
+        return len(errors) == 0, errors
+    
+    def print_summary(self):
+        """Print configuration summary for debugging."""
+        print("\n" + "="*60)
+        print("📋 Current Configuration Summary:")
+        print("="*60)
+        
+        weather = self.get_weather_params()
+        print("\n🌦️  Weather Parameters:")
+        for key, value in weather.items():
+            print(f"   {key}: {value}")
+            
+        traffic = self.get_traffic_params()
+        print("\n🚗 Traffic Parameters:")
+        for key, value in traffic.items():
+            print(f"   {key}: {value}")
+            
+        sim = self.get('simulation', {})
+        print("\n⚙️  Simulation Settings:")
+        print(f"   Duration: {sim.get('duration', 600)}s")
+        print(f"   Tick Rate: {sim.get('tick_rate', 30)} FPS")
+        print("="*60 + "\n")
 
 class SimulationError(Exception):
     """Custom exception for simulation-specific errors"""
@@ -47,8 +268,20 @@ class SensorConfiguration:
         self.sensors_specs = sensors_specs
 
 class AVSimulation:
-    def __init__(self):
+    def __init__(self, config_file='carla_settings.ini'):
+        """
+        Initialize CARLA AV Simulation with configuration file support.
+        
+        Args:
+            config_file (str): Path to configuration file (YAML format)
+        """
         try:
+            # Load configuration from file
+            self.config_loader = ConfigLoader(config_file)
+            
+            # Print configuration summary on startup
+            self.config_loader.print_summary()
+            
             self.client = carla.Client('localhost', 2000)
             self.client.set_timeout(20.0)  # Increased timeout
 
@@ -65,15 +298,20 @@ class AVSimulation:
             if not pygame.get_init():
                 pygame.init()
             try:
-                self.display = pygame.display.set_mode((1920, 1080), pygame.HWSURFACE | pygame.DOUBLEBUF)
+                viz_config = self.config_loader.get('visualization', {})
+                window_size = viz_config.get('window_size', [1920, 1080])
+                self.display = pygame.display.set_mode(tuple(window_size), pygame.HWSURFACE | pygame.DOUBLEBUF)
                 self.clock = pygame.time.Clock()
             except pygame.error as e:
                 raise SimulationError(f"Failed to initialize Pygame display: {str(e)}")
 
-            # Initialize queues with maximum size
-            self.image_queue = queue.Queue(maxsize=100)
-            self.lidar_queue = queue.Queue(maxsize=100)
-            self.radar_queue = queue.Queue(maxsize=100)
+            # Initialize queues with configurable max size
+            perf_config = self.config_loader.get('performance', {})
+            max_queue_size = perf_config.get('max_sensor_queue_size', 100)
+            
+            self.image_queue = queue.Queue(maxsize=max_queue_size)
+            self.lidar_queue = queue.Queue(maxsize=max_queue_size)
+            self.radar_queue = queue.Queue(maxsize=max_queue_size)
 
             # Sensor data storage with capacity checks
             self.sensor_data = {
@@ -88,10 +326,10 @@ class AVSimulation:
             self.active_sensors = []
             self.active_actors = []
 
-            # Define sensor configurations (same as before)
+            # Define sensor configurations (now can be overridden by config file)
             self.define_sensor_configurations()
 
-            logging.info("AVSimulation initialized successfully")
+            logging.info("✅ AVSimulation initialized successfully (with config file support)")
 
         except Exception as e:
             logging.error(f"Failed to initialize AVSimulation: {str(e)}")
@@ -247,17 +485,34 @@ class AVSimulation:
                 }, carla.Transform(carla.Location(x=2.0, z=1.0)))
             ])
         }
-    def setup_weather(self):
+    def setup_weather(self, weather_params=None):
+        """
+        Set up weather conditions from config file or custom parameters.
+
+        Args:
+            weather_params (dict): Optional custom weather parameters (overrides config file)
+                                   If None, loads from carla_settings.ini
+        """
         try:
-            # Set up rainy weather conditions
+            # Load from config file if no custom params provided
+            if weather_params is None:
+                weather_params = self.config_loader.get_weather_params()
+                logging.info("📂 Loading weather parameters from configuration file")
+            
+            # Validate parameters
+            is_valid, errors = self.config_loader.validate_weather_params(weather_params)
+            if not is_valid:
+                logging.warning(f"⚠️  Weather parameter validation warnings: {errors}")
+            
+            # Set up weather with loaded/custom parameters
             weather = carla.WeatherParameters(
-                cloudiness=100.0,
-                precipitation=100.0,
-                precipitation_deposits=100.0,
-                wind_intensity=50.0,
-                fog_density=20.0,
-                wetness=100.0,
-                sun_altitude_angle=45.0
+                cloudiness=weather_params.get('cloudiness', 100.0),
+                precipitation=weather_params.get('precipitation', 100.0),
+                precipitation_deposits=weather_params.get('precipitation_deposits', 100.0),
+                wind_intensity=weather_params.get('wind_intensity', 50.0),
+                fog_density=weather_params.get('fog_density', 20.0),
+                wetness=weather_params.get('wetness', 100.0),
+                sun_altitude_angle=weather_params.get('sun_altitude_angle', 45.0)
             )
 
             # Apply weather settings
@@ -266,6 +521,7 @@ class AVSimulation:
             # Store weather state
             self.sensor_data['weather'].append({
                 'timestamp': datetime.now().isoformat(),
+                'source': 'config_file' if weather_params else 'custom',
                 'params': {
                     'cloudiness': weather.cloudiness,
                     'precipitation': weather.precipitation,
@@ -277,24 +533,45 @@ class AVSimulation:
                 }
             })
 
-            logging.info("Weather configured: Heavy rain conditions")
+            logging.info(f"✅ Weather configured: Rain={weather.precipitation:.1f}%, Fog={weather.fog_density:.1f}%, Wind={weather.wind_intensity:.1f}%")
             return weather
 
         except Exception as e:
             logging.error(f"Failed to setup weather: {str(e)}")
             raise SimulationError(f"Weather setup failed: {str(e)}")
 
-    def setup_traffic(self, num_vehicles=50, num_pedestrians=30):
+    def setup_traffic(self, num_vehicles=None, num_pedestrians=None):
+        """
+        Set up traffic and pedestrians from config file or custom parameters.
+
+        Args:
+            num_vehicles (int): Number of vehicles (if None, loads from config)
+            num_pedestrians (int): Number of pedestrians (if None, loads from config)
+        """
         vehicles = []
         pedestrians = []
         controllers = []
         
         try:
-            # Set up traffic manager
+            # Load defaults from config file if not provided
+            if num_vehicles is None or num_pedestrians is None:
+                traffic_params = self.config_loader.get_traffic_params()
+                if num_vehicles is None:
+                    num_vehicles = traffic_params['max_vehicles']
+                    logging.info(f"📂 Loading vehicle count from config: {num_vehicles}")
+                if num_pedestrians is None:
+                    num_pedestrians = traffic_params['max_pedestrians']
+                    logging.info(f"📂 Loading pedestrian count from config: {num_pedestrians}")
+            
+            # Set up traffic manager with config parameters
             traffic_manager = self.client.get_trafficmanager(8000)  # Port 8000
             traffic_manager.set_synchronous_mode(True)
             traffic_manager.set_random_device_seed(0)
+            
+            # Apply traffic settings from config
+            safe_distance = self.config_loader.get('traffic.safe_distance', 0.5)
             traffic_manager.global_percentage_speed_difference(0)
+            # Note: safe_distance can be applied per-vehicle later if needed
             
             spawn_points = self.map.get_spawn_points()
             if not spawn_points:

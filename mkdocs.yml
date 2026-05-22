@@ -1,4 +1,5 @@
 site_name: 神经网络
+site_url: https://wengqiuyi.github.io/nn/
 # 参考链接：https://blog.csdn.net/m0_63203517/article/details/129765689
 
 #repo_url: https://github.com/carla-simulator/carla
@@ -10,7 +11,7 @@ site_name: 神经网络
 repo_url: https://github.com/OpenHUTB/nn
 
 # 页面右上角添加直接编辑页面的按钮
-edit_uri: edit/master/docs/
+edit_uri: edit/main/docs/
 
 theme:
   name: readthedocs
@@ -45,6 +46,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- CarRacing DQN/DoubleDQN：训练改进与可视化对比: 'car_racing_dqn_improvements.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 
 
@@ -52,3 +54,4 @@ nav:
 markdown_extensions:
   - admonition
   - mdx_math
+  - tables
