@@ -10,6 +10,7 @@
 - 生成深度网格选点图、候选区域得分排序图、AirSim 下降轨迹回放图和 AirSim 深度相机运行效果图。
 
 ## 运行
+
 ```bash
 python src/airsim_landing_zone_selector/landing_zone.py --output docs/pr_assets/airsim_landing_zone_selector
 python src/airsim_landing_zone_selector/tests/test_landing_zone.py
