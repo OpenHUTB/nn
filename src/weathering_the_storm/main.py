@@ -15,9 +15,12 @@ import argparse
 import sys
 import io
 import logging
+import logging.handlers
 import time
 import random
+import json
 from datetime import datetime
+from pathlib import Path
 
 
 # Fix Windows console encoding for Unicode/emoji support
@@ -26,14 +29,127 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 
+class SimulationLogger:
+    """
+    Enhanced logging system with rotating files and performance tracking.
+    
+    Features:
+    - RotatingFileHandler: auto-rotate at 10MB, keep 5 backups
+    - Multi-level logging: DEBUG/INFO/WARNING/ERROR
+    - Performance metrics: FPS, memory, queue sizes
+    - Structured JSON log format for analysis
+    - Separate log files for different concerns
+    """
+    
+    def __init__(self, log_dir='logs', level=logging.INFO):
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(exist_ok=True)
+        self.level = level
+        self.start_time = time.time()
+        self.frame_count = 0
+        self.last_fps_time = time.time()
+        self.last_fps_count = 0
+        self.performance_log = []
+        
+        self._setup_loggers()
+    
+    def _setup_loggers(self):
+        log_format = '%(asctime)s - %(levelname)s - %(message)s'
+        date_format = '%Y-%m-%d %H:%M:%S'
+        formatter = logging.Formatter(log_format, date_format)
+        
+        json_formatter = logging.Formatter(
+            '{"time":"%(asctime)s","level":"%(levelname)s","msg":"%(message)s"}',
+            date_format
+        )
+        
+        self.logger = logging.getLogger('carla_sim')
+        self.logger.setLevel(self.level)
+        self.logger.handlers.clear()
+        
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+        
+        main_log = self.log_dir / 'simulation.log'
+        file_handler = logging.handlers.RotatingFileHandler(
+            main_log, maxBytes=10*1024*1024, backupCount=5, encoding='utf-8'
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        
+        perf_log = self.log_dir / 'performance.log'
+        self.perf_logger = logging.getLogger('carla_sim.perf')
+        self.perf_logger.setLevel(logging.DEBUG)
+        self.perf_logger.handlers.clear()
+        self.perf_logger.propagate = False
+        perf_handler = logging.handlers.RotatingFileHandler(
+            perf_log, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8'
+        )
+        perf_handler.setLevel(logging.DEBUG)
+        perf_handler.setFormatter(json_formatter)
+        self.perf_logger.addHandler(perf_handler)
+        
+        self.logger.info(f"📝 Enhanced logging initialized: {self.log_dir}")
+        self.logger.info(f"   Main log: {main_log} (rotating, 10MB x 5)")
+        self.logger.info(f"   Perf log: {perf_log} (JSON format)")
+    
+    def record_frame(self, fps=None, queue_sizes=None, memory_mb=None):
+        self.frame_count += 1
+        elapsed = time.time() - self.start_time
+        
+        if fps is None:
+            now = time.time()
+            dt = now - self.last_fps_time
+            if dt >= 1.0:
+                fps = (self.frame_count - self.last_fps_count) / dt
+                self.last_fps_time = now
+                self.last_fps_count = self.frame_count
+            else:
+                fps = 0
+        
+        metrics = {
+            'elapsed_s': round(elapsed, 2),
+            'frame': self.frame_count,
+            'fps': round(fps, 1) if fps else 0,
+            'memory_mb': round(memory_mb, 1) if memory_mb else 0,
+            'queues': queue_sizes or {}
+        }
+        self.performance_log.append(metrics)
+        self.perf_logger.info(json.dumps(metrics))
+        return metrics
+    
+    def get_summary(self):
+        elapsed = time.time() - self.start_time
+        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+        return {
+            'total_frames': self.frame_count,
+            'elapsed_seconds': round(elapsed, 2),
+            'avg_fps': round(avg_fps, 2),
+            'log_dir': str(self.log_dir),
+            'performance_entries': len(self.performance_log)
+        }
+    
+    def print_summary(self):
+        summary = self.get_summary()
+        print("\n" + "="*60)
+        print("📝 Logging Session Summary:")
+        print("="*60)
+        print(f"   Total Frames: {summary['total_frames']}")
+        print(f"   Elapsed Time: {summary['elapsed_seconds']}s")
+        print(f"   Average FPS: {summary['avg_fps']}")
+        print(f"   Log Directory: {summary['log_dir']}")
+        print(f"   Performance Entries: {summary['performance_entries']}")
+        print("="*60 + "\n")
+
+
 def setup_logging(verbose=False):
-    """Configure logging based on verbosity level"""
+    """Configure logging using enhanced SimulationLogger system"""
     level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    sim_logger = SimulationLogger(log_dir='logs', level=level)
+    return sim_logger
 
 
 def parse_arguments():
@@ -218,7 +334,7 @@ def get_weather_parameters(weather_type):
     return weather_presets.get(weather_type, weather_presets['rain'])
 
 
-def run_quick_test(args):
+def run_quick_test(args, sim_logger=None):
     """
     Run quick test mode - lightweight CARLA connection test.
 
@@ -229,8 +345,11 @@ def run_quick_test(args):
 
     Args:
         args: Parsed command line arguments
+        sim_logger: SimulationLogger instance for enhanced logging
     """
     import carla
+    
+    log = sim_logger.logger if sim_logger else logging.getLogger()
 
     print("\n" + "="*70)
     print("🚀 CARLA AV Simulation - Quick Test Mode")
@@ -239,59 +358,53 @@ def run_quick_test(args):
     print("="*70 + "\n")
 
     try:
-        # Connect to CARLA server
-        logging.info(f"Connecting to CARLA server at {args.host}:{args.port}...")
+        log.info(f"Connecting to CARLA server at {args.host}:{args.port}...")
         client = carla.Client(args.host, args.port)
         client.set_timeout(args.timeout)
 
         world = client.get_world()
-        logging.info("✅ Successfully connected to CARLA server!")
+        log.info("✅ Successfully connected to CARLA server!")
 
-        # Get map info
         map_name = world.get_map().name
-        logging.info(f"📍 Current map: {map_name}")
+        log.info(f"📍 Current map: {map_name}")
 
-        # Set up weather
         weather_params = get_weather_parameters(args.weather)
 
         if args.rain_intensity is not None:
             weather_params['precipitation'] = args.rain_intensity
-            logging.info(f"Using custom rain intensity: {args.rain_intensity}")
+            log.info(f"Using custom rain intensity: {args.rain_intensity}")
 
         if args.fog_density is not None:
             weather_params['fog_density'] = args.fog_density
-            logging.info(f"Using custom fog density: {args.fog_density}")
+            log.info(f"Using custom fog density: {args.fog_density}")
 
         weather = carla.WeatherParameters(**weather_params)
         world.set_weather(weather)
-        logging.info(f"🌧️  Weather set to: {args.weather}")
+        log.info(f"🌧️  Weather set to: {args.weather}")
 
-        # Spawn ego vehicle
         blueprint_library = world.get_blueprint_library()
 
         vehicle_bp = blueprint_library.find('vehicle.yamaha.yzf')
         spawn_points = world.get_map().get_spawn_points()
 
         if not spawn_points:
-            logging.error("❌ No spawn points available")
+            log.error("❌ No spawn points available")
             return False
 
         spawn_point = random.choice(spawn_points)
         vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
 
         if not vehicle:
-            logging.error("❌ Failed to spawn ego vehicle")
+            log.error("❌ Failed to spawn ego vehicle")
             return False
 
-        logging.info(f"🏍️  Ego vehicle spawned: {vehicle_bp.id}")
+        log.info(f"🏍️  Ego vehicle spawned: {vehicle_bp.id}")
         vehicle.set_autopilot(True)
-        logging.info("✅ Autopilot enabled!")
+        log.info("✅ Autopilot enabled!")
 
-        # Setup traffic manager
         tm = client.get_trafficmanager(8000)
         tm.set_synchronous_mode(False)
 
-        # Spawn traffic vehicles
         vehicle_bps = blueprint_library.filter('vehicle.*')
         random.seed(42)
 
@@ -309,12 +422,11 @@ def run_quick_test(args):
                     v.set_autopilot(True, tm.get_port())
                     spawned_vehicles.append(v)
             except Exception as e:
-                logging.warning(f"Failed to spawn vehicle {i+1}: {str(e)}")
+                log.warning(f"Failed to spawn vehicle {i+1}: {str(e)}")
                 continue
 
-        logging.info(f"🚗 Spawned {len(spawned_vehicles)}/{args.vehicles} traffic vehicles")
+        log.info(f"🚗 Spawned {len(spawned_vehicles)}/{args.vehicles} traffic vehicles")
 
-        # Run simulation loop
         print("\n" + "-"*70)
         print("🎬 Starting simulation...")
         print(f"   Duration: {args.duration} seconds")
@@ -333,16 +445,19 @@ def run_quick_test(args):
                 current_time = time.time()
                 elapsed = current_time - start_time
 
-                # Log progress every second
                 if current_time - last_log_time >= 1.0:
                     progress = (elapsed / args.duration) * 100
-                    logging.info(f"⏱️  Progress: {elapsed:.1f}s / {args.duration}s ({progress:.1f}%) | Frames: {frame_count}")
+                    log.info(f"⏱️  Progress: {elapsed:.1f}s / {args.duration}s ({progress:.1f}%) | Frames: {frame_count}")
+                    
+                    if sim_logger:
+                        fps = frame_count / elapsed if elapsed > 0 else 0
+                        sim_logger.record_frame(fps=fps)
+                    
                     last_log_time = current_time
 
         except KeyboardInterrupt:
-            logging.info("\n⚠️  Simulation interrupted by user")
+            log.info("\n⚠️  Simulation interrupted by user")
 
-        # Final statistics
         total_time = time.time() - start_time
         avg_fps = frame_count / total_time if total_time > 0 else 0
 
@@ -356,19 +471,18 @@ def run_quick_test(args):
         print(f"   🚗 Vehicles spawned: {len(spawned_vehicles)}")
         print("="*70 + "\n")
 
-        # Cleanup
-        logging.info("Cleaning up actors...")
+        log.info("Cleaning up actors...")
         for v in spawned_vehicles:
             if v.is_alive:
                 v.destroy()
         if vehicle.is_alive:
             vehicle.destroy()
-        logging.info("✅ Cleanup completed!")
+        log.info("✅ Cleanup completed!")
 
         return True
 
     except Exception as e:
-        logging.error(f"❌ Error during quick test: {str(e)}")
+        log.error(f"❌ Error during quick test: {str(e)}")
         import traceback
         traceback.print_exc()
         return False
@@ -439,8 +553,8 @@ def main():
     # Parse command line arguments
     args = parse_arguments()
 
-    # Setup logging
-    setup_logging(args.verbose)
+    # Setup enhanced logging
+    sim_logger = setup_logging(args.verbose)
 
     # Print banner
     print("\n" + "█"*70)
@@ -454,7 +568,7 @@ def main():
     # Run appropriate mode
     success = False
     if args.mode == 'quick':
-        success = run_quick_test(args)
+        success = run_quick_test(args, sim_logger)
     elif args.mode == 'full':
         success = run_full_simulation(args)
 
@@ -467,7 +581,13 @@ def main():
     else:
         print("⚠️  Execution finished with errors")
     print(f"⏱  Total execution time: {total_execution_time:.2f} seconds")
-    print("─"*70 + "\n")
+    print("─"*70)
+
+    # Print logging session summary
+    if sim_logger:
+        sim_logger.print_summary()
+    else:
+        print()
 
     # Return exit code
     sys.exit(0 if success else 1)

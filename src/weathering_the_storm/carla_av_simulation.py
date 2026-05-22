@@ -11,8 +11,10 @@ import random
 import cv2
 import math
 import logging
+import logging.handlers
 import sys
 import traceback
+import os
 from matplotlib import pyplot as plt
 from pathlib import Path
 
@@ -21,17 +23,236 @@ try:
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
-    logging.warning("PyYAML not installed. Config file loading will use fallback defaults.")
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('simulation.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+
+class SimulationLogger:
+    """
+    Enhanced logging system for CARLA AV Simulation.
+    
+    Features:
+    - RotatingFileHandler: auto-rotate at 10MB, keep 5 backups
+    - Multi-level logging: DEBUG/INFO/WARNING/ERROR
+    - Performance metrics: FPS, memory, queue sizes
+    - Structured JSON log format for analysis
+    - Separate log files for different concerns
+    """
+    
+    _instance = None
+    
+    def __init__(self, log_dir='logs', level=logging.INFO):
+        """
+        Initialize enhanced logging system.
+        
+        Args:
+            log_dir (str): Directory for log files
+            level: Minimum log level
+        """
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(exist_ok=True)
+        self.level = level
+        self.start_time = time.time()
+        self.frame_count = 0
+        self.last_fps_time = time.time()
+        self.last_fps_count = 0
+        self.performance_log = []
+        
+        self._setup_loggers()
+    
+    def _setup_loggers(self):
+        """Set up all loggers with appropriate handlers."""
+        log_format = '%(asctime)s - %(levelname)s - %(message)s'
+        date_format = '%Y-%m-%d %H:%M:%S'
+        formatter = logging.Formatter(log_format, date_format)
+        
+        json_formatter = logging.Formatter(
+            '{"time":"%(asctime)s","level":"%(levelname)s","msg":"%(message)s"}',
+            date_format
+        )
+        
+        # Main logger - RotatingFileHandler (10MB, 5 backups)
+        self.logger = logging.getLogger('carla_sim')
+        self.logger.setLevel(self.level)
+        self.logger.handlers.clear()
+        
+        # Console handler (INFO and above)
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+        
+        # Rotating file handler (10MB per file, keep 5)
+        main_log = self.log_dir / 'simulation.log'
+        file_handler = logging.handlers.RotatingFileHandler(
+            main_log,
+            maxBytes=10*1024*1024,
+            backupCount=5,
+            encoding='utf-8'
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        
+        # Performance metrics logger (separate file)
+        perf_log = self.log_dir / 'performance.log'
+        self.perf_logger = logging.getLogger('carla_sim.perf')
+        self.perf_logger.setLevel(logging.DEBUG)
+        self.perf_logger.handlers.clear()
+        self.perf_logger.propagate = False
+        
+        perf_handler = logging.handlers.RotatingFileHandler(
+            perf_log,
+            maxBytes=5*1024*1024,
+            backupCount=3,
+            encoding='utf-8'
+        )
+        perf_handler.setLevel(logging.DEBUG)
+        perf_handler.setFormatter(json_formatter)
+        self.perf_logger.addHandler(perf_handler)
+        
+        # Sensor data logger (separate file, JSON format)
+        sensor_log = self.log_dir / 'sensor_events.log'
+        self.sensor_logger = logging.getLogger('carla_sim.sensor')
+        self.sensor_logger.setLevel(logging.DEBUG)
+        self.sensor_logger.handlers.clear()
+        self.sensor_logger.propagate = False
+        
+        sensor_handler = logging.handlers.RotatingFileHandler(
+            sensor_log,
+            maxBytes=10*1024*1024,
+            backupCount=5,
+            encoding='utf-8'
+        )
+        sensor_handler.setLevel(logging.DEBUG)
+        sensor_handler.setFormatter(json_formatter)
+        self.sensor_logger.addHandler(sensor_handler)
+        
+        self.logger.info(f"📝 Enhanced logging initialized: {self.log_dir}")
+        self.logger.info(f"   Main log: {main_log} (rotating, 10MB x 5)")
+        self.logger.info(f"   Perf log: {perf_log} (JSON format)")
+        self.logger.info(f"   Sensor log: {sensor_log} (JSON format)")
+    
+    def record_frame(self, fps=None, queue_sizes=None, memory_mb=None):
+        """
+        Record performance metrics for current frame.
+        
+        Args:
+            fps (float): Current frames per second
+            queue_sizes (dict): Queue sizes {name: size}
+            memory_mb (float): Current memory usage in MB
+        """
+        self.frame_count += 1
+        elapsed = time.time() - self.start_time
+        
+        if fps is None:
+            now = time.time()
+            dt = now - self.last_fps_time
+            if dt >= 1.0:
+                fps = (self.frame_count - self.last_fps_count) / dt
+                self.last_fps_time = now
+                self.last_fps_count = self.frame_count
+            else:
+                fps = 0
+        
+        metrics = {
+            'elapsed_s': round(elapsed, 2),
+            'frame': self.frame_count,
+            'fps': round(fps, 1) if fps else 0,
+            'memory_mb': round(memory_mb, 1) if memory_mb else 0,
+            'queues': queue_sizes or {}
+        }
+        
+        self.performance_log.append(metrics)
+        self.perf_logger.info(json.dumps(metrics))
+        
+        return metrics
+    
+    def log_sensor_event(self, sensor_type, event_type, data=None):
+        """
+        Log a sensor event in structured JSON format.
+        
+        Args:
+            sensor_type (str): Type of sensor (camera, lidar, radar)
+            event_type (str): Event type (data_received, queue_full, etc.)
+            data (dict): Additional event data
+        """
+        event = {
+            'sensor': sensor_type,
+            'event': event_type,
+            'frame': self.frame_count,
+            'timestamp': datetime.now().isoformat()
+        }
+        if data:
+            event.update(data)
+        self.sensor_logger.info(json.dumps(event))
+    
+    def log_weather_change(self, old_params, new_params, source='unknown'):
+        """Log weather parameter changes."""
+        self.logger.info(f"🌦️  Weather changed (source: {source})")
+        for key in new_params:
+            old_val = old_params.get(key, 'N/A')
+            new_val = new_params[key]
+            if old_val != new_val:
+                self.logger.debug(f"   {key}: {old_val} → {new_val}")
+    
+    def log_traffic_stats(self, vehicles, pedestrians):
+        """Log traffic statistics."""
+        self.logger.info(f"🚗 Traffic: {vehicles} vehicles, {pedestrians} pedestrians")
+    
+    def log_error_with_context(self, error, context=None):
+        """Log error with additional context information."""
+        self.logger.error(f"❌ {str(error)}")
+        if context:
+            self.logger.debug(f"   Context: {json.dumps(context, default=str)}")
+    
+    def get_summary(self):
+        """Get logging session summary."""
+        elapsed = time.time() - self.start_time
+        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+        return {
+            'total_frames': self.frame_count,
+            'elapsed_seconds': round(elapsed, 2),
+            'avg_fps': round(avg_fps, 2),
+            'log_dir': str(self.log_dir),
+            'performance_entries': len(self.performance_log)
+        }
+    
+    def print_summary(self):
+        """Print logging session summary."""
+        summary = self.get_summary()
+        print("\n" + "="*60)
+        print("📝 Logging Session Summary:")
+        print("="*60)
+        print(f"   Total Frames: {summary['total_frames']}")
+        print(f"   Elapsed Time: {summary['elapsed_seconds']}s")
+        print(f"   Average FPS: {summary['avg_fps']}")
+        print(f"   Log Directory: {summary['log_dir']}")
+        print(f"   Performance Entries: {summary['performance_entries']}")
+        print("="*60 + "\n")
+
+
+# Initialize enhanced logging
+_sim_logger = SimulationLogger()
+
+
+# Convenience functions for backward compatibility
+def get_logger():
+    """Get the main simulation logger."""
+    return _sim_logger.logger
+
+
+def get_perf_logger():
+    """Get the performance metrics logger."""
+    return _sim_logger
+
+
+def log_sensor_event(sensor_type, event_type, data=None):
+    """Log a sensor event."""
+    _sim_logger.log_sensor_event(sensor_type, event_type, data)
+
+
+def log_performance(fps=None, queue_sizes=None, memory_mb=None):
+    """Record performance metrics."""
+    return _sim_logger.record_frame(fps, queue_sizes, memory_mb)
 
 
 class ConfigLoader:
