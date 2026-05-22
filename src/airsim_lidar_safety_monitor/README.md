@@ -11,6 +11,17 @@
 - 生成 LiDAR 净空-风险曲线、高度-姿态风险散点图和避障动作分布图。
 - 将运行效果图输出到 `docs/pr_assets/airsim_lidar_safety_monitor`。
 
+## 环境要求
+
+- Python 3.7+
+- NumPy
+- pandas
+- matplotlib
+
+## 数据格式
+
+样例数据位于 `sample_data/airsim_lidar_log.csv`，包含高度、速度、姿态角和三向障碍物距离等字段。
+
 ## 运行
 
 ```bash

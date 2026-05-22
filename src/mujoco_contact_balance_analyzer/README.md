@@ -18,3 +18,7 @@ python src/mujoco_contact_balance_analyzer/tests/test_contact_balance.py
 ```
 
 其中 `generate_mujoco_contact_data.py` 会调用官方 `mujoco` Python 包加载 MJCF 模型并重新导出 `mujoco_sensor_export.csv`，因此数据来自 MuJoCo 仿真 step 过程。
+
+## 诊断重点
+
+分析结果时可先观察左右接触力是否长期偏向同一侧，再结合质心投影位置判断支撑多边形是否留有足够裕度。如果风险峰值同时伴随躯干横滚角增大和质心外移，说明机器人可能需要更早触发姿态恢复策略；如果只是短时间接触力波动，则更适合通过滤波或步态相位判断减少误报。

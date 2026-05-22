@@ -3,29 +3,6 @@
 用于在 Carla 模拟器中使用类激活映射（Class Activation Mapping, CAM）技术测试卷积神经网络（CNN）的应用。
 该项目旨在提高自动驾驶背景下深度学习模型的透明度。
 
-## 项目结构
-```text
-.
-├── carlacomms
-│   ├── __init__.py
-│   ├── carla_sensor_platform.py
-│   ├── config.py
-│   └── generate_traffic.py
-├── diagrams
-│   └── menu_logic.drawio
-├── visualizer
-│   ├── __init__.py
-│   ├── gui_CAM.py
-│   ├── parameters.py
-│   └── roc_functions.py
-├── Dockerfile
-├── LICENSE
-├── main.py
-├── notes.txt
-├── README.md
-└── requirements.txt
-```
-
 ## 1. CAM可视化核心原理与数学表达
 在我们的项目中可以选择多种CAM算法，比如Grad CAM、Score CAM、Ablation CAM等。为了理解模型是如何产生热力图的，我们以最经典的Grad-CAM为例做解释：  
 ### 1.1 核心数学公式

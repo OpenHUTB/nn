@@ -1,0 +1,15 @@
+# 预训练模型为二进制大文件，需自行从原始项目获取（见 README）
+models/
+
+# 根仓库 .gitignore 全局忽略 *.png，这里显式放行需要随仓库提交的示例图
+!examples/sample_input.png
+!examples/result_overlay.png
+!examples/result_mask.png
+
+# main.py 运行时生成的结果（示例效果图已单独保存在 examples/result_*.png）
+examples/sample_input_overlay.png
+examples/sample_input_mask.png
+
+# Python
+__pycache__/
+*.pyc

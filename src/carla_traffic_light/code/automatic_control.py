@@ -224,6 +224,14 @@ class KeyboardControl(object):
                 elif event.key == pygame.K_h:
                     # 显示帮助
                     self.world.hud.help.toggle()
+                elif event.key == pygame.K_n:
+                    # 切换下一种天气
+                    self.world.next_weather(reverse=False)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
+                elif event.key == pygame.K_m:
+                    # 切换上一种天气
+                    self.world.next_weather(reverse=True)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
 
     @staticmethod
     def _is_quit_shortcut(key):
@@ -442,6 +450,8 @@ class HelpText(object):
             "",
             "C        - Switch Camera View",
             "H        - Show/Hide Help",
+            "N        - Next Weather",
+            "M        - Previous Weather",
             "Ctrl+Q   - Quit",
             "ESC      - Quit",
             "",
