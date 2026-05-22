@@ -1,0 +1,43 @@
+{
+  "project": "platoon_cacc_gap_control",
+  "vehicle_count": 5,
+  "communication_delay_s": 0.35,
+  "dropout_windows": [
+    [
+      27.0,
+      31.0
+    ],
+    [
+      48.0,
+      50.5
+    ]
+  ],
+  "baseline": {
+    "min_gap_m": 11.2697,
+    "mean_abs_gap_error_m": 1.2534,
+    "max_abs_gap_error_m": 3.1983,
+    "speed_std_amplification": 1.1506,
+    "comfort_cost": 0.4864,
+    "emergency_brake_count": 0
+  },
+  "optimized": {
+    "min_gap_m": 15.3913,
+    "mean_abs_gap_error_m": 0.6401,
+    "max_abs_gap_error_m": 2.5377,
+    "speed_std_amplification": 0.8268,
+    "comfort_cost": 0.2623,
+    "emergency_brake_count": 0
+  },
+  "improvement": {
+    "mean_gap_error_percent": 48.93,
+    "max_gap_error_percent": 20.65,
+    "comfort_cost_percent": 46.07
+  },
+  "generated_files": [
+    "speed_profiles.png",
+    "cacc_gap_error_heatmap.png",
+    "metric_comparison.png",
+    "space_time_trajectories.png",
+    "cacc_gap_errors.csv"
+  ]
+}

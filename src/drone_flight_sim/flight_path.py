@@ -77,7 +77,17 @@ class FlightPath:
             # 右上角点
             (0, 0, altitude)
         ]
+    
+    @staticmethod
+    def triangle_path(size: float = 10, height: float = -3) -> List[Tuple[float, float, float]]:
+        """生成三角形飞行路径"""
 
+        return [
+            (0, 0, height),          # 起点
+            (size, 0, height),       # 右下角
+            (size / 2, size, height) # 顶点
+        ]
+    
     @staticmethod
     def custom_path(waypoints: List[Tuple[float, float, float]]) -> List[Tuple[float, float, float]]:
         """自定义飞行路径
@@ -93,6 +103,8 @@ class FlightPath:
         """
         # 直接返回用户传入的航点列表
         return waypoints
+    
+
 
     @staticmethod
     def print_path(waypoints: List[Tuple[float, float, float]]):

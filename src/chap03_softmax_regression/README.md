@@ -114,3 +114,28 @@ for i in range(1000):
 ### 4. 结果展示
 
 训练完成后，代码会绘制数据点和模型的决策边界。
+
+## 工程化改进（本次提交）
+
+为保持教学核心不变，本次仅做小幅工程化增强：
+
+1. 训练参数支持环境变量配置，避免反复改源码：
+   - `SOFTMAX_TRAIN_STEPS`（默认 `1000`）
+   - `SOFTMAX_LOG_INTERVAL`（默认 `50`）
+   - `SOFTMAX_METRICS_OUT`（默认 `outputs/softmax_metrics.json`）
+2. 训练结束后自动导出指标 JSON，包含 `final_loss`、`final_accuracy`、`train_steps` 等信息，便于实验留档与复现。
+
+### 运行示例
+
+```bash
+python softmax_regression-exercise.py
+```
+
+或（Windows PowerShell）：
+
+```powershell
+$env:SOFTMAX_TRAIN_STEPS=1200
+$env:SOFTMAX_LOG_INTERVAL=100
+$env:SOFTMAX_METRICS_OUT="outputs/softmax_metrics.json"
+python .\softmax_regression-exercise.py
+```

@@ -1,0 +1,43 @@
+{
+  "project": "DriveHealth",
+  "description": "Simulator-free multi-source anomaly diagnosis and autonomous vehicle health blackbox.",
+  "duration_s": 420,
+  "sample_hz": 1,
+  "sample_count": 420,
+  "mean_health_score": 86.19,
+  "minimum_health_score": 47.1,
+  "final_health_score": 85.55,
+  "final_level": "NORMAL",
+  "event_count": 9,
+  "severity_counts": {
+    "WATCH": 4,
+    "CRITICAL": 4,
+    "WARNING": 1
+  },
+  "peak_risk_subsystem": "Speed sensor",
+  "peak_risk_value": 100.0,
+  "top_actions": [
+    "Cross-check wheel/IMU/GNSS speed and mark sensor unreliable.",
+    "Cross-check wheel/IMU/GNSS speed and mark sensor unreliable.",
+    "Increase following distance and prepare emergency braking.",
+    "Open ventilation, isolate power module, prepare safe stop.",
+    "Issue takeover warning and switch to conservative mode."
+  ],
+  "artifact_count": 14,
+  "artifacts": [
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_blackbox_log.csv",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_events.json",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_summary.json",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\01_system_overview_dashboard.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\02_health_score_timeline.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\03_sensor_streams_overview.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\04_subsystem_risk_heatmap.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\05_blackbox_event_timeline.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\06_risk_radar_summary.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\07_event_distribution.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\08_feature_health_correlation.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\09_health_score_distribution.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\10_action_priority_board.png",
+    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_report.html"
+  ]
+}

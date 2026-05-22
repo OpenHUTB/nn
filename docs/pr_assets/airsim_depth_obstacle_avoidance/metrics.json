@@ -1,0 +1,11 @@
+{
+  "source": "AirSim DepthPerspective front camera strip log",
+  "records": 12,
+  "min_center_depth_m": 1.7,
+  "turn_right_frames": 3,
+  "generated_files": [
+    "airsim_depth_runtime_view.png",
+    "airsim_avoidance_action_curve.png",
+    "airsim_depth_avoidance_scores.csv"
+  ]
+}

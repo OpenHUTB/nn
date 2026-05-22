@@ -6,19 +6,50 @@ import carla
 import logging
 
 class EgoVehicleController:
-    def __init__(self) -> None:
-        pass
+"""
+    主车辆控制器
     
-    def setup_ego_vehicle(self, ego_vehicle):
+    功能：
+        - 初始化车辆控制参数
+        - 更新车辆速度控制（目标速度 30 km/h）
+        - 简单的车道保持（基于航点跟随）
+    
+    属性：
+        controller (carla.VehicleControl): CARLA 车辆控制对象
+    """
+    def __init__(self) -> None:
+        self.controller = None
+  
+    def setup_ego_vehicle(self, ego_vehicle):  
+    """
+        配置主车辆初始控制参数
+        
+        Args:
+            ego_vehicle (carla.Vehicle): 主车辆对象
+            
+        Returns:
+            carla.VehicleControl: 配置好的控制对象
+        """
         """Configure ego vehicle for automatic movement"""
         # Set up basic control parameters
-        control = carla.VehicleControl()
-        control.throttle = 0.5  # 50% throttle
-        control.steer = 0.0     # No steering initially
-        ego_vehicle.apply_control(control)
-        return control
+        self.controller = carla.VehicleControl()
+        self.controller.throttle = 0.5  # 50% throttle
+        self.controller.steer = 0.0     # No steering initially
+        ego_vehicle.apply_control(self.controller)
+        return self.controller
 
     def update_ego_vehicle(self, ego_vehicle, control):
+        """
+        更新车辆运动状态（带碰撞避免）
+        
+        Args:
+            ego_vehicle (carla.Vehicle): 主车辆对象
+            control (carla.VehicleControl): 控制对象（会被修改）
+        
+        控制逻辑：
+            1. 速度控制：低于 30 km/h 时加速，高于时减速
+            2. 车道跟随：计算与下一航点的角度差，调整转向
+        """
         """Update ego vehicle movement with collision avoidance"""
         # Get current transform and velocity
         transform = ego_vehicle.get_transform()
