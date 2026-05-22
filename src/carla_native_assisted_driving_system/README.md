@@ -1,5 +1,6 @@
 # CARLA-Native-Assisted-Driving-System
-## 🚗 基于 CARLA 0.9.11 原生API的轻量化辅助驾驶仿真系统
+
+基于 CARLA 0.9.11 原生 API 的轻量化辅助驾驶仿真系统。
 ---
 
 ## 1. 项目简介
