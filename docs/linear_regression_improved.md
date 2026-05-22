@@ -278,6 +278,7 @@ plt.plot(x_smooth, y_smooth, "k-", linewidth=2, label="prediction")
 - **早停机制（Early Stopping）**：验证集 loss 不再下降时自动停止，防止过拟合
 - **正则化**：引入 L2 正则化或 Dropout，进一步提升泛化能力
 - **超参数搜索**：网格搜索或贝叶斯优化寻找最优 `feature_num`、学习率等参数
+- **特征选择**：对基函数变换后的高维特征进行筛选，去除冗余基函数以提升泛化能力
 - **TensorBoard**：集成可视化训练过程中的 loss、学习率等指标变化
 
 ---
