@@ -10,6 +10,18 @@
 - 输出 keep_speed / watch / slow_down 三类建议。
 - 生成 CARLA 语义相机运行视图和风险热力图。
 
+## 环境要求
+
+- Python 3.7+
+- NumPy
+- pandas
+- matplotlib
+- OpenCV
+
+## 数据字段说明
+
+使用 CARLA `SemanticSegmentation` 相机导出的像素标签矩阵，包含 road、lane_marking、vehicle、pedestrian 等语义类别标签。
+
 ## 运行
 
 ```bash
