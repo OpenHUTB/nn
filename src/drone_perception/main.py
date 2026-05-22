@@ -215,8 +215,7 @@ def train_pytorch_model():
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
         
-        from sklearn.metrics import accuracy_score
-        accuracy = accuracy_score(all_labels, all_preds)
+        accuracy = np.mean(np.array(all_labels) == np.array(all_preds))
         val_accuracies.append(accuracy)
         
         logger.info(f'Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.4f}')

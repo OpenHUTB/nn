@@ -6,6 +6,17 @@
 import numpy as np
 # 导入 TensorFlow 库，并简写为 tf（标准约定）
 import tensorflow as tf
+import os
+import json
+from pathlib import Path
+
+# 随机种子与报告输出路径（支持环境变量覆盖）
+RANDOM_SEED = int(os.getenv("TF2_EXERCISE_SEED", "42"))
+REPORT_OUT = os.getenv("TF2_EXERCISE_REPORT_OUT", "outputs/tf2_exercise_report.json")
+
+# 固定随机性，保证可复现
+np.random.seed(RANDOM_SEED)
+tf.random.set_seed(RANDOM_SEED)
 
 # ## 实现softmax函数
 def softmax(x: tf.Tensor) -> tf.Tensor:
@@ -71,8 +82,6 @@ def softmax_ce(logits, label):
     # 参数label: one-hot格式的标签
     # 定义一个极小值epsilon（1e-8），用于数值稳定性，防止log(0)的情况
     epsilon = 1e-8
-    logits = tf.cast(logits, tf.float32)
-    label = tf.cast(label, tf.float32)
     # 数值稳定处理：减去最大值
     logits_max = tf.stop_gradient(tf.reduce_max(logits, axis = -1, keepdims = True))
     stable_logits = logits - logits_max
@@ -80,7 +89,7 @@ def softmax_ce(logits, label):
     exp_logits = tf.exp(stable_logits)
     prob = exp_logits / tf.reduce_sum(exp_logits, axis = -1, keepdims = True)
     # 计算交叉熵
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis = -1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(prob + epsilon), axis = -1))
     ##########
     return loss
 
@@ -93,8 +102,8 @@ label = np.zeros_like(test_logits, dtype = np.float32)
 label[np.arange(10), np.random.randint(0, 5, size = 10)] = 1.0
 # 比较自定义的损失值和tf自带结果，误差小于 0.0001 则认为相等
 
-((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
-  - softmax_ce(prob, label))**2 < 0.0001).numpy()
+var3 = ((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_logits))
+  - softmax_ce(test_logits, label))**2 < 0.0001).numpy()
 
 # ## 实现 sigmoid 交叉熵loss函数
 
@@ -142,4 +151,29 @@ print("tf loss:", tf_loss.numpy())
 print("custom loss:", custom_loss.numpy())
 # 检查两种实现的误差是否小于阈值（0.0001），并打印结果
 # 通过计算平方差 (tf_loss - custom_loss)^2，判断是否小于 0.0001
-print("误差是否小于0.0001:", ((tf_loss - custom_loss) ** 2 < 0.0001).numpy())
+var4 = ((tf_loss - custom_loss) ** 2 < 0.0001).numpy()
+print("误差是否小于0.0001:", var4)
+
+# 汇总测试结果并写入 json 文件，便于实验留档
+var1_ok = bool(np.all(var1))
+var2_ok = bool(np.all(var2))
+var3_ok = bool(var3)
+var4_ok = bool(var4)
+all_passed = bool(var1_ok and var2_ok and var3_ok and var4_ok)
+
+report = {
+    "random_seed": RANDOM_SEED,
+    "softmax_match": var1_ok,
+    "sigmoid_match": var2_ok,
+    "softmax_ce_match": var3_ok,
+    "sigmoid_ce_match": var4_ok,
+    "all_passed": all_passed,
+    "tf_loss": float(tf_loss.numpy()),
+    "custom_loss": float(custom_loss.numpy()),
+}
+
+out_path = Path(REPORT_OUT)
+out_path.parent.mkdir(parents=True, exist_ok=True)
+with out_path.open("w", encoding="utf-8") as f:
+    json.dump(report, f, ensure_ascii=False, indent=2)
+print("测试报告已保存:", out_path.resolve())

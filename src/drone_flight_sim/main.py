@@ -40,22 +40,8 @@ def auto_flight_mode(drone):
 
     time.sleep(1)
 
-    # ===== 定义大范围飞行航点列表 =====
-    # 注意：AirSim 中 Z 轴向下为正，所以负值表示向上飞行
-    # 飞行高度设为 -5 米，起飞高度也设为 -5 米
-    waypoints = [
-        (20, 0, -5),  # 航点1：向右飞行 10 米
-        (10, -20, -5),  # 航点2：向前飞行 10 米
-        (0, -10, -5),  # 航点3：向左飞行 10 米
-        (0, 0, -5),  # 航点4：向后飞行 10 米，回到原点
-        (-20, 0, -5),  # 航点5：继续向左飞行
-        (-10, -10, -5),  # 航点6：继续向前飞行
-        (10, -10, -5),  # 航点7：回到右侧
-        (10, 10, -5),  # 航点8：向上飞行
-        (-10, 10, -5),  # 航点9：向左飞行
-        (-10, 0, -5),  # 航点10：向后飞行
-        (0, 0, -5),  # 航点11：回到原点
-    ]
+   # 使用 FlightPath 中定义的三角形路径
+    waypoints = FlightPath.triangle_path(size=15, height=-5)
 
     # 打印飞行路径信息
     FlightPath.print_path(waypoints)
@@ -158,6 +144,10 @@ def keyboard_control_mode(drone):
 
     # 创建键盘控制器
     keyboard_controller = KeyboardController(drone)
+
+    # 设置返航点（起飞位置）
+    keyboard_controller.home_position = drone.get_position()
+    print(f"🏠 返航点已设置: ({keyboard_controller.home_position.x_val:.1f}, {keyboard_controller.home_position.y_val:.1f}, {-keyboard_controller.home_position.z_val:.1f}m)")
 
     # 启动键盘监听
     print("🕹️ 键盘控制已启动，开始控制无人机吧！")

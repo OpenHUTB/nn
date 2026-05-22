@@ -1,0 +1,12 @@
+{
+  "source": "MuJoCo double pendulum actuator rollout",
+  "records": 240,
+  "total_energy": 1.43464,
+  "max_power": 4.239784,
+  "final_angle_error": 0.062946,
+  "settle_time_s": 0.29,
+  "generated_files": [
+    "mujoco_pendulum_angles.png",
+    "mujoco_pendulum_power.png"
+  ]
+}

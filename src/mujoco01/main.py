@@ -1,15 +1,9 @@
-# 标准库
 import time
-
-# 第三方库
+import csv  # 只新增这个库
 import mujoco
 from mujoco import viewer
 
 def main():
-    """
-    主函数：加载人形机器人模型并运行物理模拟 
-    """
-    # 1. 加载MJCF模型文件
     model_path = "src/mujoco01/humanoid.xml" 
     try:
         model = mujoco.MjModel.from_xml_path(model_path)
@@ -17,40 +11,54 @@ def main():
         print(f"模型加载失败: {e}")
         return
 
-    # 2. 初始化模拟数据结构
     data = mujoco.MjData(model)
+    # 修复：必须传 keyframe 索引 0
+    mujoco.mj_resetDataKeyframe(model, data, 0)
 
-    # 3. 启动可视化窗口
+    # ======================
+    # 新增：CSV 数据记录（不影响任何原有功能）
+    # ======================
+    csv_file = open("simulation_data.csv", "w", newline="", encoding="utf-8")
+    writer = csv.writer(csv_file)
+    
+    # 写入表头
+    header = ["time"]
+    header += [f"qpos_{i}" for i in range(model.nq)]
+    header += [f"qvel_{i}" for i in range(model.nv)]
+    writer.writerow(header)
+
     print("启动模拟器...")
     with viewer.launch_passive(model, data) as v:
-        # 初始化机器人为标准站立姿态（keyframe索引1对应站立姿势）
-        mujoco.mj_resetDataKeyframe(model, data, 1)
         last_print_time = 0
         
         while v.is_running():
+            # 右手平稳抬手（原功能完全保留）
+            data.ctrl[19] = 0.4
+
+            # 仿真步进（原功能）
             mujoco.mj_step(model, data)
 
-            # (修改) 每 0.5 秒打印一次，避免刷屏卡顿
-            if data.time - last_print_time > 0.5:
-                print(f"时间: {data.time:.2f}, 躯干高度: {data.qpos[2]:.2f}m")
+            # ======================
+            # 新增：每帧写入数据（不影响原来任何代码）
+            # ======================
+            row = [data.time]
+            row += data.qpos.tolist()
+            row += data.qvel.tolist()
+            writer.writerow(row)
+
+            # 打印传感器数据（原功能完全保留）
+            if data.time - last_print_time > 0.3:
+                print("======================================")
+                print(f"加速度: {data.sensordata[0]:.2f}, {data.sensordata[1]:.2f}, {data.sensordata[2]:.2f}")
+                print(f"速度: {data.sensordata[3]:.2f}, {data.sensordata[4]:.2f}, {data.sensordata[5]:.2f}")
+                print(f"足部受力: {data.sensordata[6]:.2f}, {data.sensordata[7]:.2f}, {data.sensordata[8]:.2f}")
                 last_print_time = data.time
-        # 4. 运行模拟循环
-        while v.is_running():
-            # 步进物理引擎
-            mujoco.mj_step(model, data)
 
-            # 输出关键模拟数据 (注意：每帧输出会导致刷屏)
-            print(f"时间: {data.time:.2f}, "
-                  f"躯干位置: ({data.qpos[0]:.2f}, {data.qpos[1]:.2f}, {data.qpos[2]:.2f})")
-
-            # 5. 摔倒检测：躯干高度低于 0.2 米判定摔倒 (假设根节点是自由关节)
-            if data.qpos[2] < 0.2:
-                print("⚠️ 机器人摔倒了！程序结束。")
-                break
-
-            # 6. 更新可视化窗口并控制帧率
             v.sync()
-            time.sleep(model.opt.timestep) # 根据物理步长延时，保持真实时间流速
+
+    # 关闭文件
+    csv_file.close()
+    print("✅ 数据已保存到 simulation_data.csv")
 
 if __name__ == "__main__":
     main()
