@@ -1,4 +1,3 @@
-# 参考：https://github.com/Tiryoh/actions-mkdocs
 name: Deploy
 
 on:
@@ -8,21 +7,42 @@ on:
 
 jobs:
   build:
-    name: Deploy docs to GitHub Pages
+    name: Build site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     steps:
-      - name: Checkout 
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install deps
+        run: pip install -r requirements.txt
       - name: Build
-        uses: OpenHUTB/actions-mkdocs@main
+        run: mkdocs build --config-file mkdocs.yml --site-dir site
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          mkdocs_version: 'latest' # option
-          #mkdocs_version: '1.1' # option
-          # 安装行内公式渲染的依赖(python-markdown-math)
-          requirements: 'requirements.txt' # option
-          configfile: 'mkdocs.yml' # option
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+        id: deployment
+        uses: actions/deploy-pages@v4

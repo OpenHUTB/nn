@@ -26,6 +26,8 @@ class GraspRobot(MujocoPhyEnv):
         self.TABLE_HEIGHT = 0.9
         self.GRASP_DEPTH = 0.10  # 减小抓取深度，避免撞到桌子
         self.LIFT_HEIGHT = 0.15
+        self.GRASP_DEPTH = 0.12
+        self.LIFT_HEIGHT = 0.25
         self.SUCCESS_REWARD = 100.0
 
         self.arm_joints_names = list(self.model_names.joint_names[:6])
@@ -42,6 +44,7 @@ class GraspRobot(MujocoPhyEnv):
             vmax_xyz=1, vmax_abg=2
         )
         self.grp_ctrl = GripperEffortCtrl(physics=self.physics, gripper=self.gripper, effort=35.0)  # 增加抓取力度
+        self.grp_ctrl = GripperEffortCtrl(physics=self.physics, gripper=self.gripper, effort=15.0)
         self.target_objects = _target_box
         self.grasped_num = 0
         self.grasp_step = 0
@@ -93,6 +96,8 @@ class GraspRobot(MujocoPhyEnv):
         # 大幅增加最大步数，确保机械臂有足够时间到达目标
         max_steps = self.frame_skip * 3  # 原来是 frame_skip，现在增加到 3 倍
         for _ in range(max_steps):
+        current_frame_skip = self.frame_skip if np.linalg.norm(np.array(self.get_ee_pos()) - np.array(target)) > 0.1 else 20
+        for _ in range(current_frame_skip):
             self.controller.run(target_pose)
             self._sanitize_physics_data()
             self.step_mujoco_simulation()
@@ -115,6 +120,7 @@ class GraspRobot(MujocoPhyEnv):
         if success:
             # 大幅增加闭合时间，确保抓住物体
             for _ in range(self.frame_skip * 2):
+            for _ in range(self.frame_skip):
                 self.grp_ctrl.run(signal=1)
                 self.step_mujoco_simulation()
         return success
@@ -151,6 +157,7 @@ class GraspRobot(MujocoPhyEnv):
                 curr_pos = self.get_body_com(obj_name)
                 z_diff = curr_pos[2] - prev_pos[2]
                 if z_diff > 0.005:  # 物体提升 5mm 以上就算成功
+                if z_diff > 0.01:
                     object_lifted = True
                     lifted_object = obj_name
                     break
@@ -158,6 +165,7 @@ class GraspRobot(MujocoPhyEnv):
         self.current_grasp_target = lifted_object
         # 要么物体被提升，要么抓取器闭合到一定程度都算成功
         return object_lifted or finger_dist < 0.3
+        return finger_dist < 0.2 and object_lifted
 
     def open_gripper(self):
         for _ in range(self.frame_skip):

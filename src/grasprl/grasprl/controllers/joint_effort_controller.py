@@ -34,6 +34,9 @@ class GripperEffortCtrl:
         effort=50.0,  # 大幅增加抓取力度
         close_time=50
     ) -> None:
+        effort=25.0,
+        close_time=25
+        ) -> None:
         self.physics = physics
         self.gripper = gripper
         self.effort = effort
@@ -50,11 +53,13 @@ class GripperEffortCtrl:
         self.current_step += 1
         # 更快达到最大力度
         target_effort = min(self.effort * (self.current_step / 0.8), self.effort)
+        target_effort = min(self.effort * (self.current_step / 1.5), self.effort)
         self.physics.bind(self.gripper).qfrc_applied = target_effort
 
     def open_gripper(self):
         self.current_step = 0
         self.physics.bind(self.gripper).qfrc_applied = -self.effort * 1.5  # 更大的打开力度
+        self.physics.bind(self.gripper).qfrc_applied = -self.effort * 1.0
 
     def reset(self):
         self.current_step = 0
