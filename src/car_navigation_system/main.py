@@ -1,4 +1,4 @@
-﻿# --------------------------
+# --------------------------
 # 简化修复版：确保车辆正确生成
 # --------------------------
 
@@ -305,7 +305,7 @@ class SimpleDrivingSystem:
                 array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
                 array = np.reshape(array, (image.height, image.width, 4))
                 self.camera_image = array[:, :, :3]  # RGB通道
-        except:
+        except Exception:
             pass
 
     def update_camera_view(self):
@@ -321,7 +321,7 @@ class SimpleDrivingSystem:
                     try:
                         camera.stop()
                         camera.destroy()
-                    except:
+                    except Exception:
                         pass
             self.cameras.clear()
 
@@ -329,7 +329,7 @@ class SimpleDrivingSystem:
             if self.vehicle:
                 try:
                     self.vehicle.destroy()
-                except:
+                except Exception:
                     pass
                 self.vehicle = None
             
@@ -440,7 +440,7 @@ class SimpleDrivingSystem:
                         try:
                             camera.stop()
                             camera.destroy()
-                        except:
+                        except Exception:
                             pass
                 self.cameras.clear()
                 
@@ -527,7 +527,7 @@ class SimpleDrivingSystem:
                         try:
                             camera.stop()
                             camera.destroy()
-                        except:
+                        except Exception:
                             pass
                 self.cameras.clear()
                 
@@ -845,7 +845,7 @@ class SimpleDrivingSystem:
                             npc.set_autopilot(True)
                             npc_vehicles.append(npc)
                             print(f"生成NPC车辆 {len(npc_vehicles)}")
-                except:
+                except Exception:
                     pass
 
             print(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
@@ -876,13 +876,13 @@ class SimpleDrivingSystem:
                 try:
                     camera.stop()
                     camera.destroy()
-                except:
+                except Exception:
                     pass
 
         if self.vehicle:
             try:
                 self.vehicle.destroy()
-            except:
+            except Exception:
                 pass
 
         # 等待销毁完成

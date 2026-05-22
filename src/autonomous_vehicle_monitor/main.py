@@ -31,7 +31,7 @@ def main():
         try:
             vehicle = world.spawn_actor(bp_lib.filter('vehicle.*model3*')[0], spawn)
             break
-        except:
+        except RuntimeError:
             continue
     if not vehicle:
         return
@@ -196,14 +196,19 @@ def main():
 
     finally:
         blackbox.close()
-        try: npc_manager.destroy_all()
-        except: pass
-        try: sensors.destroy()
-        except: pass
+        try: 
+            npc_manager.destroy_all()
+        except Exception: 
+            pass
+        try: 
+            sensors.destroy()
+        except Exception: 
+            pass
         try:
             if vehicle.is_alive:
                 vehicle.destroy()
-        except: pass
+        except Exception: 
+            pass
         cv2.destroyAllWindows()
 
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 方向分析模块 - 稳定优化版
 已移除日志文件生成功能
 """
@@ -93,7 +93,7 @@ class DirectionAnalyzer:
                 image_width = road_features.get('image_width', 800)
                 centroid_offset = (cx - image_width / 2) / (image_width / 2)
                 features['centroid_offset'] = max(-1.0, min(1.0, centroid_offset))
-            except:
+            except (KeyError, TypeError):
                 pass
 
         # 2. 道路坚实度特征
@@ -173,9 +173,9 @@ class DirectionAnalyzer:
                     if width_bottom > 0:
                         convergence = width_top / width_bottom
                         return max(0.3, min(3.0, convergence))
-                except:
+                except (KeyError, IndexError):
                     pass
-        except:
+        except (KeyError, IndexError):
             pass
 
         return 1.0
@@ -203,9 +203,9 @@ class DirectionAnalyzer:
                     if left_dist + right_dist > 0:
                         symmetry = 1 - abs(left_dist - right_dist) / (left_dist + right_dist)
                         return max(0, min(1, symmetry))
-                except:
+                except (KeyError, IndexError):
                     pass
-        except:
+        except (KeyError, IndexError):
             pass
 
         return 0.5  # 默认中等对称性
@@ -230,9 +230,9 @@ class DirectionAnalyzer:
                     
                     balance = 1 - min(1.0, abs(offset_ratio))
                     return max(0, balance)
-                except:
+                except (KeyError, IndexError):
                     pass
-        except:
+        except (KeyError, IndexError):
             pass
         
         return 0.5
@@ -259,7 +259,7 @@ class DirectionAnalyzer:
                 angle = np.arccos(cos_angle)
                 
                 return min(1.0, angle / (np.pi / 3))
-        except:
+        except (IndexError, TypeError, ValueError):
             pass
         
         return 0.0

@@ -189,7 +189,7 @@ class YOLO(object):
             # ---------------------------------------------------------#
             try:
                 batch_detections = batch_detections[0].cpu().numpy()  # 将Tensor转换为numpy数组并移至CPU
-            except:
+            except (IndexError, AttributeError):
                 return image  # 无检测结果时直接返回原图
 
             # ---------------------------------------------------------#
@@ -376,7 +376,7 @@ class YOLO(object):
                     top_ymax = top_ymax / self.model_image_size[0] * image_shape[0]
                     boxes = np.concatenate([top_ymin, top_xmin, top_ymax, top_xmax], axis=-1)
 
-            except:
+            except (IndexError, AttributeError):
                 pass
 
         # 记录多次推理的起始时间
@@ -413,7 +413,7 @@ class YOLO(object):
                         top_ymax = top_ymax / self.model_image_size[0] * image_shape[0]
                         boxes = np.concatenate([top_ymin, top_xmin, top_ymax, top_xmax], axis=-1)
 
-                except:
+                except (IndexError, AttributeError):
                     pass
 
         # 记录多次推理的结束时间

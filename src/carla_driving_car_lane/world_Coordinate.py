@@ -22,7 +22,7 @@ try:
     eggs = glob.glob(os.path.join(current_dir, "carla", "dist", "*.egg"))
     for e in eggs:
         sys.path.append(e)
-except:
+except Exception:
     pass
 
 # 仅加载必要库

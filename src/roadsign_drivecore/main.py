@@ -528,14 +528,14 @@ def main():
             if actor and 'sensor' in actor.type_id:
                 try:
                     actor.stop()
-                except:
+                except Exception:
                     pass
         time.sleep(0.5)
         for actor in actor_list:
             if actor:
                 try:
                     actor.destroy()
-                except:
+                except Exception:
                     pass
         pygame.quit()
         print("程序结束")

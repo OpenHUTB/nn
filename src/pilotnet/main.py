@@ -321,10 +321,10 @@ class Menu():
             # 尝试加载中文字体
             try:
                 font = ImageFont.truetype("msyh.ttc", 24)  # Windows 系统字体
-            except:
+            except (IOError, OSError):
                 try:
                     font = ImageFont.truetype("simhei.ttf", 24)  # 备用字体
-                except:
+                except (IOError, OSError):
                     font = ImageFont.load_default()  # 默认字体
             
             font_large = ImageFont.truetype("msyh.ttc", 32) if 'font' in dir() else font

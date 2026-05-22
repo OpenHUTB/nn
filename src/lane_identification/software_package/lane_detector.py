@@ -1,4 +1,4 @@
-﻿"""
+"""
 车道线检测模块 - 负责检测和拟合车道线
 """
 
@@ -393,7 +393,7 @@ class LaneDetector:
             if left_lane['points'][0][0] > right_lane['points'][0][0]:
                 left_lane['confidence'] *= 0.6
                 right_lane['confidence'] *= 0.6
-        except:
+        except (KeyError, IndexError):
             pass
         
         return left_lane, right_lane
@@ -467,7 +467,7 @@ class LaneDetector:
                     x = center_func(y)
                     x = max(0, min(width, x))
                     path_points.append((int(x), int(y)))
-                except:
+                except (TypeError, ValueError):
                     continue
             
             if len(path_points) < self.config.min_prediction_points:

@@ -1,4 +1,4 @@
-﻿"""
+"""
 主应用程序模块 - 支持图像、视频和摄像头实时识别
 添加异常恢复、性能监控和配置热重载
 """
@@ -171,7 +171,7 @@ class LaneDetectionApp:
         try:
             if os.path.exists("icon.ico"):
                 self.root.iconbitmap("icon.ico")
-        except:
+        except Exception:
             pass
 
         # 设置窗口居中
@@ -751,7 +751,7 @@ class LaneDetectionApp:
             # 获取摄像头索引
             try:
                 self.camera_index = int(self.camera_index_var.get())
-            except:
+            except ValueError:
                 self.camera_index = self.config.camera_id
 
             # 尝试打开摄像头
