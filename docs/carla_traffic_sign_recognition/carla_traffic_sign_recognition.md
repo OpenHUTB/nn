@@ -128,7 +128,11 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 
 ## 4. 棘手环境问题排查与修复记录
 
+<<<<<<< HEAD
 在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有极高的教学参考价值。
+=======
+在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有较高的教学参考价值。
+>>>>>>> upstream/main
 
 **故障 1：幽灵文件 `nul` 索引错误**
 
@@ -142,7 +146,7 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 **故障 2：GitHub 连接重置（Connection Reset）**
 
 - **现象**：`git push` 长时间阻塞后报错 `fatal: unable to access ... Recv failure: Connection was reset`。
-- **根因分析**：国内网络环境访问境外 Amazon AWS 服务器（GitHub 托管地）存在间歇性丢包或 DNS 污染。
+- **根因分析**：国内网络环境访问境外 Amazon Web Services 服务器（GitHub 托管地）存在间歇性丢包或 DNS 污染。
 - **解决方案**：
   1. 配置 Git 全局代理（HTTP/HTTPS Proxy）指向本地科学上网端口（如 7890）。
   2. 修改 `~/.ssh/config` 使用 SSH over HTTPS 的 443 端口进行隧道穿透。
@@ -159,7 +163,7 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 
 ### 5.1 环境依赖清单
 
-为了复现本实验，请确保开发环境满足以下最低配置：
+为了复现本实验，请确保开发环境满足以下最低配置要求：
 
 | 组件                | 版本要求                          | 备注                                         |
 | :------------------ | :-------------------------------- | :------------------------------------------- |
@@ -199,7 +203,7 @@ python src/carla_traffic_sign_recognition/main.py
 
 ### 6.1 功能验证截图
 
-当脚本运行后，OpenCV 窗口将弹出第一人称驾驶视角。驾驶车辆接近十字路口的停止标志时，系统表现如下：
+脚本运行后，OpenCV 窗口将弹出第一人称驾驶视角。驾驶车辆接近十字路口的停止标志时，系统表现如下：
 
 - **远距离感知**：当 Stop Sign 占据画面像素面积约 **20x20** 时，YOLOv8 即开始响应并绘制淡黄色锚框。
 - **近距离锁定**：随着距离拉近，置信度迅速攀升至 **0.85 - 0.95** 区间，检测框稳定无抖动。
@@ -221,7 +225,7 @@ python src/carla_traffic_sign_recognition/main.py
 
 #### 1. 耗时拆解与吞吐量
 
-- **端到端延迟**：稳定在 **15~25 ms**，远优于 L2 级辅助驾驶感知规范（<100 ms）。
+- **端到端延迟**：稳定在 **15~25 ms**，明显优于 L2 级辅助驾驶感知规范（<100 ms）。
   - **预处理**：< 1 ms（基于 NumPy 内存视图实现零拷贝 Alpha 通道剥离）。
   - **模型推理**：8~12 ms（开启 CUDA 硬件加速与 FP16 半精度计算）。
   - **后处理**：~ 2 ms（基于单类别硬掩码极大缩减了 NMS 算法的交并比计算量）。
@@ -245,11 +249,11 @@ python src/carla_traffic_sign_recognition/main.py
 
 ## 7. 局限性与未来进阶规划
 
-当前版本（v1.0）已完美验证了静态感知闭环的可行性，具备了作为优秀开源基础模块的所有要素。面向未来更复杂的工业级应用，规划了以下三个演进方向：
+当前版本（v1.0）已充分验证了静态感知闭环的可行性，具备了作为优秀开源基础模块的各项要素。面向未来更复杂的工业级应用，规划了以下三个演进方向：
 
 ### 7.1 数据域迁移与微调（Domain Adaptation）
 
-**现状**：目前依赖 YOLOv8 在 COCO 数据集上的预训练权重，仅能识别 `Stop Sign` 类别，且对 **中国国标交通标志**（如注意行人、限速标志）不具备识别能力。
+**现状**：目前依赖 YOLOv8 在 COCO 数据集上的预训练权重，仅能识别 `Stop Sign` 单一类别，且对 **中国国标交通标志**（如注意行人、限速标志等）不具备识别能力。
 **规划**：引入 **TT100K (Tsinghua-Tencent 100K)** 或 **CCTSDB** 数据集，冻结 YOLOv8 骨干网络（Backbone），仅对检测头（Head）进行微调（Fine-tuning）。这将使模型能够精准覆盖国内道路常见的 **禁令标志、警告标志、指示标志** 三大类，实现本土化适配。
 
 ### 7.2 感知与控制的深度融合（Perception-Control Integration）
