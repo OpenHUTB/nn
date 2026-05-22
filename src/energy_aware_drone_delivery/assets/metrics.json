@@ -1,0 +1,22 @@
+{
+  "tasks": 4,
+  "charging_stations": 4,
+  "feasible": true,
+  "task_order": [
+    "D2",
+    "D4",
+    "D3",
+    "D1"
+  ],
+  "charges": 2,
+  "total_steps": 244,
+  "total_energy": 294.124,
+  "minimum_battery": 20.095,
+  "naive_total_energy": 293.835,
+  "naive_minimum_battery": -163.835,
+  "outputs": {
+    "route_map": "assets\\energy_aware_route.png",
+    "battery_profile": "assets\\battery_profile.png",
+    "energy_breakdown": "assets\\energy_breakdown.png"
+  }
+}

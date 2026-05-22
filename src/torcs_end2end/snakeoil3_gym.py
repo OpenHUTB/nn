@@ -473,7 +473,7 @@ class DriverAction():
             if not type(v) is list:
                 out += '%.3f' % v
             else:
-                out += ' '.join([str(x) for x in v])
+                out += ' '.join(str(x) for x in v)
             out += ')'
         return out
 

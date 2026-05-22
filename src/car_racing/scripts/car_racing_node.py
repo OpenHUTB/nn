@@ -1,9 +1,10 @@
 import rospy
 import sys
+import os
 from std_msgs.msg import Float32, String
 
 # 导入同功能包内的你的原代码（不用跨目录，ROS封装的核心）
-sys.path.append("/home/ros-industrial/catkin_ws/src/car_racing_ros/your_python_code")
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../your_python_code"))
 
 from dqn_model.DQN_model import Agent as DQNAgent
 from double_dqn_model.double_dqn import DoubleDQNAgent as DDQNAgent

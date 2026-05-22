@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
 """
-CARLA Frenet Trajectory Planning - Main Entry Point
-===================================================
+CARLA Autonomous Car - First Release
+====================================
 
-This is the main entry point for running the CARLA RL-based Frenet trajectory planning project.
-It supports training and testing of various reinforcement learning algorithms.
+Complete autonomous car system with DDPG algorithm. This is the first release
+that allows the car to drive autonomously in CARLA simulator.
 
 Usage:
     python main.py [options]
 
 Training:
-    python main.py --cfg_file configs/experiment_baseline.yaml --agent_id 1
+    python main.py --cfg_file configs/experiment_baseline.yaml --agent_id 1 --train
 
 Testing:
-    python main.py --test --agent_id 1 --test_model best_1000000
+    python main.py --agent_id 1 --test --test_model best_100000 --play_mode 1
 
-For more options:
-    python main.py --help
+Quick Start:
+    # 1. Start CARLA server first (terminal 1)
+    ./CarlaUE4.sh -carla-server -fps=20 -world-port=2000
+
+    # 2. Train the car (terminal 2)
+    python main.py --cfg_file configs/experiment_baseline.yaml --agent_id 1 --train --num_timesteps 100000
+
+    # 3. Test the trained car
+    python main.py --agent_id 1 --test --test_model best_100000 --play_mode 1
 """
 
 import os
@@ -25,145 +32,155 @@ import inspect
 import argparse
 import os.path as osp
 from pathlib import Path
+import time
+import json
+import numpy as np
 
 # Get current path
 currentPath = osp.dirname(osp.abspath(inspect.getfile(inspect.currentframe())))
 
-# Add project root and local stable_baselines to path
-# For the carla_autonomous_car module, we need to add the agents path
-sys.path.insert(0, currentPath)
+# Add local stable_baselines to path (contains custom CNN extractors)
 sys.path.insert(0, currentPath + '/agents/reinforcement_learning/')
 
-# Default availability flags
-CARLA_AVAILABLE = False
-CONFIG_AVAILABLE = False
-
-def import_modules():
-    """Import CARLA and RL modules dynamically."""
-    global CARLA_AVAILABLE, CONFIG_AVAILABLE
-    global gym, carla_gym, carla_gym_envs, Monitor
-    global DDPGMlpPolicy, DDPGCnnPolicy, CommonMlpPolicy, CommonMlpLstmPolicy, CommonCnnPolicy
-    global NormalActionNoise, OrnsteinUhlenbeckActionNoise, AdaptiveParamNoiseSpec
-    global DDPG, PPO2, TRPO, A2C
-    global nature_cnn, sequence_1d_cnn, sequence_1d_cnn_ego_bypass_tc
-    global cfg, log_config_to_file, cfg_from_list, cfg_from_yaml_file
-    global np, datetime, json, shutil
-
-    try:
-        import numpy as np
-        from datetime import datetime
-        import json
-        import shutil
-
-        import gym
-        import carla_gym
-        import carla_gym.envs
-        from stable_baselines.bench import Monitor
-        from stable_baselines.common.policies import MlpPolicy as CommonMlpPolicy
-        from stable_baselines.common.policies import MlpLstmPolicy as CommonMlpLstmPolicy
-        from stable_baselines.common.policies import CnnPolicy as CommonCnnPolicy
-        from stable_baselines import PPO2
-        # Import CNN extractors for use with eval() in config
-        from stable_baselines.common.policies import nature_cnn, sequence_1d_cnn, sequence_1d_cnn_ego_bypass_tc
-
-        CARLA_AVAILABLE = True
-    except ImportError as e:
-        print(f"Warning: Could not import CARLA modules: {e}")
-        print("Please make sure CARLA is installed. See README.md for installation instructions.")
-        CARLA_AVAILABLE = False
-        return False
-
-    try:
-        from config import cfg, log_config_to_file, cfg_from_list, cfg_from_yaml_file
-        CONFIG_AVAILABLE = True
-    except ImportError as e:
-        print(f"Warning: Could not import config module: {e}")
-        CONFIG_AVAILABLE = False
-        return False
-
-    return True
+# Import CARLA and RL modules
+try:
+    import tensorflow as tf
+    import gym
+    import carla_gym
+    import carla_gym.envs
+    from stable_baselines.bench import Monitor
+    from stable_baselines.ddpg.policies import MlpPolicy as DDPGMlpPolicy
+    from stable_baselines.common.noise import OrnsteinUhlenbeckActionNoise, AdaptiveParamNoiseSpec
+    from stable_baselines import DDPG
+    from config import cfg, cfg_from_yaml_file
+    CARLA_RL_AVAILABLE = True
+except ImportError as e:
+    print(f"❌ Error: CARLA RL modules not available: {e}")
+    print("💡 Please make sure CARLA is installed. See README.md for installation instructions.")
+    CARLA_RL_AVAILABLE = False
 
 
-def parse_args_cfgs(cfg):
-    """Parse command line arguments and configuration files."""
+def parse_args():
+    """Parse command line arguments for autonomous car system."""
     parser = argparse.ArgumentParser(
-        description='CARLA RL Frenet Trajectory Planning',
+        description='CARLA Autonomous Car - DDPG Implementation',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Quick Start:
+  # Start CARLA server first (terminal 1)
+  ./CarlaUE4.sh -carla-server -fps=20 -world-port=2000
+
+  # Train the car (terminal 2)
+  python main.py --cfg_file configs/experiment_baseline.yaml --agent_id 1 --train
+
+  # Test the trained car
+  python main.py --agent_id 1 --test --test_model best_100000 --play_mode 1
+
 Examples:
-  # Training with baseline configuration
-  python main.py --cfg_file configs/experiment_baseline.yaml --agent_id 1
+  python main.py --help
+  python main.py --list_cfgs
+  python main.py --version
+  python main.py --validate-config configs/experiment_baseline.yaml
 
-  # Training with improved configuration
-  python main.py --cfg_file configs/experiment_improved.yaml --agent_id 2
-
-  # Training with Lyapunov configuration
-  python main.py --cfg_file configs/experiment_lyapunov.yaml --agent_id 3
-
-  # Testing with saved model
-  python main.py --test --agent_id 1 --test_model best_1000000
+  # Training with different configurations
+  python main.py --cfg_file configs/experiment_baseline.yaml --agent_id 1 --train --num_timesteps 100000
+  python main.py --cfg_file configs/experiment_improved.yaml --agent_id 2 --train
 
   # Testing with visualization
-  python main.py --test --agent_id 1 --play_mode 1
+  python main.py --agent_id 1 --test --play_mode 1
+  python main.py --agent_id 1 --test --play_mode 2
         """
     )
 
-    parser.add_argument('--cfg_file', type=str, default=None, help='specify the config for training')
-    parser.add_argument('--env', help='environment ID', type=str, default='CarlaGymEnv-v1')
-    parser.add_argument('--log_interval', help='Log interval (model)', type=int, default=100)
-    parser.add_argument('--agent_id', type=int, default=None, help='Agent ID for logging and model saving')
-    parser.add_argument('--num_timesteps', type=float, default=1e7, help='Number of training timesteps')
-    parser.add_argument('--save_path', help='Path to save trained model to', default=None, type=str)
-    parser.add_argument('--log_path', help='Directory to save learning curve data.', default=None, type=str)
-    parser.add_argument('--play_mode', type=int, help='Display mode: 0:off, 1:2D, 2:3D ', default=0)
-    parser.add_argument('--verbosity', help='Terminal mode: 0:Off, 1:Action,Reward 2:All', default=0, type=int)
-    parser.add_argument('--test', default=False, action='store_true', help='Run in test mode')
-    parser.add_argument('--test_model', help='test model file name', type=str, default='')
-    parser.add_argument('--test_last', help='test model best or last?', action='store_true', default=False)
-    parser.add_argument('--carla_host', metavar='H', default='127.0.0.1', help='IP of the host server (default: 127.0.0.1)')
-    parser.add_argument('-p', '--carla_port', metavar='P', default=2000, type=int, help='TCP port to listen to (default: 2000)')
-    parser.add_argument('--tm_port', default=8000, type=int, help='Traffic Manager TCP port to listen to (default: 8000)')
-    parser.add_argument('--carla_res', metavar='WIDTHxHEIGHT', default='1280x720', help='window resolution (default: 1280x720)')
-    parser.add_argument('--list_cfgs', action='store_true', help='List available configuration files')
+    parser.add_argument('--list_cfgs', action='store_true',
+                       help='List available configuration files')
+    parser.add_argument('--version', action='version',
+                       version='CARLA Autonomous Car 1.0.0',
+                       help='Show version information')
+    parser.add_argument('--cfg_dir', type=str, default='configs',
+                       help='Configuration directory (default: configs)')
+    parser.add_argument('--validate-config', type=str, metavar='FILE',
+                       help='Validate a configuration file')
 
-    args = parser.parse_args()
+    # Training/Testing modes
+    parser.add_argument('--train', action='store_true',
+                       help='Run in training mode')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in testing mode')
+    parser.add_argument('--cfg_file', type=str, default=None,
+                       help='Configuration file for training/testing')
+    parser.add_argument('--agent_id', type=int, default=None,
+                       help='Agent ID for logging and model saving')
+    parser.add_argument('--test_model', type=str, default='',
+                       help='Test model file name (without extension)')
+    parser.add_argument('--play_mode', type=int, default=0,
+                       help='Display mode: 0:off, 1:2D, 2:3D (default: 0)')
+    parser.add_argument('--num_timesteps', type=int, default=int(1e5),
+                       help='Number of training timesteps (default: 1e5)')
+    parser.add_argument('--log_interval', type=int, default=100,
+                       help='Log interval during training (default: 100)')
 
-    args.num_timesteps = int(args.num_timesteps)
-
-    # Auto-detect config file for testing if not specified
-    if args.test and args.cfg_file is None and args.agent_id is not None:
-        path = 'logs/agent_{}/'.format(args.agent_id)
-        if os.path.exists(path):
-            conf_list = [cfg_file for cfg_file in os.listdir(path) if cfg_file.endswith('.yaml')]
-            if conf_list:
-                args.cfg_file = path + conf_list[0]
-                print(f"Auto-detected config file: {args.cfg_file}")
-
-    if args.cfg_file:
-        cfg_from_yaml_file(args.cfg_file, cfg)
-        cfg.TAG = Path(args.cfg_file).stem
-        cfg.EXP_GROUP_PATH = '/'.join(args.cfg_file.split('/')[1:-1])  # remove 'cfgs' and 'xxxx.yaml'
-
-    # visualize all test scenarios
-    if args.test:
-        args.play_mode = True
-
-    return args, cfg
+    return parser.parse_args()
 
 
-def list_config_files():
+def validate_config(config_file):
+    """Validate a YAML configuration file."""
+    print(f"\n🔍 Validating configuration: {config_file}")
+
+    if not os.path.exists(config_file):
+        print(f"❌ Config file not found: {config_file}")
+        return None
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+
+        print("✅ Configuration file syntax is valid")
+
+        # Check required sections
+        required_sections = ['POLICY', 'ENV', 'TRAINING']
+        for section in required_sections:
+            if section in config:
+                print(f"✅ Found required section: {section}")
+            else:
+                print(f"⚠️  Missing section: {section}")
+
+        # Show some key values
+        print(f"\n📊 Configuration Summary:")
+        if 'POLICY' in config and 'NAME' in config['POLICY']:
+            print(f"  Algorithm: {config['POLICY']['NAME']}")
+        if 'ENV' in config and 'NAME' in config['ENV']:
+            print(f"  Environment: {config['ENV']['NAME']}")
+        if 'TRAINING' in config and 'TIMESTEPS' in config['TRAINING']:
+            print(f"  Timesteps: {config['TRAINING']['TIMESTEPS']:,}")
+
+        return config
+
+    except yaml.YAMLError as e:
+        print(f"❌ YAML syntax error: {e}")
+        return None
+    except Exception as e:
+        print(f"❌ Error reading config: {e}")
+        return None
+
+def list_config_files(cfg_dir):
     """List available configuration files."""
-    cfg_dir = 'configs'
     if not os.path.exists(cfg_dir):
-        print(f"Config directory not found: {cfg_dir}")
-        return
+        print(f"❌ Config directory not found: {cfg_dir}")
+        return False
 
-    print("\nAvailable Configuration Files:")
-    print("=" * 50)
-    for cfg_file in sorted(os.listdir(cfg_dir)):
-        if cfg_file.endswith('.yaml'):
-            print(f"  - {cfg_file}")
-    print("=" * 50)
+    yaml_files = [f for f in os.listdir(cfg_dir) if f.endswith('.yaml')]
+
+    if not yaml_files:
+        print(f"❌ No configuration files found in {cfg_dir}")
+        return False
+
+    print(f"\n📋 Available Configuration Files in '{cfg_dir}':")
+    print("=" * 60)
+    for i, cfg_file in enumerate(sorted(yaml_files), 1):
+        print(f"  {i}. {cfg_file}")
+    print("=" * 60)
+    return True
 
 
 def save_lane_change_stats_to_file(env, agent_id, phase='training'):
@@ -504,64 +521,95 @@ def run_testing(args, cfg, env):
 
 
 def main():
-    """Main entry point."""
-    print("\n" + "=" * 80)
-    print("CARLA FRENET TRAJECTORY PLANNING - MAIN ENTRY")
-    print("=" * 80 + "\n")
+    """Main entry point for CARLA autonomous car system."""
+    print("\n" + "=" * 60)
+    print("🚗 CARLA AUTONOMOUS CAR SYSTEM - v1.0.0")
+    print("=" * 60 + "\n")
 
-    # Import modules first
-    if not import_modules():
-        print("\nFailed to import required modules.")
-        print("Cannot continue without CARLA and config modules.")
-        return
+    args = parse_args()
 
-    # Check config availability
-    try:
-        from config import cfg
-    except ImportError:
-        print("ERROR: Cannot import config module!")
-        return
-
-    args, cfg = parse_args_cfgs(cfg)
-
-    # List configs if requested
+    # Basic utilities
     if args.list_cfgs:
-        list_config_files()
+        list_config_files(args.cfg_dir)
         return
 
-    if not CARLA_AVAILABLE:
-        print("ERROR: CARLA modules are not available!")
-        print("Please make sure CARLA is installed. See README.md for installation instructions.")
+    if args.validate_config:
+        validate_config(args.validate_config)
         return
 
-    if not args.cfg_file and not args.test:
-        print("ERROR: Configuration file is required for training!")
-        print("Use --cfg_file to specify a configuration file or --list_cfgs to see available configs.")
-        print("\nExample:")
-        print("  python main.py --cfg_file configs/experiment_baseline.yaml --agent_id 1")
+    # Check CARLA availability
+    if not CARLA_RL_AVAILABLE:
+        print("❌ Cannot run: CARLA RL modules not available")
+        print("💡 Please install CARLA first:")
+        print("   https://github.com/carla-simulator/carla/releases")
         return
 
-    print('Env is starting...')
-    try:
-        env = gym.make(args.env)
-        if args.play_mode:
-            env.enable_auto_render()
-        env.begin_modules(args)
-    except Exception as e:
-        print(f"Failed to initialize environment: {e}")
-        return
+    # Determine mode
+    if args.train:
+        if not args.cfg_file:
+            print("❌ Configuration file required for training")
+            print("💡 Use --cfg_file to specify a configuration file")
+            print("💡 Use --list_cfgs to see available configs")
+            return
 
-    try:
-        if args.test:
-            run_testing(args, cfg, env)
-        else:
+        # Load configuration
+        cfg_from_yaml_file(args.cfg_file, cfg)
+        cfg.TAG = Path(args.cfg_file).stem
+
+        # Run training
+        try:
+            env = gym.make(cfg.ENV.NAME)
+            env.begin_modules(args)
             run_training(args, cfg, env)
-    except Exception as e:
-        print(f"\nERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        if 'env' in locals():
-            env.destroy()
+        except Exception as e:
+            print(f"❌ Failed to start environment: {e}")
+            import traceback
+            traceback.print_exc()
+
+    elif args.test:
+        if not args.agent_id:
+            print("❌ Agent ID required for testing")
+            print("💡 Use --agent_id to specify the trained agent")
+            return
+
+        # Auto-detect config if not specified
+        if not args.cfg_file:
+            path = 'logs/agent_{}/'.format(args.agent_id)
+            if os.path.exists(path):
+                conf_list = [f for f in os.listdir(path) if f.endswith('.yaml')]
+                if conf_list:
+                    args.cfg_file = path + conf_list[0]
+                    print(f"🤖 Auto-detected config: {args.cfg_file}")
+
+        if not args.cfg_file:
+            print("❌ Configuration file not found")
+            print("💡 Use --cfg_file to specify a configuration file")
+            return
+
+        # Load configuration
+        cfg_from_yaml_file(args.cfg_file, cfg)
+        cfg.TAG = Path(args.cfg_file).stem
+
+        # Run testing
+        try:
+            env = gym.make(cfg.ENV.NAME)
+            if args.play_mode:
+                env.enable_auto_render()
+            env.begin_modules(args)
+            run_testing(args, cfg, env)
+        except Exception as e:
+            print(f"❌ Failed to start environment: {e}")
+            import traceback
+            traceback.print_exc()
+
+    else:
+        print("💡 No mode specified. Use --train or --test")
+        print("\nAvailable commands:")
+        print("  --train              Run training mode")
+        print("  --test               Run testing mode")
+        print("  --list_cfgs          List configuration files")
+        print("  --validate-config    Validate a config file")
+        print("  --help               Show detailed help")
 
 
 if __name__ == '__main__':

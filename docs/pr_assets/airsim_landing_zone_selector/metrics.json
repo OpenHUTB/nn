@@ -1,0 +1,24 @@
+{
+  "source": "AirSim DepthPerspective image and recorder flight log",
+  "vehicle": "Drone1",
+  "depth_camera": "front_center",
+  "grid_size": [
+    12,
+    12
+  ],
+  "recorder_frames": 10,
+  "candidate_zones": 100,
+  "best_zone": [
+    5,
+    6
+  ],
+  "best_score": 0.9311,
+  "safe_zones": 48,
+  "generated_files": [
+    "airsim_depth_grid_landing.png",
+    "airsim_landing_score_rank.png",
+    "airsim_flight_replay_landing.png",
+    "airsim_runtime_depth_camera_view.png",
+    "airsim_landing_zone_scores.csv"
+  ]
+}

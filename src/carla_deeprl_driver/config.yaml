@@ -1,0 +1,26 @@
+host: localhost
+port: 2000
+tm_port: 8000
+seed: 0
+car_num: 50
+syn:
+  fixed_delta_seconds: 0.05
+substepping:
+  max_substep_delta_time: 0.01
+  max_substeps: 10
+n_layers: 3
+lr: 0.001
+gamma: 0.99
+buffer_size: 1000
+hidden_dim: 1024
+epoch: 500
+sample_n: 1
+training_n: 1
+max_episode_length: 3000
+# config for sac
+valuenet_lr: 0.001
+softq_lr: 0.001
+policy_lr: 0.001
+soft_tau: 0.01
+log_min: -20
+log_max: 2
