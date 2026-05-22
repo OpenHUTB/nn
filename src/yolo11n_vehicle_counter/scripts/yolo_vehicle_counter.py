@@ -5,7 +5,8 @@ import supervision as sv
 import os
 import json
 import time
-from keyboard_handler import handle_keyboard_events
+from keyboard_handler import handle_keyboard_events, is_edit_mode
+from draggable_handler import DraggableRect
 
 # ==================== 配置路径 ====================
 # 模型文件路径
@@ -115,7 +116,16 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     # 初始化计数器
     # 基础计数区域 [left, top, right, bottom]
     counting_region = [400, 350, 1250, 450]  # 初始计数区域
+
+    # 创建可拖拽区域对象并加载配置
+    config_path = os.path.join(os.path.dirname(__file__), "..", "config", "counting_region.json")
+    draggable_region = DraggableRect(counting_region)
+    if draggable_region.load_config(config_path):
+        counting_region = draggable_region.region
+        print(f"📍 使用保存的计数区域: {counting_region}")
+
     total_counts = []  # 总计数
+    type_counts = {'car': [], 'motorbike': [], 'bus': [], 'truck': []}  # 分车型统计
     # 车辆状态跟踪：{track_id: {'in_region': bool, 'entry_time': timestamp}}
     vehicle_states = {}
     # 区域调整参数
@@ -270,7 +280,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
             return speed_mps * 3.6  # 米/秒 -> 公里/小时
         return speed_mps  # 米/秒
 
-    def count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts):
+    def count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts, type_counts, cls_id):
         """基于区域统计车辆 - 改进版：使用轨迹方向判断 + 稳定性检查
 
         Args:
@@ -353,6 +363,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
                 if is_in_region or vehicle_states[track_id]['in_region']:
                     total_counts.append(track_id)
                     vehicle_states[track_id]['counted'] = True
+                    type_counts[class_names[cls_id]].append(track_id)
                     return True
         
         # 更新区域状态
@@ -466,7 +477,128 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         accuracy = 1.0 - error_rate
         return {'accuracy': accuracy, 'precision': accuracy, 'recall': accuracy, 'f1_score': accuracy}
 
-    def draw_tracks_and_count(frame, detections, total_counts, region, vehicle_states, speed_history, w=1920):
+    def draw_statistics_dashboard(frame, total_counts, type_counts, current_vehicle_count, 
+                                    frame_count, fps, accuracy_metrics=None, speed_stats=None,
+                                    w=1920, h=1080):
+        """绘制实时统计仪表盘
+
+        Args:
+            frame: 输入帧
+            total_counts: 总计数列表
+            type_counts: 分车型统计字典
+            current_vehicle_count: 当前画面内车辆数
+            frame_count: 当前帧计数
+            fps: 当前帧率
+            accuracy_metrics: 精度指标字典（可选）
+            speed_stats: 速度统计字典（可选）
+            w: 视频宽度
+            h: 视频高度
+        """
+        # 计算时间戳（假设视频从0秒开始）
+        elapsed_time = frame_count / fps
+        hours = int(elapsed_time // 3600)
+        minutes = int((elapsed_time % 3600) // 60)
+        seconds = int(elapsed_time % 60)
+        time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+        # 仪表盘背景面板
+        panel_x, panel_y = 10, 10
+        panel_width, panel_height = 280, 180
+        
+        # 绘制主面板背景
+        cv.rectangle(frame, (panel_x, panel_y), (panel_x + panel_width, panel_y + panel_height), 
+                     (20, 30, 40), cv.FILLED)
+        cv.rectangle(frame, (panel_x, panel_y), (panel_x + panel_width, panel_y + panel_height), 
+                     (100, 150, 255), 2)
+
+        # 标题（使用纯文本，避免emoji）
+        cv.putText(frame, "[Vehicle Counter Dashboard]", (panel_x + 15, panel_y + 25),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+        # 时间戳
+        cv.putText(frame, "Time: " + time_str, (panel_x + 15, panel_y + 50),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.6, (100, 200, 255), 1)
+
+        # 帧计数
+        cv.putText(frame, "Frame: " + str(frame_count), (panel_x + 15, panel_y + 70),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.6, (100, 200, 255), 1)
+
+        # 当前画面车辆密度
+        density_color = (0, 255, 0) if current_vehicle_count < 10 else (0, 255, 255) if current_vehicle_count < 20 else (0, 0, 255)
+        cv.putText(frame, "Density: " + str(current_vehicle_count) + " vehicles", (panel_x + 15, panel_y + 90),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.6, density_color, 1)
+
+        # 累计计数
+        cv.putText(frame, "Total Counted: " + str(len(total_counts)), (panel_x + 15, panel_y + 110),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 150), 1)
+
+        # 分车型统计（紧凑版）
+        car_count = len(type_counts['car'])
+        bike_count = len(type_counts['motorbike'])
+        bus_count = len(type_counts['bus'])
+        truck_count = len(type_counts['truck'])
+        
+        cv.putText(frame, "  Car: " + str(car_count), (panel_x + 25, panel_y + 135),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (100, 200, 255), 1)
+        cv.putText(frame, "  Bike: " + str(bike_count), (panel_x + 25, panel_y + 155),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (100, 200, 255), 1)
+        cv.putText(frame, "  Bus: " + str(bus_count), (panel_x + 130, panel_y + 135),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (100, 200, 255), 1)
+        cv.putText(frame, "  Truck: " + str(truck_count), (panel_x + 130, panel_y + 155),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (100, 200, 255), 1)
+
+        # 右侧信息面板 - 根据视频宽度动态调整位置
+        right_panel_width = 200
+        right_panel_height = 100
+        right_panel_x = max(300, w - right_panel_width - 10)  # 确保不会和主面板重叠
+        right_panel_y = 10
+
+        # 绘制右侧面板背景
+        cv.rectangle(frame, (right_panel_x, right_panel_y), 
+                     (right_panel_x + right_panel_width, right_panel_y + right_panel_height), 
+                     (20, 30, 40), cv.FILLED)
+        cv.rectangle(frame, (right_panel_x, right_panel_y), 
+                     (right_panel_x + right_panel_width, right_panel_y + right_panel_height), 
+                     (100, 200, 100), 2)
+
+        line_y = right_panel_y + 25
+        line_spacing = 22
+
+        # 精度指标
+        if accuracy_metrics:
+            cv.putText(frame, "Accuracy: " + "{:.1%}".format(accuracy_metrics['accuracy']), 
+                       (right_panel_x + 10, line_y),
+                       cv.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 100), 1)
+            cv.putText(frame, "F1: " + "{:.2f}".format(accuracy_metrics['f1_score']), 
+                       (right_panel_x + 10, line_y + line_spacing),
+                       cv.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 100), 1)
+            line_y += line_spacing * 2
+
+        # 速度统计
+        if speed_stats:
+            cv.putText(frame, "Avg: " + str(int(speed_stats['avg'])) + " " + speed_units, 
+                       (right_panel_x + 10, line_y),
+                       cv.FONT_HERSHEY_SIMPLEX, 0.55, (255, 200, 100), 1)
+            cv.putText(frame, "Max: " + str(int(speed_stats['max'])) + " " + speed_units, 
+                       (right_panel_x + 10, line_y + line_spacing),
+                       cv.FONT_HERSHEY_SIMPLEX, 0.55, (255, 100, 100), 1)
+
+        # 底部状态栏
+        status_bar_y = h - 40
+        cv.rectangle(frame, (0, status_bar_y), (w, h), (10, 20, 30), cv.FILLED)
+        
+        # FPS状态指示
+        fps_color = (0, 255, 0) if fps >= 25 else (0, 255, 255) if fps >= 15 else (0, 0, 255)
+        cv.putText(frame, "FPS: " + "{:.1f}".format(fps), (w - 100, status_bar_y + 25),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.7, fps_color, 2)
+
+        # 实时提示
+        cv.putText(frame, "d: edit region | p: pause | s: screenshot | q: quit", 
+                   (10, status_bar_y + 25),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
+
+
+    def draw_tracks_and_count(frame, detections, total_counts, type_counts, region, vehicle_states, speed_history, w=1920, h=1080):
         """绘制轨迹并统计车辆
 
         Args:
@@ -477,6 +609,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
             vehicle_states: 车辆状态字典
             speed_history: 速度历史字典
             w: 视频宽度
+            h: 视频高度
         """
         # 按车辆类别和检测置信度过滤（使用更高的阈值）
         detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > confidence_threshold)]
@@ -484,6 +617,9 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         # 过滤重叠检测（NMS）
         if len(detections) > 0:
             detections = filter_overlapping_detections(detections, iou_threshold)
+
+        # 当前画面内车辆数（密度）
+        current_vehicle_count = len(detections)
 
         # 为每个检测框生成标签（包含速度信息）
         labels = []
@@ -511,33 +647,8 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         # 计算精度指标
         accuracy_metrics = calculate_accuracy_metrics(ground_truth_total, len(total_counts))
 
-        # 处理每个检测到的车辆
-        for track_id, center_point in zip(detections.tracker_id,
-                                          detections.get_anchors_coordinates(anchor=sv.Position.CENTER)):
-            cx, cy = map(int, center_point)
-
-            cv.circle(frame, (cx, cy), 4, (0, 255, 255), cv.FILLED)  # 绘制车辆中心点
-
-            if count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts):
-                # 计数成功时高亮显示计数区域
-                draw_overlay(frame, (region[0], region[1]), (region[2], region[3]), alpha=0.25, color=(10, 255, 50))
-
-        # 绘制计数区域
-        cv.rectangle(frame, (region[0], region[1]), (region[2], region[3]), (0, 255, 0), 2)
-        cv.putText(frame, "Counting Region", (region[0], region[1]-10),
-                   cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-
-        # 显示车辆计数和精度信息
-        sv.draw_text(frame, f"COUNTS: {len(total_counts)}", sv.Point(x=110, y=30), sv.Color.ROBOFLOW, 1.25,
-                     2, background_color=sv.Color.WHITE)
-
-        # 显示精度指标
-        if accuracy_metrics:
-            accuracy_text = f"ACC: {accuracy_metrics['accuracy']:.2%} | F1: {accuracy_metrics['f1_score']:.2f}"
-            sv.draw_text(frame, accuracy_text, sv.Point(x=w-400, y=30), sv.Color.GREEN, 1.0,
-                         1, background_color=sv.Color.WHITE)
-        
-        # 显示速度统计信息
+        # 计算速度统计
+        speed_stats = None
         if speed_history:
             all_speeds = []
             for speeds in speed_history.values():
@@ -549,10 +660,34 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
                 avg_speed_real = convert_pixel_speed_to_real(avg_speed_pixel, pixel_to_meter_ratio, speed_units)
                 max_speed_pixel = np.max(all_speeds)
                 max_speed_real = convert_pixel_speed_to_real(max_speed_pixel, pixel_to_meter_ratio, speed_units)
-                
-                speed_text = f"AVG: {avg_speed_real:.1f} {speed_units} | MAX: {max_speed_real:.1f} {speed_units}"
-                sv.draw_text(frame, speed_text, sv.Point(x=w//2 - 150, y=30), sv.Color.BLUE, 1.0,
-                             1, background_color=sv.Color.WHITE)
+                speed_stats = {'avg': avg_speed_real, 'max': max_speed_real}
+
+        # 处理每个检测到的车辆
+        tracker_ids = detections.tracker_id
+        class_ids = detections.class_id
+        center_points = detections.get_anchors_coordinates(anchor=sv.Position.CENTER)
+
+        for i in range(len(tracker_ids)):
+            track_id = tracker_ids[i]
+            center_point = center_points[i]
+            cx, cy = map(int, center_point)
+            cls_id = class_ids[i]
+
+            cv.circle(frame, (cx, cy), 4, (0, 255, 255), cv.FILLED)  # 绘制车辆中心点
+
+            if count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts, type_counts, cls_id):
+                # 计数成功时高亮显示计数区域
+                draw_overlay(frame, (region[0], region[1]), (region[2], region[3]), alpha=0.25, color=(10, 255, 50))
+
+        # 绘制计数区域
+        cv.rectangle(frame, (region[0], region[1]), (region[2], region[3]), (0, 255, 0), 2)
+        cv.putText(frame, "Counting Region", (region[0], region[1]-10),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+        # 绘制实时统计仪表盘
+        draw_statistics_dashboard(frame, total_counts, type_counts, current_vehicle_count,
+                                  frame_count, avg_fps if 'avg_fps' in locals() else fps,
+                                  accuracy_metrics, speed_stats, w, h)
 
 
 
@@ -564,6 +699,16 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     if not cap.isOpened():
         raise Exception("错误: 无法打开视频文件!")
 
+    # 设置鼠标回调（用于拖拽区域）
+    window_name = "Camera"
+    cv.namedWindow(window_name)
+    cv.setMouseCallback(window_name, draggable_region.mouse_callback)
+
+    print("💡 提示: 按 'd' 键进入编辑模式，可拖拽调整计数区域")
+
+    # 编辑模式状态跟踪
+    edit_mode_just_entered = False
+    
     # 视频处理主循环
     frame_count = 0
     detection_accuracies = []  # 存储每帧的检测精度
@@ -579,42 +724,73 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     while cap.isOpened():
         # 记录帧开始时间
         frame_start_time = time.time()
-        
+
         ret, frame = cap.read()
         if not ret:
             break
 
         frame_count += 1
 
-        # 定义追踪感兴趣区域(ROI)
-        crop = frame[225:, 220:]
-        mask_b = np.zeros_like(frame, dtype=np.uint8)
-        mask_w = np.ones_like(crop, dtype=np.uint8) * 255
-        mask_b[225:, 220:] = mask_w
+        # 检查是否处于编辑模式
+        edit_mode_active = is_edit_mode()
+        
+        # 检测是否刚进入编辑模式
+        if edit_mode_active and not edit_mode_just_entered:
+            edit_mode_just_entered = True
+            # 进入编辑模式时，同步当前计数区域到拖拽区域
+            draggable_region.region = counting_region
+            print(f"📝 进入编辑模式，当前区域: {counting_region}")
+        elif not edit_mode_active:
+            edit_mode_just_entered = False
 
-        # 应用掩码到原始帧
-        ROI = cv.bitwise_and(frame, mask_b)
+        if edit_mode_active:
+            # 编辑模式：暂停检测，显示可拖拽区域
+            draggable_region.draw(frame, edit_mode=True)
 
-        # YOLO检测和追踪
-        results = model(ROI)[0]
-        detections = sv.Detections.from_ultralytics(results)
-        detections = tracker.update_with_detections(detections)
-        detections = smoother.update_with_detections(detections)
+            # 显示编辑模式提示
+            cv.putText(frame, "EDIT MODE - Press 'd' to exit", (w // 2 - 180, 30),
+                      cv.FONT_HERSHEY_SIMPLEX, 0.8, (0, 200, 255), 2)
+            
+            # 从拖拽区域更新计数区域
+            counting_region = draggable_region.region
+        else:
+            # 正常模式：执行检测和追踪
+            # 定义追踪感兴趣区域(ROI)
+            crop = frame[225:, 220:]
+            mask_b = np.zeros_like(frame, dtype=np.uint8)
+            mask_w = np.ones_like(crop, dtype=np.uint8) * 255
+            mask_b[225:, 220:] = mask_w
 
-        # 计算帧级精度（基于置信度）
-        if len(detections) > 0:
-            avg_confidence = np.mean(detections.confidence) if hasattr(detections, 'confidence') and len(detections.confidence) > 0 else 0.5
-            detection_accuracies.append(avg_confidence)
-            total_detections += len(detections)
-            correct_detections += int(len(detections) * avg_confidence)
+            # 应用掩码到原始帧
+            ROI = cv.bitwise_and(frame, mask_b)
 
-        # 每N帧自动调整计数区域
-        if frame_count % region_adjust_interval == 0:
-            counting_region = adjust_counting_region(frame, detections, counting_region, region_padding)
+            # YOLO检测和追踪
+            results = model(ROI)[0]
+            detections = sv.Detections.from_ultralytics(results)
+            detections = tracker.update_with_detections(detections)
+            detections = smoother.update_with_detections(detections)
 
-        if detections.tracker_id is not None:
-            # 处理车辆轨迹和计数
-            draw_tracks_and_count(frame, detections, total_counts, counting_region, vehicle_states, speed_history, w)
+            # 计算帧级精度（基于置信度）
+            if len(detections) > 0:
+                avg_confidence = np.mean(detections.confidence) if hasattr(detections, 'confidence') and len(detections.confidence) > 0 else 0.5
+                detection_accuracies.append(avg_confidence)
+                total_detections += len(detections)
+                correct_detections += int(len(detections) * avg_confidence)
+
+            # 每N帧自动调整计数区域
+            if frame_count % region_adjust_interval == 0:
+                counting_region = adjust_counting_region(frame, detections, counting_region, region_padding)
+
+            if detections.tracker_id is not None:
+                # 处理车辆轨迹和计数
+                draw_tracks_and_count(frame, detections, total_counts, type_counts, counting_region, vehicle_states, speed_history, w, h)
+
+            # 绘制计数区域（非编辑模式）
+            draggable_region.region = counting_region
+            draggable_region.draw(frame, edit_mode=False)
+
+        # 从拖拽区域更新计数区域
+        counting_region = draggable_region.region
 
         # 计算帧时间和FPS
         frame_end_time = time.time()
@@ -635,33 +811,20 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         avg_fps = np.mean(fps_history) if fps_history else 0
         avg_frame_time = np.mean(frame_time_history) if frame_time_history else 0
         
-        # 计算状态色标
-        if avg_fps > 60:
-            fps_color = (0, 255, 0)  # 绿色
-        elif avg_fps > 30:
-            fps_color = (0, 255, 255)  # 黄色
-        else:
-            fps_color = (0, 0, 255)  # 红色
-        
-        # 显示FPS、帧时间和状态色标
-        fps_text = f"FPS: {avg_fps:.1f}"
-        frame_time_text = f"Frame Time: {avg_frame_time:.1f}ms"
-        
-        # 绘制FPS信息面板
-        cv.rectangle(frame, (w - 200, 60), (w - 10, 120), (255, 255, 255), cv.FILLED)
-        cv.rectangle(frame, (w - 200, 60), (w - 10, 120), fps_color, 2)
-        cv.putText(frame, fps_text, (w - 190, 90), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-        cv.putText(frame, frame_time_text, (w - 190, 115), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-
         # 写入帧到输出视频
         out.write(frame)
         # 显示当前帧
-        cv.imshow("Camera", frame)
+        cv.imshow(window_name, frame)
 
         # 键盘事件处理
         key = cv.waitKey(1) & 0xff
-        if not handle_keyboard_events(key, frame, frame_count, cap, out, "Camera"):
+        continue_running, need_update = handle_keyboard_events(key, frame, frame_count, cap, out, window_name)
+        if not continue_running:
             break
+
+    # 保存区域配置
+    draggable_region.region = counting_region
+    draggable_region.save_config(config_path)
 
     # 计算整体精度
     overall_accuracy = 0.0
@@ -683,6 +846,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     print("="*60)
     print(f"📈 处理总帧数: {frame_count}")
     print(f"🚗 总计数车辆: {len(total_counts)}")
+    print(f"   - Car: {len(type_counts['car'])} | Motorbike: {len(type_counts['motorbike'])} | Bus: {len(type_counts['bus'])} | Truck: {len(type_counts['truck'])}")
     print(f"📊 平均检测精度: {overall_accuracy:.2%}")
     print(f"🎯 检测精确率: {detection_precision:.2%}")
     print(f"📝 总检测框数: {total_detections}")

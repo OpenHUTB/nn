@@ -113,14 +113,17 @@ def detect_front_obstacle(vehicle, world, max_distance=50.0, angle_threshold=35.
     return min_distance
 
 # 根据检测到的标志/红绿灯控制车辆
-def control_vehicle_based_on_sign(vehicle, detected_signs, lights, simulation_time,base_control,world):
+def control_vehicle_based_on_sign(vehicle, detected_signs, lights, simulation_time, base_control, world, current_speed=None, obstacle_distance=None):
     # 计算当前车速（m/s → km/h）
-    velocity = vehicle.get_velocity()
-    current_speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6  # m/s to km/h
+    if current_speed is None:
+        velocity = vehicle.get_velocity()
+        current_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6  # m/s to km/h
     print(f"当前车辆速度: {current_speed:.2f} km/h")
 
     # 障碍物检测
-    obstacle_distance = detect_front_obstacle(vehicle, world)
+    if obstacle_distance is None:
+        obstacle_distance = detect_front_obstacle(vehicle, world)
+
     if obstacle_distance is not None:
         print(f"前方障碍物距离: {obstacle_distance:.2f} 米")
         # 重新计算安全距离：车速越快，距离越长，完全避免追尾
@@ -285,6 +288,9 @@ def main():
         # 初始化Pygame窗口
         display = init_pygame(800, 600)
 
+        pygame.font.init()
+        hud_font = pygame.font.SysFont("Arial", 20)  # 使用Arial字体，大小20
+
         # 摄像头回调：接收并转换图像
         image_surface = [None]
         def image_callback(image):
@@ -335,22 +341,57 @@ def main():
             final_control.steer = steer
             final_control.brake = 0.0
 
+            #预计算共用变量，避免重复调用
+            shared_detected_signs = None
+            shared_current_speed = None
+            shared_obstacle_distance = None
+            if image_surface[0] is not None:
+                shared_detected_signs = detect_traffic_signs(image_surface[0])
+                # 预计算车速
+                velocity = vehicle.get_velocity()
+                shared_current_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6
+                # 预计算障碍物距离
+                shared_obstacle_distance = detect_front_obstacle(vehicle, world)
+
             # 检测交通标志并控车
             if image_surface[0] is not None:
-                detected_signs = detect_traffic_signs(image_surface[0])
                 simulation_time = time.time() - start_time
                 # 传入基础控制，得到最终控制
                 final_control = control_vehicle_based_on_sign(
                     vehicle,
-                    detected_signs,
+                    shared_detected_signs,
                     world.get_actors().filter("traffic.traffic_light"),
                     simulation_time,
                     final_control,
-                    world
+                    world,
+                    shared_current_speed,
+                    shared_obstacle_distance
                 )
                 # 渲染摄像头画面到Pygame窗口
                 surface = pygame.image.frombuffer(image_surface[0].tobytes(), (800, 600), "RGB")
                 display.blit(surface, (0, 0))
+
+                # 1. 显示当前车速
+                speed_text = hud_font.render(f"Speed: {shared_current_speed:.1f} km/h", True, (255, 255, 255))
+                display.blit(speed_text, (10, 10))
+
+                # 2. 显示前方障碍物距离
+                if shared_obstacle_distance:
+                    obstacle_text = hud_font.render(f"Obstacle: {shared_obstacle_distance:.1f} m", True, (255, 0, 0))
+                else:
+                    obstacle_text = hud_font.render("Obstacle: None", True, (0, 255, 0))
+
+                display.blit(obstacle_text, (10, 40))
+
+                # 3. 显示检测到的交通标志
+                if shared_detected_signs:
+                    sign_label = shared_detected_signs[0][0]  # 取第一个检测到的标志
+                    sign_text = hud_font.render(f"Sign: {sign_label}", True, (255, 255, 0))
+                else:
+                    sign_text = hud_font.render("Sign: None", True, (200, 200, 200))
+
+                display.blit(sign_text, (10, 70))
+
                 pygame.display.flip()
 
             # 统一执行最终控制指令

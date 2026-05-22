@@ -3,11 +3,13 @@ import json
 import time
 import threading
 import queue
+from copy import deepcopy
+from pathlib import Path
 import numpy as np
 import cv2
 import carla
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Tuple
 import logging
 
 class DataRecorder:
@@ -31,7 +33,7 @@ class DataRecorder:
             image_size: RGB camera image dimensions (width, height)
             enable_recording: Whether to start recording immediately
         """
-        self.output_dir = output_dir
+        self.output_dir = Path(output_dir)
         self.sampling_rate = max(5.0, min(10.0, sampling_rate))  # Clamp between 5-10 Hz
         self.image_size = image_size
         self.enable_recording = enable_recording
@@ -68,21 +70,21 @@ class DataRecorder:
         
     def setup_directories(self):
         """Create necessary directories for data storage."""
-        self.images_dir = os.path.join(self.output_dir, "images")
-        self.metadata_dir = os.path.join(self.output_dir, "metadata")
+        self.images_dir = self.output_dir / "images"
+        self.metadata_dir = self.output_dir / "metadata"
         
-        os.makedirs(self.images_dir, exist_ok=True)
-        os.makedirs(self.metadata_dir, exist_ok=True)
+        self.images_dir.mkdir(parents=True, exist_ok=True)
+        self.metadata_dir.mkdir(parents=True, exist_ok=True)
         
         # Create session directory with timestamp
         session_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.session_dir = os.path.join(self.output_dir, f"session_{session_name}")
-        self.session_images_dir = os.path.join(self.session_dir, "images")
-        self.session_metadata_dir = os.path.join(self.session_dir, "metadata")
+        self.session_dir = self.output_dir / f"session_{session_name}"
+        self.session_images_dir = self.session_dir / "images"
+        self.session_metadata_dir = self.session_dir / "metadata"
         
-        os.makedirs(self.session_dir, exist_ok=True)
-        os.makedirs(self.session_images_dir, exist_ok=True)
-        os.makedirs(self.session_metadata_dir, exist_ok=True)
+        self.session_dir.mkdir(parents=True, exist_ok=True)
+        self.session_images_dir.mkdir(parents=True, exist_ok=True)
+        self.session_metadata_dir.mkdir(parents=True, exist_ok=True)
         
         self.logger.info(f"Data recorder initialized. Session: {session_name}")
         
@@ -114,6 +116,7 @@ class DataRecorder:
         self.stop_recording_event.set()
         
         if self.recording_thread and self.recording_thread.is_alive():
+            self.data_queue.join()
             self.recording_thread.join(timeout=5.0)
             
         # Save session summary
@@ -206,7 +209,7 @@ class DataRecorder:
                 'rgb_image': self.current_data['rgb_image'].copy(),
                 'control_signals': self.current_data['control_signals'].copy(),
                 'vehicle_speed': self.current_data['vehicle_speed'],
-                'vehicle_transform': self.current_data['vehicle_transform'],
+                'vehicle_transform': deepcopy(self.current_data['vehicle_transform']),
                 'timestamp': self.current_data['timestamp'],
                 'frame_id': self.current_data['frame_id']
             }
@@ -222,18 +225,21 @@ class DataRecorder:
         
     def _recording_worker(self):
         """Worker thread for saving recorded data."""
-        while not self.stop_recording_event.is_set():
+        while not self.stop_recording_event.is_set() or not self.data_queue.empty():
+            frame_data = None
             try:
                 # Get data from queue with timeout
                 frame_data = self.data_queue.get(timeout=1.0)
                 self._save_frame_data(frame_data)
-                self.data_queue.task_done()
                 
             except queue.Empty:
                 continue
             except Exception as e:
                 self.logger.error(f"Error in recording worker: {e}")
-                
+            finally:
+                if frame_data is not None:
+                    self.data_queue.task_done()
+                    
     def _save_frame_data(self, frame_data: Dict[str, Any]):
         """Save individual frame data to disk."""
         try:
@@ -241,8 +247,9 @@ class DataRecorder:
             
             # Save RGB image
             image_filename = f"frame_{frame_id:06d}.jpg"
-            image_path = os.path.join(self.session_images_dir, image_filename)
-            cv2.imwrite(image_path, frame_data['rgb_image'])
+            image_path = self.session_images_dir / image_filename
+            if not cv2.imwrite(str(image_path), frame_data['rgb_image']):
+                raise IOError(f"Failed to save image to {image_path}")
             
             # Prepare metadata
             metadata = {
@@ -256,9 +263,9 @@ class DataRecorder:
             
             # Save metadata
             metadata_filename = f"frame_{frame_id:06d}.json"
-            metadata_path = os.path.join(self.session_metadata_dir, metadata_filename)
+            metadata_path = self.session_metadata_dir / metadata_filename
             
-            with open(metadata_path, 'w') as f:
+            with metadata_path.open('w', encoding='utf-8') as f:
                 json.dump(metadata, f, indent=2)
                 
         except Exception as e:
@@ -278,9 +285,9 @@ class DataRecorder:
                     'image_size': self.image_size
                 },
                 'recording_settings': {
-                    'output_directory': self.session_dir,
-                    'images_directory': self.session_images_dir,
-                    'metadata_directory': self.session_metadata_dir
+                    'output_directory': str(self.session_dir),
+                    'images_directory': str(self.session_images_dir),
+                    'metadata_directory': str(self.session_metadata_dir)
                 },
                 'data_format': {
                     'rgb_image': 'JPG format, resized to specified dimensions',
@@ -292,8 +299,8 @@ class DataRecorder:
                 }
             }
             
-            summary_path = os.path.join(self.session_dir, "session_summary.json")
-            with open(summary_path, 'w') as f:
+            summary_path = self.session_dir / "session_summary.json"
+            with summary_path.open('w', encoding='utf-8') as f:
                 json.dump(summary, f, indent=2)
                 
             self.logger.info(f"Session summary saved to {summary_path}")
@@ -312,7 +319,7 @@ class DataRecorder:
             'session_duration': session_duration,
             'sampling_rate': self.sampling_rate,
             'queue_size': self.data_queue.qsize(),
-            'session_directory': self.session_dir
+            'session_directory': str(self.session_dir)
         }
         
     def toggle_recording(self):
@@ -336,6 +343,7 @@ class DataRecorder:
         while not self.data_queue.empty():
             try:
                 self.data_queue.get_nowait()
+                self.data_queue.task_done()
             except queue.Empty:
                 break
                 
