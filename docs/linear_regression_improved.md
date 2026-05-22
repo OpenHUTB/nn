@@ -276,6 +276,7 @@ plt.plot(x_smooth, y_smooth, "k-", linewidth=2, label="prediction")
 
 - **Mini-Batch 训练**：当前使用全批量梯度下降，大规模数据集可采用小批量训练
 - **早停机制（Early Stopping）**：验证集 loss 不再下降时自动停止，防止过拟合
+- **K 折交叉验证**：将数据集划分为 K 份，轮流训练验证，更可靠地评估模型泛化能力
 - **正则化**：引入 L2 正则化或 Dropout，进一步提升泛化能力
 - **超参数搜索**：网格搜索或贝叶斯优化寻找最优 `feature_num`、学习率等参数
 - **TensorBoard**：集成可视化训练过程中的 loss、学习率等指标变化
