@@ -12,34 +12,125 @@ UVA_flight_control_system是一个基于**AirSim仿真平台开发**的无人机
 
 |名称|功能|
 | ---- | ---- |
-环境层|AirSim物理仿真引擎，提供真实的飞行反馈
-控制层|键盘输入映射、多线程轨迹规划、飞行状态平滑处理、指令解析与调度
-执行层|通过AirSim API下发`moveByVelocity`、`moveToPosition`控制指令，驱动无人机运动执行
+**环境层**|AirSim物理仿真引擎，提供真实的飞行反馈
+**控制层**|键盘输入映射、多线程轨迹规划、飞行状态平滑处理、指令解析与调度
+**执行层**|通过AirSim API下发`moveByVelocity`、`moveToPosition`控制指令，驱动无人机运动执行
 
 #### 1.1.2 核心任务描述
 无人机控制系统的核心任务围绕“**精准操控**、**自主运行**、**安全可靠**”三大目标展开，涵盖实时交互、轨迹规划、性能调节及应急保障四大核心维度，具体如下：
 
 |名称|功能|
 | ---- | ---- |
- 实时交互控制|实现低延迟键盘遥控，支持前后、左右、垂直升降全维度操控
-自动化航迹算法|内置多种数学模型，实现环绕、方形、螺旋上升等三维复杂轨迹飞行
-动态性能调节|设计多档位速度切换机制，适配精细操控与快速巡航不同需求
-应急保障机制|集成一键悬停、一键返航、安全降落逻辑，保障仿真飞行稳定性
+ **实时交互控制**|实现低延迟键盘遥控，支持前后、左右、垂直升降全维度操控
+**自动化航迹算法**|内置多种数学模型，实现环绕、方形、螺旋上升等三维复杂轨迹飞行
+**动态性能调节**|设计多档位速度切换机制，适配精细操控与快速巡航不同需求
+**应急保障机制**|集成一键悬停、一键返航、安全降落逻辑，保障仿真飞行稳定性
 
 ### 1.2 原代码的设计问题及其优化
-原生AirSim基础示例代码仅实现简单移动功能，未考虑实际操控体验与工程化应用需求，存在诸多设计短板，具体表现如下：
+原生AirSim基础示例代码仅实现简单移动功能，未考虑实际操控体验与工程化应用需求，存在诸多设计短板，以下是针对各短板的优化说明：
 
-- **操控体验较差**：飞行操控卡顿，无任何平滑过渡处理，启停瞬间易出现机身抖动、轨迹偏移等问题，不符合真实无人机的飞行惯性特性。
-- **功能不够完整**：缺少实用的速度分级机制，无法适配精细操控与快速巡航等不同场景，且飞行过程中无安全保障。
-- **代码架构不合理**：各功能逻辑耦合度高、无模块化拆分，核心控制代码与输入输出逻辑混杂在一起，不便于后续功能扩展与代码调试。
-- **适配性不足**：难以满足工程化运行的稳定性需求，无法支撑后续进阶开发与场景拓展。
-  
-针对以上问题，项目进行了全方位的优化：
+#### 1.2.1 操控体验操控体验优化：引入平滑过渡与速度分级
 
-- 引入平滑系数与速度倍率矩阵，模拟实体飞行器惯性特性，飞行轨迹更加自然流畅。
-- 通过`threading`多线程异步执行轨迹算法，实现自主飞行与手动介入无缝切换。
-- 新增档位调速、一键悬停、返航等多种实用性功能，降低操作门槛，提升演示调试效率。
-- 统一代码运行链路，解决程序报错、按键卡死、机身掉高漂移等问题，提升环境复现性。
+原生代码直接下发固定速度指令，无平滑处理与速度分级，导致飞行卡顿、启停抖动，不符合真实无人机惯性特性。
+
+```python
+# 原生代码：无平滑处理的按键控制（已废弃）
+def on_press(key):
+    try:
+        # 直接使用固定速度，无任何平滑过渡
+        if key.char == 'w':
+            client.moveByVelocityBodyFrameAsync(1.5, 0, 0, 0.1)
+        if key.char == 's':
+            client.moveByVelocityBodyFrameAsync(-1.5, 0, 0, 0.1)
+        if key.char == 'a':
+            client.moveByVelocityBodyFrameAsync(0, -1.5, 0, 0.1)
+        if key.char == 'd':
+            client.moveByVelocityBodyFrameAsync(0, 1.5, 0, 0.1)
+    except:
+        pass
+
+# 松开按键无制动处理，飞机易漂移
+def on_release(key):
+    pass
+```    
+
+#### 1.2.2 多任务并发优化：基于`threading`实现异步执行
+
+原生代码所有逻辑耦合在主线程中，自动飞行与手动控制无法同时运行，扩展性差。
+
+```python
+# 原生代码：无多线程的耦合逻辑（已废弃）
+while True:
+    # 自动飞行与键盘监听在同一线程，会互相阻塞
+    if orbit_mode_active:
+        orbit_mode()
+    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    listener.start()
+    time.sleep(0.1)
+```
+
+#### 1.2.3 功能完整性优化：新增档位调速与安全保障
+
+原生代码缺少实用功能，无速度分级、一键悬停、自动返航等机制，无法适配不同操控场景，也无安全保障。
+
+```python
+# 原生代码：无调速与安全功能的主逻辑（已废弃）
+# 无速度分级、无悬停、无返航功能
+SPEED = 1.5
+HEIGHT = -3
+
+# 起飞后仅支持基础移动
+client.takeoffAsync().join()
+time.sleep(2)
+client.moveToZAsync(HEIGHT, 1).join()
+
+def on_press(key):
+    try:
+        # 仅支持固定速度移动，无其他功能
+        if key.char == 'w':
+            client.moveByVelocityBodyFrameAsync(SPEED, 0, 0, 0.1)
+    except:
+        pass
+```
+
+#### 1.2.4 代码架构优化：模块化拆分与稳定性提升
+
+原生代码各功能逻辑耦合度高、无模块化拆分，核心控制代码与输入输出逻辑混杂，易出现报错、卡死等问题，环境复现性差。
+
+```python
+# 原生代码：结构混乱的耦合代码（已废弃）
+import airsim
+import time
+from pynput import keyboard
+
+# 所有逻辑混杂在一起，无模块化拆分
+client = airsim.MultirotorClient()
+client.confirmConnection()
+client.enableApiControl(True)
+client.armDisarm(True)
+client.takeoffAsync().join()
+client.moveToZAsync(-3, 1).join()
+
+def on_press(key):
+    try:
+        # 所有按键逻辑写在同一个函数中，难以维护
+        if key.char == 'w': client.moveByVelocityBodyFrameAsync(1.5,0,0,0.1)
+        if key.char == 's': client.moveByVelocityBodyFrameAsync(-1.5,0,0,0.1)
+        if key.char == 'a': client.moveByVelocityBodyFrameAsync(0,-1.5,0,0.1)
+        if key.char == 'd': client.moveByVelocityBodyFrameAsync(0,1.5,0,0.1)
+        if key.char == 'z': client.moveToZAsync(-3.5,1)
+        if key.char == 'x': client.moveToZAsync(-2.5,1)
+    except:
+        pass
+
+listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+listener.start()
+
+while True:
+    time.sleep(0.1)
+```
+
+本次优化统一了代码运行链路，解决程序报错、按键卡死、机身掉高漂移等问题，提升了环境复现性。
 
 ## 2. 核心技术栈与理论基础
 ### 2.1 核心技术栈
@@ -54,16 +145,20 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
 
 ### 2.2 核心理论基础
 #### 2.2.1 系统整体运行流程
-<img width="1062" height="3623" alt="系统流程图" src="https://github.com/user-attachments/assets/8cfd4940-8560-4552-99a9-25f7f8b8edcf" />
+<img width="450" alt="系统流程图" src="https://github.com/user-attachments/assets/8cfd4940-8560-4552-99a9-25f7f8b8edcf" />
 
 #### 2.2.2 关键算法原理
 **自主巡航轨迹数学模型**
+
 - **方形巡航**：通过序列化坐标点位，分段规划直线路径，依次抵达四个顶点，分段衔接闭环飞行
+
 - **螺旋上升轨迹**：融合极坐标变换与高度增量控制，定时更新平面坐标与垂直高度
   
-  x=R⋅cos(ωt),y=R⋅sin(ωt),z=z0​−k⋅t
+$$
+x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
+$$
   
-    ，其中R为盘旋半径，k为上升速率系数，实现匀速盘旋加稳定爬升三维运动。
+，其中R为盘旋半径，k为上升速率系数，实现匀速盘旋加稳定爬升三维运动。
 
 - **NED坐标系映射**：系统严格遵循无人机标准 NED 坐标系规范：
   
@@ -83,6 +178,7 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
 ## 3. 系统模块设计
 本系统为了提升代码的可维护性与功能的可扩展性，采用模块化分层设计，构建了 “**通信交互层 - 核心控制层 - 功能实现层**” 三级架构：以飞行控制模块为核心，整合AirSim仿真通信与键盘交互能力，将各类轨迹与安全功能封装为独立可调用的模块，既实现了控制逻辑的解耦，也为后续功能迭代与问题调试提供了便利。
 ### 3.1 核心模块概览
+
 <img width="2191" height="523" alt="核心模块图" src="https://github.com/user-attachments/assets/63232eb7-abb9-40ee-ba11-eb959c29df00" />
 
 ### 3.2 主要函数说明
@@ -98,16 +194,12 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
 `on_press()` /`on_release()`|键盘实时交互控制
 `start_*()`|启动对应轨迹模式的线程
 
-## 4. 遇到的问题与解决方案
-  项目开发与调试阶段，实际遇到了许多问题，诸如无人机运行故障、代码逻辑bug、功能异常等，最终根据分析得出了可行的解决方案，均为实际调试验证有效，为后续同类项目开发提供避坑参考。
+## 4. 开发关键问题与技术解决方案
+  在项目开发与调试过程中，遇到了多类典型技术问题，如异步指令执行时序异常、异常捕获机制屏蔽底层报错、控制权限生效时序不当等。本节对关键问题进行分析，并给出经调试验证的解决方案，为同类仿真控制项目提供参考。
 ### 4.1 无人机执行起飞指令无响应
 - **根本原因**：
 
-  1.原代码中起飞指令未添加`.join()`阻塞等待，异步指令未执行完成就直接运行后续代码，导致起飞流程中断；
-  
-  2.外层包裹冗余`try-except`代码块，吞掉了底层报错信息，无法定位故障；
-     
-  3.API控制权限与电机解锁未完全生效就执行起飞。
+  原代码中起飞指令未添加`.join()`阻塞等待，异步指令未执行完成就直接运行后续代码，导致起飞流程中断；且外层包裹冗余`try-except`代码块，吞掉了底层报错信息，无法定位故障。
 
 - **解决方案**：
 
@@ -128,7 +220,7 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
    client.moveToZAsync(HEIGHT, 1).join()
 ```
 
-   <img width="480" height="300" alt="4 1" src="https://github.com/user-attachments/assets/f5bf4e58-82bd-43b5-a5d0-b91aca3fc963" />
+   <img width="1280" height="642" alt="平稳飞行512" src="https://github.com/user-attachments/assets/c62730be-1c40-419d-9e4c-e94b18f254b2" />
 
 ### 4.2 飞行时抖动严重
 - **根本原因**：
@@ -149,7 +241,7 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
    now_speed = SPEED * speed_ratio[speed_level - 1] * smooth
    client.moveByVelocityBodyFrameAsync(now_speed,0,0,0.1)
 ```
-   <img width="480" height="300" alt="converted" src="https://github.com/user-attachments/assets/f9f4b3ad-7c67-44c5-bfde-ff34d3d56ee0" />  
+   <img width="1280" height="642" alt="平稳飞行512" src="https://github.com/user-attachments/assets/c62730be-1c40-419d-9e4c-e94b18f254b2" />  
 
 ### 4.3 按下自动返航键无人机无反应
 - **根本原因**：
@@ -168,7 +260,9 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
   if key.char == 'b':
       threading.Thread(target=auto_return_home, daemon=True).start()
 ```
-  <img width="480" height="300" alt="converted" src="https://github.com/user-attachments/assets/e8772df7-ec50-405f-80fc-56ea65aab325" />
+
+ <img width="1280" height="640" alt="返航512" src="https://github.com/user-attachments/assets/c8f5cbc9-9af9-4e8e-9063-4eb2df2b62b4" />
+
   
 ### 4.4 自动轨迹模式运行时，键盘操控失灵无响应
 - **根本原因**：
@@ -187,31 +281,8 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
   if key.char == 'o': start_orbit()
   if key.char == 'm': start_square()
 ```
-  <img width="480" height="300" alt="环形4 4" src="https://github.com/user-attachments/assets/13f26fc4-21ce-4d4c-9dbf-a89680663e59" />
-  
-### 4.5 无人机莫名掉高漂移，悬停功能失效
-- **根本原因**：
 
-  1.原高度参数`HEIGHT`未固定，部分轨迹函数随意修改高度值，导致全局高度混乱；
-  
-  2.悬停指令未添加`.join()`，悬停逻辑未完整执行；
-  
-  3. 按键松开后未及时清零速度指令。
-- **解决方案**：固定全局高度常量，禁止轨迹函数随意修改全局高度参数；优化悬停函数，确保悬停指令完整执行；在按键松开回调函数中，强制清零无人机速度，避免惯性漂移。
-```
-  # 悬停功能优化
-  if key.char == 'h':
-      client.hoverAsync().join()
-  
-  # 按键松开清零速度
-  def on_release(key):
-      try:
-          client.moveByVelocityBodyFrameAsync(0,0,0, 0.1)
-      except:
-          pass
-```
-   <img width="480" height="300" alt="高度" src="https://github.com/user-attachments/assets/4513e223-bb60-4706-b95b-61e97a6c4600" />
-
+ <img width="1280" height="640" alt="环形512" src="https://github.com/user-attachments/assets/5eda9d8f-a704-414f-b4e1-e77f8da2e564" />
 
 ## 5. 系统运行效果
 ### 5.1 运行环境
@@ -247,15 +318,18 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
 下面是部分功能的运行效果展示：
 #### 5.4.1 螺旋上升
 
-<img width="480" height="300" alt="螺旋上升" src="https://github.com/user-attachments/assets/5c56a9ea-0df6-40a0-ae20-0ff7d195f811" />
+<img width="1280" height="564" alt="螺旋上升512" src="https://github.com/user-attachments/assets/292797e2-06bd-4199-9432-1d5999fb09b5" />
+
 
 #### 5.4.2 原地旋转
 
-<img width="480" height="300" alt="旋转" src="https://github.com/user-attachments/assets/b8468745-3474-4cf6-a809-6a9a9cee5487" />
+<img width="1280" height="632" alt="原地旋转512" src="https://github.com/user-attachments/assets/15a7ae42-f60b-413e-9dc9-b26501fd7218" />
+
 
 #### 5.4.3 切换飞行速度
 
-<img width="480" height="300" alt="变速" src="https://github.com/user-attachments/assets/49644d99-4c9d-4235-bc18-252b832a3f3a" />
+<img width="1280" height="632" alt="变速512" src="https://github.com/user-attachments/assets/3c98c691-9f1c-40e2-a330-a3a0ffb1512c" />
+
 
 ## 6. 功能扩展与未来规划
   在现有基础飞行控制能力之上，本系统仍有较大的扩展空间。未来将围绕环境感知、路径规划、视觉任务与数据可视化四个方向持续迭代，逐步构建更智能、更稳定的无人机控制体系，为后续复杂场景下的算法验证与应用开发提供更完善的平台支撑。

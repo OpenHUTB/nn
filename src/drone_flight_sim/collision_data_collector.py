@@ -24,8 +24,15 @@ class CollisionDataCollector:
         self.output_dir = output_dir
         self.depth_dir = os.path.join(output_dir, "depth")
         self.labels_file = os.path.join(output_dir, "labels.csv")
-        
+
         self._create_directories()
+        
+        # 如果 labels.csv 不存在，则创建并写入表头
+        if not os.path.exists(self.labels_file):
+            with open(self.labels_file, 'w') as f:
+                f.write("filename,label,risk,min_depth,mean_depth,x,y,z\n")
+
+        
         
         self.client = airsim.MultirotorClient()
         self.client.confirmConnection()
@@ -75,8 +82,8 @@ class CollisionDataCollector:
             risk_name = "safe" if self.current_label == 0 else "danger"
             with open(self.labels_file, 'a') as f:
                 f.write(f"{filename},{self.current_label},{risk_name},"
-                        f"{min_depth:.2f},{mean_depth:.2f},{pos.x_val:.1f},{pos.y_val:.1f}\n")
-            
+                        f"{min_depth:.2f},{mean_depth:.2f},"
+                        f"{pos.x_val:.1f},{pos.y_val:.1f},{pos.z_val:.1f}\n")
             self.sample_count += 1
             print(f"✅ 样本 {self.sample_count}: {filename} (深度:{min_depth:.1f}m)")
             return True

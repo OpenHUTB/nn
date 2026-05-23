@@ -1,0 +1,13 @@
+time_s,distance_to_home_m,battery_percent,ground_speed_mps,wind_mps,altitude_m,payload_kg,estimated_return_time_s,required_battery_percent,battery_margin,rth_action
+0.0,0.0,100.0,0.0,1.2,2.0,0.4,0.0,8.0,92.0,continue_mission
+30.0,90.0,96.0,3.0,1.5,10.0,0.4,30.0,9.51,86.49,continue_mission
+60.0,185.0,91.0,3.3,1.8,15.0,0.4,56.06,11.06,79.94,continue_mission
+90.0,290.0,85.0,3.5,2.1,18.0,0.4,82.86,12.77,72.23,continue_mission
+120.0,405.0,78.0,3.8,2.6,21.0,0.4,106.58,14.54,63.46,continue_mission
+150.0,520.0,70.0,4.0,3.1,23.0,0.4,130.0,16.4,53.6,continue_mission
+180.0,650.0,61.0,4.2,3.8,25.0,0.4,154.76,18.62,42.38,continue_mission
+210.0,780.0,51.0,4.1,4.2,24.0,0.4,190.24,21.24,29.76,continue_mission
+240.0,900.0,42.0,3.8,4.4,22.0,0.4,236.84,24.39,17.61,prepare_return
+270.0,1010.0,34.0,3.5,4.6,20.0,0.4,288.57,27.85,6.15,return_now
+300.0,1080.0,28.0,3.0,4.8,18.0,0.4,360.0,32.62,-4.62,return_now
+330.0,1130.0,22.0,2.7,5.0,16.0,0.4,418.52,36.46,-14.46,return_now

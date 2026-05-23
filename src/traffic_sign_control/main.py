@@ -6,6 +6,7 @@ import numpy as np
 import math
 import os
 import threading
+import argparse
 from ultralytics import YOLO
 import torch
 
@@ -191,21 +192,129 @@ def draw_vehicle_status(surface, vehicle, detected_signs, traffic_light_state=No
         no_light_text = font.render("NO LIGHT DETECTED", True, (128, 128, 128))
         surface.blit(no_light_text, (panel_x + padding, panel_y + y_offset))
 
+# 查找最新训练权重
+def find_latest_weights():
+    """查找最新的训练权重文件"""
+    runs_dir = 'runs/detect'
+    if not os.path.exists(runs_dir):
+        return None
+
+    best_weights = None
+    latest_time = 0
+
+    for root, dirs, files in os.walk(runs_dir):
+        if 'best.pt' in files:
+            weight_path = os.path.join(root, 'best.pt')
+            mtime = os.path.getmtime(weight_path)
+            if mtime > latest_time:
+                latest_time = mtime
+                best_weights = weight_path
+
+    return best_weights
+
 # 加载YOLOv8预训练模型用于交通标志检测
-model = YOLO("yolov8n.pt")
+def parse_args():
+    # 查找最新训练权重作为默认
+    default_model = find_latest_weights() or 'yolov8n.pt'
+
+    parser = argparse.ArgumentParser(description="CARLA交通标志检测与数据采集")
+    parser.add_argument('--model', type=str, default=default_model,
+                       help=f'YOLO模型路径 (默认: 自动选择最新训练权重)')
+    parser.add_argument('--save-interval', type=int, default=30,
+                       help='自动保存帧间隔 (默认: 30帧保存1张)')
+    parser.add_argument('--output-dir', type=str, default='dataset',
+                       help='数据集输出目录 (默认: dataset)')
+    args = parser.parse_args()
+
+    # 检查模型文件是否存在
+    if not os.path.exists(args.model):
+        print(f"错误: 模型文件不存在: {args.model}")
+        print(f"提示: 使用默认模型请运行: python main.py")
+        exit(1)
+
+    return args
+
+# 初始化模型（延迟加载）
+model = None
 
 # COCO数据集中交通相关类别: stop sign(11), traffic light(9)
 TRAFFIC_RELEVANT_CLASSES = {9, 11}
 
+# CARLA语义分割中的交通标志类别ID
+CARLA_TRAFFIC_SIGN_LABEL = 12
+CARLA_TRAFFIC_LIGHT_LABEL = 18
+
+# 数据集采集管理器
+class DatasetCollector:
+    def __init__(self, output_dir='dataset'):
+        self.output_dir = output_dir
+        self.images_dir = os.path.join(output_dir, 'images')
+        self.semantic_dir = os.path.join(output_dir, 'semantic')
+        self.labels_dir = os.path.join(output_dir, 'labels')
+
+        # 创建目录结构
+        os.makedirs(self.images_dir, exist_ok=True)
+        os.makedirs(self.semantic_dir, exist_ok=True)
+        os.makedirs(self.labels_dir, exist_ok=True)
+
+        self.frame_count = 0
+        print(f"数据集采集初始化: {output_dir}")
+
+    def save_frame(self, rgb_image, seg_image, detections):
+        """保存一帧数据（RGB、语义分割、YOLO标注）"""
+        if rgb_image is None:
+            return
+
+        self.frame_count += 1
+        frame_name = f"frame_{self.frame_count:06d}"
+
+        # 保存RGB图像
+        rgb_path = os.path.join(self.images_dir, f"{frame_name}.jpg")
+        rgb_surface = pygame.surfarray.make_surface(rgb_image.swapaxes(0, 1))
+        pygame.image.save(rgb_surface, rgb_path)
+
+        # 保存语义分割图像（如果有）
+        if seg_image is not None:
+            seg_path = os.path.join(self.semantic_dir, f"{frame_name}.png")
+            seg_surface = pygame.surfarray.make_surface(seg_image.swapaxes(0, 1))
+            pygame.image.save(seg_surface, seg_path)
+
+        # 保存YOLO格式标注
+        label_path = os.path.join(self.labels_dir, f"{frame_name}.txt")
+        self._save_yolo_labels(label_path, detections, rgb_image.shape)
+
+        print(f"保存帧 {frame_name}: RGB + {'语义分割 + ' if seg_image is not None else ''}标注")
+
+    def _save_yolo_labels(self, label_path, detections, image_shape):
+        """保存YOLO格式标注文件"""
+        height, width = image_shape[:2]
+        with open(label_path, 'w') as f:
+            for sign, conf, bbox in detections:
+                x1, y1, x2, y2 = bbox
+                # 转换为YOLO格式 (x_center, y_center, width, height) - 归一化
+                x_center = (x1 + x2) / 2.0 / width
+                y_center = (y1 + y2) / 2.0 / height
+                bbox_width = (x2 - x1) / width
+                bbox_height = (y2 - y1) / height
+
+                # 类别ID映射：stop sign=0, traffic light=1
+                if "stop" in sign.lower():
+                    class_id = 0
+                else:
+                    class_id = 1
+
+                f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {bbox_width:.6f} {bbox_height:.6f}\n")
+
 # 异步检测器：在独立线程中运行YOLO推理，避免阻塞主循环
 class AsyncDetector:
-    def __init__(self, detect_interval=3):
+    def __init__(self, detect_interval=3, is_custom_model=False):
         self._lock = threading.Lock()
         self._latest_signs = []
         self._image_to_detect = None
         self._running = True
         self._detect_interval = detect_interval  # 每N帧检测一次
         self._frame_count = 0
+        self._is_custom_model = is_custom_model  # 是否使用自定义模型
         self._thread = threading.Thread(target=self._detect_loop, daemon=True)
         self._thread.start()
 
@@ -232,8 +341,12 @@ class AsyncDetector:
                 for i in range(len(detections)):
                     cls_id = int(detections.cls[i])
                     conf = float(detections.conf[i])
-                    if cls_id not in TRAFFIC_RELEVANT_CLASSES:
+
+                    # 自定义模型：所有类别都保留（只有stop_sign和traffic_light）
+                    # COCO预训练模型：只保留交通相关类别
+                    if not self._is_custom_model and cls_id not in TRAFFIC_RELEVANT_CLASSES:
                         continue
+
                     x1, y1, x2, y2 = detections.xyxy[i].cpu().numpy().astype(int)
                     label = names[cls_id]
                     signs.append((label, conf, (int(x1), int(y1), int(x2), int(y2))))
@@ -405,8 +518,26 @@ def spawn_dynamic_elements(world, blueprint_library):
 
 # 主函数
 def main():
+    # 解析命令行参数（已包含模型存在性检查）
+    args = parse_args()
+
+    # 加载模型
+    global model
+    print(f"\n{'='*50}")
+    print(f"加载模型: {args.model}")
+    if 'runs/detect' in args.model:
+        print(">>> 使用自定义训练模型 <<<")
+    else:
+        print(">>> 使用预训练模型 <<<")
+    print(f"{'='*50}\n")
+    model = YOLO(args.model)
+
     actor_list = []
-    detector = AsyncDetector()
+    # 判断是否使用自定义模型（非默认yolov8n.pt）
+    is_custom = os.path.basename(args.model) != 'yolov8n.pt'
+    detector = AsyncDetector(is_custom_model=is_custom)
+    collector = DatasetCollector(args.output_dir)
+    frame_counter = 0
     try:
         client = carla.Client("localhost", 2000)
         client.set_timeout(10.0)
@@ -455,13 +586,65 @@ def main():
         camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
         actor_list.append(camera)
 
+        # 语义分割相机设置
+        seg_camera_bp = blueprint_library.find("sensor.camera.semantic_segmentation")
+        seg_camera_bp.set_attribute("image_size_x", "800")
+        seg_camera_bp.set_attribute("image_size_y", "600")
+        seg_camera_bp.set_attribute("fov", "90")
+        seg_camera = world.spawn_actor(seg_camera_bp, camera_transform, attach_to=vehicle)
+        actor_list.append(seg_camera)
+
         # 设置Pygame显示
         display = init_pygame(800, 600)
 
         image_surface = [None]
+        seg_surface = [None]
+
         def image_callback(image):
             image_surface[0] = process_image(image)
+
+        def seg_callback(image):
+            # 语义分割图像转换（CARLA输出的是类别ID，需要转换为彩色）
+            array = np.frombuffer(image.raw_data, dtype=np.uint8)
+            array = array.reshape((image.height, image.width, 4))
+            # 提取语义标签（R通道）
+            semantic_labels = array[:, :, 2]  # CARLA语义分割存储在BGR的R通道
+
+            # 简单的颜色映射（可以根据需要扩展）
+            color_map = {
+                0: (0, 0, 0),        # Unlabeled - 黑色
+                1: (0, 0, 255),      # Building - 蓝色
+                2: (0, 255, 0),      # Fence - 绿色
+                3: (255, 255, 255),  # Other - 白色
+                4: (255, 0, 0),      # Pedestrian - 红色
+                5: (255, 255, 0),    # Pole - 黄色
+                6: (0, 255, 255),    # RoadLine - 青色
+                7: (128, 64, 128),   # Road - 灰紫色
+                8: (64, 0, 128),     # SideWalk - 紫色
+                9: (64, 64, 0),      # Vegetation - 橄榄色
+                10: (0, 128, 192),   # Vehicles - 深青色
+                11: (0, 0, 128),     # Wall - 深红色
+                12: (192, 128, 128), # TrafficSign - 浅蓝色
+                13: (0, 128, 128),   # Sky - 灰青色
+                14: (128, 128, 128), # Ground - 灰色
+                15: (64, 0, 64),     # Bridge - 深紫色
+                16: (64, 64, 64),    # RailTrack - 深灰色
+                17: (128, 0, 128),   # GuardRail - 紫红色
+                18: (192, 192, 128), # TrafficLight - 浅黄色
+                19: (0, 0, 192),     # Static - 深蓝色
+                20: (128, 128, 0),   # Dynamic - 橄榄色
+            }
+
+            # 创建彩色图像
+            colored = np.zeros((image.height, image.width, 3), dtype=np.uint8)
+            for label, color in color_map.items():
+                mask = semantic_labels == label
+                colored[mask] = color
+
+            seg_surface[0] = colored
+
         camera.listen(image_callback)
+        seg_camera.listen(seg_callback)
 
         spectator = world.get_spectator()
         def update_spectator():
@@ -484,6 +667,11 @@ def main():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                     return
+                # 手动保存当前帧（按S键）
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
+                    if image_surface[0] is not None:
+                        detected_signs = detector.get_latest_signs()
+                        collector.save_frame(image_surface[0], seg_surface[0], detected_signs)
 
             transform = vehicle.get_transform()
             waypoint = map.get_waypoint(transform.location, project_to_road=True, lane_type=carla.LaneType.Driving)
@@ -506,6 +694,11 @@ def main():
                 # 获取最新的检测结果（非阻塞，立即返回）
                 detected_signs = detector.get_latest_signs()
 
+                # 帧间隔自动保存
+                frame_counter += 1
+                if frame_counter % args.save_interval == 0:
+                    collector.save_frame(image_surface[0], seg_surface[0], detected_signs)
+
                 # 获取红绿灯状态
                 traffic_light_state = vehicle.get_traffic_light_state()
 
@@ -521,6 +714,10 @@ def main():
                 fps_text = f"FPS: {clock.get_fps():.1f}"
                 fps_surface = fps_font.render(fps_text, True, (255, 255, 0))
                 surface.blit(fps_surface, (10, 10))
+                # 绘制数据采集状态
+                status_text = f"Frames: {collector.frame_count} | Press 'S' to save"
+                status_surface = fps_font.render(status_text, True, (255, 255, 255))
+                surface.blit(status_surface, (10, 30))
                 display.blit(surface, (0, 0))
             else:
                 # 等待相机图像时显示提示

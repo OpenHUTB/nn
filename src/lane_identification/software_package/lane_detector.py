@@ -299,48 +299,51 @@ class LaneDetector:
             'avg_lane_width': avg_lane_width,
             'lane_positions': midpoints
         }
-    
+
     def _fit_lane_model(self, lines: List[Dict], image_shape: Tuple[int, ...]) -> Optional[Dict]:
         """拟合车道线模型"""
         if len(lines) < 2:
             return None
-        
+
         # 收集所有点
         x_points, y_points = [], []
         for line in lines:
             for (x, y) in line['points']:
                 x_points.append(x)
                 y_points.append(y)
-        
+
         # 多项式拟合
         try:
             coeffs = np.polyfit(y_points, x_points, 2)
             model_type = 'quadratic'
-        except:
+        except (ValueError, TypeError):
             try:
                 coeffs = np.polyfit(y_points, x_points, 1)
                 model_type = 'linear'
-            except:
+            except (ValueError, TypeError):
                 return None
-        
+
         poly_func = np.poly1d(coeffs)
-        
+
         # 生成车道线点
         height, width = image_shape[:2]
         y_bottom = height
         y_top = int(height * 0.4)
-        
+
         try:
             x_bottom = int(poly_func(y_bottom))
             x_top = int(poly_func(y_top))
-            
+
             # 限制范围
             x_bottom = max(0, min(width, x_bottom))
             x_top = max(0, min(width, x_top))
-            
-            # 计算置信度
-            confidence = min(len(lines) / 10.0, 1.0)
-            
+
+            # 计算置信度 - 基于线段数量和长度
+            avg_length = np.mean([line['length'] for line in lines])
+            length_score = min(avg_length / 100.0, 1.0)
+            count_score = min(len(lines) / 8.0, 1.0)
+            confidence = 0.6 * count_score + 0.4 * length_score
+
             return {
                 'func': poly_func,
                 'coeffs': coeffs.tolist(),
@@ -349,9 +352,9 @@ class LaneDetector:
                 'confidence': confidence,
                 'num_lines': len(lines)
             }
-        except:
+        except (IndexError, OverflowError):
             return None
-    
+
     def _validate_lanes(self, left_lane: Optional[Dict], right_lane: Optional[Dict],
                        image_shape: Tuple[int, ...]) -> Tuple[Optional[Dict], Optional[Dict]]:
         """验证车道线合理性"""

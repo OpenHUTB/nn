@@ -14,7 +14,7 @@ hyperparameters:
                                  # 越小: 目标网络更新越平滑
                                  # 推荐: 0.001 ~ 0.01
   
-  update_target_every: 10000    # 软更新间隔
+  update_target_every: 1        # 软更新间隔
                                  # 每隔多少步执行一次软更新
                                  # 注意: DoubleDQN 使用软更新，不需要硬同步
                                  # 推荐: 10000

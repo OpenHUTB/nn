@@ -237,7 +237,15 @@ class KeyboardController:
                 else:
                     print("⚠️ 未设置返航点")
                 return
-
+            
+            # O 键：一键环绕
+            if key_char == 'o' or key_char == 'O':
+                if self.current_movement:
+                    self._stop_movement(self.current_movement)
+                print("\n🔄 开始环绕飞行...")
+                self._circle_flight()
+                return
+            
             # P 键：拍照
             if key_char == 'p' or key_char == 'P':
                 self.drone.capture_image()
@@ -303,6 +311,36 @@ class KeyboardController:
 
         except AttributeError:
             pass
+    def _circle_flight(self):
+        """一键环绕飞行：绕当前物体飞矩形轨迹"""
+        # 获取当前位置
+        pos = self.drone.get_position()
+        x, y, z = pos.x_val, pos.y_val, pos.z_val
+        
+        # 环绕半径（米）
+        radius = 5
+        
+        print(f"📍 起始位置: ({x:.1f}, {y:.1f})")
+        print("   矩形环绕轨迹: 右 → 前 → 左 → 后")
+        
+        # 矩形环绕的4个点
+        waypoints = [
+            (x + radius, y, z),      # 右边
+            (x + radius, y + radius, z),  # 前边
+            (x, y + radius, z),      # 左边
+            (x, y, z),               # 回到起点
+        ]
+        
+        # 依次飞过每个点
+        for i, (wx, wy, wz) in enumerate(waypoints, 1):
+            print(f"   航点{i}: ({wx:.1f}, {wy:.1f})")
+            self.drone.fly_to_position(wx, wy, wz, velocity=3)
+            import time
+            time.sleep(0.5)
+        
+        # 悬停收尾
+        self.drone.hover()
+        print("✅ 环绕完成")
 
     def start(self):
         """启动键盘监听
@@ -341,6 +379,7 @@ def print_control_help():
      P         : 拍照
      T         : 拍摄所有图像(RGB+深度+分割)
      N         : 拍摄深度图像
+     O         : 一键环绕（飞矩形轨迹）
 
   🛬 安全控制:
      L         : 执行降落
