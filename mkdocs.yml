@@ -47,6 +47,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 nav:
 - 首页: 'index.md'
 - CarRacing DQN/DoubleDQN：训练改进与可视化对比: 'car_racing_dqn_improvements.md'
+- 危险判断逻辑优化与 CARLA 测试报告: 'risk_logic_carla_report/index.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 
 
