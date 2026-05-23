@@ -255,6 +255,142 @@ def log_performance(fps=None, queue_sizes=None, memory_mb=None):
     return _sim_logger.record_frame(fps, queue_sizes, memory_mb)
 
 
+class MemoryMonitor:
+    """
+    Memory monitoring and management system for long-running simulations.
+    
+    Features:
+    - Real-time memory usage tracking (RSS)
+    - Configurable memory threshold warnings
+    - Automatic incremental export when memory exceeds threshold
+    - Frame count limits per sensor type
+    - Memory usage history logging
+    """
+    
+    def __init__(self, max_memory_mb=4096, max_frames_per_sensor=5000,
+                 check_interval_seconds=5, warn_threshold_pct=0.8):
+        """
+        Initialize memory monitor.
+        
+        Args:
+            max_memory_mb (int): Maximum allowed memory in MB before forced export
+            max_frames_per_sensor (int): Max frames stored per sensor before auto-export
+            check_interval_seconds (int): How often to check memory (seconds)
+            warn_threshold_pct (float): Warning threshold as fraction of max (0.0-1.0)
+        """
+        self.max_memory_mb = max_memory_mb
+        self.max_frames_per_sensor = max_frames_per_sensor
+        self.check_interval_seconds = check_interval_seconds
+        self.warn_threshold_pct = warn_threshold_pct
+        self.last_check_time = 0
+        self.memory_history = []
+        self.export_count = 0
+        
+    def get_memory_mb(self):
+        """Get current process memory usage in MB."""
+        try:
+            import psutil
+            process = psutil.Process()
+            return process.memory_info().rss / (1024 * 1024)
+        except ImportError:
+            try:
+                import resource
+                return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+            except ImportError:
+                return 0
+    
+    def should_check(self, current_time):
+        """Check if it's time for a memory check."""
+        return current_time - self.last_check_time >= self.check_interval_seconds
+    
+    def check_memory(self, sensor_data, current_time=None):
+        """
+        Check memory usage and sensor data sizes.
+        
+        Args:
+            sensor_data (dict): The sensor_data dictionary from AVSimulation
+            current_time (float): Current time (time.time())
+            
+        Returns:
+            dict: Memory status with recommendations
+        """
+        if current_time is None:
+            current_time = time.time()
+            
+        if not self.should_check(current_time):
+            return {'status': 'ok', 'action': 'none'}
+        
+        self.last_check_time = current_time
+        memory_mb = self.get_memory_mb()
+        
+        frame_counts = {}
+        for sensor_type, data_list in sensor_data.items():
+            frame_counts[sensor_type] = len(data_list)
+        
+        status = {
+            'memory_mb': round(memory_mb, 1),
+            'max_memory_mb': self.max_memory_mb,
+            'memory_pct': round(memory_mb / self.max_memory_mb * 100, 1) if self.max_memory_mb > 0 else 0,
+            'frame_counts': frame_counts,
+            'status': 'ok',
+            'action': 'none'
+        }
+        
+        self.memory_history.append({
+            'time': datetime.now().isoformat(),
+            'memory_mb': status['memory_mb'],
+            'frame_counts': frame_counts.copy()
+        })
+        
+        if memory_mb >= self.max_memory_mb:
+            status['status'] = 'critical'
+            status['action'] = 'export_and_clear'
+            logging.warning(f"🔴 CRITICAL: Memory {memory_mb:.0f}MB >= {self.max_memory_mb}MB! Forcing export.")
+        elif memory_mb >= self.max_memory_mb * self.warn_threshold_pct:
+            status['status'] = 'warning'
+            status['action'] = 'export_and_clear'
+            logging.warning(f"🟡 WARNING: Memory {memory_mb:.0f}MB >= {self.max_memory_mb * self.warn_threshold_pct:.0f}MB threshold")
+        
+        for sensor_type, count in frame_counts.items():
+            if count >= self.max_frames_per_sensor:
+                status['status'] = 'frame_limit'
+                status['action'] = 'export_and_clear'
+                status['limit_sensor'] = sensor_type
+                logging.warning(f"🟡 {sensor_type} frames ({count}) >= limit ({self.max_frames_per_sensor}). Triggering export.")
+                break
+        
+        if status['memory_mb'] > 0:
+            logging.info(f"💾 Memory: {status['memory_mb']}MB ({status['memory_pct']}%) | "
+                        f"Camera: {frame_counts.get('camera', 0)} | "
+                        f"LiDAR: {frame_counts.get('lidar', 0)} | "
+                        f"Radar: {frame_counts.get('radar', 0)}")
+        
+        return status
+    
+    def clear_sensor_data(self, sensor_data, keep_last_n=100):
+        """
+        Clear sensor data after export, keeping the most recent N frames.
+        
+        Args:
+            sensor_data (dict): The sensor_data dictionary
+            keep_last_n (int): Number of recent frames to keep for visualization
+        """
+        for sensor_type in sensor_data:
+            if isinstance(sensor_data[sensor_type], list) and len(sensor_data[sensor_type]) > keep_last_n:
+                old_count = len(sensor_data[sensor_type])
+                sensor_data[sensor_type] = sensor_data[sensor_type][-keep_last_n:]
+                logging.info(f"🧹 Cleared {sensor_type}: {old_count} → {len(sensor_data[sensor_type])} frames")
+    
+    def get_summary(self):
+        """Get memory monitoring summary."""
+        return {
+            'export_count': self.export_count,
+            'memory_history_entries': len(self.memory_history),
+            'peak_memory_mb': max(h['memory_mb'] for h in self.memory_history) if self.memory_history else 0,
+            'max_memory_mb': self.max_memory_mb
+        }
+
+
 class ConfigLoader:
     """
     Configuration loader for CARLA AV Simulation.
@@ -546,6 +682,16 @@ class AVSimulation:
 
             self.active_sensors = []
             self.active_actors = []
+
+            # Memory monitor for long-running simulations
+            perf_config = self.config_loader.get('performance', {})
+            self.memory_monitor = MemoryMonitor(
+                max_memory_mb=perf_config.get('max_memory_mb', 4096),
+                max_frames_per_sensor=perf_config.get('max_frames_per_sensor', 5000),
+                check_interval_seconds=perf_config.get('memory_check_interval', 5),
+                warn_threshold_pct=perf_config.get('memory_warn_threshold', 0.8)
+            )
+            self.incremental_export_count = 0
 
             # Define sensor configurations (now can be overridden by config file)
             self.define_sensor_configurations()
@@ -1032,15 +1178,23 @@ class AVSimulation:
 
             while time.time() - start_time < duration_seconds:
                 try:
-                    # Tick the world
                     self.world.tick()
                     
-                    # Visualize data
+                    # Memory monitoring - check every N seconds
+                    mem_status = self.memory_monitor.check_memory(
+                        self.sensor_data, time.time()
+                    )
+                    if mem_status['action'] == 'export_and_clear':
+                        logging.info("💾 Memory threshold reached, performing incremental export...")
+                        self.export_data_incremental(".")
+                        self.memory_monitor.clear_sensor_data(self.sensor_data)
+                        self.memory_monitor.export_count += 1
+                        self.incremental_export_count += 1
+                    
                     self.visualize_data()
                     
                     frame_count += 1
                     
-                    # Process Pygame events
                     for event in pygame.event.get():
                         if event.type == pygame.QUIT:
                             return
@@ -1052,10 +1206,65 @@ class AVSimulation:
         finally:
             self.export_data(".")
 
-            # Disable synchronous mode when done
+            mem_summary = self.memory_monitor.get_summary()
+            logging.info(f"💾 Memory Monitor Summary:")
+            logging.info(f"   Incremental exports: {mem_summary['export_count']}")
+            logging.info(f"   Peak memory: {mem_summary['peak_memory_mb']:.1f}MB / {mem_summary['max_memory_mb']}MB")
+
             settings = self.world.get_settings()
             settings.synchronous_mode = False
             self.world.apply_settings(settings)
+
+    def export_data_incremental(self, output_dir):
+        """
+        Export current sensor data incrementally (for memory management).
+        
+        Exports data with a unique batch number, then the caller should
+        clear the sensor_data to free memory.
+        
+        Args:
+            output_dir (str): Directory to save incremental data
+        """
+        try:
+            batch_id = self.incremental_export_count
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            batch_dir = Path(output_dir) / f"incremental_batch_{batch_id:03d}_{timestamp}"
+            batch_dir.mkdir(parents=True, exist_ok=True)
+            
+            frame_counts = {}
+            for sensor_type, data_list in self.sensor_data.items():
+                frame_counts[sensor_type] = len(data_list)
+            
+            metadata = {
+                'batch_id': batch_id,
+                'export_timestamp': timestamp,
+                'frame_counts': frame_counts,
+                'memory_monitor': self.memory_monitor.get_summary()
+            }
+            
+            with open(batch_dir / 'metadata.json', 'w') as f:
+                json.dump(metadata, f, indent=2, default=str)
+            
+            if self.sensor_data['camera']:
+                cam_dir = batch_dir / 'camera'
+                cam_dir.mkdir(exist_ok=True)
+                for idx, frame in enumerate(self.sensor_data['camera']):
+                    img = frame.get('data')
+                    if img is not None:
+                        cv2.imwrite(str(cam_dir / f'frame_{idx:06d}.png'), img)
+            
+            if self.sensor_data['lidar']:
+                lidar_data = {
+                    'timestamps': [f['timestamp'] for f in self.sensor_data['lidar']],
+                    'points': [f['points'].tolist() for f in self.sensor_data['lidar']]
+                }
+                with open(batch_dir / 'lidar_data.json', 'w') as f:
+                    json.dump(lidar_data, f, default=str)
+            
+            logging.info(f"📦 Incremental export #{batch_id}: {frame_counts} → {batch_dir}")
+            
+        except Exception as e:
+            logging.error(f"Failed incremental export: {str(e)}")
 
     def export_data(self, output_dir):
         """

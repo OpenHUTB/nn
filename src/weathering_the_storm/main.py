@@ -451,7 +451,15 @@ def run_quick_test(args, sim_logger=None):
                     
                     if sim_logger:
                         fps = frame_count / elapsed if elapsed > 0 else 0
-                        sim_logger.record_frame(fps=fps)
+                        mem_mb = 0
+                        try:
+                            import psutil
+                            mem_mb = psutil.Process().memory_info().rss / (1024*1024)
+                        except ImportError:
+                            pass
+                        sim_logger.record_frame(fps=fps, memory_mb=mem_mb)
+                        if mem_mb > 0:
+                            log.info(f"💾 Memory: {mem_mb:.1f}MB")
                     
                     last_log_time = current_time
 
