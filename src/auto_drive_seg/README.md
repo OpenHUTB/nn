@@ -19,6 +19,12 @@
 <img width="500px" src="examples/result_mask.png"/>
 </p>
 
+也支持视频输入，逐帧分割后输出叠加视频。下图为视频中 6 个采样帧的分割结果：
+
+<p align="center">
+<img width="600px" src="examples/result_video_frames.png"/>
+</p>
+
 ## 运行环境
 
 - 平台：Windows 10/11（Linux 同理）
@@ -57,6 +63,10 @@ src/auto_drive_seg/models/unet_model_256x256_50/
 
 ## 运行步骤
 
+`main.py` 按输入文件扩展名自动识别图片或视频。
+
+### 图片输入
+
 ```bash
 cd src/auto_drive_seg
 # 用自带示例图 + 默认 256x256 模型
@@ -71,6 +81,18 @@ python main.py examples/sample_input.png models/unet_model_512x512_50
 
 运行后在输入图同目录生成 `*_overlay.png`（分割叠加图）和 `*_mask.png`（纯掩码图）。
 
+### 视频输入
+
+```bash
+# 逐帧分割一段视频（.mp4/.avi/.mov/.mkv/.webm）
+python main.py path/to/video.mp4
+
+# 指定模型和最大处理帧数（默认 150 帧）
+python main.py path/to/video.mp4 models/unet_model_256x256_50 120
+```
+
+视频为二进制大文件，不随仓库提交。可用原始项目 `examples/` 目录下的 `.mp4`（如 `movie1.mp4`）作测试。运行后在视频同目录生成 `*_seg.mp4`（逐帧分割叠加视频）和 `*_seg_frames.png`（采样帧拼图）。
+
 ## 目录说明
 
 ```
@@ -80,7 +102,7 @@ src/auto_drive_seg/
     semantic/               推理所需代码（U-Net 模型/数据加载/可视化/类别定义）
         unet/               模型结构、数据集、训练、可视化工具
         carla_controller/   CARLA 语义类别与颜色映射
-    examples/               示例输入图与运行效果图
+    examples/               示例输入图与运行效果图（图片 + 视频采样帧）
     models/                 预训练模型（需自行获取，见上）
 ```
 

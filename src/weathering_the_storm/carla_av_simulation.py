@@ -269,15 +269,6 @@ class MemoryMonitor:
     
     def __init__(self, max_memory_mb=4096, max_frames_per_sensor=5000,
                  check_interval_seconds=5, warn_threshold_pct=0.8):
-        """
-        Initialize memory monitor.
-        
-        Args:
-            max_memory_mb (int): Maximum allowed memory in MB before forced export
-            max_frames_per_sensor (int): Max frames stored per sensor before auto-export
-            check_interval_seconds (int): How often to check memory (seconds)
-            warn_threshold_pct (float): Warning threshold as fraction of max (0.0-1.0)
-        """
         self.max_memory_mb = max_memory_mb
         self.max_frames_per_sensor = max_frames_per_sensor
         self.check_interval_seconds = check_interval_seconds
@@ -345,22 +336,22 @@ class MemoryMonitor:
         if memory_mb >= self.max_memory_mb:
             status['status'] = 'critical'
             status['action'] = 'export_and_clear'
-            logging.warning(f"🔴 CRITICAL: Memory {memory_mb:.0f}MB >= {self.max_memory_mb}MB! Forcing export.")
+            logging.warning(f"CRITICAL: Memory {memory_mb:.0f}MB >= {self.max_memory_mb}MB! Forcing export.")
         elif memory_mb >= self.max_memory_mb * self.warn_threshold_pct:
             status['status'] = 'warning'
             status['action'] = 'export_and_clear'
-            logging.warning(f"🟡 WARNING: Memory {memory_mb:.0f}MB >= {self.max_memory_mb * self.warn_threshold_pct:.0f}MB threshold")
+            logging.warning(f"WARNING: Memory {memory_mb:.0f}MB >= {self.max_memory_mb * self.warn_threshold_pct:.0f}MB threshold")
         
         for sensor_type, count in frame_counts.items():
             if count >= self.max_frames_per_sensor:
                 status['status'] = 'frame_limit'
                 status['action'] = 'export_and_clear'
                 status['limit_sensor'] = sensor_type
-                logging.warning(f"🟡 {sensor_type} frames ({count}) >= limit ({self.max_frames_per_sensor}). Triggering export.")
+                logging.warning(f"{sensor_type} frames ({count}) >= limit ({self.max_frames_per_sensor}). Triggering export.")
                 break
         
         if status['memory_mb'] > 0:
-            logging.info(f"💾 Memory: {status['memory_mb']}MB ({status['memory_pct']}%) | "
+            logging.info(f"Memory: {status['memory_mb']}MB ({status['memory_pct']}%) | "
                         f"Camera: {frame_counts.get('camera', 0)} | "
                         f"LiDAR: {frame_counts.get('lidar', 0)} | "
                         f"Radar: {frame_counts.get('radar', 0)}")
@@ -368,18 +359,12 @@ class MemoryMonitor:
         return status
     
     def clear_sensor_data(self, sensor_data, keep_last_n=100):
-        """
-        Clear sensor data after export, keeping the most recent N frames.
-        
-        Args:
-            sensor_data (dict): The sensor_data dictionary
-            keep_last_n (int): Number of recent frames to keep for visualization
-        """
+        """Clear sensor data after export, keeping the most recent N frames."""
         for sensor_type in sensor_data:
             if isinstance(sensor_data[sensor_type], list) and len(sensor_data[sensor_type]) > keep_last_n:
                 old_count = len(sensor_data[sensor_type])
                 sensor_data[sensor_type] = sensor_data[sensor_type][-keep_last_n:]
-                logging.info(f"🧹 Cleared {sensor_type}: {old_count} → {len(sensor_data[sensor_type])} frames")
+                logging.info(f"Cleared {sensor_type}: {old_count} -> {len(sensor_data[sensor_type])} frames")
     
     def get_summary(self):
         """Get memory monitoring summary."""

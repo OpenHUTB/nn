@@ -24,19 +24,22 @@
 
 ```shell
 python main.py
+```
+
 程序自动加载驾驶事故视频数据，通过时序拼贴提示生成输入指令，调用大模型完成事故识别，并输出分类结果、置信度与场景分析内容。
-项目创新点
+
+## 项目创新点
 面向交通事故识别任务，创新设计时序拼贴提示方法，有效挖掘视频时序动态特征；
 依托仿真驾驶数据开展实验，规避真实事故数据采集难、成本高、样本稀缺的问题；
 结合 GPT-4o 多模态能力，兼顾视觉画面与时序语义理解，大幅提升复杂事故识别效果；
 方案轻量化、成本可控，无需大规模深度学习模型训练，依靠提示工程即可完成任务落地；
 适配不同路况、不同类型交通事故场景，可拓展用于驾驶安全检测、车载风险预警等下游任务。
-论文原信息
+## 论文原信息
 论文标题：时序拼贴提示：基于仿真器的低成本交通事故视频识别（结合 GPT-4o）
 作者：Pratch Suntichaikul, Pittawat Taveekitworachai, Chakarida Nukoolkit, Ruck Thawonmas
 录用会议：2024 年第八届信息技术国际会议（InCIT 2024）
-本仓库为该论文配套开源仓库，包含论文实验完整代码、处理数据与相关实验资源。
-引用
+本仓库为该论文配套开源仓库，包含论文实验完整代码、处理数据与相关实验资源。## 引用
+
 若本项目与论文内容对你的研究有所帮助，欢迎引用本文：
 @inproceedings{suntichaikul2024temporal,
     title        = {{Temporal Collage Prompting: A Cost-Effective Simulator-Based Driving Accident Video Recognition With GPT-4o}},
@@ -46,5 +49,6 @@ python main.py
     pages        = {708--713},
     doi          = {10.1109/InCIT63192.2024.10810536}
 }
-开源协议
+## 开源协议
+
 本仓库内所有代码、资源文件均遵循 MIT 开源协议 开源共享。

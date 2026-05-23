@@ -26,7 +26,7 @@ spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
 ### 使用示例
 
 ```bash
-python data_reciever.py --filter name --name John29
+python data_receiver.py --filter name --name John29
 ```
 
 脚本会自动保存文件 `out_John29.csv`，包含 6 轴 IMU 数据，且标签列统一填充为 `John29`。
