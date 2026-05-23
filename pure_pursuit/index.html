@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/pure_pursuit/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
     <title>Carla 无人车路径跟踪系统实现与深度分析报告 - 神经网络</title>
     <link rel="stylesheet" href="../css/theme.css" />
@@ -14,8 +14,8 @@
       <script>
         // Current page data
         var mkdocs_page_name = "Carla \u65e0\u4eba\u8f66\u8def\u5f84\u8ddf\u8e2a\u7cfb\u7edf\u5b9e\u73b0\u4e0e\u6df1\u5ea6\u5206\u6790\u62a5\u544a";
-        var mkdocs_page_input_path = "test.md";
-        var mkdocs_page_url = null;
+        var mkdocs_page_input_path = "pure_pursuit.md";
+        var mkdocs_page_url = "/nn/pure_pursuit/";
       </script>
     
     <!--[if lt IE 9]>
@@ -45,6 +45,10 @@
                 </li>
               </ul>
               <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
                 </li>
               </ul>
@@ -64,7 +68,7 @@
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
       <li class="breadcrumb-item active">Carla 无人车路径跟踪系统实现与深度分析报告</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/test.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/pure_pursuit.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
   </ul>
   <hr/>
@@ -111,7 +115,7 @@
 </tr>
 <tr>
 <td>Python</td>
-<td>3.8.10（推荐Anac</td>
+<td>3.8.10（推荐Anaconda）</td>
 </tr>
 <tr>
 <td>核心依赖库</td>
@@ -243,11 +247,11 @@ l_y = -(x_g - x_v)\sin\theta + (y_g - y_v)\cos\theta
 </ul>
 <h3 id="42">4.2 系统实现效果</h3>
 <p>系统实现效果图如下</p>
-<p><img alt="起始图" src="images/1.png" /></p>
-<p><img alt="结尾图" src="images/2.png" /></p>
+<p><img alt="起始图" src="pure_pursuit_image/1.png" /></p>
+<p><img alt="结尾图" src="pure_pursuit_image/2.png" /></p>
 <h3 id="43">4.3 轨迹跟踪结果可视化分析</h3>
-<p>轨迹对比图如下：
-<img alt="轨迹对比图" src="images/result.png" /></p>
+<p>轨迹对比图如下：</p>
+<p><img alt="轨迹对比图" src="pure_pursuit_image/3.png" /></p>
 <ul>
 <li>直线路段：实际轨迹与参考路径高度重合，跟踪误差小于0.5m，无明显偏移。</li>
 <li>弯道路段：受车辆动力学约束，实际轨迹与参考路径存在轻微偏差，但整体未脱离车道，偏差控制在1.5m以内。</li>

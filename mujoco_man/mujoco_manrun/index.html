@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/mujoco_man/mujoco_manrun/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
     <title>基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo） - 神经网络</title>
     <link rel="stylesheet" href="../../css/theme.css" />
@@ -15,7 +15,7 @@
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e CPG + PD \u7684\u4eba\u5f62\u673a\u5668\u4eba\u7a33\u5b9a\u7ad9\u7acb\u4e0e\u884c\u8d70\u4eff\u771f\uff08MuJoCo\uff09";
         var mkdocs_page_input_path = "mujoco_man/mujoco_manrun.md";
-        var mkdocs_page_url = null;
+        var mkdocs_page_url = "/nn/mujoco_man/mujoco_manrun/";
       </script>
     
     <!--[if lt IE 9]>
@@ -45,6 +45,10 @@
                 </li>
               </ul>
               <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
                 </li>
               </ul>
@@ -64,7 +68,7 @@
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
       <li class="breadcrumb-item active">基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/mujoco_man/mujoco_manrun.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/mujoco_man/mujoco_manrun.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
   </ul>
   <hr/>
@@ -78,7 +82,7 @@
 <p>本项目面向简化人形机器人在 MuJoCo 物理仿真中的稳定站立与基础行走控制需求，采用 <strong>"CPG 步态生成 + 基于 IMU 的姿态稳定（PD/PID）+ 足底接触反馈 + 初始化落地支撑"</strong> 的组合式控制框架，在不依赖深度学习模型的前提下实现可交互的站立/行走演示，并支持键盘与 ROS <code>/cmd_vel</code> 实时控制。</p>
 <p>项目在"关节索引映射、力矩到执行器控制映射、足底接触力计算、初始化落地支撑、跌倒恢复机制、输入兼容性与日志节流"等关键工程点上形成了稳定可运行的基线，最终实现 <strong>"可运行、可复现、可继续向强化学习扩展"</strong> 的最小闭环控制系统。</p>
 <h3 id="12">1.2 项目整体流程</h3>
-<p><img src="assets/mujoco_man.png" alt="项目流程" width="40%"></p>
+<p><img alt="项目流程" src="../assets/mujoco_man.png" /></p>
 <p>该系统形成完整的机器人控制闭环：
 输入 → 状态机 → 步态生成 → 姿态稳定 → actuator控制 → 仿真反馈</p>
 <h3 id="13">1.3 项目组成</h3>

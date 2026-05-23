@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_traffic_sign_recognition/carla_traffic_sign_recognition/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
     <title>基于 YOLOv8 与 Carla 的交通标志实时感知与交互控制系统 - 神经网络</title>
     <link rel="stylesheet" href="../../css/theme.css" />
@@ -15,7 +15,7 @@
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e YOLOv8 \u4e0e Carla \u7684\u4ea4\u901a\u6807\u5fd7\u5b9e\u65f6\u611f\u77e5\u4e0e\u4ea4\u4e92\u63a7\u5236\u7cfb\u7edf";
         var mkdocs_page_input_path = "carla_traffic_sign_recognition/carla_traffic_sign_recognition.md";
-        var mkdocs_page_url = null;
+        var mkdocs_page_url = "/nn/carla_traffic_sign_recognition/carla_traffic_sign_recognition/";
       </script>
     
     <!--[if lt IE 9]>
@@ -45,6 +45,10 @@
                 </li>
               </ul>
               <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
                 </li>
               </ul>
@@ -64,7 +68,7 @@
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
       <li class="breadcrumb-item active">基于 YOLOv8 与 Carla 的交通标志实时感知与交互控制系统</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/carla_traffic_sign_recognition/carla_traffic_sign_recognition.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_traffic_sign_recognition/carla_traffic_sign_recognition.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
   </ul>
   <hr/>
@@ -74,27 +78,45 @@
               
                 <h1 id="yolov8-carla">基于 YOLOv8 与 Carla 的交通标志实时感知与交互控制系统</h1>
 <h2 id="_1">摘要</h2>
-<p>本文档详细阐述了为 <code>OpenHUTB/nn</code> 开源仓库贡献的一项核心功能模块：<strong>基于 YOLOv8 神经网络与 Carla 模拟器的交通标志实时感知与交互控制系统</strong>。本模块填补了该项目在静态交通环境视觉感知领域的空白，构建了一套从虚拟传感器数据采集、深度神经网络推理到“人在回路”（Human-in-the-loop）车辆控制的完整闭环验证流程。项目严格遵循现代开源协作规范，涵盖了从需求分析、系统架构设计、核心算法实现、工程环境排错到学术级文档撰写的全生命周期。通过引入 YOLOv8n 轻量化模型进行实时目标检测，并结合 OpenCV 实现异步可视化与键盘接管逻辑，本系统成功在 Carla 高保真环境中验证了交通标志（以 Stop Sign 为例）识别的毫秒级响应与鲁棒性，为后续 L2 级自动驾驶控制策略的集成奠定了坚实基础。</p>
+<p>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+本文档详尽阐述了为 <code>OpenHUTB/nn</code> 开源仓库贡献的一项核心功能模块：<strong>基于 YOLOv8 神经网络与 Carla 模拟器的交通标志实时感知与交互控制系统</strong>。本模块填补了该项目在静态交通环境视觉感知领域的空白，构建了一套从虚拟传感器数据采集、深度神经网络推理到“人在回路”（Human-in-the-loop）车辆控制的完整闭环验证流程。项目严格遵循现代开源协作规范，涵盖了从需求分析、系统架构设计、核心算法实现、工程环境排错到学术级文档撰写的全生命周期。通过引入 YOLOv8n 轻量化模型进行实时目标检测，并结合 OpenCV 实现异步可视化与键盘接管逻辑，本系统成功在 Carla 高保真环境中验证了交通标志（以 Stop Sign 为例）识别的毫秒级响应与鲁棒性，为今后 L2 级自动驾驶控制策略的集成奠定了坚实基础。
+=======
+本文档详细阐述了为 <code>OpenHUTB/nn</code> 开源仓库贡献的一项核心功能模块：<strong>基于 YOLOv8 神经网络与 Carla 模拟器的交通标志实时感知与交互控制系统</strong>。本模块填补了该项目在静态交通环境视觉感知领域的空白，构建了一套从虚拟传感器数据采集、深度神经网络推理到“人在回路”（Human-in-the-Loop）车辆控制的完整闭环验证流程。项目严格遵循现代开源协作规范，覆盖了从需求分析、系统架构设计、核心算法实现、工程环境排错到学术级文档撰写的全生命周期。通过引入 YOLOv8n 轻量化模型进行实时目标检测，并结合 OpenCV 实现异步可视化与键盘接管逻辑，本系统成功在 Carla 高保真环境中验证了交通标志（以 Stop Sign 为例）识别的毫秒级响应与鲁棒性，为后续 L2 级自动驾驶控制策略的集成奠定了坚实基础。</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>upstream/main</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
 <hr />
 <h2 id="1">1. 项目背景与立项依据</h2>
 <h3 id="11">1.1 课程实践背景</h3>
-<p>本项目源于《基础软件和开源系统》课程的实践要求，旨在通过向开源社区（<code>OpenHUTB/nn</code>）贡献高质量的代码与文档，完整走通 <strong>“Issue 分析 -&gt; 分支管理 -&gt; 功能开发 -&gt; 测试验证 -&gt; 文档撰写 -&gt; Pull Request 提交”</strong> 的标准化软件工程流程。</p>
+<p>本项目源于《基础软件和开源系统》课程实践要求，旨在通过向开源社区（<code>OpenHUTB/nn</code>）贡献高质量的代码与文档，完整走通 <strong>“Issue 分析 -&gt; 分支管理 -&gt; 功能开发 -&gt; 测试验证 -&gt; 文档撰写 -&gt; Pull Request 提交”</strong> 的标准化软件工程全流程。</p>
 <h3 id="12">1.2 技术背景与架构缺口分析</h3>
-<p>在现代自动驾驶系统（ADS，Autonomous Driving System）的感知-规划-控制链条中，<strong>视觉感知模块</strong>是连接物理世界与数字决策的首要接口。<code>OpenHUTB/nn</code> 仓库作为 Carla 模拟器与多种神经网络（NN）结合的教学与科研平台，现有内容多侧重于动态目标检测（如车辆、行人）或车道线跟踪，缺乏针对 <strong>静态交通标志</strong> 的专项感知验证用例。</p>
-<p>交通标志识别（TSR，Traffic Sign Recognition）具有极高的合规性与安全性权重。为此，本模块精准切入这一架构空白，旨在构建一个低延迟、高鲁棒性的端到端视觉感知验证流水线，确保车辆能够在复杂光照与城市背景下准确捕获交通指示信息。</p>
+<p>在现代自动驾驶系统(ADS, Autonomous Driving System)的感知-规划-控制链条中，<strong>视觉感知模块</strong>是连接物理世界与数字决策的关键接口。<code>OpenHUTB/nn</code> 仓库作为 Carla 模拟器与多种神经网络（NN）结合的教学与科研平台，现有内容多侧重于动态目标检测（如车辆、行人）或车道线跟踪，缺乏针对 <strong>静态交通标志</strong> 的专项感知验证用例。</p>
+<p>交通标志识别(TSR, Traffic Sign Recognition)具有极高的合规性与安全性权重。为此，本模块精准切入这一架构空白，旨在构建一个低延迟、高鲁棒性的端到端视觉感知验证流水线，确保车辆能够在复杂光照与城市背景下准确捕获交通指示信息。</p>
 <h3 id="13">1.3 技术选型论证</h3>
 <ul>
-<li><strong>模拟环境</strong>：<strong>Carla 0.9.13+</strong>。作为开源自动驾驶模拟器的事实标准，Carla 提供逼真的物理引擎、天气系统和传感器模型，其 Python API 赋予了研究者极高的可编程自由度。</li>
+<li><strong>模拟环境</strong>：<strong>Carla 0.9.13+</strong>。作为开源自动驾驶模拟器的行业标准之一，Carla 提供逼真的物理引擎、天气系统和传感器模型，其 Python API 赋予了研究者极高的可编程自由度。</li>
 <li><strong>神经网络框架</strong>：<strong>Ultralytics YOLOv8</strong>。YOLOv8 是当前目标检测领域 SOTA（State-of-the-Art）级别的轻量化模型。选用其 Nano 版本（YOLOv8n）可在保证高 mAP（Mean Average Precision）的前提下，将单帧推理延迟压缩至毫秒级，完美契合实时仿真的帧率要求。</li>
-<li><strong>可视化与交互</strong>：<strong>OpenCV</strong>。利用 OpenCV 的高效 I/O 与窗口回调机制，实现传感器数据流的实时渲染与键盘事件的非阻塞捕获，为“人在回路”验证提供直观的操作界面。</li>
+<li><strong>可视化与交互</strong>：<strong>OpenCV</strong>。借助 OpenCV 的高效 I/O 与窗口回调机制，实现传感器数据流的实时渲染与键盘事件的非阻塞捕获，为“人在回路”验证提供直观的操作界面。</li>
 </ul>
 <hr />
 <h2 id="2">2. 系统架构与通信机制</h2>
-<p>本模块严格遵循 Carla 官方推荐的 <strong>Client-Server 异步架构</strong>。图 2.1 展示了系统内部的数据流转闭环。</p>
+<p>本模块严格遵循 Carla 官方推荐的 <strong>Client-Server 异步架构</strong>。下图展示了系统内部的数据流转闭环。</p>
 <p><img alt="数据流转闭环" src="assets/1.png" /></p>
 <p><em>图 2.1：系统核心数据流与模块交互示意图。从物理模拟到神经网络推理再到可视化控制，构成了完整的感知闭环。</em></p>
 <h3 id="21-server-carla">2.1 Server 端：Carla 物理模拟核心</h3>
-<p>Carla 服务端（通常通过 <code>CarlaUE4.exe</code> 运行）承担高负载的物理计算与图形渲染任务。它独立于 Python 进程运行，通过本地 <strong>2000 端口</strong> 对外暴露 RPC（Remote Procedure Call）服务。服务端负责：</p>
+<p>Carla 服务端（通常通过 <code>CarlaUE4.exe</code> 启动）承担高负载的物理计算与图形渲染任务。它独立于 Python 进程运行，通过本地 <strong>2000 端口</strong> 对外暴露 RPC（Remote Procedure Call）服务。服务端负责：</p>
 <ul>
 <li>维护 Ego Vehicle 的刚体动力学解算。</li>
 <li>生成高动态范围（HDR）的天空光照与城市街景。</li>
@@ -112,7 +134,7 @@
 <hr />
 <h2 id="3">3. 核心功能实现细节</h2>
 <h3 id="31">3.1 虚拟传感器挂载与张量维度重塑</h3>
-<p>在 Carla 中，传感器数据的获取不是标准的图像文件，而是经过序列化的一维字节流。代码关键步骤如下：</p>
+<p>在 Carla 中，传感器数据的获取并非标准的图像文件，而是经过序列化的一维字节流。代码关键步骤如下：</p>
 <p>python</p>
 <pre><code># 传感器回调函数片段
 def camera_callback(image):
@@ -133,7 +155,7 @@ def camera_callback(image):
 if frame_count % INFER_EVERY_N_FRAMES == 0:
     results = model(frame, classes=[11], verbose=False)
 </code></pre>
-<p><strong>原理</strong>：Carla 传感器通常以 30-60 FPS 回调。若每帧都送入神经网络，主线程将被计算密集型的 CUDA 内核调用阻塞，导致渲染窗口卡顿（Stuttering）。本系统采用 <strong>每隔 4 帧推理一次</strong> 的策略，既利用了相邻帧间的高时间冗余性（Temporal Redundancy），又释放了 CPU 周期用于处理用户输入与窗口重绘，视觉观感依然流畅。</p>
+<p><strong>原理</strong>：Carla 传感器通常以 30-60 FPS 回调。若每帧都送入神经网络，主线程将被计算密集型的 CUDA 内核调用阻塞，导致渲染窗口卡顿（Stuttering）现象。本系统采用 <strong>每隔 4 帧推理一次</strong> 的策略，既利用了相邻帧间的高时间冗余性（Temporal Redundancy），又释放了 CPU 周期用于处理用户输入与窗口重绘，视觉观感依然流畅。</p>
 <h4 id="322-hard-class-masking">3.2.2 类别硬掩码过滤（Hard Class Masking）</h4>
 <p>在模型推理时显式传入 <code>classes=[11]</code> 参数。此举将模型后处理阶段的搜索空间从 COCO 数据集的 <strong>80 个类别</strong> 压缩为仅关注 <strong>“停止标志（Stop Sign）”</strong> 单一类别。
 <strong>收益</strong>：</p>
@@ -156,42 +178,26 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 <li><strong>档位切换防抖</strong>：代码中监测了 <code>current_speed &lt; 0.2 m/s</code> 才允许切换 <code>reverse</code> 标志位。这防止了高速行驶时误触 <code>S</code> 键导致变速箱逻辑混乱（现实中会损坏变速箱），体现了对汽车工程细节的考量。</li>
 </ul>
 <hr />
-<h2 id="4">4. 工程实践与开源协作过程</h2>
-<p>本项目的实施过程严格遵循了企业级 Git Flow 工作流。以下记录了从环境搭建到成功推送的完整技术日志，这是《基础软件和开源系统》课程要求的核心实践环节。</p>
-<h3 id="41">4.1 分支管理与代码托管策略</h3>
-<table>
-<thead>
-<tr>
-<th style="text-align: left;">步骤</th>
-<th style="text-align: left;">操作指令</th>
-<th style="text-align: left;">目的与说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: left;"><strong>克隆与分支</strong></td>
-<td style="text-align: left;"><code>git checkout -b dev-yss</code></td>
-<td style="text-align: left;">从 <code>main</code> 拉出新分支，遵循 <strong>GitHub Flow</strong> 规范，确保主分支的稳定性不受开发中的代码影响。</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>代码开发</strong></td>
-<td style="text-align: left;">编写 <code>main.py</code> 与 <code>README.md</code></td>
-<td style="text-align: left;">在本地分支进行迭代开发与测试。</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>暂存与提交</strong></td>
-<td style="text-align: left;"><code>git add .</code> <code>git commit -m "feat: Add Carla TSR module"</code></td>
-<td style="text-align: left;">遵循 <strong>Conventional Commits</strong> 规范编写提交信息，便于后续生成变更日志（Changelog）。</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>首次推送</strong></td>
-<td style="text-align: left;"><code>git push --set-upstream origin dev-yss</code></td>
-<td style="text-align: left;">将本地功能分支推送到远程仓库，准备发起 Pull Request。</td>
-</tr>
-</tbody>
-</table>
-<h3 id="42">4.2 棘手环境问题排查与修复记录</h3>
-<p>在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有极高的教学参考价值。</p>
+<h2 id="4">4. 棘手环境问题排查与修复记录</h2>
+<p>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有极高的教学参考价值。
+=======
+在实际部署过程中，遇到了 Windows 系统与 Git 底层交互的特定报错，以下是详细排雷过程，具有较高的教学参考价值。</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>upstream/main</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
 <p><strong>故障 1：幽灵文件 <code>nul</code> 索引错误</strong></p>
 <ul>
 <li><strong>现象</strong>：执行 <code>git add</code> 时终端报错 <code>error: open("nul"): Permission denied</code> 或 <code>unable to index file 'nul'</code>。</li>
@@ -204,7 +210,7 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 <p><strong>故障 2：GitHub 连接重置（Connection Reset）</strong></p>
 <ul>
 <li><strong>现象</strong>：<code>git push</code> 长时间阻塞后报错 <code>fatal: unable to access ... Recv failure: Connection was reset</code>。</li>
-<li><strong>根因分析</strong>：国内网络环境访问境外 Amazon AWS 服务器（GitHub 托管地）存在间歇性丢包或 DNS 污染。</li>
+<li><strong>根因分析</strong>：国内网络环境访问境外 Amazon Web Services 服务器（GitHub 托管地）存在间歇性丢包或 DNS 污染。</li>
 <li><strong>解决方案</strong>：</li>
 <li>配置 Git 全局代理（HTTP/HTTPS Proxy）指向本地科学上网端口（如 7890）。</li>
 <li>修改 <code>~/.ssh/config</code> 使用 SSH over HTTPS 的 443 端口进行隧道穿透。</li>
@@ -218,7 +224,7 @@ control.steer   += np.clip(target_steer - control.steer, -steer_step, steer_step
 <hr />
 <h2 id="5">5. 运行环境配置与部署指南</h2>
 <h3 id="51">5.1 环境依赖清单</h3>
-<p>为了复现本实验，请确保开发环境满足以下最低配置：</p>
+<p>为了复现本实验，请确保开发环境满足以下最低配置要求：</p>
 <table>
 <thead>
 <tr>
@@ -276,7 +282,7 @@ python src/carla_traffic_sign_recognition/main.py
 <hr />
 <h2 id="6">6. 运行效果与性能评估</h2>
 <h3 id="61">6.1 功能验证截图</h3>
-<p>当脚本运行后，OpenCV 窗口将弹出第一人称驾驶视角。驾驶车辆接近十字路口的停止标志时，系统表现如下：</p>
+<p>脚本运行后，OpenCV 窗口将弹出第一人称驾驶视角。驾驶车辆接近十字路口的停止标志时，系统表现如下：</p>
 <ul>
 <li><strong>远距离感知</strong>：当 Stop Sign 占据画面像素面积约 <strong>20x20</strong> 时，YOLOv8 即开始响应并绘制淡黄色锚框。</li>
 <li><strong>近距离锁定</strong>：随着距离拉近，置信度迅速攀升至 <strong>0.85 - 0.95</strong> 区间，检测框稳定无抖动。</li>
@@ -286,19 +292,35 @@ python src/carla_traffic_sign_recognition/main.py
 <p><em>图 6.1：展示操作说明。</em></p>
 <p><img alt="Carla 模拟器实车第一视角" src="assets/2026-04-18_222914.png" /></p>
 <p><em>图 6.2：Carla 模拟器实车第一视角。左侧画面叠加了 YOLOv8 推理结果，展示了 Stop Sign 的精准识别。</em></p>
-<h3 id="62">6.2 性能基准测试</h3>
-<p>在搭载 NVIDIA RTX 3060 Laptop GPU 的测试平台上，针对 <code>640x360</code> 分辨率输入：</p>
+<h3 id="62">6.2 性能基准与对比测试</h3>
+<p><strong>测试平台</strong>：NVIDIA RTX 3060 Laptop GPU (6GB VRAM), Intel i7</p>
+<p><strong>输入规格</strong>：640x360 连续 RGB 图像流</p>
+<h4 id="1_1">1. 耗时拆解与吞吐量</h4>
 <ul>
-<li><strong>预处理耗时</strong>：&lt; 1ms (NumPy 内存视图操作)</li>
-<li><strong>YOLOv8n 推理耗时</strong>：~8-12ms (开启 FP16 半精度)</li>
-<li><strong>NMS 后处理耗时</strong>：~2ms</li>
-<li><strong>整体感知延迟</strong>：<strong>&lt; 25ms</strong>，完全满足 L2 级辅助驾驶的实时性要求（通常要求 &lt; 100ms）。</li>
+<li><strong>端到端延迟</strong>：稳定在 <strong>15~25 ms</strong>，明显优于 L2 级辅助驾驶感知规范（&lt;100 ms）。</li>
+<li><strong>预处理</strong>：&lt; 1 ms（基于 NumPy 内存视图实现零拷贝 Alpha 通道剥离）。</li>
+<li><strong>模型推理</strong>：8~12 ms（开启 CUDA 硬件加速与 FP16 半精度计算）。</li>
+<li><strong>后处理</strong>：~ 2 ms（基于单类别硬掩码极大缩减了 NMS 算法的交并比计算量）。</li>
+<li><strong>吞吐量</strong>：在 Carla 引擎同步运行的高负载工况下，实测帧率达 <strong>35~45 FPS</strong>。完美适配主流 30Hz 车载传感器，实现零积压、无拖影感知。</li>
 </ul>
+<h4 id="2_1">2. 方案对比与消融实验</h4>
+<ul>
+<li><strong>算力平台对比 (GPU FP16 vs. CPU FP32)</strong></li>
+</ul>
+<p>若降级为 CPU 推理，延迟高达 80~120 ms。以车辆 60 km/h 行驶为例，本 GPU 加速方案将系统的“感知盲区”由 1.66 米大幅压缩至极其安全的 <strong>0.4 米</strong>以内。</p>
+<ul>
+<li><strong>输入分辨率权衡 (640x360 vs. 1080p)</strong></li>
+</ul>
+<p>若采用 1080p 分辨率，像素量激增 9 倍，端到端延迟攀升至 &gt;45 ms。本方案的 <code>640x360</code> 配合宽 FOV，实现了远距检出率与高实时性的最优平衡。</p>
+<ul>
+<li><strong>模型轻量化验证 (YOLOv8n vs. YOLOv8s)</strong></li>
+</ul>
+<p>较之 s 版本，Nano 版参数量骤减 71%（3.2M vs 11.2M）。在单一目标（Stop Sign）检测任务下，本方案以可忽略的精度折损，换取了近 <strong>40% 的推理速度提升</strong>，显著优化了边缘端资源利用率。</p>
 <hr />
 <h2 id="7">7. 局限性与未来进阶规划</h2>
-<p>当前版本（v1.0）已完美验证了静态感知闭环的可行性，具备了作为优秀开源基础模块的所有要素。面向未来更复杂的工业级应用，规划了以下三个演进方向：</p>
+<p>当前版本（v1.0）已充分验证了静态感知闭环的可行性，具备了作为优秀开源基础模块的各项要素。面向未来更复杂的工业级应用，规划了以下三个演进方向：</p>
 <h3 id="71-domain-adaptation">7.1 数据域迁移与微调（Domain Adaptation）</h3>
-<p><strong>现状</strong>：目前依赖 YOLOv8 在 COCO 数据集上的预训练权重，仅能识别 <code>Stop Sign</code> 类别，且对 <strong>中国国标交通标志</strong>（如注意行人、限速标志）不具备识别能力。
+<p><strong>现状</strong>：目前依赖 YOLOv8 在 COCO 数据集上的预训练权重，仅能识别 <code>Stop Sign</code> 单一类别，且对 <strong>中国国标交通标志</strong>（如注意行人、限速标志等）不具备识别能力。
 <strong>规划</strong>：引入 <strong>TT100K (Tsinghua-Tencent 100K)</strong> 或 <strong>CCTSDB</strong> 数据集，冻结 YOLOv8 骨干网络（Backbone），仅对检测头（Head）进行微调（Fine-tuning）。这将使模型能够精准覆盖国内道路常见的 <strong>禁令标志、警告标志、指示标志</strong> 三大类，实现本土化适配。</p>
 <h3 id="72-perception-control-integration">7.2 感知与控制的深度融合（Perception-Control Integration）</h3>
 <p><strong>现状</strong>：采用“人在回路”键盘控制，识别结果仅用于可视化，未介入车辆运动学控制。

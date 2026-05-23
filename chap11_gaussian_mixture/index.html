@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/chap11_gaussian_mixture/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
     <title>基于 EM 算法的高斯混合模型（GMM）实现与模型选择优化 - 神经网络</title>
     <link rel="stylesheet" href="../css/theme.css" />
@@ -15,7 +15,7 @@
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e EM \u7b97\u6cd5\u7684\u9ad8\u65af\u6df7\u5408\u6a21\u578b\uff08GMM\uff09\u5b9e\u73b0\u4e0e\u6a21\u578b\u9009\u62e9\u4f18\u5316";
         var mkdocs_page_input_path = "chap11_gaussian_mixture/README.md";
-        var mkdocs_page_url = null;
+        var mkdocs_page_url = "/nn/chap11_gaussian_mixture/";
       </script>
     
     <!--[if lt IE 9]>
@@ -45,6 +45,10 @@
                 </li>
               </ul>
               <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
                 </li>
               </ul>
@@ -64,7 +68,7 @@
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
       <li class="breadcrumb-item active">基于 EM 算法的高斯混合模型（GMM）实现与模型选择优化</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/chap11_gaussian_mixture/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/chap11_gaussian_mixture/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
   </ul>
   <hr/>
@@ -95,12 +99,15 @@
 <p>支持四种协方差类型（<code>full</code>、<code>tied</code>、<code>diagonal</code>、<code>spherical</code>），满足不同数据分布特性的建模需求，特别适合高维数据和样本量有限的场景。</p>
 <p><strong>异常检测功能</strong></p>
 <p>基于密度估计实现异常检测，可识别远离聚类中心的离群点，拓展了 GMM 的应用场景。</p>
+<p><strong>数值稳定性增强</strong></p>
+<p>通过引入安全对数计算、安全除法和数值裁剪机制，避免 EM 算法迭代过程中可能出现的数值问题（除零、log(0)、NaN 传播等），确保模型在各种数据分布下都能稳定收敛。</p>
 <h3 id="13">1.3 应用场景</h3>
 <ul>
 <li><strong>数据聚类</strong>：无监督场景下自动发现数据簇结构</li>
 <li><strong>密度估计</strong>：拟合数据的概率密度分布</li>
 <li><strong>异常检测</strong>：识别低密度区域的离群点</li>
-<li><strong>模型选择</strong>：自动确定最佳聚类数量</li>
+<li><strong>信号处理</strong>：语音识别中的声学建模、医学信号分析等</li>
+<li><strong>数据预处理</strong>：处理多模态数据、识别数据中的子群体</li>
 </ul>
 <hr />
 <h2 id="2">2. 核心技术栈与理论基础</h2>
@@ -151,13 +158,26 @@
 <hr />
 <h2 id="3">3. 优化整体思路</h2>
 <h3 id="31">3.1 优化总体原则</h3>
-<ul>
-<li>保持算法的数值稳定性，使用 <code>logsumexp</code> 避免数值溢出</li>
-<li>提供多种初始化策略，支持 k-means++ 智能初始化</li>
-<li>实现 AIC/BIC 自动模型选择，提升实用性</li>
-<li>生成丰富的可视化结果，便于分析和展示</li>
-<li><strong>向量化计算优化，减少 Python 循环，提升大规模数据处理效率</strong></li>
-</ul>
+<p><strong>数值稳定性优先</strong>
+- 使用 <code>logsumexp</code> 技巧避免指数运算溢出
+- 协方差矩阵添加正则化项防止奇异
+- 使用 <code>slogdet</code> 替代直接行列式计算
+- 安全对数计算：<code>_safe_log(x) = log(max(x, eps))</code>，避免 log(0)
+- 安全除法：<code>_safe_divide(a, b) = a / max(b, eps)</code>，避免除零
+- 关键变量数值裁剪：对 <code>gamma</code>（后验概率）和 <code>Nk</code>（有效样本数）进行边界裁剪</p>
+<p><strong>向量化计算优化</strong>
+- 使用 NumPy 广播机制和 <code>einsum</code> 操作替代 Python 循环
+- E 步、M 步全流程向量化，提升大规模数据处理效率</p>
+<p><strong>多层次并行加速</strong>
+- 利用 <code>ThreadPoolExecutor</code> 实现多高斯成分并行计算
+- 支持多核 CPU 配置，可获得近线性加速比</p>
+<p><strong>功能灵活性扩展</strong>
+- 支持四种协方差类型（full/tied/diagonal/spherical）
+- 提供多种初始化策略（random + k-means++）
+- 实现 AIC/BIC 自动模型选择</p>
+<p><strong>工程化完整性</strong>
+- 异常检测功能拓展应用场景
+- 完整的命令行接口，便于集成和部署</p>
 <h3 id="32">3.2 功能特性对比</h3>
 <table>
 <thead>
@@ -243,6 +263,11 @@
 <td>❌</td>
 <td>✅</td>
 </tr>
+<tr>
+<td>数值稳定性增强</td>
+<td>❌</td>
+<td>✅（安全对数/除法+数值裁剪）</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -255,7 +280,32 @@
     sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)
     return max_val + np.log(sum_exp)
 </code></pre>
-<h3 id="42-k-means">4.2 k-means++ 初始化</h3>
+<h3 id="42">4.2 安全数学运算（数值稳定性核心）</h3>
+<p>为避免 EM 算法迭代过程中的数值问题，实现了安全对数计算和安全除法：</p>
+<pre><code class="language-python">def _safe_log(self, x):
+    &quot;&quot;&quot;安全对数计算，避免 log(0)&quot;&quot;&quot;
+    return np.log(np.maximum(x, self.eps))
+
+def _safe_divide(self, numerator, denominator):
+    &quot;&quot;&quot;安全除法，避免除零&quot;&quot;&quot;
+    return numerator / np.maximum(denominator, self.eps)
+</code></pre>
+<p><strong>数值裁剪应用</strong>：在 EM 算法的关键步骤中进行数值裁剪，确保数值稳定性：</p>
+<pre><code class="language-python"># E步：裁剪gamma值，避免极端值影响计算
+gamma = np.exp(log_prob - log_prob_sum)
+gamma = np.clip(gamma, self.eps, 1 - self.eps)
+
+# M步：裁剪Nk值，避免除零
+Nk = np.sum(gamma, axis=0)
+Nk = np.maximum(Nk, self.eps)
+
+# 使用安全除法计算新均值
+new_mu = self._safe_divide(np.sum(gamma_X, axis=0), Nk[:, np.newaxis])
+
+# 使用安全对数计算混合权重的对数
+log_pi = self._safe_log(self.pi)
+</code></pre>
+<h3 id="43-k-means">4.3 k-means++ 初始化</h3>
 <p>k-means++ 以平方距离为权重进行概率采样，使初始中心点尽量分散：</p>
 <pre><code class="language-python">def _kmeans_plus_plus_init(self, X):
     # 随机选取第一个中心
@@ -273,7 +323,7 @@
         next_idx = self.rng.choice(n_samples, p=probs)
         centers.append(X[next_idx].copy())
 </code></pre>
-<h3 id="43-aicbic">4.3 AIC/BIC 模型选择</h3>
+<h3 id="44-aicbic">4.4 AIC/BIC 模型选择</h3>
 <pre><code class="language-python">def _compute_aic_bic(self, X):
     n_samples, n_features = X.shape
     params_per_component = n_features + n_features * (n_features + 1) // 2
@@ -283,7 +333,7 @@
     self.aic_ = 2 * total_params - 2 * log_likelihood
     self.bic_ = total_params * np.log(n_samples) - 2 * log_likelihood
 </code></pre>
-<h3 id="44-em">4.4 向量化 EM 算法</h3>
+<h3 id="45-em">4.5 向量化 EM 算法</h3>
 <p>通过批量矩阵运算替代 Python 循环，显著提升计算效率：</p>
 <p><strong>E 步向量化</strong>：批量计算所有高斯成分的对数概率密度</p>
 <pre><code class="language-python">def _log_gaussian_batch(self, X, mu, sigma):
@@ -319,7 +369,7 @@
 - 消除 EM 主循环中的 Python for 循环
 - 利用 NumPy 广播机制进行批量矩阵运算
 - 提升大规模数据（10000+ 样本）的处理速度</p>
-<h3 id="45">4.5 多线程并行加速</h3>
+<h3 id="46">4.6 多线程并行加速</h3>
 <p>通过 <code>concurrent.futures.ThreadPoolExecutor</code> 实现多线程并行计算，进一步提升大规模数据的处理效率：</p>
 <pre><code class="language-python">def _log_gaussian_parallel(self, X, mu, sigma):
     n_samples, n_features = X.shape
@@ -348,7 +398,7 @@
 - 当成分数量较多（如 k &gt; 8）时，并行优势明显
 - 在多核 CPU 上可获得近线性加速比
 - 特别适合大规模数据和多成分场景</p>
-<h3 id="46">4.6 协方差类型扩展</h3>
+<h3 id="47">4.7 协方差类型扩展</h3>
 <p>支持四种协方差类型，适用于不同的数据分布特性：</p>
 <table>
 <thead>
@@ -390,7 +440,7 @@
 - 数据维度高、样本量有限 → <code>diagonal</code> 或 <code>spherical</code>（减少过拟合）
 - 各类别分布相似 → <code>tied</code>（共享协方差）
 - 需要捕捉复杂相关性 → <code>full</code>（完整协方差）</p>
-<h3 id="47">4.7 异常检测扩展</h3>
+<h3 id="48">4.8 异常检测扩展</h3>
 <p>基于密度估计的异常检测功能，可识别远离聚类中心的离群点：</p>
 <p><strong>核心方法</strong>：</p>
 <table>
@@ -558,31 +608,23 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 <tbody>
 <tr>
 <td><code>comparison_benchmark.png</code></td>
-<td>初始化方法对比图（箱线图+直方图）</td>
+<td>初始化方法对比图（箱线图+直方图） <img alt="comparison_benchmark" src="img/comparison_benchmark.png" /></td>
 </tr>
 <tr>
 <td><code>cluster_comparison.png</code></td>
-<td>聚类结果散点图对比</td>
+<td>聚类结果散点图对比 <img alt="cluster_comparison" src="img/cluster_comparison.png" /></td>
 </tr>
 <tr>
 <td><code>convergence_comparison.png</code></td>
-<td>EM 收敛曲线对比</td>
+<td>EM 收敛曲线对比 <img alt="convergence_comparison" src="img/convergence_comparison.png" /></td>
 </tr>
 <tr>
 <td><code>bic_model_selection.png</code></td>
-<td>BIC/AIC 模型选择曲线</td>
+<td>BIC/AIC 模型选择曲线 <img alt="bic_model_selection" src="img/bic_model_selection.png" /></td>
 </tr>
 <tr>
 <td><code>anomaly_detection.png</code></td>
-<td>异常检测结果可视化</td>
-</tr>
-<tr>
-<td><code>iteration_log.csv</code></td>
-<td>迭代对数似然日志</td>
-</tr>
-<tr>
-<td><code>bic_aic_log.csv</code></td>
-<td>BIC/AIC 模型选择日志</td>
+<td>异常检测结果可视化 <img alt="anomaly_detection" src="img/anomaly_detection.png" /></td>
 </tr>
 </tbody>
 </table>
@@ -612,7 +654,6 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 <li><strong>在线学习</strong>：支持增量学习，动态更新模型参数</li>
 <li><strong>变分贝叶斯高斯混合模型</strong>：实现基于变分推断的贝叶斯高斯混合模型</li>
 <li><strong>并行加速</strong>：使用多线程或 GPU 加速大规模数据训练</li>
-<li><strong>可视化工具</strong>：添加交互式聚类结果可视化</li>
 </ul>
 <hr />
               

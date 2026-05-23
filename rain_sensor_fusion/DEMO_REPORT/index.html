@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/rain_sensor_fusion/DEMO_REPORT/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u57fa\u4e8e\u6df1\u5ea6\u5b66\u4e60\u7f6e\u4fe1\u5ea6\u52a0\u6743\u7684\u81ea\u52a8\u9a7e\u9a76\u96e8\u5929\u591a\u4f20\u611f\u5668\u878d\u5408\u611f\u77e5\u4f18\u5316";
+        var mkdocs_page_input_path = "rain_sensor_fusion/DEMO_REPORT.md";
+        var mkdocs_page_url = "/nn/rain_sensor_fusion/DEMO_REPORT/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/rain_sensor_fusion/DEMO_REPORT.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="_1">基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化</h1>
+<h2 id="1">1. 汇报摘要</h2>
+<p>本项目面向自动驾驶车辆在雨天、雾天和湿滑路面下的感知可靠性下降问题，设计并实现了一个轻量级深度学习多传感器融合系统。系统融合 RGB 相机、LiDAR 和毫米波雷达三类传感器特征，并结合雨量、雾气和路面湿滑程度，动态调整不同传感器的置信权重，输出目标置信度、粗 3D 检测框、风险评分和驾驶动作建议。</p>
+<p>本次演示重点展示三点：</p>
+<ol>
+<li>雨天环境下，相机可靠性下降，系统会自动提升雷达和 LiDAR 权重。</li>
+<li>近距离、高闭合速度目标会使风险评分显著升高。</li>
+<li>可视化结果能够直观展示模型决策过程，便于解释和汇报。</li>
+</ol>
+<h2 id="2">2. 研究背景</h2>
+<p>自动驾驶感知系统在晴天环境下通常依赖相机进行车道线、目标外观和交通标志识别。但在雨天场景中，图像会受到雨滴、雾气、积水反光和低对比度影响，导致视觉特征退化。LiDAR 在强雨中也会出现点云稀疏、飞溅噪声和反射异常。毫米波雷达虽然空间分辨率较低，但在雨雾环境中具有更好的穿透性和速度感知能力。</p>
+<p>因此，本课题的核心问题是：<strong>如何让自动驾驶感知系统根据天气和传感器质量，动态决定更相信哪个传感器？</strong></p>
+<h2 id="3">3. 项目目标</h2>
+<p>本项目在原 <code>rain_sensor_fusion</code> 目录基础上新增完整代码和实验结果，实现以下目标：</p>
+<ul>
+<li>构建可运行的雨天多传感器融合深度学习模型；</li>
+<li>模拟晴天、小雨、大雨、雨雾四类典型驾驶场景；</li>
+<li>输出相机、LiDAR、雷达三类传感器的动态融合权重；</li>
+<li>输出目标检测置信度、风险评分和动作建议；</li>
+<li>生成可用于汇报展示的可视化图表。</li>
+</ul>
+<h2 id="4">4. 技术路线</h2>
+<p>系统整体流程如下：</p>
+<pre><code class="language-text">雨天场景参数
+  ├── rain intensity
+  ├── fog density
+  └── wet road level
+        ↓
+合成多传感器特征
+  ├── Camera features
+  ├── LiDAR features
+  └── Radar features
+        ↓
+多模态 MLP 编码器
+        ↓
+雨天质量先验 + 神经网络注意力门控
+        ↓
+深度融合特征
+        ↓
+风险检测头
+  ├── object confidence
+  ├── risk score
+  ├── 3D box
+  └── recommended action
+</code></pre>
+<h3 id="41">4.1 输入特征</h3>
+<p>相机特征包括可见度、对比度、清晰度、车道可见性和目标外观强度。</p>
+<p>LiDAR 特征包括点云密度、聚类置信度、距离一致性和雨水飞溅噪声。</p>
+<p>毫米波雷达特征包括目标接近程度、闭合速度、多普勒置信度和障碍物存在概率。</p>
+<p>天气特征包括雨量、雾气和湿滑路面程度。</p>
+<h3 id="42">4.2 深度学习模型</h3>
+<p>模型使用 PyTorch 实现，主要由三部分组成：</p>
+<ul>
+<li><strong>多模态编码器</strong>：分别对 camera、LiDAR、radar 特征进行 MLP 编码；</li>
+<li><strong>融合权重模块</strong>：结合神经网络学习权重和雨天质量先验，得到三类传感器权重；</li>
+<li><strong>风险输出头</strong>：根据融合特征输出目标置信度、风险评分、雨天严重度等信息。</li>
+</ul>
+<p>核心文件：</p>
+<ul>
+<li><code>fusion/deep_fusion.py</code>：深度融合网络和推理引擎；</li>
+<li><code>sensor/synthetic.py</code>：雨天传感器退化模拟和合成样本生成；</li>
+<li><code>detection/risk.py</code>：风险评分、动作建议和粗 3D 框估计；</li>
+<li><code>visualization/plots.py</code>：可视化结果生成。</li>
+</ul>
+<h2 id="5">5. 运行方式</h2>
+<p>基础推理：</p>
+<pre><code class="language-bash">python -m src.rain_sensor_fusion.main --scenario heavy_rain
+</code></pre>
+<p>生成完整可视化结果：</p>
+<pre><code class="language-bash">python -m src.rain_sensor_fusion.main --scenario heavy_rain --visualize --compare --output-dir src/rain_sensor_fusion/visualization_results
+</code></pre>
+<p>本次汇报使用的结果已保存到：</p>
+<pre><code class="language-text">docs/rain_sensor_fusion/image/
+</code></pre>
+<h2 id="6">6. 运行结果</h2>
+<h3 id="61">6.1 场景结果表</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th style="text-align: right;">雨量</th>
+<th style="text-align: right;">雾气</th>
+<th style="text-align: right;">湿滑路面</th>
+<th style="text-align: right;">Camera 权重</th>
+<th style="text-align: right;">LiDAR 权重</th>
+<th style="text-align: right;">Radar 权重</th>
+<th style="text-align: right;">目标置信度</th>
+<th style="text-align: right;">风险分数</th>
+<th>动作建议</th>
+<th style="text-align: right;">目标距离</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>clear</td>
+<td style="text-align: right;">0.0%</td>
+<td style="text-align: right;">0.0%</td>
+<td style="text-align: right;">0.0%</td>
+<td style="text-align: right;">38.9%</td>
+<td style="text-align: right;">37.1%</td>
+<td style="text-align: right;">24.0%</td>
+<td style="text-align: right;">57.2%</td>
+<td style="text-align: right;">27.3%</td>
+<td>monitor</td>
+<td style="text-align: right;">42.0 m</td>
+</tr>
+<tr>
+<td>light_rain</td>
+<td style="text-align: right;">28.0%</td>
+<td style="text-align: right;">12.0%</td>
+<td style="text-align: right;">45.0%</td>
+<td style="text-align: right;">31.2%</td>
+<td style="text-align: right;">37.2%</td>
+<td style="text-align: right;">31.6%</td>
+<td style="text-align: right;">62.4%</td>
+<td style="text-align: right;">40.6%</td>
+<td>monitor</td>
+<td style="text-align: right;">31.0 m</td>
+</tr>
+<tr>
+<td>heavy_rain</td>
+<td style="text-align: right;">82.0%</td>
+<td style="text-align: right;">42.0%</td>
+<td style="text-align: right;">90.0%</td>
+<td style="text-align: right;">16.2%</td>
+<td style="text-align: right;">32.7%</td>
+<td style="text-align: right;">51.1%</td>
+<td style="text-align: right;">70.1%</td>
+<td style="text-align: right;">66.3%</td>
+<td>slow_down</td>
+<td style="text-align: right;">17.0 m</td>
+</tr>
+<tr>
+<td>foggy_storm</td>
+<td style="text-align: right;">68.0%</td>
+<td style="text-align: right;">78.0%</td>
+<td style="text-align: right;">85.0%</td>
+<td style="text-align: right;">14.8%</td>
+<td style="text-align: right;">34.9%</td>
+<td style="text-align: right;">50.3%</td>
+<td style="text-align: right;">66.8%</td>
+<td style="text-align: right;">57.9%</td>
+<td>slow_down</td>
+<td style="text-align: right;">22.0 m</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62">6.2 结果解读</h3>
+<p>从表格可以看到，晴天场景中相机和 LiDAR 权重较高，Radar 权重为 24.0%。当雨量增强到 82.0% 时，Camera 权重下降到 16.2%，Radar 权重上升到 51.1%。这说明模型能够根据雨天视觉退化情况，自动把感知信任度转移到更稳定的毫米波雷达。</p>
+<p>风险评分也随场景恶化明显升高。晴天场景风险为 27.3%，系统建议 <code>monitor</code>；大雨场景风险升高到 66.3%，系统建议 <code>slow_down</code>。这与自动驾驶安全策略一致：在目标更近、雨量更大、闭合速度更高时，应降低速度并提高制动准备。</p>
+<h2 id="7">7. 可视化展示</h2>
+<h3 id="71">7.1 大雨场景仪表盘</h3>
+<p><img alt="heavy_rain_dashboard" src="../image/heavy_rain_dashboard.png" /></p>
+<p>该图展示了大雨场景下的完整决策过程：</p>
+<ul>
+<li>左上：深度融合权重，Radar 权重最高；</li>
+<li>右上：天气强度、网络风险、物理风险和最终风险；</li>
+<li>左下：不同传感器的归一化特征热力图；</li>
+<li>右下：目标 3D 检测框俯视示意，显示前方障碍物位置和风险。</li>
+</ul>
+<h3 id="72">7.2 晴天场景对照</h3>
+<p><img alt="clear_dashboard" src="../image/clear_dashboard.png" /></p>
+<p>晴天场景中，相机可见度和 LiDAR 点云质量更稳定，因此 Camera 与 LiDAR 权重更高，风险评分较低，系统只需要保持监控。</p>
+<h3 id="73">7.3 小雨场景对照</h3>
+<p><img alt="light_rain_dashboard" src="../image/light_rain_dashboard.png" /></p>
+<p>小雨场景下，相机权重开始下降，Radar 权重上升，但风险分数仍低于减速阈值，因此动作建议仍为 <code>monitor</code>。</p>
+<h3 id="74">7.4 雨雾混合场景</h3>
+<p><img alt="foggy_storm_dashboard" src="../image/foggy_storm_dashboard.png" /></p>
+<p>雨雾混合场景中，雾气进一步降低视觉可靠性，系统继续提高 Radar 权重，并给出 <code>slow_down</code> 建议。</p>
+<h3 id="75">7.5 多场景对比图</h3>
+<p><img alt="scenario_comparison" src="../image/scenario_comparison.png" /></p>
+<p>该图用于横向比较四类天气场景。可以观察到：</p>
+<ul>
+<li>雨量上升时，Camera 权重整体下降；</li>
+<li>Radar 权重在恶劣天气中明显上升；</li>
+<li>风险分数随雨量、雾气和目标距离变化而升高；</li>
+<li>大雨和雨雾场景均触发减速建议。</li>
+</ul>
+<h3 id="76">7.6 雨强扫描曲线</h3>
+<p><img alt="rain_intensity_sweep" src="../image/rain_intensity_sweep.png" /></p>
+<p>该图模拟雨强从 0 到 1 逐渐增强时的模型响应。随着雨强上升，Camera 权重持续降低，Radar 权重逐步升高；风险曲线也随雨强和目标接近程度逐渐升高。图中的阈值线可以用于解释动作策略：风险超过减速阈值后，系统进入更保守的驾驶模式。</p>
+<h2 id="8">8. 创新点</h2>
+<ol>
+<li><strong>从固定融合改为动态融合</strong>：传统方法常用固定权重融合传感器，本项目使用深度学习和天气先验动态调整权重。</li>
+<li><strong>结合可解释风险评分</strong>：不仅输出神经网络结果，还结合距离、闭合速度和天气强度计算物理风险，使结果更容易解释。</li>
+<li><strong>可脱离 CARLA 运行演示</strong>：通过合成传感器退化数据快速完成训练、推理和可视化，便于课堂展示和实验复现。</li>
+<li><strong>结果可视化完整</strong>：提供仪表盘、对比图、雨强扫描曲线和 CSV 数据，便于写实验报告。</li>
+</ol>
+<h2 id="9">9. 不足与后续改进</h2>
+<p>当前版本使用合成特征模拟雨天传感器退化，适合课程演示和算法验证，但还不是完整真实驾驶数据实验。后续可以继续改进：</p>
+<ul>
+<li>接入 CARLA 同步采集的 RGB、LiDAR 和 Radar 数据；</li>
+<li>使用真实 3D 检测数据集训练融合网络；</li>
+<li>加入多目标跟踪和时序预测；</li>
+<li>将风险结果接入路径规划和车辆控制模块；</li>
+<li>增加 Precision、Recall、mAP、碰撞率等定量评价指标。</li>
+</ul>
+<h2 id="10">10. 汇报结论</h2>
+<p>本项目完成了一个面向雨天自动驾驶场景的深度学习多传感器融合系统。实验结果表明，在雨量和雾气增强时，系统能够自动降低相机权重，提高雷达和 LiDAR 的融合权重；在目标距离变近、闭合速度升高时，风险评分随之升高，并给出更保守的驾驶动作建议。</p>
+<p>因此，该方法能够提升自动驾驶感知系统在恶劣天气下的鲁棒性，并且通过可视化结果清楚展示了模型的融合逻辑和安全决策依据。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/unmanned_vehicle_safety_and_operation/DRIVEHEALTH_DEMO_REPORT/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>DriveHealth：面向无人车运行安全的多源异常诊断与自健康黑匣子系统 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "DriveHealth\uff1a\u9762\u5411\u65e0\u4eba\u8f66\u8fd0\u884c\u5b89\u5168\u7684\u591a\u6e90\u5f02\u5e38\u8bca\u65ad\u4e0e\u81ea\u5065\u5eb7\u9ed1\u5323\u5b50\u7cfb\u7edf";
+        var mkdocs_page_input_path = "unmanned_vehicle_safety_and_operation/DRIVEHEALTH_DEMO_REPORT.md";
+        var mkdocs_page_url = "/nn/unmanned_vehicle_safety_and_operation/DRIVEHEALTH_DEMO_REPORT/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">DriveHealth：面向无人车运行安全的多源异常诊断与自健康黑匣子系统</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/unmanned_vehicle_safety_and_operation/DRIVEHEALTH_DEMO_REPORT.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="drivehealth">DriveHealth：面向无人车运行安全的多源异常诊断与自健康黑匣子系统</h1>
+<h2 id="1">1. 项目摘要</h2>
+<p>DriveHealth 是一个不依赖 CARLA、AirSim、MuJoCo 或 Gazebo 的无人车运行安全监测系统。项目面向无人车运行过程中可能出现的内部故障和安全退化问题，融合温度、烟雾、速度、制动安全裕度、人机接管状态和运行效率等多源数据，输出车辆健康分数、子系统风险、黑匣子事件记录和可视化复盘报告。</p>
+<p>本项目的核心目标不是在三维模拟器中测试车辆如何开车，而是回答一个更偏运行安全的问题：</p>
+<p><strong>当无人车已经在运行时，系统如何及时发现自身状态异常，并留下可复盘的黑匣子证据？</strong></p>
+<h2 id="2">2. 项目特点</h2>
+<ul>
+<li><strong>无需模拟器</strong>：不需要启动 CARLA、AirSim、MuJoCo 或 Gazebo。</li>
+<li><strong>多源健康诊断</strong>：同时分析热管理、烟雾、电控/速度、制动、人机接管和效率风险。</li>
+<li><strong>黑匣子事件提取</strong>：自动记录高风险事件的起止时间、峰值风险、严重等级和建议动作。</li>
+<li><strong>可解释风险评分</strong>：每个风险都有对应传感器依据，不是单纯输出一个黑盒分类结果。</li>
+<li><strong>报告可视化完整</strong>：自动生成 CSV、JSON、HTML 和 10 张 PNG 图表，适合课堂演示和项目答辩。</li>
+</ul>
+<h2 id="3">3. 系统运行方式</h2>
+<p>运行入口：</p>
+<pre><code class="language-bash">python src/unmanned_vehicle_safety_and_operation/drivehealth_blackbox.py
+</code></pre>
+<p>可选参数：</p>
+<pre><code class="language-bash">python src/unmanned_vehicle_safety_and_operation/drivehealth_blackbox.py --duration 600 --event-threshold 60
+</code></pre>
+<p>默认输出目录：</p>
+<pre><code class="language-text">src/unmanned_vehicle_safety_and_operation/drivehealth_visualizations/
+</code></pre>
+<h2 id="4">4. 数据来源说明</h2>
+<p>本次演示使用合成传感器流，采样频率为 1 Hz，总时长为 420 秒，共生成 420 条黑匣子日志。合成数据用于模拟真实无人车运行日志中的典型状态变化，包括：</p>
+<table>
+<thead>
+<tr>
+<th>数据类型</th>
+<th>含义</th>
+<th>风险场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>电机/电池/控制器温度</td>
+<td>关键部件热状态</td>
+<td>过热、散热失效</td>
+</tr>
+<tr>
+<td>烟雾浓度</td>
+<td>车内或电气舱烟雾风险</td>
+<td>短路、燃烧、烟雾扩散</td>
+</tr>
+<tr>
+<td>速度</td>
+<td>车辆运动状态</td>
+<td>速度突变、传感器跳变</td>
+</tr>
+<tr>
+<td>障碍物距离和路面摩擦</td>
+<td>制动安全裕度</td>
+<td>距离不足、湿滑路面</td>
+</tr>
+<tr>
+<td>驾驶员疲劳/注意力</td>
+<td>人机共驾接管能力</td>
+<td>接管时间过长</td>
+</tr>
+<tr>
+<td>效率分数</td>
+<td>路径、能耗和驾驶平顺性</td>
+<td>运行效率退化</td>
+</tr>
+</tbody>
+</table>
+<p>后续可以将合成数据替换为真实 CSV 运行日志或硬件传感器数据。</p>
+<h2 id="5">5. 技术路线</h2>
+<pre><code class="language-text">多源传感器流
+  ├── 温度 / 烟雾 / 速度
+  ├── 障碍物距离 / 路面摩擦
+  ├── 驾驶员状态 / 自动驾驶置信度
+  └── 能耗 / 路径偏差 / 效率
+        ↓
+子系统风险评分
+  ├── thermal_risk
+  ├── smoke_risk
+  ├── speed_risk
+  ├── brake_risk
+  ├── takeover_risk
+  └── efficiency_risk
+        ↓
+加权融合健康分数
+        ↓
+黑匣子事件提取
+        ↓
+CSV / JSON / HTML / PNG 可视化报告
+</code></pre>
+<h2 id="6">6. 核心指标结果</h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th style="text-align: right;">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运行时长</td>
+<td style="text-align: right;">420 s</td>
+</tr>
+<tr>
+<td>采样频率</td>
+<td style="text-align: right;">1 Hz</td>
+</tr>
+<tr>
+<td>日志样本数</td>
+<td style="text-align: right;">420 条</td>
+</tr>
+<tr>
+<td>平均健康分</td>
+<td style="text-align: right;">86.19</td>
+</tr>
+<tr>
+<td>最低健康分</td>
+<td style="text-align: right;">47.10</td>
+</tr>
+<tr>
+<td>最终健康分</td>
+<td style="text-align: right;">85.55</td>
+</tr>
+<tr>
+<td>最终状态</td>
+<td style="text-align: right;">NORMAL</td>
+</tr>
+<tr>
+<td>黑匣子事件数</td>
+<td style="text-align: right;">9</td>
+</tr>
+<tr>
+<td>峰值风险子系统</td>
+<td style="text-align: right;">Speed sensor</td>
+</tr>
+<tr>
+<td>峰值风险值</td>
+<td style="text-align: right;">100.00</td>
+</tr>
+</tbody>
+</table>
+<p>事件严重等级统计：</p>
+<table>
+<thead>
+<tr>
+<th>等级</th>
+<th style="text-align: right;">数量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WATCH</td>
+<td style="text-align: right;">4</td>
+</tr>
+<tr>
+<td>WARNING</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>CRITICAL</td>
+<td style="text-align: right;">4</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7">7. 黑匣子事件复盘</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>子系统</th>
+<th>严重等级</th>
+<th style="text-align: right;">起止时间</th>
+<th style="text-align: right;">峰值时间</th>
+<th style="text-align: right;">峰值风险</th>
+<th style="text-align: right;">最低健康分</th>
+<th>建议动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DH-001</td>
+<td>Thermal</td>
+<td>WATCH</td>
+<td style="text-align: right;">144-149 s</td>
+<td style="text-align: right;">149 s</td>
+<td style="text-align: right;">73.00</td>
+<td style="text-align: right;">72.57</td>
+<td>降低速度，开启冷却，检查电池/电机回路</td>
+</tr>
+<tr>
+<td>DH-002</td>
+<td>Smoke</td>
+<td>CRITICAL</td>
+<td style="text-align: right;">187-201 s</td>
+<td style="text-align: right;">194 s</td>
+<td style="text-align: right;">94.42</td>
+<td style="text-align: right;">68.32</td>
+<td>开启通风，隔离电源模块，准备安全停车</td>
+</tr>
+<tr>
+<td>DH-003</td>
+<td>Speed sensor</td>
+<td>CRITICAL</td>
+<td style="text-align: right;">226-241 s</td>
+<td style="text-align: right;">230 s</td>
+<td style="text-align: right;">100.00</td>
+<td style="text-align: right;">68.62</td>
+<td>交叉检查轮速、IMU、GNSS，标记速度传感器不可靠</td>
+</tr>
+<tr>
+<td>DH-005</td>
+<td>Brake margin</td>
+<td>WATCH</td>
+<td style="text-align: right;">292-292 s</td>
+<td style="text-align: right;">292 s</td>
+<td style="text-align: right;">69.74</td>
+<td style="text-align: right;">70.63</td>
+<td>增大跟车距离，准备紧急制动</td>
+</tr>
+<tr>
+<td>DH-004</td>
+<td>Speed sensor</td>
+<td>CRITICAL</td>
+<td style="text-align: right;">300-306 s</td>
+<td style="text-align: right;">300 s</td>
+<td style="text-align: right;">100.00</td>
+<td style="text-align: right;">47.10</td>
+<td>交叉检查轮速、IMU、GNSS，标记速度传感器不可靠</td>
+</tr>
+<tr>
+<td>DH-006</td>
+<td>Brake margin</td>
+<td>CRITICAL</td>
+<td style="text-align: right;">294-304 s</td>
+<td style="text-align: right;">300 s</td>
+<td style="text-align: right;">100.00</td>
+<td style="text-align: right;">47.10</td>
+<td>增大跟车距离，准备紧急制动</td>
+</tr>
+<tr>
+<td>DH-007</td>
+<td>Takeover</td>
+<td>WATCH</td>
+<td style="text-align: right;">351-352 s</td>
+<td style="text-align: right;">351 s</td>
+<td style="text-align: right;">65.07</td>
+<td style="text-align: right;">80.11</td>
+<td>发出接管提醒，切换到保守驾驶模式</td>
+</tr>
+<tr>
+<td>DH-008</td>
+<td>Takeover</td>
+<td>WATCH</td>
+<td style="text-align: right;">355-356 s</td>
+<td style="text-align: right;">356 s</td>
+<td style="text-align: right;">68.30</td>
+<td style="text-align: right;">80.18</td>
+<td>发出接管提醒，切换到保守驾驶模式</td>
+</tr>
+<tr>
+<td>DH-009</td>
+<td>Takeover</td>
+<td>WARNING</td>
+<td style="text-align: right;">359-364 s</td>
+<td style="text-align: right;">364 s</td>
+<td style="text-align: right;">77.35</td>
+<td style="text-align: right;">77.02</td>
+<td>发出接管提醒，切换到保守驾驶模式</td>
+</tr>
+</tbody>
+</table>
+<p>从事件表可以看出，系统不仅发现了单一故障，还识别出多个风险之间的组合关系。例如在 294-304 秒附近，速度传感器风险和制动安全裕度风险同时升高，车辆健康分降到 47.10，是本次演示中最危险的运行片段。</p>
+<h2 id="8">8. 可视化结果说明</h2>
+<h3 id="81">8.1 系统总览仪表盘</h3>
+<p><img alt="系统总览仪表盘" src="../drivehealth_visualizations/01_system_overview_dashboard.png" /></p>
+<p>该图适合作为演示首页。左上展示健康分时间线，右上展示各子系统峰值风险，左下展示速度、障碍物距离和制动裕度，右下汇总平均健康分、最低健康分、事件数量和最终状态。</p>
+<p>讲解重点：</p>
+<ul>
+<li>系统大部分时间保持高健康分。</li>
+<li>在中后段出现明显风险下探，说明黑匣子成功捕捉异常片段。</li>
+<li>峰值风险集中在速度传感器和制动安全裕度。</li>
+</ul>
+<h3 id="82">8.2 健康分数时间线</h3>
+<p><img alt="健康分数时间线" src="../drivehealth_visualizations/02_health_score_timeline.png" /></p>
+<p>该图展示车辆健康分随时间变化的过程，并用阈值线区分正常、预警和严重状态。</p>
+<p>讲解重点：</p>
+<ul>
+<li>健康分不是单一传感器判断，而是多个子系统风险融合后的结果。</li>
+<li>300 秒附近健康分跌到最低值 47.10，进入明显风险区间。</li>
+<li>最终健康分恢复到 85.55，说明风险事件结束后系统状态恢复正常。</li>
+</ul>
+<h3 id="83">8.3 多源传感器曲线</h3>
+<p><img alt="多源传感器曲线" src="../drivehealth_visualizations/03_sensor_streams_overview.png" /></p>
+<p>该图展示温度、烟雾、速度、制动、人机接管和效率等核心数据流。</p>
+<p>讲解重点：</p>
+<ul>
+<li>温度曲线在 144 秒后出现热风险。</li>
+<li>烟雾浓度在 187-201 秒出现明显峰值。</li>
+<li>速度和制动裕度在 300 秒附近同时异常，形成复合风险。</li>
+<li>接管风险在 350 秒后升高，反映驾驶员注意力下降或疲劳累积。</li>
+</ul>
+<h3 id="84">8.4 子系统风险热力图</h3>
+<p><img alt="子系统风险热力图" src="../drivehealth_visualizations/04_subsystem_risk_heatmap.png" /></p>
+<p>热力图用于快速观察不同子系统在不同时间段的风险强度。</p>
+<p>讲解重点：</p>
+<ul>
+<li>烟雾风险集中在 190 秒附近。</li>
+<li>速度传感器风险在 230 秒和 300 秒附近出现两次高亮。</li>
+<li>制动风险与第二次速度异常部分重叠，说明系统不仅能发现孤立异常，也能发现风险耦合。</li>
+</ul>
+<h3 id="85">8.5 黑匣子事件时间线</h3>
+<p><img alt="黑匣子事件时间线" src="../drivehealth_visualizations/05_blackbox_event_timeline.png" /></p>
+<p>该图把所有高风险事件按时间和子系统展示，点越大、颜色越深表示风险越高。</p>
+<p>讲解重点：</p>
+<ul>
+<li>事件不是逐帧散点，而是经过连续区间聚合后的黑匣子记录。</li>
+<li>每个事件都有唯一 ID，便于报告、复盘和追责。</li>
+<li>高风险事件集中在烟雾、速度传感器和制动裕度。</li>
+</ul>
+<h3 id="86">8.6 风险雷达图</h3>
+<p><img alt="风险雷达图" src="../drivehealth_visualizations/06_risk_radar_summary.png" /></p>
+<p>雷达图对比各子系统的平均风险和峰值风险。</p>
+<p>讲解重点：</p>
+<ul>
+<li>平均风险代表系统长期运行状态。</li>
+<li>峰值风险代表极端风险暴露。</li>
+<li>即使某个子系统平均风险不高，只要峰值风险过高，也需要进入黑匣子复盘。</li>
+</ul>
+<h3 id="87">8.7 事件类型与严重等级分布</h3>
+<p><img alt="事件分布" src="../drivehealth_visualizations/07_event_distribution.png" /></p>
+<p>该图展示事件按子系统和严重等级的分布。</p>
+<p>讲解重点：</p>
+<ul>
+<li>本次演示共提取 9 个事件。</li>
+<li>其中 CRITICAL 事件有 4 个，说明系统捕捉到了多次高危状态。</li>
+<li>Takeover 事件数量较多，但严重程度主要是 WATCH/WARNING，更适合提前提醒而不是立即停车。</li>
+</ul>
+<h3 id="88">8.8 特征与健康分相关性矩阵</h3>
+<p><img alt="相关性矩阵" src="../drivehealth_visualizations/08_feature_health_correlation.png" /></p>
+<p>相关性矩阵用于解释哪些因素最影响健康分。</p>
+<p>讲解重点：</p>
+<ul>
+<li>烟雾、温度、接管时间、制动裕度等指标和健康分存在不同方向的关联。</li>
+<li>该图可以帮助分析系统为什么给出某个健康分，而不是只输出一个不可解释结果。</li>
+<li>后续接入真实数据后，可用该图发现关键风险因子。</li>
+</ul>
+<h3 id="89">8.9 健康分分布</h3>
+<p><img alt="健康分分布" src="../drivehealth_visualizations/09_health_score_distribution.png" /></p>
+<p>该图展示 420 个采样点的健康分分布。</p>
+<p>讲解重点：</p>
+<ul>
+<li>大多数时间车辆处于较高健康分区间。</li>
+<li>少数样本进入低健康分区间，正是黑匣子需要重点保存和解释的片段。</li>
+<li>该分布可用于评估系统运行稳定性。</li>
+</ul>
+<h3 id="810">8.10 动作优先级看板</h3>
+<p><img alt="动作优先级看板" src="../drivehealth_visualizations/10_action_priority_board.png" /></p>
+<p>该图按照峰值风险对事件进行排序，形成运维或安全员优先处理列表。</p>
+<p>讲解重点：</p>
+<ul>
+<li>风险最高的事件优先处理。</li>
+<li>系统不仅报警，还给出明确动作建议。</li>
+<li>这让 DriveHealth 更像一个安全运维工具，而不是单纯的分类模型。</li>
+</ul>
+<h2 id="9">9. 演示讲解流程建议</h2>
+<ol>
+<li><strong>先说明不依赖模拟器</strong>：本项目做的是无人车自身健康监测，不是道路驾驶仿真。</li>
+<li><strong>展示系统总览图</strong>：说明健康分、风险子系统和黑匣子事件。</li>
+<li><strong>讲 300 秒附近的复合风险</strong>：速度传感器风险和制动安全裕度同时达到高风险，健康分最低。</li>
+<li><strong>切换到事件时间线</strong>：说明系统如何把连续风险片段记录为事件。</li>
+<li><strong>展示动作优先级看板</strong>：强调系统能给出可执行建议。</li>
+<li><strong>最后展示 CSV/JSON/HTML 输出</strong>：说明结果可复盘、可审计、可扩展到真实日志。</li>
+</ol>
+<h2 id="10">10. 项目创新点</h2>
+<ol>
+<li>
+<p><strong>从外部感知转向自健康监测</strong><br />
+   常见自动驾驶项目关注车道线、目标检测、路径规划，本项目关注无人车内部状态是否健康。</p>
+</li>
+<li>
+<p><strong>无需大型模拟器</strong><br />
+   系统使用传感器流和日志即可运行，降低部署和演示成本。</p>
+</li>
+<li>
+<p><strong>多源异常融合</strong><br />
+   同时考虑温度、烟雾、速度、制动、人机接管和效率，避免单一指标误报或漏报。</p>
+</li>
+<li>
+<p><strong>黑匣子式事件记录</strong><br />
+   每个高风险事件都有 ID、时间、峰值、严重等级和建议动作，便于事故复盘。</p>
+</li>
+<li>
+<p><strong>强可视化表达</strong><br />
+   自动生成 10 张图表和 HTML 报告，适合演示、答辩和后续论文/报告撰写。</p>
+</li>
+</ol>
+<h2 id="11">11. 不足与后续改进</h2>
+<p>当前版本主要使用合成传感器流，适合作为原型验证。后续可以继续扩展：</p>
+<ul>
+<li>支持读取真实车辆 CSV 日志；</li>
+<li>接入真实温度、烟雾、电池、电机控制器等硬件传感器；</li>
+<li>加入多传感器一致性校验，例如轮速、IMU 和 GNSS 互相验证；</li>
+<li>引入时序模型预测未来 5-10 秒健康分变化；</li>
+<li>加入事件片段自动导出功能，生成可复盘的数据包；</li>
+<li>将风险结果接入自动降级策略，例如限速、靠边停车或人工接管提醒。</li>
+</ul>
+<h2 id="12">12. 结论</h2>
+<p>DriveHealth 构建了一个无需模拟器的无人车自健康黑匣子系统。实验结果表明，系统能够在 420 秒运行日志中自动识别 9 个关键风险事件，最低健康分降至 47.10，并能定位速度传感器、制动裕度、烟雾和接管风险等主要问题。</p>
+<p>相比传统自动驾驶仿真项目，DriveHealth 的价值在于：它不关注车辆在虚拟城市中如何行驶，而关注无人车在真实运行或离线日志中是否安全、是否可靠、是否可复盘。这使它更适合做无人车安全运维、故障诊断和事件取证方向的项目展示。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

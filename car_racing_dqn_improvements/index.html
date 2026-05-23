@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/car_racing_dqn_improvements/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
     <title>CarRacing DQN/DoubleDQN：训练改进与可视化对比 - 神经网络</title>
     <link rel="stylesheet" href="../css/theme.css" />
@@ -15,7 +15,7 @@
         // Current page data
         var mkdocs_page_name = "CarRacing DQN/DoubleDQN\uff1a\u8bad\u7ec3\u6539\u8fdb\u4e0e\u53ef\u89c6\u5316\u5bf9\u6bd4";
         var mkdocs_page_input_path = "car_racing_dqn_improvements.md";
-        var mkdocs_page_url = null;
+        var mkdocs_page_url = "/nn/car_racing_dqn_improvements/";
       </script>
     
     <!--[if lt IE 9]>
@@ -44,6 +44,80 @@
                 <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
                 </li>
               </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#_1">项目概述</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_2">项目目标</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#dqn">核心算法原理（DQN 系列）</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-dqn">1. DQN：用深度网络逼近动作价值函数</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-double-dqn-q">2. Double DQN：缓解 Q 值过估计</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-dueling-network">3. Dueling Network：分解状态价值与动作优势</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4">4. 本项目中的稳定性增强手段（与算法配套）</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_3">项目介绍</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_4">项目具体做了什么</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_5">项目范围（从输入到输出）</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_6">代码结构与关键文件（可在演讲中直接指路）</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_7">项目核心亮点</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_8">汇报大纲</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#1">1. 项目背景与研究动机</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2">2. 系统性改进方案</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#21">2.1 算法层改进</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#22">2.2 工程层改进</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#23">2.3 环境预处理设计</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3_1">3. 实验设计与结果来源</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#31">3.1 实验日志来源</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#32">3.2 对比组定义</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#33">3.3 图像结果</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4_2">4. 量化结果与效果分析</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#41-200-episodes">4.1 主实验结果表（200 Episodes）</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#42">4.2 如何理解这张表</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#43">4.3 一句话总结主实验</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#5">5. 名词解释</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#6">6. 实验结果结论</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#7">7. 未来工作展望</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
                 </li>
@@ -64,7 +138,7 @@
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
       <li class="breadcrumb-item active">CarRacing DQN/DoubleDQN：训练改进与可视化对比</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/car_racing_dqn_improvements.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/car_racing_dqn_improvements.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
   </ul>
   <hr/>
@@ -72,158 +146,381 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="carracing-dqndoubledqn">CarRacing DQN/DoubleDQN：训练改进与可视化对比</h1>
-<p>今天汇报的主题是：对 <code>nn/src/car_racing</code> 目录下 CarRacing 的 DQN/DoubleDQN 训练代码进行一轮系统性改进，目标是把训练从“能跑”提升到“可复现、可对比、可解释”，并把运行结果（reward、吞吐等）可视化输出，便于在 GPU 上做长跑对比。</p>
+                <h1 id="carracing-dqndoubledqn">CarRacing DQN/DoubleDQN：训练改进、实验结果与可视化分析</h1>
+<hr />
+<h2 id="_1">项目概述</h2>
+<p>本项目围绕 Gymnasium <code>CarRacing-v2</code> 视觉控制任务，搭建并改进 DQN/DoubleDQN 训练框架，目标是把训练从“能跑通”提升到“可复现、可对比、可解释”，并以实验日志与可视化结果支撑算法迭代。</p>
+<p>项目输出包括：</p>
+<ul>
+<li>可配置训练入口（DQN/DoubleDQN），支持固定随机种子与关键开关；</li>
+<li>标准化日志与对比图（reward、loss、SPS、UPS 等）；</li>
+<li>模型权重与评估流程，便于复用与复现；</li>
+<li>面向后续扩展（PER、NoisyNet、n-step return 等）的工程底座。</li>
+</ul>
+<h2 id="_2">项目目标</h2>
+<ol>
+<li><strong>可复现</strong>：训练参数配置化，固定 <code>seed</code>，日志与产物可追溯，保证同配置可复跑。</li>
+<li><strong>可对比</strong>：将关键改进点做成开关，支持 baseline vs improved、消融对照与多组实验对比绘图。</li>
+<li><strong>可解释</strong>：不仅观察 reward，还记录 loss、回合长度与吞吐指标（SPS/UPS），让训练现象可分析。</li>
+<li><strong>可扩展</strong>：在不破坏训练主流程的前提下，能快速加入更多 DQN 变体或训练技巧。</li>
+<li><strong>可落地</strong>：在 GPU 环境下支持 AMP 等加速手段，能进行长时间稳定训练并输出可汇报结果。</li>
+</ol>
+<h2 id="dqn">核心算法原理（DQN 系列）</h2>
+<h3 id="1-dqn">1. DQN：用深度网络逼近动作价值函数</h3>
+<p>强化学习中，动作价值函数 <code>Q(s, a)</code> 表示在状态 <code>s</code> 下选择动作 <code>a</code> 后，未来累计回报的期望。DQN 使用神经网络 <code>Q(s, a; θ)</code> 来逼近该函数，并通过最小化 TD 误差训练网络。</p>
+<p>核心计算包含：</p>
+<ul>
+<li><strong>ε-greedy 探索</strong>：以概率 <code>ε</code> 随机探索，以 <code>1-ε</code> 选择 <code>argmax_a Q(s, a; θ)</code>。</li>
+<li><strong>目标值（TD Target）</strong>：<code>y = r + γ max_{a'} Q(s', a'; θ⁻)</code>。</li>
+<li><strong>损失（TD Loss）</strong>：常见为 Huber/MSE：<code>L = E[(Q(s, a; θ) - y)^2]</code>。</li>
+</ul>
+<p>为提升稳定性，DQN 通常配合两项关键机制：</p>
+<ul>
+<li><strong>经验回放（Replay Buffer）</strong>：从历史样本中随机采样训练，打破样本相关性，提高数据利用率。</li>
+<li><strong>目标网络（Target Network）</strong>：使用参数较慢更新的 <code>θ⁻</code> 计算目标值，降低“目标漂移”带来的不稳定。</li>
+</ul>
+<h3 id="2-double-dqn-q">2. Double DQN：缓解 Q 值过估计</h3>
+<p>标准 DQN 的 <code>max</code> 操作容易引入过估计。Double DQN 将“选动作”和“评估动作”拆开：</p>
+<ul>
+<li>先用在线网络选动作：<code>a* = argmax_{a'} Q(s', a'; θ)</code></li>
+<li>再用目标网络评估：<code>y = r + γ Q(s', a*; θ⁻)</code></li>
+</ul>
+<p>这通常能让学习目标更稳，减少价值函数发散风险。</p>
+<h3 id="3-dueling-network">3. Dueling Network：分解状态价值与动作优势</h3>
+<p>Dueling 结构将 <code>Q(s, a)</code> 分解为：</p>
+<ul>
+<li>状态价值 <code>V(s)</code>：状态本身的价值</li>
+<li>动作优势 <code>A(s, a)</code>：相对平均动作的优势</li>
+</ul>
+<p>常用聚合方式：</p>
+<p><code>Q(s, a) = V(s) + (A(s, a) - mean_a A(s, a))</code></p>
+<p>这样能让网络在“动作差异不大”的状态下更高效地学习，有助于视觉任务的稳定与样本效率。</p>
+<h3 id="4">4. 本项目中的稳定性增强手段（与算法配套）</h3>
+<ul>
+<li><strong>观测归一化</strong>：将 <code>uint8(0~255)</code> 缩放到 <code>float(0~1)</code>，改善 CNN 输入尺度。</li>
+<li><strong>梯度裁剪</strong>：限制梯度范数，缓解训练后期梯度爆炸与震荡。</li>
+<li><strong>AMP</strong>：在 GPU 上启用混合精度，在尽量不损失稳定性的前提下提高吞吐。</li>
+</ul>
+<h2 id="_3">项目介绍</h2>
+<p>这个项目面向一个具体问题：<strong>如何让 CarRacing-v2（图像输入的驾驶控制任务）上的 DQN/DoubleDQN 训练，从“能跑”变成“可复现、可对比、可解释”</strong>，并且能支撑后续持续迭代。</p>
+<h3 id="_4">项目具体做了什么</h3>
+<ol>
+<li><strong>把训练做成一条标准管线</strong>：环境预处理 → 采样与回放 → 更新网络 → 记录日志 → 画图对比 → 保存模型/评估。</li>
+<li><strong>把关键算法点模块化为开关</strong>：<code>double_q</code>、<code>dueling</code>、<code>normalize_obs</code>、<code>max_grad_norm</code>、<code>amp</code> 等都可以通过参数控制，方便做对照实验。</li>
+<li><strong>把“实验结果”落到文件与指标上</strong>：训练过程自动输出 CSV 日志，并对 reward、loss、SPS、UPS 做可视化与表格统计，确保结论可追溯。</li>
+</ol>
+<h3 id="_5">项目范围（从输入到输出）</h3>
+<ul>
+<li><strong>任务与环境</strong>：Gymnasium <code>CarRacing-v2</code>，图像观测输入，离散动作空间（<code>continuous=False</code>）。</li>
+<li><strong>输入状态</strong>：经过灰度化、缩放与帧堆叠后的图像序列（典型形状为 <code>(4, 84, 84)</code>）。</li>
+<li><strong>输出策略</strong>：离散动作（转向/加速/刹车/空动作），通过估计 <code>Q(s, a)</code> 选择动作。</li>
+<li><strong>训练产物</strong>：</li>
+<li>训练日志（CSV）：reward、loss、epsilon、SPS、UPS、episode length；</li>
+<li>模型权重（<code>.pt</code>）；</li>
+<li>对比曲线图（PNG）。</li>
+</ul>
+<h3 id="_6">代码结构与关键文件（可在演讲中直接指路）</h3>
+<ul>
+<li><strong>训练入口</strong></li>
+<li>DQN：<code>nn/src/car_racing/car_racing_ros/dqn_model/training_dqn.py</code></li>
+<li>DoubleDQN：<code>nn/src/car_racing/car_racing_ros/doubledqn_model/training_double_dqn.py</code></li>
+<li><strong>核心智能体与网络</strong></li>
+<li>DQN Agent：<code>nn/src/car_racing/car_racing_ros/dqn_model/dqn_agent.py</code></li>
+<li>Dueling 网络结构：<code>nn/src/car_racing/car_racing_ros/dqn_model/base_agent.py</code></li>
+<li>DoubleDQN Agent：<code>nn/src/car_racing/car_racing_ros/doubledqn_model/doubledqn_agent.py</code></li>
+<li><strong>配置文件（复现与对比的关键）</strong></li>
+<li><code>nn/src/car_racing/car_racing_ros/configs/dqn.yaml</code></li>
+<li><code>nn/src/car_racing/car_racing_ros/configs/double_dqn.yaml</code></li>
+<li><strong>实验产物目录</strong></li>
+<li>日志：<code>nn/src/car_racing/car_racing_ros/training/logs/</code></li>
+<li>权重：<code>nn/src/car_racing/car_racing_ros/training/saved_models/</code></li>
+<li>图像：<code>nn/src/car_racing/car_racing_ros/training/*.png</code></li>
+<li><strong>对比绘图工具</strong></li>
+<li><code>nn/src/car_racing/car_racing_ros/plot_comparison.py</code></li>
+</ul>
+<h3 id="_7">项目核心亮点</h3>
+<ol>
+<li><strong>不只是论文复现</strong>：把 Double DQN、Dueling Network、梯度裁剪、观测归一化等技术<strong>从“零散在代码里”变成“可开关、可对比的模块”</strong>；</li>
+<li><strong>不只有单条 reward 曲线</strong>：补充 SPS、UPS 等工程指标与完整实验结果表格，让训练过程透明可分析；</li>
+<li><strong>不只有数字结果</strong>：对关键术语、表格指标逐个解释，让结果可理解、可验证；</li>
+<li><strong>是一个可迭代的工程底座</strong>：为后续集成 PER、NoisyNet、n-step 等更多 DQN 变体预留了统一接口。</li>
+</ol>
+<h3 id="_8">汇报大纲</h3>
+<ol>
+<li>项目背景与研究动机</li>
+<li>系统性改进方案（算法 + 工程）</li>
+<li>实验设计与结果来源</li>
+<li>量化结果与效果分析</li>
+<li>关键术语与表格解读</li>
+<li>总结与未来展望</li>
+</ol>
 <h2 id="1">1. 项目背景与研究动机</h2>
-<p>研究任务：CarRacing-v2 是一个典型的、具有挑战性的图像输入连续控制任务，智能体需从像素输入中学习驾驶策略以最大化累计奖励。
-原有的训练管线存在三类问题：
-1. 复现成本高：每次修改参数都要手动改代码，难以进行稳定的对比实验。
-2. 训练不稳定​：奖励曲线波动大，训练过程难以收敛。
-3. 工程体验差：缺乏性能监控，可视化工具存在兼容性问题。
-核心目标：构建一个标准化、可复现、具备完整可观测性的强化学习实验框架，以支撑高效的算法迭代与性能分析。</p>
+<p><code>CarRacing-v2</code> 是一个典型的强化学习视觉控制任务。智能体从图像观测中学习驾驶策略，目标是在赛道上尽可能稳定地前进并获得更高累计奖励。
+典型难点：
+1. <strong>输入是像素图像</strong>：状态维度高，特征提取依赖 CNN，训练开销明显高于低维状态任务。
+2. <strong>奖励稀疏且波动较大</strong>：智能体在训练初期经常无法形成有效驾驶行为，reward 曲线会剧烈震荡。
+3. <strong>强化学习训练稳定性差</strong>：经验回放、目标网络、探索率衰减等细节都会显著影响结果。
+4. <strong>实验复现成本高</strong>：如果参数散落在代码中，每次做对比实验都容易引入额外变量。
+因此，本项目的核心目标并不是只追求一个“更高的 reward”，而是构建一个：
+- 能固定随机种子、重复实验的训练框架；
+- 能记录 reward、loss、SPS、UPS 等关键指标的监控系统；
+- 能对比 baseline 与改进方案的实验平台；
+- 能为后续扩展 PER、NoisyNet、n-step return 等方法提供统一接口的工程底座。</p>
 <h2 id="2">2. 系统性改进方案</h2>
-<h3 id="21">2.1 算法层：增强学习稳定性与性能</h3>
-<p>不是简单地应用现有算法，而是将其作为可配置的模块集成到框架中，并通过量化实验验证其效果。
-1.Double DQN 机制：解决Q值过估计问题。在dqn_agent.py中实现为可选开关 (double_q)，通过策略网络选择动作，目标网络评估价值，提升学习目标的稳定性。
-2.Dueling Network 结构：在base_agent.py中实现，将Q值函数分解为状态价值(V)和动作优势(A)，使网络能更好理解状态与动作的独立贡献。
-3.梯度裁剪与观测归一化：
-  -梯度裁剪​ (max_grad_norm)：在AMP与非AMP训练路径下均实现梯度范数裁剪，有效防止梯度爆炸，这是训练曲线后期仍能保持稳定的关键。
-  -观测归一化​ (normalize_obs)：将uint8类型的图像观测(0-255)在线归一化至float32(0.0-1.0)，大幅改善CNN输入的数值尺度，加速收敛。</p>
-<h3 id="22">2.2 工程层：提升效率与可复现性</h3>
-<p>详述的核心工程优化包括：
-1.张量搬运优化：将经验回放采样后的整个batch一次性搬运至计算设备，并将.squeeze(1)替换为.view(-1)，消除了大量细粒度张量操作的开销与维度不稳定性。
-2.训练脚本全面参数化：training_dqn.py支持超过12个命令行参数，覆盖训练规模(--episodes, --max-timesteps)、模型结构(--dueling, --double-q)、训练配置(--amp, --normalize-obs)等，实现了“参数化而非改代码”的实验模式。
-3.性能监控指标：在每个训练回合中，自动计算并记录每秒步数(SPS)​ 与每秒更新次数(UPS)，为分析训练瓶颈提供数据支持。
-4.计算加速：在CUDA环境下自动启用cuDNN benchmark、TF32以及混合精度训练(AMP)，显著提升GPU利用率与训练吞吐。</p>
-<h3 id="23">2.3 可视化层：实现分析自动化与深度化</h3>
-<p>开发了增强型对比画图脚本plot_comparison.py，它支持：
-1.多实验对比：可同时加载多条实验日志进行绘制。
-2.多指标分析：支持reward、loss、steps_per_sec、updates_per_sec等多个指标的对比。
-3.趋势平滑：通过--smooth N参数提供滑动平均平滑，便于观察长期趋势，过滤短期噪声。
-4.环境兼容性：通过设置MPLCONFIGDIR环境变量，彻底解决了Matplotlib在无头服务器上的缓存警告与启动慢问题。
-<img alt="Reward 对比图" src="../src/car_racing/car_racing_ros/training/dqn_reward_smooth20.png" /></p>
-<h2 id="3">3. 量化结果与效果分析</h2>
+<h3 id="21">2.1 算法层改进</h3>
+<p>本项目并非简单替换算法名称，而是把多个稳定训练的重要机制做成了<strong>可开关、可对比</strong>的模块。</p>
+<h4 id="1-double-dqn">1. Double DQN 机制</h4>
+<p><code>Double DQN</code> 的核心作用是缓解标准 DQN 中常见的 <strong>Q 值过估计（overestimation）</strong> 问题。
+- 标准 DQN 往往使用同一个目标值过程同时“选动作”和“评估动作”，容易把某些动作价值估得过高。
+- Double DQN 将这两个过程分开：
+  - 用<strong>在线网络（policy net）</strong>选择下一个动作；
+  - 用<strong>目标网络（target/frozen net）</strong>评估该动作对应的 Q 值。</p>
+<p>这样做的好处是：
+- 学习目标更稳；
+- reward 曲线通常更容易上升；
+- 在长时间训练中更不容易出现价值函数发散。</p>
+<h4 id="2-dueling-network">2. Dueling Network 结构</h4>
+<p><code>Dueling Network</code> 将 Q 值函数分解为两部分：
+- <strong>状态价值 <code>V(s)</code></strong>：当前状态本身有多“好”；
+- <strong>动作优势 <code>A(s, a)</code></strong>：在该状态下，某个动作比平均动作“好多少”。
+这样做的意义在于：
+- 网络能先学会“这个状态值不值得继续”，再学“这个状态下哪个动作更优”；
+- 在很多状态下，不同动作差异不大，Dueling 结构通常能提升特征利用效率；
+- 对图像输入任务尤其有帮助，因为它能更好地区分“环境状态信息”和“动作偏好信息”。</p>
+<h4 id="3-gradient-clipping">3. 梯度裁剪（Gradient Clipping）</h4>
+<p><code>max_grad_norm</code> 用于限制梯度范数，防止训练中出现梯度爆炸。
+通俗理解：
+- 如果一次反向传播得到的梯度过大，参数更新会非常剧烈；
+- 过剧烈的更新会导致 loss 突增、Q 值震荡甚至训练崩掉；
+- 梯度裁剪会在梯度过大时将其缩放回安全范围。
+这类机制对强化学习尤其重要，因为强化学习的目标值本身就在不断变化，比监督学习更容易不稳定。</p>
+<h4 id="4-observation-normalization">4. 观测归一化（Observation Normalization）</h4>
+<p>环境原始图像通常是 <code>uint8</code> 类型，像素值范围是 <code>0~255</code>。<br />
+<code>normalize_obs</code> 会把它转换为 <code>float32</code> 并缩放到 <code>0.0~1.0</code>。
+这样做的好处是：
+- CNN 输入尺度更稳定；
+- 梯度传播更平滑；
+- 不同 batch 之间的数值范围更一致；
+- 通常能加快收敛并减少训练前期震荡。</p>
+<h4 id="5-amp">5. AMP 混合精度训练</h4>
+<p><code>AMP</code> 是 <code>Automatic Mixed Precision</code> 的缩写，即<strong>自动混合精度训练</strong>。
+它的作用是：
+- 一部分计算使用半精度浮点数，降低显存压力；
+- 关键位置保留高精度，避免数值不稳定；
+- 在 GPU 环境下通常可以提升吞吐。
+对于需要长时间训练的 CarRacing 图像任务，AMP 可以显著改善训练效率。</p>
+<h3 id="22">2.2 工程层改进</h3>
+<h4 id="1_1">1. 参数化训练入口</h4>
+<p>训练脚本 <code>training_dqn.py</code> 已支持大量命令行参数，例如：
+- <code>--episodes</code>
+- <code>--max-timesteps</code>
+- <code>--dueling</code>
+- <code>--double-q</code>
+- <code>--amp</code>
+- <code>--normalize-obs</code>
+- <code>--seed</code>
+这意味着实验不再依赖“手改代码”，而是可以通过命令行固定配置、直接复现。</p>
+<h4 id="2_1">2. 性能监控指标</h4>
+<p>训练日志中额外记录了两类工程指标：
+- <strong>SPS（Steps Per Second）</strong>：每秒环境交互步数；
+- <strong>UPS（Updates Per Second）</strong>：每秒网络更新次数。
+它们可以帮助回答两个关键问题：
+- 训练慢是因为环境模拟慢，还是因为网络更新慢？
+- 新增算法模块后，性能收益是否值得吞吐开销？</p>
+<h4 id="3">3. 张量处理与设备搬运优化</h4>
+<p>代码中对经验回放采样后的 batch 做了更合理的设备搬运与形状整理，减少了细粒度张量操作带来的额外开销，也降低了训练过程中的维度错误风险。</p>
+<h4 id="4_1">4. 可视化脚本统一化</h4>
+<p><code>plot_comparison.py</code> 支持：
+- 多个日志同时绘图；
+- reward、loss、SPS、UPS 等多个指标对比；
+- <code>--smooth N</code> 滑动平均平滑；
+- 服务器/无头环境下通过 <code>MPLCONFIGDIR</code> 规避 Matplotlib 缓存问题。</p>
+<h3 id="23">2.3 环境预处理设计</h3>
+<p>训练入口中对 CarRacing 做了标准视觉强化学习预处理：
+1. <strong>GrayScaleObservation</strong>：彩色图像转灰度，降低输入复杂度。
+2. <strong>ResizeObservation(84, 84)</strong>：将图像统一到经典 Atari 风格尺寸。
+3. <strong>FrameStack(4)</strong>：堆叠连续 4 帧，让网络获得速度与运动方向信息。
+4. <strong>SkipFrame(4)</strong>：每 4 步执行一次同动作，减少冗余计算并提升训练效率。</p>
+<p>这些预处理对于视觉控制任务非常关键，因为单帧图像通常不足以让智能体推断速度和方向变化。</p>
+<h2 id="3_1">3. 实验设计与结果来源</h2>
+<h3 id="31">3.1 实验日志来源</h3>
+<p>本文中的量化结果主要来自以下日志文件：
+- <code>nn/src/car_racing/car_racing_ros/training/logs/DQN_baseline_long.csv</code>
+- <code>nn/src/car_racing/car_racing_ros/training/logs/DQN_improved_long.csv</code>
+这两份日志都包含 <strong>200 个 episode</strong> 的训练记录，适合作为本次主实验对比数据。
+这些文件可以作为开发阶段验证使用，但在“正式对比结论”上，<code>*_long.csv</code> 更有代表性。</p>
+<h3 id="32">3.2 对比组定义</h3>
+<p>为便于理解，这里将实验分为两组：
+| 组别 | 配置说明 | 主要特点 |
+| :--- | :--- | :--- |
+| <strong>Baseline</strong> | 较原始的 DQN 训练配置 | 作为对照组，观察未充分优化时的训练表现 |
+| <strong>Improved</strong> | 启用 <code>dueling</code>、<code>double_q</code>、<code>normalize_obs</code>、<code>amp</code>、<code>max_grad_norm</code> 等改进 | 目标是提升稳定性、样本效率和最终策略性能 |</p>
+<h3 id="33">3.3 图像结果</h3>
+<p>下面给出项目中已经生成的对比图，便于从趋势上观察 reward 和 loss 的变化。
+<img alt="Reward 对比图（smooth=20）" src="../src/car_racing/car_racing_ros/training/dqn_reward_smooth20.png" />
+<img alt="Loss 对比图（smooth=20）" src="../src/car_racing/car_racing_ros/training/dqn_loss_smooth20.png" /></p>
+<h2 id="4_2">4. 量化结果与效果分析</h2>
+<h3 id="41-200-episodes">4.1 主实验结果表（200 Episodes）</h3>
+<p>基于 <code>DQN_baseline_long.csv</code> 和 <code>DQN_improved_long.csv</code> 统计得到的主结果如下：</p>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">评估指标</th>
-<th style="text-align: left;">Baseline (原始配置)</th>
-<th style="text-align: left;">Improved (改进配置)</th>
-<th style="text-align: left;">变化</th>
-<th style="text-align: left;">含义</th>
+<th style="text-align: left;">指标</th>
+<th style="text-align: center;">Baseline</th>
+<th style="text-align: center;">Improved</th>
+<th style="text-align: center;">变化趋势</th>
+<th style="text-align: left;">解读</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>损失(Loss)均值</strong></td>
-<td style="text-align: left;">0.6205</td>
-<td style="text-align: left;">0.2194</td>
-<td style="text-align: left;">↓ 64.6%</td>
-<td style="text-align: left;">训练稳定性显著提升</td>
+<td style="text-align: left;"><strong>平均奖励（Mean Reward）</strong></td>
+<td style="text-align: center;">-41.99</td>
+<td style="text-align: center;">101.72</td>
+<td style="text-align: center;">明显提升</td>
+<td style="text-align: left;">从整体负回报转为正回报，说明改进配置已经学到更有效的驾驶策略</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>末回合奖励</strong></td>
-<td style="text-align: left;">1.0959</td>
-<td style="text-align: left;">4.5205</td>
-<td style="text-align: left;">↑ 312%</td>
-<td style="text-align: left;">策略性能大幅改善</td>
+<td style="text-align: left;"><strong>末回合奖励（Last Episode Reward）</strong></td>
+<td style="text-align: center;">64.06</td>
+<td style="text-align: center;">723.53</td>
+<td style="text-align: center;">大幅提升</td>
+<td style="text-align: left;">训练结束时 Improved 的策略质量显著更高</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>最近 10 回合平均奖励</strong></td>
+<td style="text-align: center;">6.48</td>
+<td style="text-align: center;">597.17</td>
+<td style="text-align: center;">大幅提升</td>
+<td style="text-align: left;">说明 Improved 不只是偶然跑出高分，而是在后期形成了稳定优势</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>最佳单回合奖励（Best Reward）</strong></td>
+<td style="text-align: center;">219.81</td>
+<td style="text-align: center;">916.20</td>
+<td style="text-align: center;">大幅提升</td>
+<td style="text-align: left;">改进配置具备更高的性能上限</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>平均回合长度（Mean Episode Length）</strong></td>
+<td style="text-align: center;">205.38</td>
+<td style="text-align: center;">221.40</td>
+<td style="text-align: center;">小幅提升</td>
+<td style="text-align: left;">智能体平均存活更久、能覆盖更多赛道步骤</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>平均 SPS</strong></td>
-<td style="text-align: left;">45.0 (原 2.98)</td>
-<td style="text-align: left;">40.0 (原 2.23)</td>
-<td style="text-align: left;">↓ 11.1%</td>
-<td style="text-align: left;">GPU 上吞吐大幅提升；Improved 因计算量增加仍略低于 Baseline</td>
+<td style="text-align: center;">9.20</td>
+<td style="text-align: center;">9.30</td>
+<td style="text-align: center;">基本持平</td>
+<td style="text-align: left;">改进后的训练并未明显拖慢环境交互速度</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>平均 UPS</strong></td>
-<td style="text-align: left;">12.0 (原 0.71)</td>
-<td style="text-align: left;">10.5 (原 0.52)</td>
-<td style="text-align: left;">↓ 12.5%</td>
-<td style="text-align: left;">同上，计算复杂度增加带来的微小损耗</td>
+<td style="text-align: center;">2.30</td>
+<td style="text-align: center;">2.32</td>
+<td style="text-align: center;">基本持平</td>
+<td style="text-align: left;">加入增强模块后，网络更新吞吐仍然保持稳定</td>
 </tr>
 <tr>
-<td style="text-align: left;">结论：在短跑实验中，改进配置以约11%的吞吐代价，换取了超过3倍的性能提升和超过60%的训练稳定性提升。在GPU环境下启用AMP后，吞吐下降的代价将被部分抵消。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">## 4.总结、应用与展望</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">### 4.1 框架核心价值总结</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">1.可复现：通过--seed和全参数CLI，确保任何实验均可精确复现。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">2.可对比：参数化设计使得控制变量对比实验变得极其便捷（如--double-q 0vs --double-q 1）。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">3.可解释：多维指标(SPS, UPS, Loss, Reward)与可视化工具为训练过程提供了完整的可观测性，使算法行为变得透明、可分析。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">根据您提供的文档内容，我对演讲内容进行了系统性的优化，重点在于突出量化结果、明确改进细节、并提供实操路径，使其更适合向导师、同行或评审委员会汇报。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">### 4.2 未来工作展望</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">1.算法扩展：可基于当前框架，轻松集成并对比如PER(Prioritized Experience Replay)、Noisy Networks等更多高级DQN变体。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">2.超参数优化：利用框架的可复现性，开展系统的超参数扫描研究。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-</tr>
-<tr>
-<td style="text-align: left;">3.多任务支持：将当前框架的模式迁移至其他Atari或机器人控制环境，验证其通用性。</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>平均 Loss</strong></td>
+<td style="text-align: center;">0.2504</td>
+<td style="text-align: center;">0.3509</td>
+<td style="text-align: center;">数值上升</td>
+<td style="text-align: left;">在强化学习中 loss 不能单独等价为“效果变差”，需结合 reward 与训练阶段一起分析</td>
 </tr>
 </tbody>
 </table>
+<h3 id="42">4.2 如何理解这张表</h3>
+<p>上表中的每一个指标都有明确含义，下面逐项解释。</p>
+<h4 id="1-mean-reward">1. 平均奖励（Mean Reward）</h4>
+<p>这是整个训练过程中，所有 episode 奖励的平均值。
+- 如果平均奖励长期为负，通常说明智能体大部分时间仍然在“乱开”或频繁偏离赛道。
+- 如果平均奖励转正，说明整体策略已经从“经常失败”走向“经常能有效完成驾驶”。
+本实验中，平均奖励从 <code>-41.99</code> 提升到 <code>101.72</code>，说明改进配置在整体训练质量上显著优于 baseline。</p>
+<h4 id="2-last-episode-reward">2. 末回合奖励（Last Episode Reward）</h4>
+<p>这是最后一个训练回合的 reward，用于观察训练结束时模型大致处于什么水平。
+- Baseline 末回合奖励为 <code>64.06</code>；
+- Improved 末回合奖励为 <code>723.53</code>。
+这表示在训练末期，改进配置已经学到更成熟的驾驶行为。</p>
+<h4 id="3-10">3. 最近 10 回合平均奖励</h4>
+<p>这个指标比“单个末回合奖励”更可靠。
+原因是单次 episode 可能有偶然性，而最近 10 回合平均值更能反映训练后期是否<strong>稳定地好</strong>。
+在本实验中：
+- Baseline 最近 10 回合平均奖励仅为 <code>6.48</code>；
+- Improved 最近 10 回合平均奖励达到 <code>597.17</code>。
+这说明 Improved 后期性能提升并不是偶然尖峰，而是稳定趋势。</p>
+<h4 id="4-best-reward">4. 最佳单回合奖励（Best Reward）</h4>
+<p>表示整个训练过程中跑出的最高单回合 reward。
+它反映模型的<strong>性能上限</strong>，但不代表模型每次都能稳定达到这个水平，因此需要结合“最近 10 回合平均奖励”一起看。</p>
+<h4 id="5-episode-length">5. 平均回合长度（Episode Length）</h4>
+<p>这里的 <code>length</code> 表示一个 episode 持续了多少步。
+- 在 CarRacing 中，回合越长通常意味着智能体越不容易早早失控；
+- 但“回合长”并不一定等于“得分高”，仍需与 reward 一起看。
+本实验中 Improved 的平均回合长度略高，说明它一般能在赛道上坚持更久。</p>
+<h4 id="6-sps-ups">6. SPS 与 UPS</h4>
+<p>这两个指标是工程性能指标：
+- <strong>SPS（Steps Per Second）</strong>：每秒完成多少个环境交互步；
+- <strong>UPS（Updates Per Second）</strong>：每秒完成多少次网络参数更新。
+如果一个改进方案让 reward 提升很多，但 SPS、UPS 下降非常明显，就要重新评估“性能收益是否值得工程成本”。<br />
+本实验中这两个指标几乎持平，说明改进配置在不牺牲吞吐的前提下获得了更好的学习效果。</p>
+<h4 id="7-loss">7. Loss 为什么没有直接下降？</h4>
+<p>这是强化学习文档里最容易误解的地方。
+在监督学习中，loss 降低通常意味着模型更好；但在强化学习里，<code>loss</code> 是 TD 误差相关的训练信号，它会受到以下因素影响：
+- 当前策略是否进入了更高回报、但也更复杂的状态分布；
+- 目标网络是否在持续变化；
+- Q 值估计范围是否扩大；
+- 后期 episode 是否更长，包含更多高价值状态。
+因此：
+- <strong>reward 是衡量策略表现的核心指标</strong>；
+- <strong>loss 更适合作为训练稳定性的辅助参考</strong>；
+- 不能只因为 loss 数值更大，就断言模型效果更差。
+在本实验中，虽然 <code>Improved</code> 的平均 loss 更高，但 reward、后期均值和最佳表现都明显更好，因此应综合判断为“策略性能更优”。</p>
+<h3 id="43">4.3 一句话总结主实验</h3>
+<p>在 200 回合主实验中，改进配置实现了：
+- 从整体负回报到整体正回报的跃迁；
+- 训练末期奖励的显著提升；
+- 最近 10 回合稳定高分；
+- 几乎不增加吞吐损耗的前提下获得明显性能收益。</p>
+<h2 id="5">5. 名词解释</h2>
+<p>下面对文中核心术语做一个集中解释，方便在汇报或答辩时直接引用。
+| 名词 | 解释 |
+| :--- | :--- |
+| <strong>DQN</strong> | Deep Q-Network，使用神经网络逼近动作价值函数 <code>Q(s, a)</code> 的经典值函数方法 |
+| <strong>Double DQN</strong> | 对 DQN 的改进，通过“选动作”和“评估动作”分离来降低 Q 值过估计 |
+| <strong>Dueling Network</strong> | 将 Q 值拆成状态价值 <code>V(s)</code> 和动作优势 <code>A(s, a)</code> 两部分建模的网络结构 |
+| <strong>Q 值</strong> | 在状态 <code>s</code> 下执行动作 <code>a</code> 后，未来累计回报的估计值 |
+| <strong>目标网络（Target/Frozen Net）</strong> | 用于生成训练目标的网络，参数更新较慢，用于稳定训练 |
+| <strong>经验回放（Replay Buffer）</strong> | 存储历史交互样本，从中随机采样训练，打破数据相关性 |
+| <strong>Reward</strong> | 每个 episode 的累计奖励，是评价策略好坏的最直接指标 |
+| <strong>Loss</strong> | 训练时 Q 值预测与目标值之间的误差，更多反映学习过程信号，而非最终任务表现 |
+| <strong>Episode</strong> | 从环境重置到终止的一次完整交互过程 |
+| <strong>SPS</strong> | Steps Per Second，每秒环境交互步数，反映采样吞吐 |
+| <strong>UPS</strong> | Updates Per Second，每秒参数更新次数，反映训练吞吐 |
+| <strong>AMP</strong> | 自动混合精度训练，在 GPU 上可降低显存占用并提升速度 |
+| <strong>Gradient Clipping</strong> | 梯度裁剪，把过大的梯度限制在安全范围内，避免训练发散 |
+| <strong>Observation Normalization</strong> | 将输入观测从 <code>0~255</code> 缩放到 <code>0~1</code>，让网络更容易学习 |
+| <strong>Frame Stack</strong> | 将连续多帧图像拼接为一个状态，使模型能感知运动趋势 |
+| <strong>Skip Frame</strong> | 连续多步重复同一动作，减少计算量并提升训练效率 |</p>
+<h2 id="6">6. 实验结果结论</h2>
+<p>结合日志、曲线和量化表格，可以得到以下结论：
+1. <strong>改进方案有效</strong>：<code>Improved</code> 组在 200 回合主实验中显著优于 baseline，尤其体现在后期 reward 的稳定提升。
+2. <strong>性能提升具有持续性</strong>：最近 10 回合平均奖励大幅领先，说明不是偶然波动，而是训练后期已形成稳定优势。
+3. <strong>工程开销可接受</strong>：SPS 与 UPS 基本持平，说明启用 Dueling、Double DQN、归一化与裁剪后，并未带来明显吞吐损失。
+4. <strong>评价模型不能只看 loss</strong>：强化学习中的 loss 只是过程信号，必须与 reward、回合长度和后期趋势结合分析。</p>
+<h2 id="7">7. 未来工作展望</h2>
+<p>基于当前已经完成的框架，后续可以继续扩展：
+1. <strong>更强的 DQN 变体</strong>：如 PER（Prioritized Experience Replay，优先经验回放）、Noisy Networks、n-step return。
+2. <strong>更系统的超参数搜索</strong>：利用现有参数化脚本，对 <code>lr</code>、<code>batch_size</code>、<code>target_update</code>、<code>epsilon_decay</code> 做网格搜索或贝叶斯优化。
+3. <strong>评估体系完善</strong>：增加固定模型检查点、独立评估脚本、均值与方差统计，让结果更适合论文或课程报告使用。
+4. <strong>迁移到更多环境</strong>：将当前框架迁移到 Atari 或机器人控制任务，验证方法的通用性。</p>
               
             </div>
           </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="首页"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+        <a href="../carla_yolo_detection/" class="btn btn-neutral float-right" title="自动驾驶感知系统">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
 
   <hr/>
 
@@ -249,6 +546,10 @@
         </span>
     
     
+      <span><a href=".." style="color: #fcfcfc">&laquo; 前一页</a></span>
+    
+    
+      <span><a href="../carla_yolo_detection/" style="color: #fcfcfc">后一页 &raquo;</a></span>
     
   </span>
 </div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT/" />
       <link rel="shortcut icon" href="../../../../img/favicon.ico" />
     <title>基于深度强化学习的机器人自主导航系统 - 神经网络</title>
     <link rel="stylesheet" href="../../../../css/theme.css" />
@@ -15,7 +15,7 @@
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e\u6df1\u5ea6\u5f3a\u5316\u5b66\u4e60\u7684\u673a\u5668\u4eba\u81ea\u4e3b\u5bfc\u822a\u7cfb\u7edf";
         var mkdocs_page_input_path = "robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT.md";
-        var mkdocs_page_url = null;
+        var mkdocs_page_url = "/nn/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT/";
       </script>
     
     <!--[if lt IE 9]>
@@ -45,6 +45,10 @@
                 </li>
               </ul>
               <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../../../carla_yolo_detection/">自动驾驶感知系统</a>
                 </li>
               </ul>
@@ -64,7 +68,7 @@
     <li><a href="../../../.." class="icon icon-home" aria-label="Docs"></a></li>
       <li class="breadcrumb-item active">基于深度强化学习的机器人自主导航系统</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
   </ul>
   <hr/>
@@ -150,7 +154,7 @@
 <hr />
 <h2 id="_5">可视化结果分析</h2>
 <h3 id="1_1">1. 导航过程可视化</h3>
-<p><img alt="导航过程截图" src="navigation_episode_0.png" /></p>
+<p><img alt="导航过程截图" src="../navigation_episode_0.png" /></p>
 <p><strong>图1：机器人导航过程</strong></p>
 <ul>
 <li><strong>蓝色圆形</strong>: 机器人当前位置</li>
@@ -164,7 +168,7 @@
 - 激光雷达360度全方位扫描，实时感知环境
 - 路径规划避开红色障碍物区域</p>
 <h3 id="2_1">2. 训练性能分析</h3>
-<p><img alt="训练奖励曲线" src="training_reward.png" /></p>
+<p><img alt="训练奖励曲线" src="../training_reward.png" /></p>
 <p><strong>图2：训练奖励变化曲线</strong></p>
 <p><strong>关键指标</strong>:
 - 初始阶段：奖励波动较大，探索行为频繁
@@ -175,7 +179,7 @@
 - ε-贪心策略平衡了探索与利用
 - 训练50轮后，奖励曲线呈现上升趋势</p>
 <h3 id="3">3. 测试结果可视化</h3>
-<p><img alt="测试导航结果" src="test_navigation_result.png" /></p>
+<p><img alt="测试导航结果" src="../test_navigation_result.png" /></p>
 <p><strong>图3：测试阶段导航结果</strong></p>
 <p><strong>测试指标</strong>:
 - 总奖励：反映导航效率
@@ -186,7 +190,7 @@
 - 避障系统有效工作
 - 路径规划基本合理</p>
 <h3 id="4">4. 激光雷达数据可视化</h3>
-<p><img alt="激光雷达热力图" src="lidar_heatmap.png" /></p>
+<p><img alt="激光雷达热力图" src="../lidar_heatmap.png" /></p>
 <p><strong>图4：激光雷达极坐标热力图</strong></p>
 <p><strong>特征</strong>:
 - 极坐标展示360度扫描数据
