@@ -1,3 +1,9 @@
+"""CARLA 碰撞检测与巡航测试系统
+
+支持键盘控制车辆巡航，视觉感知模块检测前方障碍物，自动触发
+变道绕行（AES）或紧急制动（AEB）。
+"""
+
 import carla
 import time
 import pygame
@@ -7,263 +13,363 @@ import numpy as np
 from vision_module import VisionSystem
 from planner import LanePlanner
 
-def main():
-    print("===================================")
-    print("🚗 欢迎使用 CARLA 碰撞与巡航测试系统")
-    print("请选择本次生成的测试障碍物：")
-    print("  [1] 测试车辆")
-    print("  [2] 测试行人")
-    print("===================================")
-    choice = input("请输入选项 (1 或 2，默认按回车选 1): ").strip()
-    target_type_name = "行人" if choice == '2' else "车辆"
-    print(f"\n⏳ 正在连接 CARLA 服务器并准备生成 {target_type_name}...\n")
+# ── 常量配置 ──────────────────────────────────────────────
+CARLA_HOST = "localhost"
+CARLA_PORT = 2000
+TIMEOUT = 10.0
+FIXED_DT = 0.05
 
-    client = carla.Client('localhost', 2000)
-    client.set_timeout(10.0)
+# 速度控制
+SPEED_STEP = 5.0            # 每次按键调整速度的步长 (km/h)
+PID_KP = 0.15               # 比例系数
+PID_KI = 0.02               # 积分系数
+PID_MAX_INTEGRAL = 40.0     # 积分饱和上限
+MAX_THROTTLE = 0.75
+MAX_BRAKE_COAST = 0.2       # 0 目标速度时轻刹
+MAX_BRAKE_STOP = 1.0        # 完全停车时重刹
+
+# AEB 参数
+DECELERATION = 6.0          # 制动减速度 (m/s²)
+REACTION_DIST = 3.0         # 反应距离 (m)
+LANE_CHANGE_SPEED = 15.0    # 变道时的临时巡航速度 (km/h)
+AEB_MIN_SPEED = 2.0         # AEB触发的最低速度 (km/h)
+
+# 显示
+SCREEN_SIZE = (400, 240)
+FONT_NAME = "simhei"
+FONT_SIZE = 24
+
+# 靶标前方距离
+TARGET_DISTANCE = 60.0
+FALLBACK_DISTANCE = 40.0
+
+
+# ── 辅助类 ────────────────────────────────────────────────
+
+class SpeedController:
+    """PI速度控制器，支持前进/后退"""
+
+    def __init__(self):
+        self.target_kmh = 0.0
+        self.error_sum = 0.0
+        self.is_reverse = False
+
+    def set_target(self, kmh: float):
+        self.target_kmh = max(0.0, kmh)
+
+    def adjust_target(self, delta: float):
+        self.target_kmh = max(0.0, self.target_kmh + delta)
+
+    def toggle_reverse(self):
+        self.is_reverse = not self.is_reverse
+
+    def reset(self):
+        self.target_kmh = 0.0
+        self.error_sum = 0.0
+
+    def compute(self, current_speed_kmh: float) -> tuple:
+        """返回 (throttle, brake)"""
+        error = self.target_kmh - current_speed_kmh
+
+        if self.target_kmh > 0:
+            self.error_sum = max(min(self.error_sum + error, PID_MAX_INTEGRAL), -PID_MAX_INTEGRAL)
+        else:
+            self.error_sum = 0.0
+
+        if self.target_kmh == 0.0:
+            return 0.0, MAX_BRAKE_COAST if current_speed_kmh > 0.5 else MAX_BRAKE_STOP
+        elif error > 0:
+            throttle = min(max((error * PID_KP) + (self.error_sum * PID_KI), 0.0), MAX_THROTTLE)
+            return throttle, 0.0
+        else:
+            brake = min(max((-error * PID_KP) - (self.error_sum * PID_KI), 0.0), 0.5)
+            return 0.0, brake
+
+
+class DisplayPanel:
+    """Pygame 控制面板"""
+
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode(SCREEN_SIZE)
+        pygame.display.set_caption("CARLA 控制面板")
+        pygame.font.init()
+        self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
+
+    def render(self, target_kmh: float, current_kmh: float,
+               throttle: float, brake: float, reverse: bool, aeb_active: bool):
+        self.screen.fill((30, 30, 30))
+
+        aeb_text = "AEB 制动中!" if aeb_active else "巡航系统已启动 (W/S 调速)"
+        aeb_color = (255, 50, 50) if aeb_active else (255, 200, 0)
+
+        lines = [
+            (aeb_text, aeb_color),
+            (f"设定巡航: {target_kmh:.1f} km/h", (255, 150, 200)),
+            (f"当前车速: {current_kmh:.1f} km/h", (0, 255, 255)),
+            (f"油门:[{'开' if throttle > 0.01 else '关'}]  刹车:[{'开' if brake > 0.01 else '关'}]", (150, 150, 150)),
+            (f"档位: {'[R] 倒车' if reverse else '[D] 前进'}", (255, 255, 255)),
+        ]
+
+        for i, (text, color) in enumerate(lines):
+            surf = self.font.render(text, True, color)
+            self.screen.blit(surf, (20, 20 + i * 40))
+
+        pygame.display.flip()
+
+    def quit(self):
+        pygame.quit()
+
+
+# ── 场景初始化 ────────────────────────────────────────────
+
+def get_user_choice():
+    """获取用户选择的靶标类型"""
+    print("=" * 40)
+    print("CARLA 碰撞与巡航测试系统")
+    print("   [1] 测试车辆")
+    print("   [2] 测试行人")
+    print("=" * 40)
+    choice = input("请输入选项 (默认 1): ").strip()
+    return choice if choice in ('1', '2') else '1'
+
+
+def spawn_ego_vehicle(world, bp_lib):
+    """在主车生成点生成车辆，优先选择前方非路口的直道"""
+    spawn_points = world.get_map().get_spawn_points()
+    target_wp = None
+
+    for sp in spawn_points:
+        wp = world.get_map().get_waypoint(sp.location)
+        if not wp.is_junction:
+            fwd = wp.next(TARGET_DISTANCE)
+            if fwd and not fwd[0].is_junction:
+                ego_vehicle = world.try_spawn_actor(bp_lib.find('vehicle.lincoln.mkz_2017'), sp)
+                return ego_vehicle, fwd[0]
+
+    # 回退：使用第一个生成点
+    sp = spawn_points[0]
+    wp = world.get_map().get_waypoint(sp.location)
+    ego_vehicle = world.try_spawn_actor(bp_lib.find('vehicle.lincoln.mkz_2017'), sp)
+    return ego_vehicle, wp.next(FALLBACK_DISTANCE)[0]
+
+
+def spawn_target(world, bp_lib, waypoint, target_type: str):
+    """在指定航点生成靶标"""
+    transform = waypoint.transform
+    transform.location.z += 0.5
+
+    if target_type == '2':
+        target_bp = bp_lib.filter('walker.pedestrian.*')[0]
+    else:
+        target_bp = bp_lib.find('vehicle.tesla.model3')
+
+    actor = world.try_spawn_actor(target_bp, transform)
+    if actor:
+        type_name = "行人" if target_type == '2' else "车辆"
+        print(f"靶标 [{type_name}] 已生成在 ({transform.location.x:.1f}, {transform.location.y:.1f})")
+    else:
+        print("靶标生成失败，空间可能受限")
+    return actor
+
+
+def setup_collision_sensor(world, bp_lib, vehicle):
+    """挂载碰撞传感器，返回 (sensor, flag_list)"""
+    bp = bp_lib.find('sensor.other.collision')
+    sensor = world.try_spawn_actor(bp, carla.Transform(), attach_to=vehicle)
+    flag = [False]
+
+    def on_collision(event):
+        if flag[0]:
+            return
+        flag[0] = True
+        loc = event.actor.get_transform().location
+        impulse = event.normal_impulse
+        intensity = math.sqrt(impulse.x ** 2 + impulse.y ** 2 + impulse.z ** 2)
+        hit_type = "行人" if "walker" in event.other_actor.type_id else "车辆"
+        print(f"\033[91m\n[COLLISION] {hit_type} ({event.other_actor.type_id}), "
+              f"冲量={intensity:.0f}, 坐标=({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})\033[0m")
+
+    if sensor:
+        sensor.listen(on_collision)
+        print("碰撞传感器已挂载")
+    return sensor, flag
+
+
+# ── 主循环逻辑 ────────────────────────────────────────────
+
+def handle_keyboard(speed_ctrl: SpeedController):
+    """处理键盘输入，返回是否退出"""
+    prev_w = getattr(handle_keyboard, 'prev_w', False)
+    prev_s = getattr(handle_keyboard, 'prev_s', False)
+    prev_q = getattr(handle_keyboard, 'prev_q', False)
+
+    curr_q = keyboard.is_pressed('q')
+    if curr_q and not prev_q:
+        speed_ctrl.toggle_reverse()
+
+    curr_w = keyboard.is_pressed('w')
+    if curr_w and not prev_w:
+        speed_ctrl.adjust_target(SPEED_STEP)
+
+    curr_s = keyboard.is_pressed('s')
+    if curr_s and not prev_s:
+        speed_ctrl.adjust_target(-SPEED_STEP)
+
+    handle_keyboard.prev_w = curr_w
+    handle_keyboard.prev_s = curr_s
+    handle_keyboard.prev_q = curr_q
+
+    return keyboard.is_pressed('esc') or pygame.event.peek(pygame.QUIT)
+
+
+def handle_vision_aeb(ego_vehicle, vision_system, lane_planner, speed_ctrl: SpeedController,
+                      control: carla.VehicleControl):
+    """视觉感知 + 变道/AEB 决策"""
+    if not vision_system:
+        return False
+
+    _, min_dist = vision_system.process_and_render()
+    safe_dist = min_dist if min_dist != float('inf') else 100.0
+
+    v = ego_vehicle.get_velocity()
+    speed_m_s = math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2)
+    speed_kmh = speed_m_s * 3.6
+
+    # 横向控制
+    planner_steer = lane_planner.get_lateral_control(safe_dist, speed_kmh)
+    if not speed_ctrl.is_reverse and planner_steer is not None:
+        control.steer = planner_steer
+
+    # 纵向 AEB 决策
+    if min_dist == float('inf'):
+        return False
+
+    braking_dist = (speed_m_s ** 2) / (2 * DECELERATION) + REACTION_DIST
+
+    if lane_planner.is_changing_lane and not speed_ctrl.is_reverse:
+        # 变道时降低速度而非急刹
+        speed_ctrl.target_kmh = LANE_CHANGE_SPEED
+        control.brake = 0.0
+        return False
+
+    if min_dist <= braking_dist and speed_kmh > AEB_MIN_SPEED and not speed_ctrl.is_reverse:
+        print("\033[91m路径受阻，触发 AEB 紧急刹车!\033[0m")
+        speed_ctrl.reset()
+        control.throttle = 0.0
+        control.brake = MAX_BRAKE_STOP
+        control.hand_brake = True
+        return True
+
+    return False
+
+
+def update_spectator(world, ego_vehicle):
+    """更新观察者视角到车辆后方"""
+    transform = ego_vehicle.get_transform()
+    loc = transform.location + carla.Location(z=5) - transform.get_forward_vector() * 10
+    rot = carla.Rotation(pitch=-20, yaw=transform.rotation.yaw)
+    world.get_spectator().set_transform(carla.Transform(loc, rot))
+
+
+def cleanup(world, actor_list: list, display: DisplayPanel):
+    """清理所有 Actor 和设置"""
+    keyboard.unhook_all()
+    for actor in actor_list:
+        if actor is not None:
+            actor.destroy()
+    settings = world.get_settings()
+    settings.synchronous_mode = False
+    world.apply_settings(settings)
+    display.quit()
+    print("环境已清理")
+
+
+# ── 主函数 ────────────────────────────────────────────────
+
+def main():
+    choice = get_user_choice()
+    client = carla.Client(CARLA_HOST, CARLA_PORT)
+    client.set_timeout(TIMEOUT)
     world = client.get_world()
 
     settings = world.get_settings()
     settings.synchronous_mode = True
-    settings.fixed_delta_seconds = 0.05
+    settings.fixed_delta_seconds = FIXED_DT
     world.apply_settings(settings)
 
-    ego_vehicle = None
-    dummy_target = None       
-    collision_sensor = None   
-    vision_system = None      
+    display = DisplayPanel()
+    bp_lib = world.get_blueprint_library()
 
-    pygame.init()
-    screen = pygame.display.set_mode((400, 240)) 
-    pygame.display.set_caption("CARLA 控制面板")
-    
-    pygame.font.init()
-    font = pygame.font.SysFont("simhei", 24) 
+    ego_vehicle, target_wp = spawn_ego_vehicle(world, bp_lib)
+    if not ego_vehicle:
+        print("主车生成失败")
+        cleanup(world, [], display)
+        return
+
+    print("主车已生成，定速巡航就绪")
+    vision_system = VisionSystem(ego_vehicle, world)
+    lane_planner = LanePlanner(ego_vehicle, world)
+
+    dummy_target = spawn_target(world, bp_lib, target_wp, choice)
+    collision_sensor, collision_flag = setup_collision_sensor(world, bp_lib, ego_vehicle)
+
+    speed_ctrl = SpeedController()
+    control = carla.VehicleControl()
+    aeb_active = False
+    was_aeb = False
+
+    actors = [ego_vehicle, dummy_target, collision_sensor,
+              vision_system if hasattr(vision_system, 'destroy') else None]
 
     try:
-        bp_lib = world.get_blueprint_library()
-        vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2017')
-        
-        spawn_points = world.get_map().get_spawn_points()
-        
-        # 1. 寻找一条前方至少有 80 米没有路口的纯直道
-        ego_spawn_point = None
-        target_waypoint = None
-        
-        for sp in spawn_points:
-            wp = world.get_map().get_waypoint(sp.location)
-            # 必须当前不是路口
-            if not wp.is_junction:
-                # 探寻前方 60 米处的路点
-                fwd_wps = wp.next(60.0)
-                if fwd_wps and not fwd_wps[0].is_junction:
-                    ego_spawn_point = sp
-                    target_waypoint = fwd_wps[0]
-                    break
-                    
-        if not ego_spawn_point:
-            print("⚠️ 没找到完美的超长直道，将就用默认点。")
-            ego_spawn_point = spawn_points[0]
-            target_waypoint = world.get_map().get_waypoint(ego_spawn_point.location).next(40.0)[0]
-
-        # 2. 生成主车
-        ego_vehicle = world.try_spawn_actor(vehicle_bp, ego_spawn_point)
-        
-        if ego_vehicle:
-            print("✅ 主车已生成！定速巡航模块已就绪。")
-            vision_system = VisionSystem(ego_vehicle, world)
-            lane_planner = LanePlanner(ego_vehicle, world) 
-
-            # 3. 生成靶标 (使用地图路网获取的精确前方航点)
-            target_transform = target_waypoint.transform
-            target_transform.location.z += 0.5  # 稍微抬高防止卡地里
-            
-            if choice == '2':
-                target_bp = bp_lib.filter('walker.pedestrian.*')[0]
-            else:
-                target_bp = bp_lib.find('vehicle.tesla.model3')
-                
-            dummy_target = world.try_spawn_actor(target_bp, target_transform)
-            
-            if dummy_target:
-                print(f"🎯 前方固定坐标静态测试靶标 [{target_type_name}] 已生成！准备进行测试。")
-            else:
-                print(f"⚠️ {target_type_name} 生成失败，前方空间可能受限。")
-
-            collision_bp = bp_lib.find('sensor.other.collision')
-            collision_sensor = world.try_spawn_actor(collision_bp, carla.Transform(), attach_to=ego_vehicle)
-            collision_flag = [False]
-
-            def on_collision(event):
-                if collision_flag[0]: return
-                collision_flag[0] = True
-                t = event.actor.get_transform()
-                loc = t.location
-                impulse = event.normal_impulse
-                intensity = math.sqrt(impulse.x**2 + impulse.y**2 + impulse.z**2)
-                hit_type = "行人" if "walker" in event.other_actor.type_id else "车辆"
-                
-                print(f"\033[91m\n💥 [致命警告] 发生撞击! 撞击对象: {hit_type} ({event.other_actor.type_id}), "
-                      f"碰撞冲量大小: {intensity:.0f}, "
-                      f"坐标: (x={loc.x:.2f}, y={loc.y:.2f}, z={loc.z:.2f})\033[0m")
-
-            if collision_sensor:
-                collision_sensor.listen(on_collision)
-                print("✅ 碰撞传感器已挂载。")
-
-            control = carla.VehicleControl()
-            steer_cache, is_reverse, target_speed_kmh = 0.0, False, 0.0  
-            Kp, Ki, error_sum = 0.15, 0.02, 0.0 
-
-            prev_key_w = False
-            prev_key_s = False
-            prev_key_q = False
-
-            vision_aeb_active = False 
-            was_aeb_active = False 
-
-            running = True
-            while running:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        running = False
-                        
-                if keyboard.is_pressed('esc'):
+        running = True
+        while running:
+            # 事件处理
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
                     running = False
+            if keyboard.is_pressed('esc'):
+                running = False
 
-                curr_q = keyboard.is_pressed('q')
-                if curr_q and not prev_key_q:
-                    is_reverse = not is_reverse 
-                prev_key_q = curr_q
+            # 键盘控制
+            handle_keyboard(speed_ctrl)
+            if keyboard.is_pressed('space') or collision_flag[0]:
+                speed_ctrl.reset()
+                control.hand_brake, control.throttle, control.brake = True, 0.0, MAX_BRAKE_STOP
+            else:
+                control.hand_brake = False
 
-                curr_w = keyboard.is_pressed('w')
-                if curr_w and not prev_key_w:
-                    target_speed_kmh += 5.0
-                prev_key_w = curr_w
+            # 速度控制
+            v = ego_vehicle.get_velocity()
+            speed_kmh = math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2) * 3.6
+            control.throttle, control.brake = speed_ctrl.compute(speed_kmh)
 
-                curr_s = keyboard.is_pressed('s')
-                if curr_s and not prev_key_s:
-                    target_speed_kmh = max(0.0, target_speed_kmh - 5.0)
-                prev_key_s = curr_s
+            # 视觉 AEB
+            was_aeb = aeb_active
+            aeb_active = handle_vision_aeb(ego_vehicle, vision_system, lane_planner,
+                                           speed_ctrl, control)
+            if aeb_active and not was_aeb:
+                pass  # 日志已在 handle_vision_aeb 中打印
 
-                curr_space = keyboard.is_pressed('space')
-                curr_a = keyboard.is_pressed('a')
-                curr_d = keyboard.is_pressed('d')
+            # 执行控制
+            control.reverse = speed_ctrl.is_reverse
+            ego_vehicle.apply_control(control)
+            world.tick()
 
-                v = ego_vehicle.get_velocity() 
-                speed_m_s = math.sqrt(v.x**2 + v.y**2 + v.z**2) 
-                current_speed_kmh = speed_m_s * 3.6 
-                error = target_speed_kmh - current_speed_kmh
-
-                if target_speed_kmh > 0:
-                    error_sum = max(min(error_sum + error, 40.0), -40.0) 
-                else:
-                    error_sum = 0.0
-
-                if target_speed_kmh == 0.0:
-                    control.throttle, control.brake = 0.0, 0.2 if current_speed_kmh > 0.5 else 1.0
-                elif error > 0:
-                    control.throttle, control.brake = min(max((error * Kp) + (error_sum * Ki), 0.0), 0.75), 0.0
-                else:
-                    control.throttle, control.brake = 0.0, min(max((-error * Kp) - (error_sum * Ki), 0.0), 0.5)
-
-                if curr_space or collision_flag[0]:
-                    control.hand_brake, control.throttle, control.brake, target_speed_kmh, error_sum = True, 0.0, 1.0, 0.0, 0.0             
-                else:
-                    control.hand_brake = False
-
-                # ==========================================
-                # 🌟 核心：感知、规划与控制
-                # ==========================================
-                vision_aeb_active = False
-                
-                if vision_system:
-                    # 1. 视觉感知：获取最近障碍物距离
-                    _, min_dist = vision_system.process_and_render()
-                    
-                    safe_dist = min_dist if min_dist != float('inf') else 100.0
-                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh)
-                    
-                    if not is_reverse and planner_steer is not None:
-                        control.steer = planner_steer
-                        
-                    # 3. 纵向决策 (AES 减速 vs AEB 急刹)
-                    if min_dist != float('inf'):
-                        # 计算当前车速下的安全制动距离 (公式：v²/2a + 反应距离)
-                        braking_dist = (speed_m_s ** 2) / (2 * 6.0) + 3.0 
-                        
-                        if lane_planner.is_changing_lane and not is_reverse:
-                            # 【变道优先级高】：如果正在变道，我们选择“减速绕过”而不是“原地停死”
-                            # 这样可以防止车子切到一半停在马路中间
-                            target_speed_kmh = 15.0  
-                            control.brake = 0.0     # 变道时禁制 AEB 介入
-                            
-                        elif min_dist <= braking_dist and current_speed_kmh > 2.0 and not is_reverse:
-                            # 【制动保底】：如果没有在变道（比如旁边没路），则触发 AEB 紧急制动
-                            vision_aeb_active = True
-                            if not was_aeb_active:
-                                print(f"\033[91m⚠️ 路径受阻且无法变道，触发 AEB 紧急刹车！\033[0m")
-                            target_speed_kmh = 0.0   
-                            control.throttle = 0.0
-                            control.brake = 1.0      
-                            control.hand_brake = True
-                
-                was_aeb_active = vision_aeb_active
-                # ==========================================
-
-                control.reverse = is_reverse
-                ego_vehicle.apply_control(control)
-                world.tick()
-
-                spectator = world.get_spectator()
-                transform = ego_vehicle.get_transform()
-                spectator.set_transform(carla.Transform(
-                    transform.location + carla.Location(z=5) - transform.get_forward_vector() * 10,
-                    carla.Rotation(pitch=-20, yaw=transform.rotation.yaw)
-                ))
-                
-                screen.fill((30, 30, 30)) 
-
-                throttle_status = "开" if control.throttle > 0.01 else "关"
-                brake_status = "开" if control.brake > 0.01 else "关"
-
-                if vision_aeb_active:
-                    info_text1 = font.render("⚠️ 视觉 AEB 介入制动中！", True, (255, 50, 50))
-                else:
-                    info_text1 = font.render("巡航系统已启动 (W/S 调速)", True, (255, 200, 0))
-                    
-                info_text2 = font.render(f"设定巡航: {target_speed_kmh:.1f} km/h", True, (255, 150, 200))
-                info_text3 = font.render(f"当前车速: {current_speed_kmh:.1f} km/h", True, (0, 255, 255))
-                info_text4 = font.render(f"底层输出 -> 油门:[{throttle_status}]  刹车:[{brake_status}]", True, (150, 150, 150))
-                info_text5 = font.render(f"当前档位: {'[R] 倒车' if control.reverse else '[D] 前进'}", True, (255, 255, 255))
-                
-                screen.blit(info_text1, (20, 20))
-                screen.blit(info_text2, (20, 60))
-                screen.blit(info_text3, (20, 100))
-                screen.blit(info_text4, (20, 140))
-                screen.blit(info_text5, (20, 180))
-                
-                pygame.display.flip()
-                
-        else:
-            print("❌ 生成失败，请尝试重启模拟器。")
+            # 渲染
+            update_spectator(world, ego_vehicle)
+            display.render(speed_ctrl.target_kmh, speed_kmh,
+                           control.throttle, control.brake,
+                           speed_ctrl.is_reverse, aeb_active)
 
     except KeyboardInterrupt:
-        print("\n👋 停止程序")
+        print("\n用户中断")
     finally:
-        keyboard.unhook_all()
-        if vision_system:
+        if hasattr(vision_system, 'destroy'):
             vision_system.destroy()
-        if collision_sensor:
-            collision_sensor.destroy()
-        if dummy_target:
-            dummy_target.destroy()
-        if ego_vehicle:
-            ego_vehicle.destroy()
-            
-        settings.synchronous_mode = False
-        world.apply_settings(settings)
-        pygame.quit() 
-        print("🧹 环境已清理。")
+        cleanup(world, [ego_vehicle, dummy_target, collision_sensor], display)
+
 
 if __name__ == '__main__':
     main()

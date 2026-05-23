@@ -24,36 +24,37 @@ def cfg_from_list(cfg_list, config):
             d = d[subkey]
         subkey = key_list[-1]
         assert subkey in d, 'NotFoundKey: %s' % subkey
+
         try:
             value = literal_eval(v)
-        except:
+        except (ValueError, SyntaxError):
             value = v
 
-        if type(value) != type(d[subkey]) and isinstance(d[subkey], EasyDict):
+        if not isinstance(value, type(d[subkey])) and isinstance(d[subkey], EasyDict):
             key_val_list = value.split(',')
             for src in key_val_list:
                 cur_key, cur_val = src.split(':')
                 val_type = type(d[subkey][cur_key])
                 cur_val = val_type(cur_val)
                 d[subkey][cur_key] = cur_val
-        elif type(value) != type(d[subkey]) and isinstance(d[subkey], list):
+        elif not isinstance(value, type(d[subkey])) and isinstance(d[subkey], list):
             val_list = value.split(',')
-            for k, x in enumerate(val_list):
-                val_list[k] = type(d[subkey][0])(x)
+            for k_idx, x in enumerate(val_list):
+                val_list[k_idx] = type(d[subkey][0])(x)
             d[subkey] = val_list
         else:
-            assert type(value) == type(d[subkey]), \
+            assert isinstance(value, type(d[subkey])), \
                 'type {} does not match original type {}'.format(type(value), type(d[subkey]))
             d[subkey] = value
 
 
 def merge_new_config(config, new_config):
     if '_BASE_CONFIG_' in new_config:
-        with open(new_config['_BASE_CONFIG_'], 'r') as f:
+        with open(new_config['_BASE_CONFIG_'], 'r', encoding='utf-8') as f:
             try:
+                yaml_config = yaml.safe_load(f)
+            except yaml.YAMLError:
                 yaml_config = yaml.load(f, Loader=yaml.FullLoader)
-            except:
-                yaml_config = yaml.load(f)
         config.update(EasyDict(yaml_config))
 
     for key, val in new_config.items():
