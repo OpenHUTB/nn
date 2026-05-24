@@ -31,6 +31,17 @@ NOTE: `<env-name>` should be the name of your virtual env.
 ```bash
 pip install -r requirements.txt
 ```
+## 📦 模型权重文件下载
+由于模型文件体积较大，未直接上传至仓库，请通过以下方式获取：
+
+### 下载链接
+链接: https://pan.baidu.com/s/1qubYmwj-uwLHeTeCifNjJw?pwd=ujqw 提取码: ujqw
+
+### 配置方法
+1.  下载模型权重文件（`.pt` 格式）
+2.  将文件放入项目根目录下的 `weights` 文件夹中
+3.  确保路径为：`weights/你的模型文件名.pt`，即可正常运行代码
+
 
 8. Once the setup is done, run Carla.exe file to launch simulator.
 9. Open command prompt or launch Jupyter from conda prompt.
@@ -46,3 +57,4 @@ Example:
 ```bash
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
 ```
+
