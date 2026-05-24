@@ -58,6 +58,10 @@ class SimulationLogger:
         
         self._setup_loggers()
     
+    @staticmethod
+    def _fix_console_encoding():
+        pass
+    
     def _setup_loggers(self):
         """Set up all loggers with appropriate handlers."""
         log_format = '%(asctime)s - %(levelname)s - %(message)s'
@@ -376,6 +380,239 @@ class MemoryMonitor:
         }
 
 
+class AsyncSensorProcessor:
+    """
+    Asynchronous sensor data processing system.
+    
+    Features:
+    - ThreadPoolExecutor for non-blocking sensor callback processing
+    - Batch processing of sensor data to reduce overhead
+    - Non-blocking queue operations with drop policy
+    - Processing statistics and performance tracking
+    """
+    
+    def __init__(self, max_workers=4, batch_size=5, batch_timeout=0.1):
+        """
+        Initialize async sensor processor.
+        
+        Args:
+            max_workers (int): Number of worker threads for processing
+            batch_size (int): Number of items to process per batch
+            batch_timeout (float): Max seconds to wait before processing a partial batch
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.batch_size = batch_size
+        self.batch_timeout = batch_timeout
+        
+        self._pending_camera = []
+        self._pending_lidar = []
+        self._pending_radar = []
+        self._lock_camera = __import__('threading').Lock()
+        self._lock_lidar = __import__('threading').Lock()
+        self._lock_radar = __import__('threading').Lock()
+        
+        self.stats = {
+            'camera_processed': 0,
+            'camera_dropped': 0,
+            'lidar_processed': 0,
+            'lidar_dropped': 0,
+            'radar_processed': 0,
+            'radar_dropped': 0,
+            'batches_flushed': 0
+        }
+        self._shutdown = False
+        
+    def process_camera(self, data, image_queue, sensor_data_list):
+        """
+        Process camera data asynchronously.
+        
+        Args:
+            data: CARLA sensor data
+            image_queue: Queue for visualization
+            sensor_data_list: List to append processed data
+        """
+        def _process():
+            try:
+                array = np.frombuffer(data.raw_data, dtype=np.dtype("uint8"))
+                array = np.reshape(array, (data.height, data.width, 4))
+                array = array[:, :, :3]
+                
+                try:
+                    if not image_queue.full():
+                        image_queue.put((data.frame, array), block=False)
+                    else:
+                        with self._lock_camera:
+                            self.stats['camera_dropped'] += 1
+                except queue.Full:
+                    with self._lock_camera:
+                        self.stats['camera_dropped'] += 1
+                
+                with self._lock_camera:
+                    self._pending_camera.append({
+                        'timestamp': data.timestamp,
+                        'frame': data.frame,
+                        'data': array,
+                        'transform': data.transform
+                    })
+                    self.stats['camera_processed'] += 1
+                    
+                    if len(self._pending_camera) >= self.batch_size:
+                        sensor_data_list.extend(self._pending_camera)
+                        self._pending_camera.clear()
+                        self.stats['batches_flushed'] += 1
+            except Exception as e:
+                logging.error(f"Error processing camera data: {str(e)}")
+        
+        self.executor.submit(_process)
+    
+    def process_lidar(self, data, lidar_queue, sensor_data_list):
+        """
+        Process LiDAR data asynchronously.
+        
+        Args:
+            data: CARLA sensor data
+            lidar_queue: Queue for visualization
+            sensor_data_list: List to append processed data
+        """
+        def _process():
+            try:
+                points = np.frombuffer(data.raw_data, dtype=np.dtype('f4'))
+                points = np.reshape(points, (int(points.shape[0] / 4), 4))
+                
+                try:
+                    if not lidar_queue.full():
+                        lidar_queue.put((data.frame, points), block=False)
+                    else:
+                        with self._lock_lidar:
+                            self.stats['lidar_dropped'] += 1
+                except queue.Full:
+                    with self._lock_lidar:
+                        self.stats['lidar_dropped'] += 1
+                
+                with self._lock_lidar:
+                    self._pending_lidar.append({
+                        'timestamp': data.timestamp,
+                        'frame': data.frame,
+                        'points': points,
+                        'transform': data.transform
+                    })
+                    self.stats['lidar_processed'] += 1
+                    
+                    if len(self._pending_lidar) >= self.batch_size:
+                        sensor_data_list.extend(self._pending_lidar)
+                        self._pending_lidar.clear()
+                        self.stats['batches_flushed'] += 1
+            except Exception as e:
+                logging.error(f"Error processing lidar data: {str(e)}")
+        
+        self.executor.submit(_process)
+    
+    def process_radar(self, data, radar_queue, sensor_data_list):
+        """
+        Process radar data asynchronously.
+        
+        Args:
+            data: CARLA sensor data
+            radar_queue: Queue for visualization
+            sensor_data_list: List to append processed data
+        """
+        def _process():
+            try:
+                points = np.frombuffer(data.raw_data, dtype=np.dtype('f4'))
+                points = np.reshape(points, (int(points.shape[0] / 4), 4))
+                
+                try:
+                    if not radar_queue.full():
+                        radar_queue.put((data.frame, points), block=False)
+                    else:
+                        with self._lock_radar:
+                            self.stats['radar_dropped'] += 1
+                except queue.Full:
+                    with self._lock_radar:
+                        self.stats['radar_dropped'] += 1
+                
+                with self._lock_radar:
+                    self._pending_radar.append({
+                        'timestamp': data.timestamp,
+                        'frame': data.frame,
+                        'points': points,
+                        'transform': data.transform
+                    })
+                    self.stats['radar_processed'] += 1
+                    
+                    if len(self._pending_radar) >= self.batch_size:
+                        sensor_data_list.extend(self._pending_radar)
+                        self._pending_radar.clear()
+                        self.stats['batches_flushed'] += 1
+            except Exception as e:
+                logging.error(f"Error processing radar data: {str(e)}")
+        
+        self.executor.submit(_process)
+    
+    def flush_all(self, sensor_data):
+        """
+        Flush all pending data to sensor_data lists.
+        Call this at the end of simulation or periodically.
+        
+        Args:
+            sensor_data (dict): The sensor_data dictionary
+        """
+        with self._lock_camera:
+            if self._pending_camera:
+                sensor_data['camera'].extend(self._pending_camera)
+                self._pending_camera.clear()
+                self.stats['batches_flushed'] += 1
+        
+        with self._lock_lidar:
+            if self._pending_lidar:
+                sensor_data['lidar'].extend(self._pending_lidar)
+                self._pending_lidar.clear()
+                self.stats['batches_flushed'] += 1
+        
+        with self._lock_radar:
+            if self._pending_radar:
+                sensor_data['radar'].extend(self._pending_radar)
+                self._pending_radar.clear()
+                self.stats['batches_flushed'] += 1
+    
+    def get_stats(self):
+        """Get processing statistics."""
+        total_processed = (self.stats['camera_processed'] + 
+                          self.stats['lidar_processed'] + 
+                          self.stats['radar_processed'])
+        total_dropped = (self.stats['camera_dropped'] + 
+                        self.stats['lidar_dropped'] + 
+                        self.stats['radar_dropped'])
+        return {
+            **self.stats,
+            'total_processed': total_processed,
+            'total_dropped': total_dropped,
+            'drop_rate': f"{total_dropped / (total_processed + total_dropped) * 100:.1f}%" if (total_processed + total_dropped) > 0 else "0%"
+        }
+    
+    def print_stats(self):
+        """Print processing statistics."""
+        stats = self.get_stats()
+        try:
+            print("\n" + "="*60)
+            print("[AsyncSensor] Processor Statistics:")
+            print("="*60)
+            print(f"   Camera: {stats['camera_processed']} processed, {stats['camera_dropped']} dropped")
+            print(f"   LiDAR:  {stats['lidar_processed']} processed, {stats['lidar_dropped']} dropped")
+            print(f"   Radar:  {stats['radar_processed']} processed, {stats['radar_dropped']} dropped")
+            print(f"   Total:  {stats['total_processed']} processed, {stats['total_dropped']} dropped ({stats['drop_rate']})")
+            print(f"   Batches flushed: {stats['batches_flushed']}")
+            print("="*60 + "\n")
+        except UnicodeEncodeError:
+            logging.info(f"[AsyncSensor] Stats: {stats}")
+    
+    def shutdown(self):
+        """Shutdown the executor."""
+        self._shutdown = True
+        self.executor.shutdown(wait=True)
+
+
 class ConfigLoader:
     """
     Configuration loader for CARLA AV Simulation.
@@ -569,25 +806,28 @@ class ConfigLoader:
     
     def print_summary(self):
         """Print configuration summary for debugging."""
-        print("\n" + "="*60)
-        print("📋 Current Configuration Summary:")
-        print("="*60)
-        
-        weather = self.get_weather_params()
-        print("\n🌦️  Weather Parameters:")
-        for key, value in weather.items():
-            print(f"   {key}: {value}")
+        try:
+            print("\n" + "="*60)
+            print("[Config] Current Configuration Summary:")
+            print("="*60)
             
-        traffic = self.get_traffic_params()
-        print("\n🚗 Traffic Parameters:")
-        for key, value in traffic.items():
-            print(f"   {key}: {value}")
-            
-        sim = self.get('simulation', {})
-        print("\n⚙️  Simulation Settings:")
-        print(f"   Duration: {sim.get('duration', 600)}s")
-        print(f"   Tick Rate: {sim.get('tick_rate', 30)} FPS")
-        print("="*60 + "\n")
+            weather = self.get_weather_params()
+            print("\n[Weather] Parameters:")
+            for key, value in weather.items():
+                print(f"   {key}: {value}")
+                
+            traffic = self.get_traffic_params()
+            print("\n[Traffic] Parameters:")
+            for key, value in traffic.items():
+                print(f"   {key}: {value}")
+                
+            sim = self.get('simulation', {})
+            print("\n[Simulation] Settings:")
+            print(f"   Duration: {sim.get('duration', 600)}s")
+            print(f"   Tick Rate: {sim.get('tick_rate', 30)} FPS")
+            print("="*60 + "\n")
+        except UnicodeEncodeError:
+            logging.info("Configuration summary printed (console encoding skipped emoji)")
 
 class SimulationError(Exception):
     """Custom exception for simulation-specific errors"""
@@ -622,7 +862,10 @@ class AVSimulation:
             self.config_loader = ConfigLoader(config_file)
             
             # Print configuration summary on startup
-            self.config_loader.print_summary()
+            try:
+                self.config_loader.print_summary()
+            except Exception:
+                logging.info("Configuration loaded (summary display skipped)")
             
             self.client = carla.Client('localhost', 2000)
             self.client.set_timeout(20.0)  # Increased timeout
@@ -678,10 +921,18 @@ class AVSimulation:
             )
             self.incremental_export_count = 0
 
+            # Async sensor processor for non-blocking callbacks
+            async_config = perf_config.get('async_sensor', {})
+            self.async_processor = AsyncSensorProcessor(
+                max_workers=async_config.get('max_workers', 4),
+                batch_size=async_config.get('batch_size', 5),
+                batch_timeout=async_config.get('batch_timeout', 0.1)
+            )
+
             # Define sensor configurations (now can be overridden by config file)
             self.define_sensor_configurations()
 
-            logging.info("✅ AVSimulation initialized successfully (with config file support)")
+            logging.info("✅ AVSimulation initialized successfully (with config file support + async sensor processing)")
 
         except Exception as e:
             logging.error(f"Failed to initialize AVSimulation: {str(e)}")
@@ -1013,58 +1264,30 @@ class AVSimulation:
 
     def sensor_callback(self, data, sensor_type):
         try:
+            if self.async_processor._shutdown:
+                return
             if sensor_type == 'camera':
+                self.async_processor.process_camera(
+                    data, self.image_queue, self.sensor_data['camera']
+                )
+            elif sensor_type == 'lidar':
+                self.async_processor.process_lidar(
+                    data, self.lidar_queue, self.sensor_data['lidar']
+                )
+            elif sensor_type == 'radar':
+                self.async_processor.process_radar(
+                    data, self.radar_queue, self.sensor_data['radar']
+                )
+            elif sensor_type in ('semantic', 'depth'):
                 array = np.frombuffer(data.raw_data, dtype=np.dtype("uint8"))
                 array = np.reshape(array, (data.height, data.width, 4))
                 array = array[:, :, :3]
-
-                try:
-                    if not self.image_queue.full():
-                        self.image_queue.put((data.frame, array), block=False)
-                except queue.Full:
-                    logging.warning("Image queue is full, dropping frame")
-
-                self.sensor_data['camera'].append({
+                self.sensor_data[sensor_type].append({
                     'timestamp': data.timestamp,
                     'frame': data.frame,
                     'data': array,
                     'transform': data.transform
                 })
-
-            elif sensor_type == 'lidar':
-                points = np.frombuffer(data.raw_data, dtype=np.dtype('f4'))
-                points = np.reshape(points, (int(points.shape[0] / 4), 4))
-
-                try:
-                    if not self.lidar_queue.full():
-                        self.lidar_queue.put((data.frame, points), block=False)
-                except queue.Full:
-                    logging.warning("LiDAR queue is full, dropping frame")
-
-                self.sensor_data['lidar'].append({
-                    'timestamp': data.timestamp,
-                    'frame': data.frame,
-                    'points': points,
-                    'transform': data.transform
-                })
-
-            elif sensor_type == 'radar':
-                points = np.frombuffer(data.raw_data, dtype=np.dtype('f4'))
-                points = np.reshape(points, (int(points.shape[0] / 4), 4))
-
-                try:
-                    if not self.radar_queue.full():
-                        self.radar_queue.put((data.frame, points), block=False)
-                except queue.Full:
-                    logging.warning("Radar queue is full, dropping frame")
-
-                self.sensor_data['radar'].append({
-                    'timestamp': data.timestamp,
-                    'frame': data.frame,
-                    'points': points,
-                    'transform': data.transform
-                })
-
         except Exception as e:
             logging.error(f"Error in sensor callback ({sensor_type}): {str(e)}")
 
@@ -1175,6 +1398,10 @@ class AVSimulation:
                         self.memory_monitor.clear_sensor_data(self.sensor_data)
                         self.memory_monitor.export_count += 1
                         self.incremental_export_count += 1
+
+                    # Flush pending async sensor data every 10 frames
+                    if frame_count % 10 == 0:
+                        self.async_processor.flush_all(self.sensor_data)
                     
                     self.visualize_data()
                     
@@ -1189,6 +1416,14 @@ class AVSimulation:
                     break
                 
         finally:
+            # Clean up sensors first to stop callbacks
+            self.cleanup_actors()
+
+            # Flush remaining async sensor data before export
+            self.async_processor.flush_all(self.sensor_data)
+            self.async_processor.print_stats()
+            self.async_processor.shutdown()
+
             self.export_data(".")
 
             mem_summary = self.memory_monitor.get_summary()

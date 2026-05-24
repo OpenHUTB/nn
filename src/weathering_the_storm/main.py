@@ -53,6 +53,10 @@ class SimulationLogger:
         
         self._setup_loggers()
     
+    @staticmethod
+    def _fix_console_encoding():
+        pass
+    
     def _setup_loggers(self):
         log_format = '%(asctime)s - %(levelname)s - %(message)s'
         date_format = '%Y-%m-%d %H:%M:%S'
@@ -134,15 +138,18 @@ class SimulationLogger:
     
     def print_summary(self):
         summary = self.get_summary()
-        print("\n" + "="*60)
-        print("📝 Logging Session Summary:")
-        print("="*60)
-        print(f"   Total Frames: {summary['total_frames']}")
-        print(f"   Elapsed Time: {summary['elapsed_seconds']}s")
-        print(f"   Average FPS: {summary['avg_fps']}")
-        print(f"   Log Directory: {summary['log_dir']}")
-        print(f"   Performance Entries: {summary['performance_entries']}")
-        print("="*60 + "\n")
+        try:
+            print("\n" + "="*60)
+            print("[Logging] Session Summary:")
+            print("="*60)
+            print(f"   Total Frames: {summary['total_frames']}")
+            print(f"   Elapsed Time: {summary['elapsed_seconds']}s")
+            print(f"   Average FPS: {summary['avg_fps']}")
+            print(f"   Log Directory: {summary['log_dir']}")
+            print(f"   Performance Entries: {summary['performance_entries']}")
+            print("="*60 + "\n")
+        except UnicodeEncodeError:
+            logging.info(f"[Logging] Summary: {summary}")
 
 
 def setup_logging(verbose=False):
