@@ -89,101 +89,54 @@ class FlightControl:
         """导入 GUI 模块"""
         if self.use_gui:
             try:
-                print("开始导入 GUI 模块...")
                 from .gui import FlightControlGUI
                 self.FlightControlGUI = FlightControlGUI
                 print("成功导入 GUI 模块")
-            except Exception as e:
-                print(f"相对导入失败: {e}")
+            except ImportError:
                 try:
-                    import sys
-                    import os
+                    import sys, os
                     sys.path.append(os.path.dirname(__file__))
-                    print(f"添加路径: {os.path.dirname(__file__)}")
                     from gui import FlightControlGUI
                     self.FlightControlGUI = FlightControlGUI
-                    print("成功导入 GUI 模块（直接导入）")
-                except Exception as e2:
-                    print(f"导入 GUI 模块失败: {e2}")
-                    import traceback
-                    traceback.print_exc()
+                    print("成功导入 GUI 模块(直接导入)")
+                except ImportError as e:
+                    print(f"导入 GUI 模块失败: {e}")
                     self.use_gui = False
     
     def import_map(self):
         """导入地图显示模块"""
         if self.use_map:
             try:
-                print("开始导入地图显示模块...")
-                # 尝试相对导入
-                from .map_display import MapDisplay
-                self.MapDisplay = MapDisplay
-                print("成功导入地图显示模块（相对导入）")
-            except Exception as e:
-                print(f"相对导入失败: {e}")
-                try:
-                    # 尝试直接导入
-                    import sys
-                    import os
-                    # 添加src目录到Python路径
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-                    print(f"添加路径: {os.path.join(os.path.dirname(__file__), '..', '..')}")
-                    from src.flight_control.map_display import MapDisplay
-                    self.MapDisplay = MapDisplay
-                    print("成功导入地图显示模块（直接导入）")
-                except Exception as e2:
-                    print(f"导入地图显示模块失败: {e2}")
-                    import traceback
-                    traceback.print_exc()
-                    self.use_map = False
-    
-    def import_map(self):
-        """导入地图显示模块"""
-        if self.use_map:
-            try:
-                # 尝试相对导入
                 from .map_display import MapDisplay
                 self.MapDisplay = MapDisplay
                 print("成功导入地图显示模块")
-            except Exception as e:
-                print(f"相对导入失败: {e}")
+            except ImportError:
                 try:
-                    # 尝试直接导入
-                    import sys
-                    import os
-                    # 添加src目录到Python路径
+                    import sys, os
                     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
                     from src.flight_control.map_display import MapDisplay
                     self.MapDisplay = MapDisplay
-                    print("成功导入地图显示模块")
-                except Exception as e2:
-                    print(f"导入地图显示模块失败: {e2}")
+                    print("成功导入地图显示模块(直接导入)")
+                except ImportError as e:
+                    print(f"导入地图显示模块失败: {e}")
                     self.use_map = False
     
     def import_video(self):
         """导入视频流模块"""
         if self.use_video:
             try:
-                print("开始导入视频流模块...")
-                # 尝试相对导入
                 from .video_stream import create_video_window
                 self.create_video_window = create_video_window
-                print("成功导入视频流模块（相对导入）")
-            except Exception as e:
-                print(f"相对导入失败: {e}")
+                print("成功导入视频流模块")
+            except ImportError:
                 try:
-                    # 尝试直接导入
-                    import sys
-                    import os
-                    # 添加src目录到Python路径
+                    import sys, os
                     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-                    print(f"添加路径: {os.path.join(os.path.dirname(__file__), '..', '..')}")
                     from src.flight_control.video_stream import create_video_window
                     self.create_video_window = create_video_window
-                    print("成功导入视频流模块（直接导入）")
-                except Exception as e2:
-                    print(f"导入视频流模块失败: {e2}")
-                    import traceback
-                    traceback.print_exc()
+                    print("成功导入视频流模块(直接导入)")
+                except ImportError as e:
+                    print(f"导入视频流模块失败: {e}")
                     self.use_video = False
     
     def connect_drone(self):
@@ -234,73 +187,71 @@ class FlightControl:
     def on_press(self, key):
         """处理按键按下事件"""
         try:
-            # 退出程序
             if key == keyboard.Key.esc:
                 self.exit_program()
                 return False
 
-            # 悬停
-            if hasattr(key, 'char') and key.char == 'h':
-                print("悬停")
-                try:
-                    self.client.hoverAsync().join()
-                    self.current_velocity = (0, 0, 0)
-                except Exception as e:
-                    print(f"悬停操作错误: {e}")
+            char = getattr(key, 'char', None)
+            if char is None:
+                return
 
-            # 返航
-            if hasattr(key, 'char') and key.char == 'b':
-                print("返航原点")
-                try:
-                    self.client.moveToPositionAsync(0, 0, self.HEIGHT, 2).join()
-                    self.current_velocity = (0, 0, 0)
-                except Exception as e:
-                    print(f"返航操作错误: {e}")
+            # 按键调度表
+            handlers = {
+                'h': self._hover,
+                'b': self._return_home,
+                'w': lambda: self._move_body(self.SPEED, 0, 0),
+                's': lambda: self._move_body(-self.SPEED * 0.7, 0, 0),
+                'a': lambda: self._move_body(0, -self.SPEED, 0),
+                'd': lambda: self._move_body(0, self.SPEED, 0),
+                'z': self._move_up,
+                'x': self._move_down,
+            }
 
-            # 实时移动
-            if hasattr(key, 'char') and key.char == 'w':
-                try:
-                    self.client.moveByVelocityBodyFrameAsync(self.SPEED, 0, 0, 0.05)
-                    self.current_velocity = (self.SPEED, 0, 0)
-                except Exception as e:
-                    print(f"前进操作错误: {e}")
-            if hasattr(key, 'char') and key.char == 's':
-                try:
-                    self.client.moveByVelocityBodyFrameAsync(-self.SPEED*0.7, 0, 0, 0.05)
-                    self.current_velocity = (-self.SPEED*0.7, 0, 0)
-                except Exception as e:
-                    print(f"后退操作错误: {e}")
-            if hasattr(key, 'char') and key.char == 'a':
-                try:
-                    self.client.moveByVelocityBodyFrameAsync(0, -self.SPEED, 0, 0.05)
-                    self.current_velocity = (0, -self.SPEED, 0)
-                except Exception as e:
-                    print(f"向左操作错误: {e}")
-            if hasattr(key, 'char') and key.char == 'd':
-                try:
-                    self.client.moveByVelocityBodyFrameAsync(0, self.SPEED, 0, 0.05)
-                    self.current_velocity = (0, self.SPEED, 0)
-                except Exception as e:
-                    print(f"向右操作错误: {e}")
-
-            # 高度
-            if hasattr(key, 'char') and key.char == 'z':
-                try:
-                    self.HEIGHT -= 0.5
-                    self.client.moveToZAsync(self.HEIGHT, 0.8)
-                    print(f"设置高度: {abs(self.HEIGHT):.1f}m")
-                except Exception as e:
-                    print(f"上升操作错误: {e}")
-            if hasattr(key, 'char') and key.char == 'x':
-                try:
-                    self.HEIGHT += 0.5
-                    self.client.moveToZAsync(self.HEIGHT, 0.8)
-                    print(f"设置高度: {abs(self.HEIGHT):.1f}m")
-                except Exception as e:
-                    print(f"下降操作错误: {e}")
+            if char in handlers:
+                handlers[char]()
 
         except Exception as e:
             print(f"按键处理错误: {e}")
+
+    def _hover(self):
+        """悬停"""
+        try:
+            self.client.hoverAsync().join()
+            self.current_velocity = (0, 0, 0)
+        except Exception as e:
+            print(f"悬停失败: {e}")
+
+    def _return_home(self):
+        """返航原点"""
+        try:
+            self.client.moveToPositionAsync(0, 0, self.HEIGHT, 2).join()
+            self.current_velocity = (0, 0, 0)
+        except Exception as e:
+            print(f"返航失败: {e}")
+
+    def _move_body(self, vx, vy, vz):
+        """体坐标系移动"""
+        try:
+            self.client.moveByVelocityBodyFrameAsync(vx, vy, vz, 0.05)
+            self.current_velocity = (vx, vy, vz)
+        except Exception as e:
+            print(f"移动操作失败: {e}")
+
+    def _move_up(self):
+        """上升"""
+        self.HEIGHT -= 0.5
+        try:
+            self.client.moveToZAsync(self.HEIGHT, 0.8)
+        except Exception as e:
+            print(f"上升失败: {e}")
+
+    def _move_down(self):
+        """下降"""
+        self.HEIGHT += 0.5
+        try:
+            self.client.moveToZAsync(self.HEIGHT, 0.8)
+        except Exception as e:
+            print(f"下降失败: {e}")
     
     def on_release(self, key):
         """处理按键释放事件"""
@@ -405,15 +356,13 @@ class FlightControl:
             print("未启用视频流显示")
     
     def update_position(self):
-        """更新无人机位置"""
-        # 模拟位置数据，用于测试地图显示
+        """更新无人机位置（用于地图显示）"""
         x, y = 0, 0
         direction = 1
         while True:
             try:
                 if self.map_display:
                     if self.client:
-                        # 获取真实无人机状态
                         state = self.client.getMultirotorState()
                         pos = state.kinematics_estimated.position
                         x, y = pos.x_val, pos.y_val
@@ -422,10 +371,9 @@ class FlightControl:
                         x += 0.1 * direction
                         if abs(x) > 10:
                             direction *= -1
-                    # 更新地图显示
                     self.map_display.update_position(x, y)
             except Exception as e:
-                pass
+                print(f"位置更新异常: {e}")
             time.sleep(0.5)
     
     def exit_program(self):
