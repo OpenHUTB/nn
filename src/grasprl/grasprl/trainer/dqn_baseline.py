@@ -79,6 +79,30 @@ class DQN_Trainer(object):
         pixel_y = max_idx // self.env.IMAGE_WIDTH
         pixel_x = max(0, min(pixel_x, self.env.IMAGE_WIDTH - 1))
         pixel_y = max(0, min(pixel_y, self.env.IMAGE_HEIGHT - 1))
+        
+        # 选择一个实际的物体而不是依赖深度图
+        selected_obj = None
+        min_dist = float('inf')
+        for obj_name in self.env.target_objects:
+            wx, wy, wz = self.env.get_body_com(obj_name)
+            if -0.224 <= wx <= 0.224 and -0.224 <= wy <= 0.224 and wz >= 0.9:
+                px, py = self.env.world2pixel(1, wx, wy, wz)
+                old_w, old_h = 224, 224
+                new_w, new_h = self.env.IMAGE_WIDTH, self.env.IMAGE_HEIGHT
+                px = int(px * new_w / old_w)
+                py = int(py * new_h / old_h)
+                px = max(0, min(px, new_w - 1))
+                py = max(0, min(py, new_h - 1))
+                dist = ((pixel_x - px)**2 + (pixel_y - py)**2)**0.5
+                if dist < min_dist:
+                    min_dist = dist
+                    selected_obj = obj_name
+        
+        if selected_obj:
+            wx, wy, wz = self.env.get_body_com(selected_obj)
+            return np.array([wx, wy, wz], dtype=np.float32)
+        
+        # 如果没有找到合适的物体，使用原方法
         if 0 <= pixel_x < self.env.IMAGE_WIDTH and 0 <= pixel_y < self.env.IMAGE_HEIGHT:
             depth = self.depth_before[pixel_y][pixel_x]
         else:
@@ -104,18 +128,23 @@ class DQN_Trainer(object):
         else:
             self.last_action = "instruction"
             action = None
+            available_objects = []
             for obj_name in self.env.target_objects:
                 wx, wy, wz = self.env.get_body_com(obj_name)
                 if -0.224 <= wx <= 0.224 and -0.224 <= wy <= 0.224 and wz >= 0.9:
-                    px, py = self.env.world2pixel(1, wx, wy, wz)
-                    old_w, old_h = 224, 224
-                    new_w, new_h = self.env.IMAGE_WIDTH, self.env.IMAGE_HEIGHT
-                    px = int(px * new_w / old_w)
-                    py = int(py * new_h / old_h)
-                    px = max(0, min(px, new_w - 1))
-                    py = max(0, min(py, new_h - 1))
-                    action = py * new_w + px
-                    break
+                    available_objects.append((obj_name, wx, wy, wz))
+            
+            if available_objects:
+                obj_name, wx, wy, wz = random.choice(available_objects)
+                px, py = self.env.world2pixel(1, wx, wy, wz)
+                old_w, old_h = 224, 224
+                new_w, new_h = self.env.IMAGE_WIDTH, self.env.IMAGE_HEIGHT
+                px = int(px * new_w / old_w)
+                py = int(py * new_h / old_h)
+                px = max(0, min(px, new_w - 1))
+                py = max(0, min(py, new_h - 1))
+                action = py * new_w + px
+            
             if action is None:
                 action = np.random.randint(0, self.env.IMAGE_WIDTH * self.env.IMAGE_HEIGHT)
             return torch.tensor([[action]], dtype=torch.long)
