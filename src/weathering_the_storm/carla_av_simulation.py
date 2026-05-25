@@ -79,7 +79,9 @@ class SimulationLogger:
         self.logger.handlers.clear()
         
         # Console handler (INFO and above)
-        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler = logging.StreamHandler(
+            open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', closefd=False)
+        )
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
@@ -887,6 +889,16 @@ class AVSimulation:
                 window_size = viz_config.get('window_size', [1920, 1080])
                 self.display = pygame.display.set_mode(tuple(window_size), pygame.HWSURFACE | pygame.DOUBLEBUF)
                 self.clock = pygame.time.Clock()
+
+                self._viz_fps = viz_config.get('visualization_fps', 15)
+                self._viz_interval = 1.0 / self._viz_fps
+                self._last_viz_time = 0.0
+                self._lidar_display_points = viz_config.get('lidar_display_points', 2000)
+                self._skip_when_minimized = viz_config.get('skip_when_minimized', True)
+
+                self._font = pygame.font.Font(None, 36)
+                self._text_cache = {}
+                self._text_cache_frame = -1
             except pygame.error as e:
                 raise SimulationError(f"Failed to initialize Pygame display: {str(e)}")
 
@@ -1620,101 +1632,111 @@ class AVSimulation:
             logging.error(f"Error during data export: {str(e)}")
             raise SimulationError(f"Data export failed: {str(e)}")
     def visualize_data(self):
+        now = time.time()
+        if now - self._last_viz_time < self._viz_interval:
+            return
+        self._last_viz_time = now
+
+        if self._skip_when_minimized:
+            try:
+                import ctypes
+                hwnd = pygame.display.get_wm_info()['window']
+                if ctypes.windll.user32.IsIconic(hwnd):
+                    return
+            except Exception:
+                pass
+
         try:
-            # Process camera image
             if not self.image_queue.empty():
                 frame, image = self.image_queue.get()
-                if not np.isnan(image).any():  # Check for NaN values
+                if not np.isnan(image).any():
                     image = np.rot90(image)
                     image = pygame.surfarray.make_surface(image)
                     self.display.blit(image, (0, 0))
-            
-            # Process LiDAR data
+
             if not self.lidar_queue.empty():
                 frame, points = self.lidar_queue.get()
                 lidar_surface = pygame.Surface((400, 400))
                 lidar_surface.fill((0, 0, 0))
-                
-                if points.size > 0 and not np.isnan(points).any():  # Check for NaN values
+
+                if points.size > 0 and not np.isnan(points).any():
                     points_2d = points[:, :2]
                     points_2d = points_2d * 10
                     points_2d += np.array([200, 200])
-                    
-                    # Remove any points outside the visible area
-                    mask = ((points_2d[:, 0] >= 0) & (points_2d[:, 0] < 400) & 
+
+                    mask = ((points_2d[:, 0] >= 0) & (points_2d[:, 0] < 400) &
                            (points_2d[:, 1] >= 0) & (points_2d[:, 1] < 400))
                     points_2d = points_2d[mask]
-                    
+
                     if points_2d.size > 0:
                         heights = points[mask, 2]
-                        heights_norm = np.clip((heights - np.min(heights)) / 
+                        heights_norm = np.clip((heights - np.min(heights)) /
                                              (np.max(heights) - np.min(heights) + 1e-6), 0, 1)
-                        
-                        for i, (x, y) in enumerate(points_2d):
-                            try:
-                                color = (int(255 * heights_norm[i]), 0, 
-                                       int(255 * (1 - heights_norm[i])))
-                                pygame.draw.circle(lidar_surface, color, 
-                                                (int(x), int(y)), 2)
-                            except (ValueError, IndexError):
-                                continue
-                
+
+                        total = len(points_2d)
+                        if total > self._lidar_display_points:
+                            indices = np.linspace(0, total - 1, self._lidar_display_points, dtype=int)
+                            points_2d = points_2d[indices]
+                            heights_norm = heights_norm[indices]
+
+                        colors_r = (255 * heights_norm).astype(int)
+                        colors_b = (255 * (1 - heights_norm)).astype(int)
+
+                        for i in range(len(points_2d)):
+                            x, y = int(points_2d[i, 0]), int(points_2d[i, 1])
+                            color = (colors_r[i], 0, colors_b[i])
+                            lidar_surface.set_at((x, y), color)
+
                 self.display.blit(lidar_surface, (0, self.display.get_height() - 400))
-            
-            # Process radar data
+
             if not self.radar_queue.empty():
                 frame, radar_data = self.radar_queue.get()
                 radar_surface = pygame.Surface((200, 200))
                 radar_surface.fill((0, 0, 0))
-                
-                if radar_data.size > 0 and not np.isnan(radar_data).any():  # Check for NaN values
+
+                if radar_data.size > 0 and not np.isnan(radar_data).any():
                     for detection in radar_data:
                         velocity, azimuth, altitude, depth = detection
                         if not any(np.isnan([velocity, azimuth, altitude, depth])):
                             x = depth * math.cos(azimuth) * 2
                             y = depth * math.sin(azimuth) * 2
-                            
+
                             screen_x = int(100 + x)
                             screen_y = int(100 + y)
-                            
+
                             if 0 <= screen_x < 200 and 0 <= screen_y < 200:
                                 color = (255, 0, 0) if velocity < 0 else (0, 255, 0)
-                                pygame.draw.circle(radar_surface, color, 
+                                pygame.draw.circle(radar_surface, color,
                                                 (screen_x, screen_y), 3)
-                
-                # Display radar visualization in bottom-right corner
-                self.display.blit(radar_surface, (self.display.get_width() - 200, 
+
+                self.display.blit(radar_surface, (self.display.get_width() - 200,
                                                 self.display.get_height() - 200))
-            
-            # Add text overlay with basic info
+
             try:
-                font = pygame.font.Font(None, 36)
                 text_color = (255, 255, 255)
-                
-                # Display frame counts
-                camera_text = f"Camera Frames: {len(self.sensor_data['camera'])}"
-                lidar_text = f"LiDAR Frames: {len(self.sensor_data['lidar'])}"
-                radar_text = f"Radar Frames: {len(self.sensor_data['radar'])}"
-                
-                camera_surface = font.render(camera_text, True, text_color)
-                lidar_surface = font.render(lidar_text, True, text_color)
-                radar_surface = font.render(radar_text, True, text_color)
-                
-                # Position text in top-right corner
-                self.display.blit(camera_surface, (self.display.get_width() - 300, 10))
-                self.display.blit(lidar_surface, (self.display.get_width() - 300, 50))
-                self.display.blit(radar_surface, (self.display.get_width() - 300, 90))
-                
+                current_frame = len(self.sensor_data.get('camera', []))
+
+                if current_frame != self._text_cache_frame:
+                    self._text_cache_frame = current_frame
+                    self._text_cache = {
+                        'camera': self._font.render(f"Camera Frames: {len(self.sensor_data['camera'])}", True, text_color),
+                        'lidar': self._font.render(f"LiDAR Frames: {len(self.sensor_data['lidar'])}", True, text_color),
+                        'radar': self._font.render(f"Radar Frames: {len(self.sensor_data['radar'])}", True, text_color),
+                        'viz_fps': self._font.render(f"Viz FPS: {self._viz_fps}", True, (200, 200, 0)),
+                    }
+
+                self.display.blit(self._text_cache['camera'], (self.display.get_width() - 300, 10))
+                self.display.blit(self._text_cache['lidar'], (self.display.get_width() - 300, 50))
+                self.display.blit(self._text_cache['radar'], (self.display.get_width() - 300, 90))
+                self.display.blit(self._text_cache['viz_fps'], (self.display.get_width() - 300, 130))
+
             except Exception as e:
                 logging.warning(f"Failed to render text overlay: {str(e)}")
-            
-            # Update display
+
             pygame.display.flip()
-            
+
         except Exception as e:
             logging.error(f"Error in visualization: {str(e)}")
-            # Don't raise the error to prevent simulation from stopping
-            pass
 def main():
     simulation = None
     try:

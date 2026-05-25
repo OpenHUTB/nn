@@ -71,7 +71,9 @@ class SimulationLogger:
         self.logger.setLevel(self.level)
         self.logger.handlers.clear()
         
-        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler = logging.StreamHandler(
+            open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', closefd=False)
+        )
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
