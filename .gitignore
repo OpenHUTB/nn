@@ -123,6 +123,9 @@ screenshots/
 !docs/rain_sensor_fusion/image/
 !docs/rain_sensor_fusion/image/*.png
 !docs/rain_sensor_fusion/image/*.csv
+!docs/auto_drive_seg/
+!docs/auto_drive_seg/images/
+!docs/auto_drive_seg/images/*.png
 !src/rain_sensor_fusion/
 !src/rain_sensor_fusion/visualization_results/
 !src/rain_sensor_fusion/visualization_results/*.png
