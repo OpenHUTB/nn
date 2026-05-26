@@ -25,6 +25,12 @@
 <img width="600px" src="examples/result_video_frames.png"/>
 </p>
 
+`--augment` 模式可视化训练时使用的 6 种数据增强（翻转/亮度/对比度/模糊/椒盐噪声/中心裁剪），便于直观了解模型为何对真实道路上的扰动具备一定鲁棒性：
+
+<p align="center">
+<img width="700px" src="examples/result_augmentation.png"/>
+</p>
+
 ## 运行环境
 
 - 平台：Windows 10/11（Linux 同理）
@@ -92,6 +98,20 @@ python main.py path/to/video.mp4 models/unet_model_256x256_50 120
 ```
 
 视频为二进制大文件，不随仓库提交。可用原始项目 `examples/` 目录下的 `.mp4`（如 `movie1.mp4`）作测试。运行后在视频同目录生成 `*_seg.mp4`（逐帧分割叠加视频）和 `*_seg_frames.png`（采样帧拼图）。
+
+### 数据增强可视化（--augment）
+
+`semantic/unet/dataset.py` 训练时对每张图随机施加 6 种增强以缓解过拟合。`--augment` 模式分别对单张输入图独立施加每种增强并排展示（不需要模型）：
+
+```bash
+# 默认示例图
+python main.py --augment
+
+# 指定输入图
+python main.py --augment examples/sample_input.png
+```
+
+运行后在输入图同目录生成 `*_augment.png`（4 列拼图，包含原图 + 6 种增强：水平翻转、亮度+30%、对比度-30%、高斯模糊、椒盐噪声 5%、中心裁剪 256）。
 
 ## 目录说明
 

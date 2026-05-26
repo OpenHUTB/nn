@@ -2,15 +2,18 @@
 自动驾驶车辆语义分割 —— 推理入口
 
 加载预训练 U-Net 模型，对 CARLA 街景做 8 类语义分割。
-支持两种输入，按扩展名自动识别：
+支持三种模式，按扩展名/参数自动识别：
   - 图片 (.png/.jpg/...)：输出叠加图 (overlay) 和纯掩码图 (mask)
   - 视频 (.mp4/.avi/...)：逐帧分割，输出叠加视频，并生成采样帧拼图
+  - --augment 图片：对同一张图分别施加 6 种训练时用到的数据增强并排展示（不需要模型）
 
 用法：
     python main.py                                   # 用默认示例图 + 默认模型
     python main.py <输入>                             # 指定输入（图片或视频）
     python main.py <输入> <模型目录>                  # 指定输入和模型
     python main.py <输入> <模型目录> <最大帧数>       # 视频限制处理帧数
+    python main.py --augment                         # 默认示例图，可视化 6 种数据增强
+    python main.py --augment <输入图>                 # 指定输入图做增强可视化
 
 模型说明：
     预训练模型为二进制大文件（每个约 17MB），未随仓库提交。
@@ -27,7 +30,7 @@ if MODULE_DIR not in sys.path:
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 from semantic.unet.utils import infer, labels_to_image, overlay_labels_on_input
 
@@ -74,6 +77,82 @@ def make_montage(frames, cols=3):
     for i, frame in enumerate(frames):
         montage.paste(frame, ((i % cols) * w, (i // cols) * h))
     return montage
+
+
+def label_panel(panel, text):
+    """在 PIL 图左上角绘制半透明黑底白字标签。"""
+    out = panel.copy()
+    draw = ImageDraw.Draw(out, "RGBA")
+    try:
+        font = ImageFont.truetype("arial.ttf", max(14, panel.size[0] // 28))
+    except OSError:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), text, font=font)
+    pad = 6
+    box = (0, 0, bbox[2] - bbox[0] + 2 * pad, bbox[3] - bbox[1] + 2 * pad)
+    draw.rectangle(box, fill=(0, 0, 0, 180))
+    draw.text((pad, pad), text, fill=(255, 255, 255, 255), font=font)
+    return out
+
+
+def visualize_augmentations(img):
+    """对单张 PIL 图分别施加 6 种训练时的数据增强，返回 (标签, 图) 列表。
+
+    增强逻辑取自 semantic/unet/dataset.py，但这里每种增强独立施加在原图上，
+    便于直观对比每种变换的效果（训练时 6 种增强会被随机组合）。
+    """
+    panels = [("original", img.copy())]
+
+    # 1. 水平翻转
+    panels.append(("horizontal flip", ImageOps.mirror(img)))
+
+    # 2. 亮度 +30%（训练时范围 ±40%）
+    panels.append(("brightness +30%", ImageEnhance.Brightness(img).enhance(1.30)))
+
+    # 3. 对比度 -30%（训练时范围 -40% 到 0%）
+    panels.append(("contrast -30%", ImageEnhance.Contrast(img).enhance(0.70)))
+
+    # 4. 高斯模糊（半径 3，训练时范围 0-5）
+    panels.append(("gaussian blur r=3", img.filter(ImageFilter.GaussianBlur(3.0))))
+
+    # 5. 椒盐噪声 5%（训练时范围 0-7%）
+    from skimage.util import random_noise
+
+    arr = np.asarray(img.convert("RGB"), dtype="uint8")
+    noisy = (255 * random_noise(arr, mode="salt", amount=0.05)).astype("uint8")
+    panels.append(("salt noise 5%", Image.fromarray(noisy)))
+
+    # 6. 中心裁剪缩放（训练时 50% 概率走该分支，从图像中间横向滑窗选 256x256 子区域）
+    w, h = img.size
+    crop_size = 256
+    cx = w // 2
+    cy = h // 2
+    cropped = img.crop(
+        (cx - crop_size // 2, cy - crop_size // 2, cx + crop_size // 2, cy + crop_size // 2)
+    )
+    panels.append(("center crop 256", cropped.resize((w, h))))
+
+    return panels
+
+
+def run_augment(input_path):
+    """加载图片，可视化 6 种数据增强，输出并排对比图（无需模型）。"""
+    img = Image.open(input_path).convert("RGB")
+    print(f"      输入图片: {input_path}  尺寸: {img.size}")
+    print("[1/2] 施加 6 种训练时使用的数据增强 ...")
+    panels = visualize_augmentations(img)
+
+    print("[2/2] 拼接对比图 ...")
+    # 每个面板缩到原图一半再拼，避免最终图过大
+    half = (img.size[0] // 2, img.size[1] // 2)
+    labeled = [label_panel(p.resize(half), name) for name, p in panels]
+    # 7 个面板用 4 列布局 → 2 行（最后一格留空）
+    grid = make_montage(labeled, cols=4)
+
+    base, _ = os.path.splitext(input_path)
+    out_path = f"{base}_augment.png"
+    grid.save(out_path)
+    print(f"      已写出数据增强可视化: {out_path}")
 
 
 def run_image(model, img_path):
@@ -142,9 +221,20 @@ def run_video(model, video_path, max_frames):
 
 
 def main():
-    input_path = sys.argv[1] if len(sys.argv) >= 2 else DEFAULT_INPUT
-    model_dir = sys.argv[2] if len(sys.argv) >= 3 else DEFAULT_MODEL
-    max_frames = int(sys.argv[3]) if len(sys.argv) >= 4 else DEFAULT_MAX_FRAMES
+    args = sys.argv[1:]
+    if args and args[0] == "--augment":
+        rest = args[1:]
+        input_path = rest[0] if rest else DEFAULT_INPUT
+        if not os.path.isfile(input_path):
+            print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
+            sys.exit(1)
+        run_augment(input_path)
+        print("完成。")
+        return
+
+    input_path = args[0] if len(args) >= 1 else DEFAULT_INPUT
+    model_dir = args[1] if len(args) >= 2 else DEFAULT_MODEL
+    max_frames = int(args[2]) if len(args) >= 3 else DEFAULT_MAX_FRAMES
 
     if not os.path.isfile(input_path):
         print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
