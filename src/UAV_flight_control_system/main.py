@@ -5,13 +5,17 @@ import signal
 import math
 import threading
 from pynput import keyboard
-
+import airsim
+import time
+import airsim
+import time
 # ======================= 连接无人机 =======================
 client = airsim.MultirotorClient()
 client.confirmConnection()
 client.enableApiControl(True)
 client.armDisarm(True)
-
+current_vx = 0
+current_vy = 0
 # ======================= 核心参数 =======================
 SPEED = 1.5
 HEIGHT = -3

@@ -1,0 +1,35 @@
+<mujoco model="quadruped_contact_balance">
+  <compiler angle="degree" coordinate="local"/>
+  <option timestep="0.01" gravity="0 0 -9.81"/>
+  <worldbody>
+    <geom name="floor" type="plane" size="2 2 0.05" rgba="0.45 0.45 0.45 1"/>
+    <body name="torso" pos="0 0 0.52">
+      <joint name="root" type="free"/>
+      <geom name="torso_geom" type="box" size="0.22 0.12 0.06" mass="8"/>
+      <site name="com_site" pos="0 0 0" size="0.02"/>
+      <body name="left_front_foot" pos="0.18 0.12 -0.49">
+        <geom name="lf_contact" type="sphere" size="0.035" condim="3"/>
+        <site name="lf_force_site" pos="0 0 0" size="0.015"/>
+      </body>
+      <body name="right_front_foot" pos="0.18 -0.12 -0.49">
+        <geom name="rf_contact" type="sphere" size="0.035" condim="3"/>
+        <site name="rf_force_site" pos="0 0 0" size="0.015"/>
+      </body>
+      <body name="left_rear_foot" pos="-0.18 0.12 -0.49">
+        <geom name="lr_contact" type="sphere" size="0.035" condim="3"/>
+        <site name="lr_force_site" pos="0 0 0" size="0.015"/>
+      </body>
+      <body name="right_rear_foot" pos="-0.18 -0.12 -0.49">
+        <geom name="rr_contact" type="sphere" size="0.035" condim="3"/>
+        <site name="rr_force_site" pos="0 0 0" size="0.015"/>
+      </body>
+    </body>
+  </worldbody>
+  <sensor>
+    <framepos name="com_position" objtype="site" objname="com_site"/>
+    <force name="lf_contact_force" site="lf_force_site"/>
+    <force name="rf_contact_force" site="rf_force_site"/>
+    <force name="lr_contact_force" site="lr_force_site"/>
+    <force name="rr_contact_force" site="rr_force_site"/>
+  </sensor>
+</mujoco>

@@ -33,6 +33,8 @@
 1. **安装 Python 依赖**:
    ```bash
    pip install pygame opencv-python numpy
+   ```
+   pip install pygame opencv-python numpy
    
 2. **启动方式：**
 CarlaUE4.exe    # Windows 系统下执行

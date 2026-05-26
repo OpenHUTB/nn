@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>DriveHealth Blackbox Report</title>
+  <style>
+    body { font-family: Arial, "Microsoft YaHei", sans-serif; margin: 28px; color: #0f172a; background: #f8fafc; }
+    header { background: #0f766e; color: white; padding: 24px; border-radius: 10px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 18px 0; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .card strong { display: block; font-size: 24px; margin-top: 6px; }
+    section { background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin: 18px 0; padding: 18px; }
+    img { width: 100%; max-width: 1200px; display: block; border: 1px solid #e5e7eb; border-radius: 6px; }
+    table { border-collapse: collapse; width: 100%; background: white; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; font-size: 13px; }
+    th { background: #ecfeff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DriveHealth: 自健康黑匣子报告</h1>
+    <p>无需 CARLA/AirSim/MuJoCo，基于多源传感器流完成运行安全诊断、事件记录和可视化复盘。</p>
+  </header>
+  <div class="cards">
+    <div class="card">平均健康分<strong>86.19</strong></div>
+    <div class="card">最低健康分<strong>47.1</strong></div>
+    <div class="card">黑匣子事件<strong>9</strong></div>
+    <div class="card">峰值风险<strong>100.0</strong></div>
+    <div class="card">最终等级<strong>NORMAL</strong></div>
+  </div>
+  <section>
+    <h2>Top Blackbox Events</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Subsystem</th><th>Severity</th><th>Peak Time(s)</th><th>Peak Risk</th><th>Recommended Action</th></tr></thead>
+      <tbody><tr><td>DH-003</td><td>Speed sensor</td><td>CRITICAL</td><td>230.0</td><td>100.0</td><td>Cross-check wheel/IMU/GNSS speed and mark sensor unreliable.</td></tr><tr><td>DH-004</td><td>Speed sensor</td><td>CRITICAL</td><td>300.0</td><td>100.0</td><td>Cross-check wheel/IMU/GNSS speed and mark sensor unreliable.</td></tr><tr><td>DH-006</td><td>Brake margin</td><td>CRITICAL</td><td>300.0</td><td>100.0</td><td>Increase following distance and prepare emergency braking.</td></tr><tr><td>DH-002</td><td>Smoke</td><td>CRITICAL</td><td>194.0</td><td>94.42</td><td>Open ventilation, isolate power module, prepare safe stop.</td></tr><tr><td>DH-009</td><td>Takeover</td><td>WARNING</td><td>364.0</td><td>77.35</td><td>Issue takeover warning and switch to conservative mode.</td></tr><tr><td>DH-001</td><td>Thermal</td><td>WATCH</td><td>149.0</td><td>73.0</td><td>Reduce speed, enable cooling, inspect battery/motor loop.</td></tr><tr><td>DH-005</td><td>Brake margin</td><td>WATCH</td><td>292.0</td><td>69.74</td><td>Increase following distance and prepare emergency braking.</td></tr><tr><td>DH-008</td><td>Takeover</td><td>WATCH</td><td>356.0</td><td>68.3</td><td>Issue takeover warning and switch to conservative mode.</td></tr><tr><td>DH-007</td><td>Takeover</td><td>WATCH</td><td>351.0</td><td>65.07</td><td>Issue takeover warning and switch to conservative mode.</td></tr></tbody>
+    </table>
+  </section>
+  <section><h2>01 System Overview Dashboard</h2><img src='01_system_overview_dashboard.png' alt='01_system_overview_dashboard'></section>
+<section><h2>02 Health Score Timeline</h2><img src='02_health_score_timeline.png' alt='02_health_score_timeline'></section>
+<section><h2>03 Sensor Streams Overview</h2><img src='03_sensor_streams_overview.png' alt='03_sensor_streams_overview'></section>
+<section><h2>04 Subsystem Risk Heatmap</h2><img src='04_subsystem_risk_heatmap.png' alt='04_subsystem_risk_heatmap'></section>
+<section><h2>05 Blackbox Event Timeline</h2><img src='05_blackbox_event_timeline.png' alt='05_blackbox_event_timeline'></section>
+<section><h2>06 Risk Radar Summary</h2><img src='06_risk_radar_summary.png' alt='06_risk_radar_summary'></section>
+<section><h2>07 Event Distribution</h2><img src='07_event_distribution.png' alt='07_event_distribution'></section>
+<section><h2>08 Feature Health Correlation</h2><img src='08_feature_health_correlation.png' alt='08_feature_health_correlation'></section>
+<section><h2>09 Health Score Distribution</h2><img src='09_health_score_distribution.png' alt='09_health_score_distribution'></section>
+<section><h2>10 Action Priority Board</h2><img src='10_action_priority_board.png' alt='10_action_priority_board'></section>
+</body>
+</html>

@@ -72,7 +72,7 @@
 在终端执行主程序：
 
 ```
-1python env_manager.py
+python env_manager.py
 ```
 
 3. 运行效果

@@ -59,6 +59,10 @@ env/
 *.pkl
 *.pickle
 *.ckpt
+*.bin
+*.safetensors
+!src/robot_navigation_system/*.pt
+!src/robot_navigation_system/*.pth
 models/
 !src/yolo12_object_detection/scripts/ultralytics/models/
 !src/yolo12_object_detection/scripts/ultralytics/cfg/models/
@@ -114,6 +118,18 @@ screenshots/
 !docs/carla_CAM/
 !docs/carla_CAM/images/
 !docs/carla_CAM/images/*.png
+!docs/dqn_*.png
+!docs/rain_sensor_fusion/
+!docs/rain_sensor_fusion/image/
+!docs/rain_sensor_fusion/image/*.png
+!docs/rain_sensor_fusion/image/*.csv
+!src/rain_sensor_fusion/
+!src/rain_sensor_fusion/visualization_results/
+!src/rain_sensor_fusion/visualization_results/*.png
+!src/rain_sensor_fusion/visualization_results/*.csv
+!src/robot_navigation_system/*.png
+!src/robot_navigation_system/*.jpg
+!src/robot_navigation_system/*.jpeg
 # ========================================
 # Jupyter Notebook
 # ========================================
@@ -149,3 +165,8 @@ site/
 # =========================================
 .env.local
 .env.*.local
+# ========================================
+# 临时 Python 文件
+# ========================================
+*.pyo
+*.pyd
