@@ -131,6 +131,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/auto_drive_seg/</loc>
+         <lastmod>2026-05-26</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_CAM/</loc>
          <lastmod>2026-05-26</lastmod>
          <changefreq>daily</changefreq>
