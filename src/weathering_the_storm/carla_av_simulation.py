@@ -19,6 +19,15 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 
 try:
+    from rich.console import Console
+    from rich.live import Live
+    from rich.panel import Panel
+    from rich.table import Table
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+
+try:
     import yaml
     YAML_AVAILABLE = True
 except ImportError:
@@ -1327,15 +1336,23 @@ class AVSimulation:
         except Exception as e:
             logging.error(f"Error during cleanup: {str(e)}")
 
+    def _scale_weather_params(self, base_params, intensity):
+        scaled = {}
+        for key, value in base_params.items():
+            if key == 'sun_altitude_angle':
+                scaled[key] = value
+            else:
+                scaled[key] = round(value * intensity, 1)
+        return scaled
+
     def run_simulation(self, config_name, duration_seconds=600):
+        dashboard = None
         try:
-            # Enable synchronous mode
             settings = self.world.get_settings()
             settings.synchronous_mode = True
-            settings.fixed_delta_seconds = 0.025  # 40 FPS
+            settings.fixed_delta_seconds = 0.025
             self.world.apply_settings(settings)
             
-            # Setup traffic manager
             traffic_manager = self.client.get_trafficmanager(8000)
             traffic_manager.set_synchronous_mode(True)
             
@@ -1344,26 +1361,22 @@ class AVSimulation:
             traffic_vehicles = []
             pedestrians = []
 
-            # Set up weather
             weather = self.setup_weather()
             logging.info("Weather configured successfully")
 
-            # Spawn ego vehicle with collision checking
-            # blueprint = self.world.get_blueprint_library().find('vehicle.tesla.model3')
+            base_weather_params = self.config_loader.get_weather_params()
+
             blueprint = self.world.get_blueprint_library().find('vehicle.yamaha.yzf')
-            # blueprint = self.world.get_blueprint_library().find('vehicle.mercedes.sprinter')
             spawn_points = self.map.get_spawn_points()
 
             if not spawn_points:
                 raise SimulationError("No spawn points available")
 
-            # Try different spawn points until finding one without collision
             spawn_success = False
-            random.shuffle(spawn_points)  # Randomize spawn points
+            random.shuffle(spawn_points)
 
             for spawn_point in spawn_points:
                 try:
-                    # Check if spawn point is clear
                     if self.world.get_spectator().get_transform().location.distance(spawn_point.location) > 2.0:
                         vehicle = self.world.try_spawn_actor(blueprint, spawn_point)
                         if vehicle is not None:
@@ -1380,38 +1393,79 @@ class AVSimulation:
             vehicle.set_autopilot(True)
             logging.info(f"Ego vehicle spawned successfully at {spawn_point}")
 
-            # Wait a moment for physics to settle
             time.sleep(0.5)
 
-            # Setup traffic
             traffic_vehicles, pedestrians = self.setup_traffic()
             logging.info("Traffic setup completed")
 
-            # Setup sensors
             sensors = self.setup_sensors(vehicle, config_name)
             self.active_sensors.extend(sensors)
             logging.info(f"Sensors setup completed for configuration: {config_name}")
 
-            # Main simulation loop
+            dashboard = SimulationDashboard(
+                duration=duration_seconds,
+                weather_name='storm',
+                mode=f'full ({config_name})'
+            )
+            dashboard.vehicles_count = len(traffic_vehicles)
+            dashboard.pedestrians_count = len(pedestrians)
+            dashboard.start()
+
+            paused = False
+            weather_intensity = 1.0
+            debug_mode = False
+            quit_requested = False
+
             start_time = time.time()
             frame_count = 0
+            last_dash_update = 0
 
-            while time.time() - start_time < duration_seconds:
+            while time.time() - start_time < duration_seconds and not quit_requested:
                 try:
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            quit_requested = True
+                        elif event.type == pygame.KEYDOWN:
+                            if event.key == pygame.K_SPACE:
+                                paused = not paused
+                                dashboard.paused = paused
+                            elif event.key == pygame.K_w:
+                                weather_intensity = min(1.0, round(weather_intensity + 0.1, 1))
+                                dashboard.weather_intensity = weather_intensity
+                                scaled = self._scale_weather_params(base_weather_params, weather_intensity)
+                                self.world.set_weather(carla.WeatherParameters(**scaled))
+                                logging.info(f"Weather intensity: {weather_intensity*100:.0f}%")
+                            elif event.key == pygame.K_s:
+                                weather_intensity = max(0.0, round(weather_intensity - 0.1, 1))
+                                dashboard.weather_intensity = weather_intensity
+                                scaled = self._scale_weather_params(base_weather_params, weather_intensity)
+                                self.world.set_weather(carla.WeatherParameters(**scaled))
+                                logging.info(f"Weather intensity: {weather_intensity*100:.0f}%")
+                            elif event.key == pygame.K_q:
+                                quit_requested = True
+                                dashboard.quit_requested = True
+                            elif event.key == pygame.K_d:
+                                debug_mode = not debug_mode
+                                dashboard.debug_mode = debug_mode
+
+                    if paused:
+                        time.sleep(0.05)
+                        elapsed = time.time() - start_time
+                        dashboard.update(elapsed=elapsed)
+                        continue
+
                     self.world.tick()
                     
-                    # Memory monitoring - check every N seconds
                     mem_status = self.memory_monitor.check_memory(
                         self.sensor_data, time.time()
                     )
                     if mem_status['action'] == 'export_and_clear':
-                        logging.info("💾 Memory threshold reached, performing incremental export...")
+                        logging.info("Memory threshold reached, performing incremental export...")
                         self.export_data_incremental(".")
                         self.memory_monitor.clear_sensor_data(self.sensor_data)
                         self.memory_monitor.export_count += 1
                         self.incremental_export_count += 1
 
-                    # Flush pending async sensor data every 10 frames
                     if frame_count % 10 == 0:
                         self.async_processor.flush_all(self.sensor_data)
                     
@@ -1419,23 +1473,40 @@ class AVSimulation:
                     
                     frame_count += 1
                     
-                    for event in pygame.event.get():
-                        if event.type == pygame.QUIT:
-                            return
+                    now = time.time()
+                    elapsed = now - start_time
+                    if now - last_dash_update >= 0.25:
+                        fps = frame_count / elapsed if elapsed > 0 else 0
+                        mem_mb = self.memory_monitor.get_memory_mb()
+                        dashboard.update(
+                            elapsed=elapsed,
+                            fps=fps,
+                            memory_mb=mem_mb,
+                            frame_count=frame_count,
+                            camera_frames=len(self.sensor_data.get('camera', [])),
+                            lidar_frames=len(self.sensor_data.get('lidar', [])),
+                            radar_frames=len(self.sensor_data.get('radar', [])),
+                            semantic_frames=len(self.sensor_data.get('semantic', [])),
+                            depth_frames=len(self.sensor_data.get('depth', [])),
+                            queue_sizes={
+                                'image': self.image_queue.qsize(),
+                                'lidar': self.lidar_queue.qsize(),
+                                'radar': self.radar_queue.qsize(),
+                            }
+                        )
+                        last_dash_update = now
                 
                 except Exception as e:
                     logging.error(f"Error in simulation loop: {str(e)}")
                     break
                 
         finally:
-            # Clean up sensors first to stop callbacks
+            if dashboard:
+                dashboard.stop()
             self.cleanup_actors()
-
-            # Flush remaining async sensor data before export
             self.async_processor.flush_all(self.sensor_data)
             self.async_processor.print_stats()
             self.async_processor.shutdown()
-
             self.export_data(".")
 
             mem_summary = self.memory_monitor.get_summary()
@@ -1737,15 +1808,174 @@ class AVSimulation:
 
         except Exception as e:
             logging.error(f"Error in visualization: {str(e)}")
+class SimulationDashboard:
+    def __init__(self, duration, weather_name='rain', mode='quick'):
+        self.duration = duration
+        self.weather_name = weather_name
+        self.mode = mode
+        self.weather_intensity = 1.0
+        self.paused = False
+        self.debug_mode = False
+        self.quit_requested = False
+        self.elapsed = 0.0
+        self.fps = 0.0
+        self.memory_mb = 0.0
+        self.frame_count = 0
+        self.camera_frames = 0
+        self.lidar_frames = 0
+        self.radar_frames = 0
+        self.semantic_frames = 0
+        self.depth_frames = 0
+        self.vehicles_count = 0
+        self.pedestrians_count = 0
+        self.queue_sizes = {}
+        self._console = Console(force_terminal=True) if RICH_AVAILABLE else None
+        self._live = None
+        self._status = "Running"
+
+    def start(self):
+        if not RICH_AVAILABLE:
+            return
+        self._live = Live(
+            self._build_panel(),
+            console=self._console,
+            refresh_per_second=4,
+            transient=False,
+        )
+        self._live.start()
+
+    def stop(self):
+        if self._live:
+            self._live.stop()
+            self._live = None
+
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+        self._status = "PAUSED" if self.paused else "Running"
+        if self._live:
+            self._live.update(self._build_panel())
+
+    def check_keyboard(self):
+        try:
+            import msvcrt
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                self._handle_key(key)
+        except ImportError:
+            pass
+
+    def _handle_key(self, key):
+        if key == b' ':
+            self.paused = not self.paused
+            self._status = "PAUSED" if self.paused else "Running"
+        elif key in (b'w', b'W'):
+            self.weather_intensity = min(1.0, round(self.weather_intensity + 0.1, 1))
+        elif key in (b's', b'S'):
+            self.weather_intensity = max(0.0, round(self.weather_intensity - 0.1, 1))
+        elif key in (b'q', b'Q'):
+            self.quit_requested = True
+            self._status = "Stopping..."
+        elif key in (b'd', b'D'):
+            self.debug_mode = not self.debug_mode
+        if self._live:
+            self._live.update(self._build_panel())
+
+    def get_scaled_weather_params(self, base_params):
+        scaled = {}
+        for key, value in base_params.items():
+            if key == 'sun_altitude_angle':
+                scaled[key] = value
+            else:
+                scaled[key] = round(value * self.weather_intensity, 1)
+        return scaled
+
+    def _get_weather_label(self):
+        i = self.weather_intensity
+        if i <= 0.05:
+            return "Clear"
+        elif i <= 0.25:
+            return "Light Rain"
+        elif i <= 0.5:
+            return "Moderate Rain"
+        elif i <= 0.75:
+            return "Heavy Rain"
+        else:
+            return "Storm"
+
+    def _build_panel(self):
+        if not RICH_AVAILABLE:
+            return ""
+
+        table = Table(show_header=False, box=None, padding=(0, 2), expand=False)
+        table.add_column(justify="left", no_wrap=True)
+
+        status_style = "bold green" if not self.paused else "bold yellow"
+        status_icon = ">" if not self.paused else "||"
+
+        table.add_row(f"[bold cyan]CARLA AV Simulation[/]  [{status_style}]{status_icon} {self._status}[/]")
+        table.add_row("[dim]──────────────────────────────────────────[/]")
+
+        progress_pct = min(self.elapsed / self.duration, 1.0) if self.duration > 0 else 0
+        bar_len = 20
+        filled = int(bar_len * progress_pct)
+        bar = "#" * filled + "-" * (bar_len - filled)
+        table.add_row(f"  Progress: [cyan][{bar}][/]{progress_pct*100:5.1f}%  {self.elapsed:.1f}/{self.duration}s")
+
+        table.add_row(f"  FPS: [cyan]{self.fps:6.1f}[/] | Memory: [cyan]{self.memory_mb:.0f}MB[/]")
+
+        weather_label = self._get_weather_label()
+        table.add_row(f"  Weather: [cyan]{weather_label} ({self.weather_intensity*100:.0f}%)[/]")
+
+        sensor_parts = [f"Camera: [cyan]{self.camera_frames}[/]"]
+        sensor_parts.append(f"LiDAR: [cyan]{self.lidar_frames}[/]")
+        if self.radar_frames > 0:
+            sensor_parts.append(f"Radar: [cyan]{self.radar_frames}[/]")
+        table.add_row("  " + " | ".join(sensor_parts))
+
+        table.add_row("[dim]──────────────────────────────────────────[/]")
+        table.add_row("[dim][Space] Pause  [W/S] Weather  [Q] Quit  [D] Debug[/]")
+
+        if self.debug_mode:
+            table.add_row("[dim]──────────────────────────────────────────[/]")
+            debug_parts = [f"Frame: {self.frame_count}"]
+            debug_parts.append(f"Vehicles: {self.vehicles_count}")
+            debug_parts.append(f"Pedestrians: {self.pedestrians_count}")
+            table.add_row(f"[dim]{' | '.join(debug_parts)}[/]")
+            if self.queue_sizes:
+                qs = " | ".join(f"{k}: {v}" for k, v in self.queue_sizes.items())
+                table.add_row(f"[dim]Queues: {qs}[/]")
+            table.add_row(f"[dim]Mode: {self.mode} | Weather base: {self.weather_name}[/]")
+
+        return Panel(table, border_style="cyan", padding=(1, 2), title="[bold]Dashboard[/]", title_align="left")
+
+
 def main():
     simulation = None
     try:
         simulation = AVSimulation()
         configs = ['minimal', 'standard', 'advanced']
+        sensor_desc = {
+            'minimal': 'RGB Camera + LiDAR',
+            'standard': 'RGB Camera + LiDAR + Radar',
+            'advanced': 'RGB + Semantic + Depth + LiDAR + Radar'
+        }
 
-        print("\nAvailable sensor configurations:")
-        for i, config in enumerate(configs):
-            print(f"{i+1}. {config}")
+        if RICH_AVAILABLE:
+            console = Console(force_terminal=True)
+            table = Table(title="Sensor Configurations", show_header=True)
+            table.add_column("Option", style="cyan", justify="center")
+            table.add_column("Configuration", style="green")
+            table.add_column("Sensors", style="yellow")
+            for i, config in enumerate(configs):
+                table.add_row(str(i + 1), config, sensor_desc.get(config, ''))
+            table.add_row("0", "Exit", "")
+            console.print(table)
+        else:
+            print("\nAvailable sensor configurations:")
+            for i, config in enumerate(configs):
+                print(f"{i+1}. {config}")
 
         while True:
             try:

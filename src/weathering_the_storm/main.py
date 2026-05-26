@@ -25,8 +25,12 @@ from pathlib import Path
 
 # Fix Windows console encoding for Unicode/emoji support
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 
 class SimulationLogger:
@@ -357,14 +361,31 @@ def run_quick_test(args, sim_logger=None):
         sim_logger: SimulationLogger instance for enhanced logging
     """
     import carla
+    from carla_av_simulation import SimulationDashboard
     
     log = sim_logger.logger if sim_logger else logging.getLogger()
 
-    print("\n" + "="*70)
-    print("🚀 CARLA AV Simulation - Quick Test Mode")
-    print("="*70)
-    print(f"⏱  Duration: {args.duration}s | 🚗 Vehicles: {args.vehicles} | 🌧 Weather: {args.weather}")
-    print("="*70 + "\n")
+    try:
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.table import Table
+        _rich = True
+    except ImportError:
+        _rich = False
+
+    if _rich:
+        console = Console(force_terminal=True)
+        info_table = Table(show_header=False, box=None, padding=(0, 2))
+        info_table.add_column(justify="left")
+        info_table.add_row(f"Duration: {args.duration}s | Vehicles: {args.vehicles} | Weather: {args.weather}")
+        info_table.add_row("[dim][Space] Pause  [W/S] Weather  [Q] Quit  [D] Debug[/]")
+        console.print(Panel(info_table, title="[bold cyan]CARLA AV Simulation - Quick Test Mode[/]", border_style="cyan", padding=(1, 2)))
+    else:
+        print("\n" + "="*70)
+        print("CARLA AV Simulation - Quick Test Mode")
+        print("="*70)
+        print(f"Duration: {args.duration}s | Vehicles: {args.vehicles} | Weather: {args.weather}")
+        print("="*70 + "\n")
 
     try:
         log.info(f"Connecting to CARLA server at {args.host}:{args.port}...")
@@ -372,10 +393,10 @@ def run_quick_test(args, sim_logger=None):
         client.set_timeout(args.timeout)
 
         world = client.get_world()
-        log.info("✅ Successfully connected to CARLA server!")
+        log.info("Successfully connected to CARLA server!")
 
         map_name = world.get_map().name
-        log.info(f"📍 Current map: {map_name}")
+        log.info(f"Current map: {map_name}")
 
         weather_params = get_weather_parameters(args.weather)
 
@@ -389,7 +410,7 @@ def run_quick_test(args, sim_logger=None):
 
         weather = carla.WeatherParameters(**weather_params)
         world.set_weather(weather)
-        log.info(f"🌧️  Weather set to: {args.weather}")
+        log.info(f"Weather set to: {args.weather}")
 
         blueprint_library = world.get_blueprint_library()
 
@@ -397,19 +418,19 @@ def run_quick_test(args, sim_logger=None):
         spawn_points = world.get_map().get_spawn_points()
 
         if not spawn_points:
-            log.error("❌ No spawn points available")
+            log.error("No spawn points available")
             return False
 
         spawn_point = random.choice(spawn_points)
         vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
 
         if not vehicle:
-            log.error("❌ Failed to spawn ego vehicle")
+            log.error("Failed to spawn ego vehicle")
             return False
 
-        log.info(f"🏍️  Ego vehicle spawned: {vehicle_bp.id}")
+        log.info(f"Ego vehicle spawned: {vehicle_bp.id}")
         vehicle.set_autopilot(True)
-        log.info("✅ Autopilot enabled!")
+        log.info("Autopilot enabled!")
 
         tm = client.get_trafficmanager(8000)
         tm.set_synchronous_mode(False)
@@ -434,59 +455,90 @@ def run_quick_test(args, sim_logger=None):
                 log.warning(f"Failed to spawn vehicle {i+1}: {str(e)}")
                 continue
 
-        log.info(f"🚗 Spawned {len(spawned_vehicles)}/{args.vehicles} traffic vehicles")
+        log.info(f"Spawned {len(spawned_vehicles)}/{args.vehicles} traffic vehicles")
 
-        print("\n" + "-"*70)
-        print("🎬 Starting simulation...")
-        print(f"   Duration: {args.duration} seconds")
-        print(f"   Watch the CARLA window for the simulation!")
-        print("-"*70 + "\n")
+        dashboard = SimulationDashboard(
+            duration=args.duration,
+            weather_name=args.weather,
+            mode='quick'
+        )
+        dashboard.vehicles_count = len(spawned_vehicles)
+        dashboard.start()
 
         start_time = time.time()
         frame_count = 0
-        last_log_time = start_time
+        last_weather_intensity = 1.0
 
         try:
-            while time.time() - start_time < args.duration:
+            while time.time() - start_time < args.duration and not dashboard.quit_requested:
+                dashboard.check_keyboard()
+
+                if dashboard.quit_requested:
+                    log.info("Quit requested by user")
+                    break
+
+                if dashboard.paused:
+                    time.sleep(0.05)
+                    elapsed = time.time() - start_time
+                    dashboard.update(elapsed=elapsed)
+                    continue
+
+                if dashboard.weather_intensity != last_weather_intensity:
+                    scaled = dashboard.get_scaled_weather_params(weather_params)
+                    new_weather = carla.WeatherParameters(**scaled)
+                    world.set_weather(new_weather)
+                    last_weather_intensity = dashboard.weather_intensity
+                    log.info(f"Weather intensity adjusted: {dashboard.weather_intensity*100:.0f}%")
+
                 world.tick()
                 frame_count += 1
 
                 current_time = time.time()
                 elapsed = current_time - start_time
 
-                if current_time - last_log_time >= 1.0:
-                    progress = (elapsed / args.duration) * 100
-                    log.info(f"⏱️  Progress: {elapsed:.1f}s / {args.duration}s ({progress:.1f}%) | Frames: {frame_count}")
-                    
-                    if sim_logger:
-                        fps = frame_count / elapsed if elapsed > 0 else 0
-                        mem_mb = 0
-                        try:
-                            import psutil
-                            mem_mb = psutil.Process().memory_info().rss / (1024*1024)
-                        except ImportError:
-                            pass
-                        sim_logger.record_frame(fps=fps, memory_mb=mem_mb)
-                        if mem_mb > 0:
-                            log.info(f"💾 Memory: {mem_mb:.1f}MB")
-                    
-                    last_log_time = current_time
+                fps = frame_count / elapsed if elapsed > 0 else 0
+                mem_mb = 0
+                try:
+                    import psutil
+                    mem_mb = psutil.Process().memory_info().rss / (1024*1024)
+                except ImportError:
+                    pass
+
+                if sim_logger and current_time - start_time >= 1.0:
+                    sim_logger.record_frame(fps=fps, memory_mb=mem_mb)
+
+                dashboard.update(
+                    elapsed=elapsed,
+                    fps=fps,
+                    memory_mb=mem_mb,
+                    frame_count=frame_count,
+                )
 
         except KeyboardInterrupt:
-            log.info("\n⚠️  Simulation interrupted by user")
+            log.info("Simulation interrupted by user")
+
+        dashboard.stop()
 
         total_time = time.time() - start_time
         avg_fps = frame_count / total_time if total_time > 0 else 0
 
-        print("\n" + "="*70)
-        print("✅ Simulation completed successfully!")
-        print("="*70)
-        print(f"📊 Statistics:")
-        print(f"   ⏱  Total time: {total_time:.2f} seconds")
-        print(f"   📈 Total frames: {frame_count}")
-        print(f"   🎯 Average FPS: {avg_fps:.2f}")
-        print(f"   🚗 Vehicles spawned: {len(spawned_vehicles)}")
-        print("="*70 + "\n")
+        if _rich:
+            stats_table = Table(show_header=False, box=None, padding=(0, 2))
+            stats_table.add_column(justify="left")
+            stats_table.add_row(f"Total time: {total_time:.2f}s")
+            stats_table.add_row(f"Total frames: {frame_count}")
+            stats_table.add_row(f"Average FPS: {avg_fps:.2f}")
+            stats_table.add_row(f"Vehicles spawned: {len(spawned_vehicles)}")
+            console.print(Panel(stats_table, title="[bold green]Simulation Completed[/]", border_style="green", padding=(1, 2)))
+        else:
+            print("\n" + "="*70)
+            print("Simulation completed successfully!")
+            print("="*70)
+            print(f"Total time: {total_time:.2f} seconds")
+            print(f"Total frames: {frame_count}")
+            print(f"Average FPS: {avg_fps:.2f}")
+            print(f"Vehicles spawned: {len(spawned_vehicles)}")
+            print("="*70 + "\n")
 
         log.info("Cleaning up actors...")
         for v in spawned_vehicles:
@@ -494,12 +546,12 @@ def run_quick_test(args, sim_logger=None):
                 v.destroy()
         if vehicle.is_alive:
             vehicle.destroy()
-        log.info("✅ Cleanup completed!")
+        log.info("Cleanup completed!")
 
         return True
 
     except Exception as e:
-        log.error(f"❌ Error during quick test: {str(e)}")
+        log.error(f"Error during quick test: {str(e)}")
         import traceback
         traceback.print_exc()
         return False
@@ -567,46 +619,60 @@ def main():
     """Main entry point for CARLA AV Simulation"""
     start_time = time.time()
 
-    # Parse command line arguments
     args = parse_arguments()
-
-    # Setup enhanced logging
     sim_logger = setup_logging(args.verbose)
 
-    # Print banner
-    print("\n" + "█"*70)
-    print("█" + " "*68 + "█")
-    print("█" + "  🚗 CARLA Autonomous Vehicle Simulation Framework  v2.0  ".center(68) + "█")
-    print("█" + " "*68 + "█")
-    print("█"*70 + "\n")
+    try:
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.text import Text
+        _rich = True
+    except ImportError:
+        _rich = False
+
+    if _rich:
+        console = Console(force_terminal=True)
+        banner = Text()
+        banner.append("CARLA Autonomous Vehicle Simulation Framework", style="bold cyan")
+        banner.append("  v2.0", style="bold green")
+        console.print(Panel(banner, border_style="cyan", padding=(1, 2)))
+    else:
+        print("\n" + "="*70)
+        print("  CARLA Autonomous Vehicle Simulation Framework  v2.0  ")
+        print("="*70 + "\n")
 
     logging.info(f"Mode: {args.mode.upper()} | Config: {args.config} | Duration: {args.duration}s")
 
-    # Run appropriate mode
     success = False
     if args.mode == 'quick':
         success = run_quick_test(args, sim_logger)
     elif args.mode == 'full':
         success = run_full_simulation(args)
 
-    # Print execution summary
     total_execution_time = time.time() - start_time
 
-    print("\n" + "─"*70)
-    if success:
-        print("🎉 Execution completed successfully!")
+    if _rich:
+        from rich.table import Table
+        result_table = Table(show_header=False, box=None, padding=(0, 2))
+        result_table.add_column(justify="left")
+        status = "[bold green]Completed successfully![/]" if success else "[bold red]Finished with errors[/]"
+        result_table.add_row(status)
+        result_table.add_row(f"Total execution time: {total_execution_time:.2f}s")
+        console.print(Panel(result_table, title="[bold]Execution Summary[/]", border_style="green" if success else "red", padding=(1, 2)))
     else:
-        print("⚠️  Execution finished with errors")
-    print(f"⏱  Total execution time: {total_execution_time:.2f} seconds")
-    print("─"*70)
+        print("\n" + "-"*70)
+        if success:
+            print("Execution completed successfully!")
+        else:
+            print("Execution finished with errors")
+        print(f"Total execution time: {total_execution_time:.2f} seconds")
+        print("-"*70)
 
-    # Print logging session summary
     if sim_logger:
         sim_logger.print_summary()
     else:
         print()
 
-    # Return exit code
     sys.exit(0 if success else 1)
 
 
