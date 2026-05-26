@@ -1,49 +1,99 @@
-# 模拟器的神经网络示例
+# Reinforcement Learning
 
-利用 `神经网络` 实现 Carla（无人车）、AirSim（无人机）、Mujoco（具身人） 的感知、规划、控制等功能。
+This is exploration into reinforcement learning with manipulators.
+We're trying to build a modular environment to train RL-Based agents by providing a standard REST Based Interface to access multiple simulations environment based of Handy Maniupulators.
+On the otherside, we're trying to design an agent that could learn and benefit from this environment setup.
 
-## 环境配置
+![RL_Architecture](/doc/images/rl_idea_architecture.png "MarineGEO logo")
 
-* 平台：Windows 10/11，Ubuntu 20.04/22.04
-* 软件：Python 3.7-3.12（需支持3.8）、Pytorch（尽量不使用Tensorflow）
-* [模拟器下载链接](https://mp.weixin.qq.com/s/3Tzo0AZEMB2PFYAu_s8gOA) 、相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
+## Quickstart
 
+To run the gazebo simulation, run the following commands which require docker.
 
-## 贡献指南
+```bash
+# make sure your display variable is set
+export DISPLAY=:0
 
-准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
-代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/zh/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
+# ensure the X server is open to connections from docker
+xhost +local:docker
 
-### 约定
+# build the container images for gazebo and ros
+make build
 
-* 模块的文档位于 `docs/{模块名}`目录下，项目概述位于`docs/{模块名}/README.md`文件中，并能够从 [项目首页](https://openhutb.github.io/nn/) 跳转过去，具体请参考 [carla_CAM 模块文档](https://openhutb.github.io/nn/carla_CAM/)
-* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
-* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
-* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
-* 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
+# run everything
+make up
 
-其他约定请参考[提交注意事项](https://github.com/OpenHUTB/.github/wiki/submit_notes) 。
+# You can enter a running container by running the following command
+docker exec -it [docker_id] /bin/bash
 
-
-
-### 文档生成
-
-测试生成的文档：
-1. 使用以下命令安装`mkdocs`和相关依赖：
-```shell
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# You can run a new docker image (e.g. to use for development) for the base image using
+docker run -it [image_id] /bin/bash
 ```
-（可选）安装完成后使用`mkdocs --version`查看是否安装成功。
 
-2. 在命令行中进入`nn`目录下，运行：
-```shell
-mkdocs build
-mkdocs serve
+By default, we build a cpu-only version of the environment.
+If you'd like to utilize a gpu for model inference or simulation, run the gpu version of the docker images.
+
+```bash
+make up-gpu
 ```
-然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
 
-## 参考
+Go to the [agent](agent/README.md) directory for more information on the agent.
 
-* [模拟器文档](https://openhutb.github.io)
-* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
-* [神经网络原理](https://github.com/OpenHUTB/neuro)
+## installing pre-commit
+
+`pre-commit` will run tooling to lint and format code before committing.
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+This should now run automatically on commit.
+
+## installing new dependencies
+
+To add a new python dependency to the ros packages, add a `requirements.in` to the package root.
+Then add a reference to it from the top-level `requirements.in`.
+Then compile the dependencies using `pip-compile` via `pip-tools`.
+
+```bash
+pip install pip-tools
+pip-compile
+
+# or via docker
+docker compose run base pip-compile
+sudo chown -R $(id -u):$(id -g) requirements.txt
+```
+
+Rebuild the docker images to pull in the new dependencies.
+
+## notes on wsl2
+
+Using host networking mode in docker on wsl2 will end up using the dockerd networking stack instead of the one inside of your wsl2 environment.
+We need to use host networking for ROS to work properly, due to the dynamic allocation of ports and the fixed ip addresses of various nodes.
+This conflicts the idea of running a web service, since the dockerd wsl2 environment is firewalled from the the rest of the network.
+To get around this, we can use tailscale to create a vpn tunnel to the host machine.
+
+```bash
+docker run --name=tailscaled -v /var/lib:/var/lib -v /dev/net/tun:/dev/net/tun --network=host --cap-add=NET_ADMIN --cap-add=NET_RAW tailscale/tailscale
+```
+
+Authenticate, and also authenticate on the host machine you want to interact with the service from.
+
+## generating docs
+
+We use pandoc to generate a report from markdown.
+
+```bash
+make report
+```
+
+## demos
+
+- 2023-10-03: FetchReach-v2 with random actions: https://youtu.be/16np2Y5eIGA
+
+## notes and reading
+
+- https://gymnasium.farama.org/environments/mujoco/
+- https://robotics.farama.org/
+  - This isn't compatible with 2.3.7 which is the latest version of mujoco at time of writing.
