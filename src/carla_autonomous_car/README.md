@@ -274,15 +274,9 @@ r_safety = -γ * collision_penalty if collision
 ```
 r_lane = δ * (1 - lane_offset / lane_width)
 ```
-<<<<<<< HEAD
 - δ：车道保持奖励权重（默认：0.5）
 - lane_offset：车辆偏离车道中心的距离（m）
 - lane_width：车道宽度（默认：3.7m）
-=======
-- δ：车道保持奖励权重
-- lane_offset：车辆偏离车道中心的距离
-- lane_width：车道宽度
->>>>>>> b0d15181ee03540a639fc7d760b1ba55e0883614
 
 ### 高级奖励组件
 
@@ -290,43 +284,25 @@ r_lane = δ * (1 - lane_offset / lane_width)
 ```
 r_comfort = -ε * (acceleration^2 + jerk^2)
 ```
-<<<<<<< HEAD
 - ε：舒适性惩罚权重（默认：0.1）
 - acceleration：加速度（m/s²）
 - jerk：加加速度（加速度变化率，m/s³）
-=======
-- ε：舒适性惩罚权重
-- acceleration：加速度
-- jerk：加加速度（加速度变化率）
->>>>>>> b0d15181ee03540a639fc7d760b1ba55e0883614
 
 **效率奖励（`r_efficiency`）**
 ```
 r_efficiency = ζ * progress / total_distance
 ```
-<<<<<<< HEAD
 - ζ：效率奖励权重（默认：0.1）
 - progress：沿轨迹的前进距离（m）
 - total_distance：总轨迹长度（m）
-=======
-- ζ：效率奖励权重
-- progress：沿轨迹的前进距离
-- total_distance：总轨迹长度
->>>>>>> b0d15181ee03540a639fc7d760b1ba55e0883614
 
 **变道塑形奖励（`r_lane_change`）**
 ```
 r_lane_change = η * (lane_change_success * 1.0 + smooth_lane_change * 0.5)
 ```
-<<<<<<< HEAD
 - η：变道奖励权重（基础：0.0，改进：0.5，Lyapunov：1.0）
 - lane_change_success：变道成功标志（0或1）
 - smooth_lane_change：平滑变道评分（0.0到1.0）
-=======
-- η：变道奖励权重
-- lane_change_success：变道成功标志
-- smooth_lane_change：平滑变道评分
->>>>>>> b0d15181ee03540a639fc7d760b1ba55e0883614
 
 ### 综合奖励
 
@@ -340,11 +316,7 @@ r_total = r_speed + r_safety + r_lane + r_comfort + r_efficiency + r_lane_change
 | 组件 | 基础配置 | 改进配置 | Lyapunov配置 |
 |------|----------|----------|--------------|
 | 速度奖励 | 1.0 | 1.0 | 1.0 |
-<<<<<<< HEAD
 | 安全奖励 | -50.0 | -50.0 | -100.0 |
-=======
-| 安全奖励 | -100.0 | -100.0 | -150.0 |
->>>>>>> b0d15181ee03540a639fc7d760b1ba55e0883614
 | 车道保持 | 0.5 | 0.5 | 0.8 |
 | 舒适性 | -0.1 | -0.1 | -0.2 |
 | 效率奖励 | 0.1 | 0.1 | 0.2 |

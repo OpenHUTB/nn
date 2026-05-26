@@ -42,7 +42,9 @@ def create_reward_fn(reward_fn):
             reward += reward_fn(env)
         else:
             low_speed_timer = 0.0
-            reward += penalty_reward
+            # 优化奖励
+            # reward += penalty_reward
+            reward += -1.0
             print(f"{env.episode_idx}| Terminal: ", terminal_reason)
 
         if env.success_state:
@@ -58,38 +60,68 @@ def create_reward_fn(reward_fn):
 
 
 # Reward_fn5
+# def reward_fn5(env):
+#     """
+#         reward = Positive speed reward for being close to target speed,
+#                  however, quick decline in reward beyond target speed
+#                * centering factor (1 when centered, 0 when not)
+#                * angle factor (1 when aligned with the road, 0 when more than max_angle_center_lane degress off)
+#                * distance_std_factor (1 when std from center lane is low, 0 when not)
+#     """
+#
+#     veh_angle = env.vehicle.get_transform().rotation.yaw
+#     wayp_angle = env.current_waypoint.transform.rotation.yaw
+#     angle = abs(wayp_angle - veh_angle)
+#     speed_kmh = env.get_vehicle_lon_speed()
+#     if speed_kmh < min_speed:  # When speed is in [0, min_speed] range
+#         speed_reward = speed_kmh / min_speed  # Linearly interpolate [0, 1] over [0, min_speed]
+#     elif speed_kmh > target_speed:  # When speed is in [target_speed, inf]
+#         # Interpolate from [1, 0, -inf] over [target_speed, max_speed, inf]
+#         speed_reward = 1.0 - (speed_kmh - target_speed) / (max_speed - target_speed)
+#     else:  # Otherwise
+#         speed_reward = 1.0  # Return 1 for speeds in range [min_speed, target_speed]
+#
+#     # Interpolated from 1 when centered to 0 when 3 m from center
+#     centering_factor = max(1.0 - env.distance_from_center / max_distance, 0.0)
+#
+#     # Interpolated from 1 when aligned with the road to 0 when +/- 20 degress of road
+#     # 优化一
+#     # angle_factor = max(1.0 - abs(angle / np.deg2rad(max_angle_center_lane)), 0.0)
+#     angle_factor = max(1.0 - abs(angle / max_angle_center_lane), 0.0)
+#
+#     std = np.std(env.distance_from_center_history)
+#     distance_std_factor = max(1.0 - abs(std / max_std_center_lane), 0.0)
+#
+#     # Final reward
+#     reward = speed_reward * centering_factor * angle_factor * distance_std_factor
+#
+#     return reward
+
+# 优化函数二
 def reward_fn5(env):
     """
-        reward = Positive speed reward for being close to target speed,
-                 however, quick decline in reward beyond target speed
-               * centering factor (1 when centered, 0 when not)
-               * angle factor (1 when aligned with the road, 0 when more than max_angle_center_lane degress off)
-               * distance_std_factor (1 when std from center lane is low, 0 when not)
+    加权求和的奖励函数：
+    - 速度奖励：在合理速度范围内得高分
+    - 居中奖励：离车道中心越近分越高
+    - 角度奖励：与道路方向越对齐分越高
     """
 
     veh_angle = env.vehicle.get_transform().rotation.yaw
     wayp_angle = env.current_waypoint.transform.rotation.yaw
     angle = abs(wayp_angle - veh_angle)
     speed_kmh = env.get_vehicle_lon_speed()
-    if speed_kmh < min_speed:  # When speed is in [0, min_speed] range
-        speed_reward = speed_kmh / min_speed  # Linearly interpolate [0, 1] over [0, min_speed]
-    elif speed_kmh > target_speed:  # When speed is in [target_speed, inf]
-        # Interpolate from [1, 0, -inf] over [target_speed, max_speed, inf]
+    if speed_kmh < min_speed:
+        speed_reward = speed_kmh / min_speed
+    elif speed_kmh > target_speed:
         speed_reward = 1.0 - (speed_kmh - target_speed) / (max_speed - target_speed)
-    else:  # Otherwise
-        speed_reward = 1.0  # Return 1 for speeds in range [min_speed, target_speed]
+    else:
+        speed_reward = 1.0
 
-    # Interpolated from 1 when centered to 0 when 3 m from center
     centering_factor = max(1.0 - env.distance_from_center / max_distance, 0.0)
+    angle_factor = max(1.0 - abs(angle / max_angle_center_lane), 0.0)
 
-    # Interpolated from 1 when aligned with the road to 0 when +/- 20 degress of road
-    angle_factor = max(1.0 - abs(angle / np.deg2rad(max_angle_center_lane)), 0.0)
-
-    std = np.std(env.distance_from_center_history)
-    distance_std_factor = max(1.0 - abs(std / max_std_center_lane), 0.0)
-
-    # Final reward
-    reward = speed_reward * centering_factor * angle_factor * distance_std_factor
+    # 加权求和，每个维度都有独立的梯度信号
+    reward = 0.4 * speed_reward + 0.35 * centering_factor + 0.25 * angle_factor
 
     return reward
 

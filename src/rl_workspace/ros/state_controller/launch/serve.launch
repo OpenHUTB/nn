@@ -1,0 +1,18 @@
+<launch>
+  <!-- Load fastapi -->
+  <node
+    name="state_controller_serve_app"
+    pkg="state_controller"
+    type="serve-app.sh"
+    output="screen"
+  />
+
+  <!-- Load sveltekit ui -->
+  <node
+    name="state_controller_serve_ui"
+    pkg="state_controller"
+    type="serve-ui.sh"
+    output="screen"
+  />
+
+</launch>

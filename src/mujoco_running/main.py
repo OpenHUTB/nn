@@ -8,7 +8,25 @@ import threading
 from collections import deque
 import gymnasium as gym
 from gymnasium import spaces
-from stable_baselines3 import PPO
+import torch
+import torch.nn as nn
+# 替换为SAC算法
+from stable_baselines3 import SAC
+from stable_baselines3.common.callbacks import BaseCallback
+
+
+# ===================== 梯度裁剪回调函数 抑制训练震荡 =====================
+class GradientClipCallback(BaseCallback):
+    def __init__(self, clip_value: float = 1.0, verbose: int = 0):
+        super().__init__(verbose)
+        self.clip_value = clip_value
+
+    def _on_step(self) -> bool:
+        # 裁剪策略网络梯度，防止梯度爆炸
+        for param in self.model.policy.parameters():
+            if param.grad is not None:
+                param.grad.data.clamp_(-self.clip_value, self.clip_value)
+        return True
 
 
 # ===================== ROS话题接收模块 =====================
@@ -51,12 +69,12 @@ class ROSCmdVelHandler(threading.Thread):
             return
 
         if raw_speed > 0:
-            target_speed = float(np.clip(raw_speed, 0.1, 0.8))
+            target_speed = float(np.clip(raw_speed, 0.1, 0.5))
             self.stabilizer.set_walk_speed(target_speed)
             if self.stabilizer.state == "STAND":
                 self.stabilizer.set_state("PREPARE")
         else:
-            target_speed = float(np.clip(raw_speed, -0.6, -0.1))
+            target_speed = float(np.clip(raw_speed, -0.4, -0.1))
             self.stabilizer.set_walk_speed(target_speed)
             if self.stabilizer.state == "STAND":
                 self.stabilizer.set_state("PREPARE")
@@ -84,7 +102,7 @@ class ROSCmdVelHandler(threading.Thread):
         self.running = False
 
 
-# ===================== Windows 稳定键盘控制（已修复） =====================
+# ===================== Windows 稳定键盘控制 =====================
 class KeyboardInputHandler(threading.Thread):
     def __init__(self, stabilizer):
         super().__init__(daemon=True)
@@ -96,15 +114,14 @@ class KeyboardInputHandler(threading.Thread):
         print("📌 W = 前进   S = 停止   R = 复位")
         print("📌 X = 后退   A = 左转   D = 右转")
         print("📌 空格 = 回正   1=慢走 2=正常 3=小跑 4=原地踏步")
-        print("📌 P = 加载PPO智能步态")
+        print("📌 P = 加载SAC超稳智能步态")
         print("=====================================\n")
 
         import msvcrt
         while self.running:
             if msvcrt.kbhit():
-                # 修复：去掉decode('utf-8')，直接取字符
                 key = msvcrt.getch()
-                if key == b'\x03': # Ctrl+C
+                if key == b'\x03':
                     break
                 key = key.decode('utf-8', errors='ignore').lower()
                 if key:
@@ -148,8 +165,8 @@ class KeyboardInputHandler(threading.Thread):
         elif key == '4':
             self.stabilizer.set_gait_mode("STEP_IN_PLACE")
         elif key == 'p':
-            self.stabilizer.load_ppo_policy()
-            print("🤖 已加载PPO强化学习智能步态")
+            self.stabilizer.load_sac_policy()
+            print("🤖 已加载SAC强化学习超稳智能步态")
 
 
 # ===================== 优化版CPG步态发生器 =====================
@@ -163,7 +180,7 @@ class CPGOscillator:
         self.base_coupling = coupling_strength
         self.coupling = coupling_strength
         self.state = np.array([np.sin(phase), np.cos(phase)])
-        self.smooth_alpha = 0.12
+        self.smooth_alpha = 0.08
         self.tar_freq = freq
         self.tar_amp = amp
 
@@ -198,17 +215,17 @@ class CPGOscillator:
         self.state = np.array([np.sin(self.phase), np.cos(self.phase)])
 
 
-# ===================== PPO强化学习环境（已修复维度） =====================
+# ===================== SAC专属人形机器人训练环境 =====================
 class HumanoidGaitEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 100}
     def __init__(self, model_path):
         super().__init__()
         self.stabilizer = HumanoidStabilizer(model_path, train_mode=True)
-        # 观测空间：姿态roll/pitch/yaw(3)、角速度(3)、足力(2)、质心高度(1) → 共9维
+        # 9维观测空间
         self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(9,), dtype=np.float32
+            low=-1.0, high=1.0, shape=(9,), dtype=np.float32
         )
-        # 动作空间：调整步态频率、幅值、重心高度、平衡KP
+        # 4维动作空间
         self.action_space = spaces.Box(
             low=-1.0, high=1.0, shape=(4,), dtype=np.float32
         )
@@ -221,8 +238,15 @@ class HumanoidGaitEnv(gym.Env):
         vel = sensor["vel"]
         lf, rf = sensor["lf"], sensor["rf"]
         com_z = self.stabilizer.data.subtree_com[0][2]
-        # 维度：3+3+2+1=9
-        obs = np.concatenate([euler, vel, [lf, rf, com_z]])
+
+        # 核心优化：观测数据归一化
+        norm_euler = np.clip(euler / 0.5, -1.0, 1.0)
+        norm_vel = np.clip(vel / 2.0, -1.0, 1.0)
+        norm_lf = np.clip(lf / 200.0, 0.0, 1.0)
+        norm_rf = np.clip(rf / 200.0, 0.0, 1.0)
+        norm_comz = np.clip((com_z - 0.70) / 0.05, -1.0, 1.0)
+
+        obs = np.concatenate([norm_euler, norm_vel, [norm_lf, norm_rf, norm_comz]])
         return obs.astype(np.float32)
 
     def reset(self, seed=None, options=None):
@@ -233,31 +257,48 @@ class HumanoidGaitEnv(gym.Env):
 
     def step(self, action):
         self.current_step += 1
-        # PPO动作映射到实际控制参数
-        freq_mod = np.clip(0.5 + action[0]*0.2, 0.3, 0.7)
-        amp_mod = np.clip(0.35 + action[1]*0.1, 0.25, 0.45)
-        comz_mod = np.clip(0.72 + action[2]*0.02, 0.70, 0.74)
-        kp_mod = np.clip(260 + action[3]*20, 240, 280)
+        # 严格限制动作输出范围，仅做微调
+        freq_mod = np.clip(0.5 + action[0] * 0.08, 0.42, 0.58)
+        amp_mod = np.clip(0.35 + action[1] * 0.05, 0.30, 0.40)
+        comz_mod = np.clip(0.70 + action[2] * 0.015, 0.68, 0.72)
+        kp_mod = np.clip(330 + action[3] * 15, 300, 360)
 
-        # 生效参数
+        # 赋值优化参数
         self.stabilizer.right_leg_cpg.set_target(freq_mod, amp_mod)
         self.stabilizer.left_leg_cpg.set_target(freq_mod, amp_mod)
         self.stabilizer.com_target[2] = comz_mod
         self.stabilizer.kp_pitch = kp_mod
 
-        # 仿真一步
+        # 仿真步进
         torques = self.stabilizer._calculate_stabilizing_torques()
         self.stabilizer.data.ctrl[:] = self.stabilizer._torques_to_ctrl(torques)
         mujoco.mj_step(self.stabilizer.model, self.stabilizer.data)
 
         obs = self._get_obs()
-        # 奖励函数：姿态平稳+不倒+行走稳定
-        roll, pitch = obs[0], obs[1]
-        reward = 2.0 - 5.0 * (roll**2 + pitch**2)
-        # 摔倒惩罚
-        if abs(roll) > 0.6 or abs(pitch) > 0.6:
-            reward -= 20
-        terminated = abs(roll) > 0.7 or abs(pitch) > 0.7
+        raw_sensor = self.stabilizer._get_sensor_data()
+        roll, pitch = raw_sensor["euler"][0], raw_sensor["euler"][1]
+        ang_vel = raw_sensor["vel"]
+
+        # 极致平衡奖励函数
+        reward = 4.0
+        # 姿态倾斜惩罚
+        reward -= 10.0 * (roll ** 2 + pitch ** 2)
+        # 角速度抖动惩罚
+        reward -= 4.0 * (ang_vel[0]**2 + ang_vel[1]**2)
+        # 重心高度贴合奖励
+        reward += 1.0 - abs(raw_sensor["com_z"] - 0.70)
+        # 双脚着地稳定奖励
+        reward += 0.6 * (1 if raw_sensor["lf"]>self.stabilizer.foot_contact_threshold else 0)
+        reward += 0.6 * (1 if raw_sensor["rf"]>self.stabilizer.foot_contact_threshold else 0)
+
+        # 倾斜分级惩罚
+        if abs(roll) > 0.3 or abs(pitch) > 0.3:
+            reward -= 5
+        if abs(roll) > 0.4 or abs(pitch) > 0.4:
+            reward -= 15
+
+        # 终止条件收紧
+        terminated = abs(roll) > 0.5 or abs(pitch) > 0.5
         truncated = self.current_step >= self.max_step
 
         return obs, reward, terminated, truncated, {}
@@ -266,7 +307,7 @@ class HumanoidGaitEnv(gym.Env):
         pass
 
 
-# ===================== 全优化人形机器人控制器（接入PPO） =====================
+# ===================== 全优化人形机器人控制器（适配SAC） =====================
 class HumanoidStabilizer:
     def __init__(self, model_path, train_mode=False):
         self.train_mode = train_mode
@@ -286,7 +327,7 @@ class HumanoidStabilizer:
         self.model.opt.iterations = 500
         self.model.opt.tolerance = 1e-8
 
-        self.init_wait_time = 5.0
+        self.init_wait_time = 7.0
         self._log_last = {}
         self._imu_euler_filt = np.zeros(3, dtype=np.float64)
         self._imu_angvel_filt = np.zeros(3, dtype=np.float64)
@@ -312,42 +353,42 @@ class HumanoidStabilizer:
             self._actuator_gear_by_joint[joint_name] = self.model.actuator_gear[aid, 0]
             self._actuator_ctrlrange_by_joint[joint_name] = self.model.actuator_ctrlrange[aid]
 
-        # PID
-        self.kp_roll = 290.0
-        self.kd_roll = 75.0
-        self.kp_pitch = 260.0
-        self.kd_pitch = 65.0
-        self.kp_yaw = 55.0
-        self.kd_yaw = 28.0
+        # 超稳PID平衡参数
+        self.kp_roll = 360.0
+        self.kd_roll = 95.0
+        self.kp_pitch = 330.0
+        self.kd_pitch = 85.0
+        self.kp_yaw = 65.0
+        self.kd_yaw = 35.0
 
-        self.base_kp_hip = 400
-        self.base_kd_hip = 75
-        self.base_kp_knee = 440
-        self.base_kd_knee = 85
-        self.base_kp_ankle = 360
-        self.base_kd_ankle = 90
-        self.kp_waist = 65
-        self.kd_waist = 28
+        self.base_kp_hip = 460
+        self.base_kd_hip = 90
+        self.base_kp_knee = 500
+        self.base_kd_knee = 100
+        self.base_kp_ankle = 420
+        self.base_kd_ankle = 105
+        self.kp_waist = 180
+        self.kd_waist = 45
         self.kp_arm = 35
         self.kd_arm = 22
 
-        # LIPM
-        self.lipm_height = 0.72
+        self.integral_limit = 0.15
+        self.integral_yaw_limit = 0.12
+
+        self.lipm_height = 0.70
         self.g = 9.81
         self.omega = np.sqrt(self.g / self.lipm_height)
 
-        self.com_target = np.array([0.05, 0.0, 0.72])
+        self.com_target = np.array([0.05, 0.0, 0.70])
         self.kp_com = 85.0
         self.total_mass = np.sum(self.model.body_mass)
         self.weight = self.total_mass * abs(self.model.opt.gravity[2])
-        self.foot_contact_threshold = max(35.0, 0.15 * self.weight)
+        self.foot_contact_threshold = max(45.0, 0.18 * self.weight)
         self._force_factor_norm = max(1.0, 0.6 * self.weight)
 
         self.integral_roll = 0.0
         self.integral_pitch = 0.0
         self.integral_yaw = 0.0
-        self.integral_limit = 0.22
-        self.integral_yaw_limit = 0.16
 
         self._left_foot_geom_ids = {
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot1_left"),
@@ -389,16 +430,18 @@ class HumanoidStabilizer:
         self.walk_start_time = None
         self.stop_start_time = None
 
-        # PPO模型
-        self.ppo_model = None
-        self.ppo_model_path = "humanoid_ppo_gait.zip"
+        # SAC模型路径
+        self.sac_model = None
+        self.sac_model_path = "humanoid_sac_gait.zip"
 
         self._init_stable_pose()
 
-    def load_ppo_policy(self):
-        if os.path.exists(self.ppo_model_path):
-            self.ppo_model = PPO.load(self.ppo_model_path)
+    # 加载SAC模型
+    def load_sac_policy(self):
+        if os.path.exists(self.sac_model_path):
+            self.sac_model = SAC.load(self.sac_model_path)
             return True
+        print("未找到SAC训练模型，请先执行训练！")
         return False
 
     def _torques_to_ctrl(self, tqs):
@@ -420,23 +463,24 @@ class HumanoidStabilizer:
         self.g = self.gait_config[mode]
         self.right_leg_cpg.set_target(self.g["freq"], self.g["amp"])
         self.left_leg_cpg.set_target(self.g["freq"], self.g["amp"])
-        self.com_target[2] = 0.72 + self.g["cz"]
+        self.com_target[2] = 0.70 + self.g["cz"]
 
+    # 超低重心稳定初始化姿态
     def _init_stable_pose(self):
         mujoco.mj_resetData(self.model, self.data)
-        self.data.qpos[2] = 0.72
+        self.data.qpos[2] = 0.70
         self.data.qpos[3:7] = [1, 0, 0, 0]
         self.data.qvel[:] = 0
 
         i = self.joint_name_to_idx
         self.joint_targets[:] = 0
-        self.joint_targets[i["abdomen_y"]] = 0.08
-        self.joint_targets[i["hip_y_right"]] = 0.10
-        self.joint_targets[i["knee_right"]] = -0.65
-        self.joint_targets[i["ankle_y_right"]] = 0.08
-        self.joint_targets[i["hip_y_left"]] = 0.10
-        self.joint_targets[i["knee_left"]] = -0.65
-        self.joint_targets[i["ankle_y_left"]] = 0.08
+        self.joint_targets[i["abdomen_y"]] = 0.10
+        self.joint_targets[i["hip_y_right"]] = 0.12
+        self.joint_targets[i["knee_right"]] = -0.72
+        self.joint_targets[i["ankle_y_right"]] = 0.10
+        self.joint_targets[i["hip_y_left"]] = 0.12
+        self.joint_targets[i["knee_left"]] = -0.72
+        self.joint_targets[i["ankle_y_left"]] = 0.10
 
     def _get_sensor_data(self):
         q = self.data.qpos[3:7]
@@ -466,7 +510,7 @@ class HumanoidStabilizer:
         self.right_foot_force = rf
         lc = 1 if lf > self.foot_contact_threshold else 0
         rc = 1 if rf > self.foot_contact_threshold else 0
-        return {"euler": euler, "vel": self.data.qvel[3:6], "lf": lf, "rf": rf, "lc": lc, "rc": rc}
+        return {"euler": euler, "vel": self.data.qvel[3:6], "lf": lf, "rf": rf, "lc": lc, "rc": lc, "com_z":self.data.subtree_com[0][2]}
 
     def _state_stand(self):
         self.right_leg_cpg.reset()
@@ -537,19 +581,18 @@ class HumanoidStabilizer:
         self.turn_angle = np.clip(angle, -0.4, 0.4)
 
     def set_walk_speed(self, speed):
-        self.walk_speed = np.clip(speed, -0.6, 0.8)
+        self.walk_speed = np.clip(speed, -0.4, 0.5)
 
     def _calculate_stabilizing_torques(self):
-        # 若加载PPO模型，每步推理优化参数
-        if self.ppo_model is not None:
+        # SAC模型实时推理优化步态参数
+        if self.sac_model is not None:
             sensor = self._get_sensor_data()
             euler = sensor["euler"]
             vel = sensor["vel"]
-            obs = np.concatenate([euler, vel, [sensor["lf"], sensor["rf"], self.data.subtree_com[0][2]]])
-            action, _ = self.ppo_model.predict(obs, deterministic=True)
-            # 映射参数
-            freq_mod = np.clip(0.5 + action[0]*0.2, 0.3, 0.7)
-            amp_mod = np.clip(0.35 + action[1]*0.1, 0.25, 0.45)
+            obs = np.concatenate([euler, vel, [sensor["lf"], sensor["rf"], sensor["com_z"]]])
+            action, _ = self.sac_model.predict(obs, deterministic=True)
+            freq_mod = np.clip(0.5 + action[0] * 0.08, 0.42, 0.58)
+            amp_mod = np.clip(0.35 + action[1] * 0.05, 0.30, 0.40)
             self.right_leg_cpg.set_target(freq_mod, amp_mod)
             self.left_leg_cpg.set_target(freq_mod, amp_mod)
 
@@ -584,7 +627,18 @@ class HumanoidStabilizer:
         for jn in ["abdomen_z", "abdomen_y", "abdomen_x"]:
             i = self.joint_name_to_idx[jn]
             e = np.clip(self.joint_targets[i] - q[i], -0.3, 0.3)
-            tq[i] = self.kp_waist * e - self.kd_waist * qv[i]
+            # 基础PD力矩
+            base_torque = self.kp_waist * e - self.kd_waist * qv[i]
+            # 叠加平衡力矩（根据关节轴分配）
+            if jn == "abdomen_x":      # 绕X轴 → 侧倾（roll）
+                extra = r_tor
+            elif jn == "abdomen_y":    # 绕Y轴 → 俯仰（pitch）
+                extra = p_tor
+            elif jn == "abdomen_z":    # 绕Z轴 → 偏航（yaw）
+                extra = y_tor
+            else:
+                extra = 0.0
+            tq[i] = base_torque + extra            
 
         legs = ["hip_x_right", "hip_z_right", "hip_y_right", "knee_right", "ankle_y_right", "ankle_x_right",
                 "hip_x_left", "hip_z_left", "hip_y_left", "knee_left", "ankle_y_left", "ankle_x_left"]
@@ -616,7 +670,6 @@ class HumanoidStabilizer:
         ros = ROSCmdVelHandler(self)
         ros.start()
         kb = KeyboardInputHandler(self)
-        # 修复：启动键盘线程
         kb.start()
 
         try:
@@ -624,18 +677,18 @@ class HumanoidStabilizer:
                 v.cam.distance = 3.2
                 v.cam.azimuth = 90
                 v.cam.elevation = -22
-                print("🚀 启动成功 → 5秒站稳")
+                print("🚀 启动成功 → 7秒预稳定")
                 start = time.time()
                 while time.time() - start < self.init_wait_time:
-                    alpha = min(1.0, (time.time() - start) / 5)
+                    alpha = min(1.0, (time.time() - start) / 7)
                     t = self._calculate_stabilizing_torques() * alpha
                     self.data.ctrl[:] = self._torques_to_ctrl(t)
                     mujoco.mj_step(self.model, self.data)
-                    self.data.qvel *= 0.96
+                    self.data.qvel *= 0.94
                     v.sync()
                     time.sleep(self.dt)
 
-                print("✅ 就绪！W前进 X后退 A/D转弯 | 按P加载PPO智能步态")
+                print("✅ 就绪！W前进 X后退 A/D转弯 | 按P加载SAC超稳智能步态")
                 while self.data.time < self.sim_duration:
                     t = self._calculate_stabilizing_torques()
                     self.data.ctrl[:] = self._torques_to_ctrl(t)
@@ -647,33 +700,45 @@ class HumanoidStabilizer:
             ros.stop()
 
 
-# ===================== PPO训练入口（已修复） =====================
-def train_ppo():
+# ===================== SAC专属训练入口（终极最优参数） =====================
+def train_sac():
     current_directory = os.path.dirname(os.path.abspath(__file__))
     model_file_path = os.path.join(current_directory, "models", "humanoid.xml")
     env = HumanoidGaitEnv(model_file_path)
 
-    # 配置PPO
-    model = PPO(
+    # 人形机器人平衡任务SAC黄金参数
+    model = SAC(
         "MlpPolicy",
         env,
         verbose=1,
-        learning_rate=3e-4,
-        n_steps=2048,
-        batch_size=64,
-        gamma=0.99,
+        learning_rate=7e-5,
+        gamma=0.998,
+        tau=0.005,
+        buffer_size=2000000,
+        learning_starts=10000,
+        batch_size=512,
+        train_freq=8,
+        gradient_steps=4,
+        policy_kwargs=dict(
+            net_arch=[400, 300],
+            activation_fn=nn.ReLU
+        ),
+        target_entropy="auto",
         device="cpu"
     )
-    print("🔰 开始PPO强化学习训练...")
-    model.learn(total_timesteps=200000)
-    model.save("humanoid_ppo_gait")
-    print("✅ PPO训练完成，模型已保存为 humanoid_ppo_gait.zip")
+
+    clip_callback = GradientClipCallback(clip_value=1.0)
+    print("🔰 开始SAC强化学习训练（极致稳定版）...")
+    model.learn(total_timesteps=400000, callback=clip_callback)
+    model.save("humanoid_sac_gait")
+    print("✅ SAC训练完成，模型已保存为 humanoid_sac_gait.zip")
 
 
 if __name__ == "__main__":
-    # 取消下面注释可开始训练
-    # train_ppo()
+    # 取消注释执行训练
+    train_sac()
 
+    # 运行仿真交互
     current_directory = os.path.dirname(os.path.abspath(__file__))
     model_file_path = os.path.join(current_directory, "models", "humanoid.xml")
     stabilizer = HumanoidStabilizer(model_file_path)

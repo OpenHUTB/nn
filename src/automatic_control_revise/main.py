@@ -959,16 +959,30 @@ def game_loop(args):
                     control.manual_gear_shift = False
                 else:
                     control = agent.run_step()
-                    # ✅ 第四次修改：速度闭环控制（P控制）
+
+                    # 获取障碍物距离（用于 ACC）
+                    obs_dist = None
+                    if hasattr(world.hud, 'current_obstacle'):
+                        obs_dist = world.hud.current_obstacle
+
+                    # 计算自适应巡航目标速度
+                    if args.acc_enable and obs_dist is not None:
+                        if obs_dist < args.acc_min_dist:
+                            target_speed = 0.0
+                        elif obs_dist < args.acc_max_dist:
+                            ratio = (obs_dist - args.acc_min_dist) / (args.acc_max_dist - args.acc_min_dist)
+                            target_speed = args.max_speed * ratio
+                        else:
+                            target_speed = args.max_speed
+                    else:
+                        target_speed = args.max_speed
+
+                    # P 控制器（速度闭环）
                     vel = world.player.get_velocity()
                     current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-
-                    target_speed = args.max_speed
                     error = target_speed - current_speed
-
                     Kp = 0.05
                     base_throttle = 0.25
-
                     if error >= 0:
                         throttle = base_throttle + Kp * error
                         control.throttle = max(0.0, min(throttle, 1.0))
@@ -1068,6 +1082,17 @@ def main():
     argparser.add_argument(
         '--aeb_distance', type=float, default=5.0,
         help='Distance in meters to trigger Automatic Emergency Braking (default: 5.0)')
+    
+    argparser.add_argument(
+        '--acc_enable', action='store_true',
+        help='Enable Adaptive Cruise Control (ACC)')
+    argparser.add_argument(
+        '--acc_max_dist', type=float, default=15.0,
+        help='Distance (m) above which ACC resumes full speed (default: 15.0)')
+    argparser.add_argument(
+        '--acc_min_dist', type=float, default=5.0,
+        help='Distance (m) below which ACC requests full stop (default: 5.0)')
+
     args = argparser.parse_args()
 
     args.width, args.height = [int(x) for x in args.res.split('x')]

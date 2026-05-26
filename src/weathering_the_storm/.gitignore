@@ -1,0 +1,30 @@
+# Simulation output data
+camera_data/
+metadata_*.json
+lidar_data_*.pkl
+radar_data_*.csv
+
+# Logs
+logs/
+
+# Debug
+debug.log
+run_output.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store

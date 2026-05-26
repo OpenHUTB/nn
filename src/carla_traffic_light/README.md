@@ -7,7 +7,7 @@
 - **自主控制**：根据交通灯状态自动调整油门与刹车。
 
 ## 使用技术
-- **仿真器**：[CARLA Simulator 0.9.11](https://github.com/carla-simulator/carla)
+- **仿真器**：[CARLA Simulator 0.9.15](https://github.com/carla-simulator/carla)
 - **语言**：Python 3
 - **库**：
   - `pygame` - 用于渲染仿真窗口

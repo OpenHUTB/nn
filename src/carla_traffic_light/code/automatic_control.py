@@ -224,6 +224,71 @@ class KeyboardControl(object):
                 elif event.key == pygame.K_h:
                     # 显示帮助
                     self.world.hud.help.toggle()
+                elif event.key == pygame.K_n:
+                    # 切换下一种天气
+                    self.world.next_weather(reverse=False)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
+                elif event.key == pygame.K_m:
+                    # 切换上一种天气
+                    self.world.next_weather(reverse=True)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
+                elif event.key == pygame.K_g:
+                    # 生成随机行人
+                    self.spawn_random_pedestrian()
+                    self.world.hud.notification("Pedestrian spawned", seconds=1.0)
+
+    def spawn_random_pedestrian(self):
+        """在车辆附近生成一个随机行人的方法"""
+        world = self.world.world
+        player_transform = self.world.player.get_transform()
+
+        # 获取行人蓝图
+        blueprint_library = world.get_blueprint_library()
+        pedestrian_bps = blueprint_library.filter('walker.pedestrian.*')
+        if not pedestrian_bps:
+            self.world.hud.notification("No pedestrian blueprints found", seconds=2.0)
+            return
+
+        # 随机选择一个行人类型
+        pedestrian_bp = random.choice(pedestrian_bps)
+
+        # 在车辆前方 5-10 米，侧方随机偏移的位置生成
+        spawn_offset = carla.Location(
+            x=random.uniform(5.0, 10.0),
+            y=random.uniform(-3.0, 3.0),
+            z=0.0
+        )
+        spawn_location = player_transform.transform(spawn_offset)
+        spawn_location.z += 0.5  # 抬高一点，防止卡地
+
+        # 调整旋转角度，使其面向车辆或随机方向
+        rotation = carla.Rotation(yaw=random.uniform(0, 360))
+        transform = carla.Transform(spawn_location, rotation)
+
+        # 尝试生成行人
+        pedestrian = world.try_spawn_actor(pedestrian_bp, transform)
+        if pedestrian is None:
+            self.world.hud.notification("Failed to spawn pedestrian", seconds=2.0)
+            return
+
+        # 给行人设置行走控制（随机速度 0.5-2.0 m/s，随机方向）
+        walker_control = carla.WalkerControl()
+        walker_control.speed = random.uniform(0.5, 2.0)
+        # 随机行走方向（偏航角）
+        direction_angle = random.uniform(-180, 180)
+        walker_control.direction = carla.Vector3D(
+            x=math.cos(math.radians(direction_angle)),
+            y=math.sin(math.radians(direction_angle)),
+            z=0.0
+        )
+        pedestrian.apply_control(walker_control)
+
+        # 保存到一个列表中，以便后续清理（可选）
+        if not hasattr(self, 'spawned_pedestrians'):
+            self.spawned_pedestrians = []
+        self.spawned_pedestrians.append(pedestrian)
+
+        self.world.hud.notification(f"Pedestrian: {pedestrian.type_id.split('.')[-1]}", seconds=1.0)
 
     @staticmethod
     def _is_quit_shortcut(key):
@@ -442,6 +507,9 @@ class HelpText(object):
             "",
             "C        - Switch Camera View",
             "H        - Show/Hide Help",
+            "N        - Next Weather",
+            "M        - Previous Weather",
+            "G        - Spawn Random Pedestrian",
             "Ctrl+Q   - Quit",
             "ESC      - Quit",
             "",
