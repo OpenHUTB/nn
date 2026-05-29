@@ -2,10 +2,11 @@
 自动驾驶车辆语义分割 —— 推理入口
 
 加载预训练 U-Net 模型，对 CARLA 街景做 8 类语义分割。
-支持三种模式，按扩展名/参数自动识别：
+支持四种模式，按扩展名/参数自动识别：
   - 图片 (.png/.jpg/...)：输出叠加图 (overlay) 和纯掩码图 (mask)
   - 视频 (.mp4/.avi/...)：逐帧分割，输出叠加视频，并生成采样帧拼图
   - --augment 图片：对同一张图分别施加 6 种训练时用到的数据增强并排展示（不需要模型）
+  - --benchmark 图片：测量 models/ 下所有预训练模型的推理延迟，输出柱状图
 
 用法：
     python main.py                                   # 用默认示例图 + 默认模型
@@ -14,6 +15,8 @@
     python main.py <输入> <模型目录> <最大帧数>       # 视频限制处理帧数
     python main.py --augment                         # 默认示例图，可视化 6 种数据增强
     python main.py --augment <输入图>                 # 指定输入图做增强可视化
+    python main.py --benchmark                       # 默认示例图，基准测试所有模型推理延迟
+    python main.py --benchmark <输入图>               # 指定输入图做基准测试
 
 模型说明：
     预训练模型为二进制大文件（每个约 17MB），未随仓库提交。
@@ -38,6 +41,15 @@ DEFAULT_INPUT = os.path.join(MODULE_DIR, "examples", "sample_input.png")
 DEFAULT_MODEL = os.path.join(MODULE_DIR, "models", "unet_model_256x256_50")
 VIDEO_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm")
 DEFAULT_MAX_FRAMES = 150
+# --benchmark 模式默认尝试加载这些模型（按这个顺序，缺失会跳过）
+BENCHMARK_MODEL_NAMES = (
+    "unet_model_256x256_50",
+    "unet_model_512x512_50",
+    "unet_model_512x512_focal_loss_with_weights",
+    "unet_512x512_focal_loss_no_weights",
+)
+BENCHMARK_RUNS = 10
+BENCHMARK_WARMUP = 2
 
 
 def load_segmentation_model(model_dir):
@@ -155,6 +167,95 @@ def run_augment(input_path):
     print(f"      已写出数据增强可视化: {out_path}")
 
 
+def run_benchmark(input_path, n_runs=BENCHMARK_RUNS, n_warmup=BENCHMARK_WARMUP):
+    """对 models/ 下所有预训练模型测量推理延迟，输出柱状图与 markdown 表格。"""
+    import time
+
+    img = Image.open(input_path).convert("RGB")
+    print(f"      输入图片: {input_path}  尺寸: {img.size}")
+
+    models_dir = os.path.join(MODULE_DIR, "models")
+    available = [
+        n for n in BENCHMARK_MODEL_NAMES if os.path.isdir(os.path.join(models_dir, n))
+    ]
+    if not available:
+        print(
+            f"[错误] 在 {models_dir} 下未找到任何预训练模型。\n"
+            f"请按 README 从原始项目获取以下任一/多个模型：\n  "
+            + "\n  ".join(BENCHMARK_MODEL_NAMES),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(f"      将基准测试 {len(available)} 个模型，每个预热 {n_warmup} 次、正式测 {n_runs} 次")
+
+    from keras.models import load_model
+
+    results = []  # (name, mean_ms, min_ms, max_ms)
+    for i, name in enumerate(available, 1):
+        model_dir = os.path.join(models_dir, name)
+        print(f"[{i}/{len(available)}] 加载并测速: {name}")
+        model = load_model(model_dir, compile=False)
+        for _ in range(n_warmup):
+            infer(model, img)
+        times_ms = []
+        for _ in range(n_runs):
+            t0 = time.perf_counter()
+            infer(model, img)
+            times_ms.append((time.perf_counter() - t0) * 1000)
+        mean_ms = sum(times_ms) / len(times_ms)
+        print(f"      平均 {mean_ms:.1f} ms (min {min(times_ms):.1f}, max {max(times_ms):.1f})")
+        results.append((name, mean_ms, min(times_ms), max(times_ms)))
+
+    print("\n## 基准测试结果（{} 次平均, CPU）\n".format(n_runs))
+    print("| 模型 | 平均 (ms) | 最快 (ms) | 最慢 (ms) | 相对速度 |")
+    print("|---|---|---|---|---|")
+    fastest_mean = min(r[1] for r in results)
+    for name, mean_ms, min_ms, max_ms in results:
+        print(
+            f"| {name} | {mean_ms:.1f} | {min_ms:.1f} | {max_ms:.1f} | {mean_ms/fastest_mean:.2f}x |"
+        )
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    short_names = [r[0].replace("unet_model_", "").replace("unet_", "") for r in results]
+    means = [r[1] for r in results]
+    mins = [r[2] for r in results]
+    maxes = [r[3] for r in results]
+    err = [
+        [m - mn for m, mn in zip(means, mins)],
+        [mx - m for m, mx in zip(means, maxes)],
+    ]
+    colors = ["#4c72b0", "#dd8452", "#55a467", "#c44e52"]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    x = list(range(len(short_names)))
+    bars = ax.bar(x, means, color=colors[: len(short_names)])
+    ax.errorbar(x, means, yerr=err, fmt="none", ecolor="black", capsize=4)
+    ax.set_xticks(x)
+    ax.set_xticklabels(short_names, rotation=12, ha="right", fontsize=9)
+    ax.set_ylabel("Inference time per image (ms, CPU)")
+    ax.set_title(f"U-Net inference latency benchmark ({n_runs} runs, CPU)")
+    for bar, m in zip(bars, means):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + max(maxes) * 0.01,
+            f"{m:.0f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+    fig.tight_layout()
+
+    base, _ = os.path.splitext(input_path)
+    out_path = f"{base}_benchmark.png"
+    fig.savefig(out_path, dpi=100)
+    print(f"\n      已写出基准测试图: {out_path}")
+
+
 def run_image(model, img_path):
     print(f"[2/3] 读取图片: {img_path}")
     img = Image.open(img_path).convert("RGB")
@@ -229,6 +330,16 @@ def main():
             print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
             sys.exit(1)
         run_augment(input_path)
+        print("完成。")
+        return
+
+    if args and args[0] == "--benchmark":
+        rest = args[1:]
+        input_path = rest[0] if rest else DEFAULT_INPUT
+        if not os.path.isfile(input_path):
+            print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
+            sys.exit(1)
+        run_benchmark(input_path)
         print("完成。")
         return
 

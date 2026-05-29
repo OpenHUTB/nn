@@ -10,12 +10,14 @@ models/
 !examples/result_mask.png
 !examples/result_video_frames.png
 !examples/result_augmentation.png
+!examples/result_benchmark.png
 
 # main.py 运行时生成的结果（示例效果图已单独保存在 examples/result_*.png）
 examples/sample_input_overlay.png
 examples/sample_input_mask.png
 examples/sample_video_seg_frames.png
 examples/sample_input_augment.png
+examples/sample_input_benchmark.png
 
 # Python
 __pycache__/

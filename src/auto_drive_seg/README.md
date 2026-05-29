@@ -31,6 +31,14 @@
 <img width="700px" src="examples/result_augmentation.png"/>
 </p>
 
+`--benchmark` 模式测量所有预训练模型在 CPU 上的推理延迟，便于按"速度 vs 精度"取舍：
+
+<p align="center">
+<img width="700px" src="examples/result_benchmark.png"/>
+</p>
+
+256x256 输入的模型比 512x512 的快 ~2.6 倍；512x512 的三个变体（基础、focal+权重、focal 无权重）速度几乎一致——它们计算量相同，差异仅在训练目标。
+
 ## 运行环境
 
 - 平台：Windows 10/11（Linux 同理）
@@ -112,6 +120,20 @@ python main.py --augment examples/sample_input.png
 ```
 
 运行后在输入图同目录生成 `*_augment.png`（4 列拼图，包含原图 + 6 种增强：水平翻转、亮度+30%、对比度-30%、高斯模糊、椒盐噪声 5%、中心裁剪 256）。
+
+### 推理延迟基准测试（--benchmark）
+
+把 `models/` 下能找到的预训练模型逐个加载（默认尝试这 4 个：`unet_model_256x256_50`、`unet_model_512x512_50`、`unet_model_512x512_focal_loss_with_weights`、`unet_512x512_focal_loss_no_weights`），每个先做 2 次预热再正式跑 10 次推理，输出柱状图与控制台 markdown 表格：
+
+```bash
+# 默认示例图
+python main.py --benchmark
+
+# 指定输入图
+python main.py --benchmark examples/sample_input.png
+```
+
+运行后在输入图同目录生成 `*_benchmark.png`，控制台同时打印一份按平均耗时排序的表格（含每个模型的均值/最快/最慢/相对速度倍数）。
 
 ## 目录说明
 
