@@ -10,7 +10,7 @@ class Agent():
 
     def __init__(self, tau_p:float = 0, tau_d:float = 0, tau_i:float = 0,
         surface_lower_threshold:float = 20e6, throttle:float = 0.3,
-        suface_upper_threshold=30e6, controller:str = 'simple') -> None:
+        surface_upper_threshold=30e6, controller:str = 'simple') -> None:
         """Constructor
 
         Args:
@@ -25,7 +25,7 @@ class Agent():
                 helps to find suitable lanes. Defaults to 20e6.
             throttle (float, optional): Throttle to return at each time step.
                 Defaults to 0.3.
-            suface_upper_threshold (_type_, optional): Maximum amount of surface
+            surface_upper_threshold (float, optional): Maximum amount of surface
                 that has to be detected in order to calculate new output. This
                 helps to find suitable lanes. Defaults to 30e6.
             controller (str, optional): Identifies the controller to be used.
@@ -42,7 +42,7 @@ class Agent():
         self.tau_d = tau_d
         self.tau_i = tau_i
         self.surface_lower_threshold = surface_lower_threshold
-        self.surface_upper_threshold = suface_upper_threshold
+        self.surface_upper_threshold = surface_upper_threshold
         self.prev_error = None
         self.throttle = throttle
         self.func = None

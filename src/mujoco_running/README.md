@@ -14,7 +14,7 @@
 - **纯 Python 轻量化运行**：Windows 直接启动
 
 ## 3. 环境依赖
-bash
+```bash
 pip install mujoco numpy
 - Python 3.8 ~ 3.11
 - MuJoCo 2.3.0 及以上
@@ -49,7 +49,7 @@ pip install mujoco numpy
 
 ## 6. 使用方法
 ### 6.1 启动仿真
-bash
+```bash
 python humanoid_stabilizer.py
 
 ### 6.2 键盘控制说明

@@ -1,47 +1,13 @@
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-
-# Virtual environment
-venv/
-env/
-.env/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Data files - images
-*.jpg
-*.jpeg
-*.png
-*.bmp
-*.gif
-*.tiff
-
-# Data files - videos
-*.mp4
-*.avi
-*.mov
-*.mkv
-
-# Dataset folders
-dataset/session_*/
-example_dataset/
-
-# Model weights (large files)
-*.pth
-*.pt
-*.onnx
-*.weights
-
-# Logs
-*.log
-
-# OS files
-.DS_Store
-Thumbs.db
+"# 模型文件" 
+"*.pt" 
+"*.onnx" 
+"" 
+"# 虚拟环境" 
+"venv/" 
+"" 
+"# Python 缓存" 
+"__pycache__/" 
+"*.pyc" 
+"" 
+"# 数据集" 
+"dataset/" 

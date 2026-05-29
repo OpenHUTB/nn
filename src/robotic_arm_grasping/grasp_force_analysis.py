@@ -132,10 +132,20 @@ def grasp_force_analysis():
     categories = ['力大小', '稳定性', '响应速度', '同步性', '效率']
     N = len(categories)
 
-    # 计算各项指标（模拟）
-    values_f1 = [np.mean(finger1_force)/10, 0.8, 0.7, 0.6, 0.75]
-    values_f2 = [np.mean(finger2_force)/10, 0.9, 0.8, 0.7, 0.85]
-    values_f3 = [np.mean(finger3_force)/10, 0.7, 0.6, 0.65, 0.7]
+    # 计算各项指标（从实际力数据计算）
+    def _force_metrics(force, all_forces):
+        force_mean = np.mean(force)
+        force_std = np.std(force)
+        stability = 1.0 - min(force_std / max(force_mean, 1e-6), 1.0)
+        response_speed = 1.0 - min(force_std / max(np.ptp(force), 1e-6), 1.0)
+        sync = 1.0 - min(np.std([np.corrcoef(force, f)[0, 1] for f in all_forces]), 1.0)
+        efficiency = min(force_mean / max(np.mean(all_forces), 1e-6), 1.0)
+        return [min(force_mean / 10, 1.0), stability, response_speed, sync, efficiency]
+
+    all_forces = [finger1_force, finger2_force, finger3_force]
+    values_f1 = _force_metrics(finger1_force, all_forces)
+    values_f2 = _force_metrics(finger2_force, all_forces)
+    values_f3 = _force_metrics(finger3_force, all_forces)
 
     # 封闭多边形
     angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
@@ -243,13 +253,25 @@ def grasp_force_analysis():
     # 9. 抓取稳定性指标
     ax9 = plt.subplot(3, 3, 9)
 
-    # 计算稳定性指标（模拟）
+    # 计算稳定性指标（从实际力数据计算）
+    mean_forces = [np.mean(finger1_force), np.mean(finger2_force), np.mean(finger3_force)]
+    total_mean = np.mean(mean_forces)
+    balance_score = 1 - np.std(mean_forces) / max(total_mean, 1e-6)
+
+    correlations = [np.corrcoef(finger1_force, finger2_force)[0, 1],
+                    np.corrcoef(finger1_force, finger3_force)[0, 1],
+                    np.corrcoef(finger2_force, finger3_force)[0, 1]]
+    sync_error = 1 - np.mean(np.abs(correlations))
+
+    max_overshoot = max(np.max(f) - np.mean(f) for f in [finger1_force, finger2_force, finger3_force])
+    normalized_overshoot = max_overshoot / max(total_mean, 1e-6)
+
     stability_metrics = {
-        '力平衡度': 0.85,
-        '同步误差': 0.12,
-        '最大过冲': 0.18,
-        '响应时间': 0.08,
-        '稳态误差': 0.05
+        '力平衡度': min(balance_score, 1.0),
+        '同步误差': min(sync_error, 1.0),
+        '最大过冲': min(normalized_overshoot, 1.0),
+        '力波动': min(np.std(total_force) / max(np.mean(total_force), 1e-6), 1.0),
+        '稳态误差': min(np.std(mean_forces) / max(total_mean, 1e-6), 1.0),
     }
 
     metrics_names = list(stability_metrics.keys())
@@ -298,7 +320,9 @@ def generate_summary_statistics(f1, f2, f3, total):
         print(f"  最小值: {np.min(data):.2f} N")
         print(f"  最大值: {np.max(data):.2f} N")
         print(f"  中位数: {np.median(data):.2f} N")
-        print(f"  变异系数: {np.std(data)/np.mean(data)*100:.1f}%")
+        mean_val = np.mean(data)
+        cv = np.std(data) / mean_val * 100 if abs(mean_val) > 1e-6 else 0.0
+        print(f"  变异系数: {cv:.1f}%")
 
     # 计算力平衡度
     mean_forces = [np.mean(f1), np.mean(f2), np.mean(f3)]
