@@ -119,6 +119,88 @@ COLLISION_WARNING_TEXT_THICKNESS = 2  # 文字粗细
 COLLISION_WARNING_TEXT_POSITION = (10, 30)  # 文字位置 (x, y)
 COLLISION_WARNING_MESSAGE = "COLLISION WARNING!"  # 预警文字
 
+# ==================== 【新增：UI界面增强模块】配置参数 ====================
+# 以下参数用于控制顶部信息条的显示样式
+
+# UI信息条配置
+UI_BAR_HEIGHT = 40  # 信息条高度（像素）
+UI_BAR_COLOR = (0, 0, 0)  # 黑色背景 (BGR格式)
+UI_BAR_ALPHA = 0.6  # 半透明透明度 (0-1，0=完全透明，1=完全不透明)
+UI_TEXT_COLOR = (255, 255, 255)  # 白色文字 (BGR格式)
+UI_TEXT_SCALE = 0.6  # 文字大小系数
+UI_TEXT_THICKNESS = 1  # 文字线条粗细
+UI_TEXT_FONT = cv2.FONT_HERSHEY_SIMPLEX  # 使用的字体
+
+# ==================== 【新增：UI界面增强模块】函数定义 ====================
+
+def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, retrograde_count, is_congested):
+    """
+    【新增：UI界面增强模块】
+    在画面顶部绘制黑色半透明信息条，显示实时数据
+    
+    参数:
+        frame: 视频帧
+        vehicle_count: 当前车辆总数
+        collision_warnings: 碰撞预警次数
+        overspeed_count: 超速车辆数量
+        retrograde_count: 逆行车辆数量
+        is_congested: 是否拥堵
+    
+    返回:
+        frame: 绘制了信息条的帧
+    """
+    # 【新增：UI界面增强模块】获取帧的尺寸
+    frame_height, frame_width = frame.shape[:2]
+    
+    # 【新增：UI界面增强模块】创建黑色半透明背景条
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, 0), (frame_width, UI_BAR_HEIGHT), UI_BAR_COLOR, -1)
+    
+    # 【新增：UI界面增强模块】将半透明背景条叠加到原帧上
+    cv2.addWeighted(overlay, UI_BAR_ALPHA, frame, 1 - UI_BAR_ALPHA, 0, frame)
+    
+    # 【新增：UI界面增强模块】准备信息文本和颜色
+    congestion_status = "拥堵" if is_congested else "正常"
+    congestion_color = (0, 0, 255) if is_congested else (0, 255, 0)  # 拥堵红色，正常绿色
+    
+    # 【新增：UI界面增强模块】准备所有要显示的信息项列表
+    info_items = [
+        f"车辆总数: {vehicle_count}",
+        f"碰撞预警: {collision_warnings}",
+        f"超速车辆: {overspeed_count}",
+        f"逆行车辆: {retrograde_count}",
+        f"拥堵状态: {congestion_status}"
+    ]
+    
+    # 【新增：UI界面增强模块】计算每个信息项的文本宽度
+    total_width = 0
+    text_widths = []
+    for item in info_items:
+        (w, h), _ = cv2.getTextSize(item, UI_TEXT_FONT, UI_TEXT_SCALE, UI_TEXT_THICKNESS)
+        text_widths.append(w)
+        total_width += w
+    
+    # 【新增：UI界面增强模块】计算均匀分布的间距
+    spacing = (frame_width - total_width) / (len(info_items) + 1)
+    
+    # 【新增：UI界面增强模块】开始绘制每个信息项
+    current_x = int(spacing)
+    text_y = int(UI_BAR_HEIGHT / 2 + UI_TEXT_SCALE * 10)  # 垂直居中
+    
+    for i, item in enumerate(info_items):
+        # 【新增：UI界面增强模块】最后一项（拥堵状态）使用特殊颜色，其他项用白色
+        if i == len(info_items) - 1:
+            cv2.putText(frame, item, (current_x, text_y), 
+                       UI_TEXT_FONT, UI_TEXT_SCALE, congestion_color, UI_TEXT_THICKNESS, cv2.LINE_AA)
+        else:
+            cv2.putText(frame, item, (current_x, text_y), 
+                       UI_TEXT_FONT, UI_TEXT_SCALE, UI_TEXT_COLOR, UI_TEXT_THICKNESS, cv2.LINE_AA)
+        
+        # 【新增：UI界面增强模块】移动到下一个信息项的位置
+        current_x += text_widths[i] + int(spacing)
+    
+    return frame
+
 # ==================== 【新增：违章行为检测】函数定义 ====================
 
 def update_violation_trajectories(tracked_vehicles, traj_dict):
@@ -643,6 +725,10 @@ class VehicleTracker:
         # 【新增：违章行为检测】初始化违章检测轨迹字典
         self.violation_traj = {}
         
+        # 【新增：UI界面增强模块】初始化碰撞预警计数器
+        # 用于统计累计碰撞预警次数，在UI信息条中显示
+        self.collision_warning_count = 0
+        
         if ULTRALYTICS_AVAILABLE:
             self._load_yolo_model()
         
@@ -890,6 +976,11 @@ class VehicleTracker:
                     # 提取风险车辆ID集合
                     collision_risk_ids = set(collision_risk.keys())
                     
+                    # 【新增：UI界面增强模块】更新碰撞预警计数器
+                    # 如果本帧检测到碰撞风险，则计数器加1
+                    if len(collision_risk_ids) > 0:
+                        self.collision_warning_count += 1
+                    
                     # 【新增：轨迹预测+提前碰撞预警】绘制预警信息
                     frame = draw_collision_warning(frame, collision_risk_ids, outputs)
                     
@@ -909,6 +1000,21 @@ class VehicleTracker:
                             overspeed_ids,
                             retrograde_ids
                         )
+                    
+                    # 【新增：UI界面增强模块】绘制顶部信息条
+                    # 准备各项统计数据
+                    vehicle_count = len(outputs)  # 当前车辆总数
+                    overspeed_count = len(overspeed_ids)  # 超速车辆数量
+                    retrograde_count = len(retrograde_ids)  # 逆行车辆数量
+                    # 调用绘制函数显示信息条
+                    frame = draw_ui_info_bar(
+                        frame, 
+                        vehicle_count, 
+                        self.collision_warning_count, 
+                        overspeed_count, 
+                        retrograde_count, 
+                        is_congested
+                    )
                     
             except Exception as e:
                 print(f"[ERROR] DeepSort 更新失败: {str(e)}")

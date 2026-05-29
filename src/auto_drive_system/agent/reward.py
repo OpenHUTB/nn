@@ -16,22 +16,20 @@ reward_functions = {}
 
 def create_reward_fn(reward_fn):
     def func(env):
+        global low_speed_timer
         terminal_reason = "Running..."
         if early_stop:
-            # Stop if speed is less than 1.0 km/h after the first 5s of an episode
-            global low_speed_timer
             low_speed_timer += 1.0 / env.fps
             speed = env.get_vehicle_lon_speed()
-            if low_speed_timer > 5.0 and speed < 1.0 and env.current_waypoint_index >= 0:
+            # 优化：3秒内速度低于3km/h就终止（原来5秒+1km/h太宽松）
+            if low_speed_timer > 3.0 and speed < 3.0 and env.current_waypoint_index >= 0:
                 env.terminate = True
                 terminal_reason = "Vehicle stopped"
 
-            # Stop if distance from center > max distance
             if env.distance_from_center > max_distance:
                 env.terminate = True
                 terminal_reason = "Off-track"
 
-            # Stop if speed is too high
             if max_speed > 0 and speed > max_speed:
                 env.terminate = True
                 terminal_reason = "Too fast"
@@ -42,8 +40,6 @@ def create_reward_fn(reward_fn):
             reward += reward_fn(env)
         else:
             low_speed_timer = 0.0
-            # 优化奖励
-            # reward += penalty_reward
             reward += -1.0
             print(f"{env.episode_idx}| Terminal: ", terminal_reason)
 
@@ -59,95 +55,72 @@ def create_reward_fn(reward_fn):
     return func
 
 
-# Reward_fn5
-# def reward_fn5(env):
-#     """
-#         reward = Positive speed reward for being close to target speed,
-#                  however, quick decline in reward beyond target speed
-#                * centering factor (1 when centered, 0 when not)
-#                * angle factor (1 when aligned with the road, 0 when more than max_angle_center_lane degress off)
-#                * distance_std_factor (1 when std from center lane is low, 0 when not)
-#     """
-#
-#     veh_angle = env.vehicle.get_transform().rotation.yaw
-#     wayp_angle = env.current_waypoint.transform.rotation.yaw
-#     angle = abs(wayp_angle - veh_angle)
-#     speed_kmh = env.get_vehicle_lon_speed()
-#     if speed_kmh < min_speed:  # When speed is in [0, min_speed] range
-#         speed_reward = speed_kmh / min_speed  # Linearly interpolate [0, 1] over [0, min_speed]
-#     elif speed_kmh > target_speed:  # When speed is in [target_speed, inf]
-#         # Interpolate from [1, 0, -inf] over [target_speed, max_speed, inf]
-#         speed_reward = 1.0 - (speed_kmh - target_speed) / (max_speed - target_speed)
-#     else:  # Otherwise
-#         speed_reward = 1.0  # Return 1 for speeds in range [min_speed, target_speed]
-#
-#     # Interpolated from 1 when centered to 0 when 3 m from center
-#     centering_factor = max(1.0 - env.distance_from_center / max_distance, 0.0)
-#
-#     # Interpolated from 1 when aligned with the road to 0 when +/- 20 degress of road
-#     # 优化一
-#     # angle_factor = max(1.0 - abs(angle / np.deg2rad(max_angle_center_lane)), 0.0)
-#     angle_factor = max(1.0 - abs(angle / max_angle_center_lane), 0.0)
-#
-#     std = np.std(env.distance_from_center_history)
-#     distance_std_factor = max(1.0 - abs(std / max_std_center_lane), 0.0)
-#
-#     # Final reward
-#     reward = speed_reward * centering_factor * angle_factor * distance_std_factor
-#
-#     return reward
-
-# 优化函数二
+# 优化后的reward_fn5：加入"不动就罚"机制
 def reward_fn5(env):
     """
-    加权求和的奖励函数：
-    - 速度奖励：在合理速度范围内得高分
+    加权求和 + 不动惩罚：
+    - 速度奖励：不动直接扣分，合理速度得高分
     - 居中奖励：离车道中心越近分越高
     - 角度奖励：与道路方向越对齐分越高
     """
-
     veh_angle = env.vehicle.get_transform().rotation.yaw
     wayp_angle = env.current_waypoint.transform.rotation.yaw
     angle = abs(wayp_angle - veh_angle)
     speed_kmh = env.get_vehicle_lon_speed()
-    if speed_kmh < min_speed:
-        speed_reward = speed_kmh / min_speed
+
+    # 速度奖励：低于5km/h直接罚分
+    if speed_kmh < 5.0:
+        speed_reward = -0.2
+    elif speed_kmh < min_speed:
+        speed_reward = speed_kmh / min_speed * 0.5
     elif speed_kmh > target_speed:
-        speed_reward = 1.0 - (speed_kmh - target_speed) / (max_speed - target_speed)
+        speed_reward = max(1.0 - (speed_kmh - target_speed) / (max_speed - target_speed), 0.0)
     else:
         speed_reward = 1.0
 
     centering_factor = max(1.0 - env.distance_from_center / max_distance, 0.0)
     angle_factor = max(1.0 - abs(angle / max_angle_center_lane), 0.0)
 
-    # 加权求和，每个维度都有独立的梯度信号
-    reward = 0.4 * speed_reward + 0.35 * centering_factor + 0.25 * angle_factor
-
+    reward = 0.45 * speed_reward + 0.30 * centering_factor + 0.25 * angle_factor
     return reward
 
 
 reward_functions["reward_fn5"] = create_reward_fn(reward_fn5)
 
 
+# 优化后的waypoint奖励：更直接的"往前开"信号
 def reward_fn_waypoints(env):
     """
-        reward
-            - Each time the vehicle overpasses a waypoint, it will receive a reward of 1.0
-            - When the vehicle does not pass a waypoint, it receives a reward of 0.0
+    waypoint奖励 + 不动惩罚：
+    - 经过waypoint得1.0分（只有往前开才能拿到）
+    - 速度太低扣分
+    - 居中作为辅助信号
     """
-    angle = env.vehicle.get_angle(env.current_waypoint)
     speed_kmh = env.get_vehicle_lon_speed()
-    if speed_kmh < min_speed:  # When speed is in [0, min_speed] range
-        speed_reward = speed_kmh / min_speed  # Linearly interpolate [0, 1] over [0, min_speed]
-    elif speed_kmh > target_speed:  # When speed is in [target_speed, inf]
-        # Interpolate from [1, 0, -inf] over [target_speed, max_speed, inf]
-        speed_reward = 1.0 - (speed_kmh - target_speed) / (max_speed - target_speed)
-    else:  # Otherwise
-        speed_reward = 1.0  # Return 1 for speeds in range [min_speed, target_speed]
 
-    # Interpolated from 1 when centered to 0 when 3 m from center
+    # 速度惩罚：不动就扣分
+    if speed_kmh < 5.0:
+        speed_penalty = -0.3
+    elif speed_kmh < min_speed:
+        speed_penalty = -0.1
+    else:
+        speed_penalty = 0.0
+
+    # waypoint通过奖励
+    waypoint_reward = (env.current_waypoint_index - env.prev_waypoint_index) * 1.0
+
+    # 速度奖励
+    if speed_kmh < min_speed:
+        speed_reward = speed_kmh / min_speed
+    elif speed_kmh > target_speed:
+        speed_reward = max(1.0 - (speed_kmh - target_speed) / (max_speed - target_speed), 0.0)
+    else:
+        speed_reward = 1.0
+
+    # 居中因子
     centering_factor = max(1.0 - env.distance_from_center / max_distance, 0.0)
-    reward = (env.current_waypoint_index - env.prev_waypoint_index) + speed_reward * centering_factor
+
+    reward = waypoint_reward + 0.3 * speed_reward + 0.2 * centering_factor + speed_penalty
     return reward
 
 

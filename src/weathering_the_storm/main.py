@@ -361,7 +361,7 @@ def run_quick_test(args, sim_logger=None):
         sim_logger: SimulationLogger instance for enhanced logging
     """
     import carla
-    from carla_av_simulation import SimulationDashboard
+    from carla_av_simulation import SimulationDashboard, WeatherScheduler
     
     log = sim_logger.logger if sim_logger else logging.getLogger()
 
@@ -408,9 +408,14 @@ def run_quick_test(args, sim_logger=None):
             weather_params['fog_density'] = args.fog_density
             log.info(f"Using custom fog density: {args.fog_density}")
 
-        weather = carla.WeatherParameters(**weather_params)
-        world.set_weather(weather)
-        log.info(f"Weather set to: {args.weather}")
+        weather_scheduler = WeatherScheduler(
+            scenario_name='storm_front',
+            duration=args.duration,
+            enable_random_events=True
+        )
+        initial_params = weather_scheduler.update(0)
+        world.set_weather(carla.WeatherParameters(**initial_params))
+        log.info(f"Weather scheduler started: {weather_scheduler.get_scenario_name()}")
 
         blueprint_library = world.get_blueprint_library()
 
@@ -459,7 +464,7 @@ def run_quick_test(args, sim_logger=None):
 
         dashboard = SimulationDashboard(
             duration=args.duration,
-            weather_name=args.weather,
+            weather_name=weather_scheduler.get_scenario_name(),
             mode='quick'
         )
         dashboard.vehicles_count = len(spawned_vehicles)
@@ -467,7 +472,7 @@ def run_quick_test(args, sim_logger=None):
 
         start_time = time.time()
         frame_count = 0
-        last_weather_intensity = 1.0
+        last_weather_update = 0
 
         try:
             while time.time() - start_time < args.duration and not dashboard.quit_requested:
@@ -483,18 +488,16 @@ def run_quick_test(args, sim_logger=None):
                     dashboard.update(elapsed=elapsed)
                     continue
 
-                if dashboard.weather_intensity != last_weather_intensity:
-                    scaled = dashboard.get_scaled_weather_params(weather_params)
-                    new_weather = carla.WeatherParameters(**scaled)
-                    world.set_weather(new_weather)
-                    last_weather_intensity = dashboard.weather_intensity
-                    log.info(f"Weather intensity adjusted: {dashboard.weather_intensity*100:.0f}%")
-
                 world.tick()
                 frame_count += 1
 
                 current_time = time.time()
                 elapsed = current_time - start_time
+
+                if current_time - last_weather_update >= 1.0:
+                    weather_params = weather_scheduler.update(elapsed)
+                    world.set_weather(carla.WeatherParameters(**weather_params))
+                    last_weather_update = current_time
 
                 fps = frame_count / elapsed if elapsed > 0 else 0
                 mem_mb = 0
@@ -512,6 +515,7 @@ def run_quick_test(args, sim_logger=None):
                     fps=fps,
                     memory_mb=mem_mb,
                     frame_count=frame_count,
+                    weather_phase=weather_scheduler.get_phase_label(),
                 )
 
         except KeyboardInterrupt:
