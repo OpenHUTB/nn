@@ -34,7 +34,7 @@ python main.py
 结合 GPT-4o 多模态能力，兼顾视觉画面与时序语义理解，大幅提升复杂事故识别效果；
 方案轻量化、成本可控，无需大规模深度学习模型训练，依靠提示工程即可完成任务落地；
 适配不同路况、不同类型交通事故场景，可拓展用于驾驶安全检测、车载风险预警等下游任务。
-## 论文原信息
+## 论文标题
 论文标题：时序拼贴提示：基于仿真器的低成本交通事故视频识别（结合 GPT-4o）
 作者：Pratch Suntichaikul, Pittawat Taveekitworachai, Chakarida Nukoolkit, Ruck Thawonmas
 录用会议：2024 年第八届信息技术国际会议（InCIT 2024）
