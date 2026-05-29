@@ -211,6 +211,13 @@ class BaseAgent:
             torch.backends.cudnn.allow_tf32 = True
 
         self.normalize_obs = bool(self.hyperparameters.get('normalize_obs', True))
+        self.reward_scale = float(self.hyperparameters.get("reward_scale", 1.0))
+        reward_clip = self.hyperparameters.get("reward_clip", None)
+        try:
+            reward_clip_f = None if reward_clip is None else float(reward_clip)
+        except (TypeError, ValueError):
+            reward_clip_f = None
+        self.reward_clip = reward_clip_f if (reward_clip_f is not None and reward_clip_f > 0) else None
         self.use_amp = bool(self.hyperparameters.get('amp', True)) and self.device == "cuda"
         if self.use_amp:
             from torch.cuda.amp import GradScaler
@@ -265,7 +272,7 @@ class BaseAgent:
         self.policy_net = self.policy_net.to(self.device)
         self.frozen_net = self.frozen_net.to(self.device)
 
-    def store(self, state, action, reward, new_state, terminated):
+    def store(self, state, action, reward, new_state, terminated, truncated=None):
         """
         将经验存储到回放缓冲区
         
@@ -274,16 +281,23 @@ class BaseAgent:
         - action: 执行的动作
         - reward: 获得的奖励
         - new_state: 下一个状态
-        - terminated: 是否结束
+        - terminated: 环境终止（到达终止状态）
+        - truncated: 时间截断/外部截断（如 time limit）
         """
         state_arr = np.asarray(state)
         new_state_arr = np.asarray(new_state)
+        reward_f = float(reward) * self.reward_scale
+        if self.reward_clip is not None:
+            reward_f = float(np.clip(reward_f, -self.reward_clip, self.reward_clip))
+        if truncated is None:
+            truncated = False
         self.buffer.add(TensorDict({
             "state": torch.as_tensor(state_arr),
             "action": torch.as_tensor(action, dtype=torch.int64),
-            "reward": torch.as_tensor(reward, dtype=torch.float32),
+            "reward": torch.as_tensor(reward_f, dtype=torch.float32),
             "new_state": torch.as_tensor(new_state_arr),
             "terminated": torch.as_tensor(terminated, dtype=torch.bool),
+            "truncated": torch.as_tensor(truncated, dtype=torch.bool),
         }, batch_size=[]))
 
     def get_samples(self, batch_size):
@@ -302,7 +316,13 @@ class BaseAgent:
         actions = batch.get('action').to(dtype=torch.int64).view(-1)
         rewards = batch.get('reward').to(dtype=torch.float32).view(-1)
         terminateds = batch.get('terminated').to(dtype=torch.bool).view(-1)
-        return states, actions, rewards, new_states, terminateds
+        if 'truncated' in batch.keys():
+            truncateds = batch.get('truncated').to(dtype=torch.bool).view(-1)
+        else:
+            truncateds = torch.zeros_like(terminateds)
+        treat_truncated_as_terminal = bool(self.hyperparameters.get('treat_truncated_as_terminal', True))
+        dones = terminateds | (truncateds if treat_truncated_as_terminal else False)
+        return states, actions, rewards, new_states, dones
 
     def take_action(self, state):
         """
@@ -345,6 +365,11 @@ class BaseAgent:
     def sync_target_net(self):
         """同步目标网络 - 将策略网络的权重复制到目标网络"""
         self.frozen_net.load_state_dict(self.policy_net.state_dict())
+
+    def soft_update_target_net(self, tau: float):
+        tau_f = float(tau)
+        for target_param, policy_param in zip(self.frozen_net.parameters(), self.policy_net.parameters()):
+            target_param.data.mul_(1.0 - tau_f).add_(policy_param.data, alpha=tau_f)
 
     def save(self, save_dir, filename):
         """保存模型到文件"""

@@ -1,4 +1,4 @@
-```markdown
+
 # 无人机视觉导航系统 (Drone Vision Navigation System)
 
 [![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-389/)
@@ -256,4 +256,3 @@ DroneVisionSystem/
 ---
 
 **感谢使用本系统！如有问题，欢迎通过 [邮箱] 反馈或提交 Issue。**
-```
