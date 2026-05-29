@@ -74,5 +74,10 @@ hyperparameters:
   dueling: true
   amp: true
   normalize_obs: true
-  double_q: false
+  treat_truncated_as_terminal: false
+  double_q: true
   max_grad_norm: 10.0
+  reward_scale: 1.0
+  reward_clip: 1.0
+  tau: 0.005
+  update_target_every: 1

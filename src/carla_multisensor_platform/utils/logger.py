@@ -1,5 +1,6 @@
 import re
 import sys
+import math
 from colorama import Fore, Style, Cursor
 
 

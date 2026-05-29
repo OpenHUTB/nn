@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, models
-from sklearn.metrics import accuracy_score
+
 import matplotlib.pyplot as plt
 
 def split_dataset(dataset_path, train_dir, test_dir, split_ratio=0.8):
@@ -293,7 +293,7 @@ def train_model(model, train_loader, test_loader, epochs, patience=5):
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
         
-        accuracy = accuracy_score(all_labels, all_preds)
+        accuracy = np.mean(np.array(all_labels) == np.array(all_preds))
         val_accuracies.append(accuracy)
         
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.4f}')

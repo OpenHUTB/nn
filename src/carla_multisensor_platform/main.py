@@ -105,7 +105,8 @@ def main():
     # sensor = [[x, y, z], [display grid], enabled]
     sensors_dict = {
         'DepthCamera': [[0, 0, 2.4], [0, 0], False],
-        'RGBCamera': [[0, 0, 2.4], [0, 1], True],
+        'RGBCamera': [[0, 0, 2.4], [0, 0], True],
+        'RGBCamera': [[0, 0, 2.4], [0, 0], True],
         'RGBCamera_BEV': [[0, 0, 20.0], [0, 1], False],
         'RGBCamera_Lane': [[2.0, 0, 2.4], [1, 3], False],
         'RGBCamera_Lane_Edges': [[2.0, 0, 2.4], [0, 3], False],
@@ -203,9 +204,16 @@ def main():
             EagleEyeMap.draw_vehicle(EagleEye, (vehicle_location.x, vehicle_location.y))
             
             loop_counter += 1
+    except Exception as e:
+        import traceback
+        logging.error("An error occurred in the main loop:")
+        logging.error(e)
+        traceback.print_exc()
+       
     # except Exception as e:
     #     logging.error(e)
         
+
     finally:
         EagleEye.stop()
         data_recorder.cleanup()  # Clean up data recorder

@@ -5,92 +5,124 @@ import numpy as np
 from stable_baselines3 import SAC
 import mujoco
 import zipfile
-import os
-import sys
+import shutil
+from pathlib import Path
 
-# --- 1. 解决新版 Mujoco 属性名冲突补丁 ---
-# 确保在 Gymnasium 渲染调用 solver_iter 时不会因版本更新而报错
+# --- 1. 动态注入兼容性补丁 ---
 if not hasattr(mujoco.MjData, 'solver_iter'):
     mujoco.MjData.solver_iter = property(lambda self: self.solver_niter)
 
-def run_simulation(zip_container="humanoid_final_walking.zip"):
-    """
-    自动从 zip 中解压 policy.pth 并使用兼容模式加载权重
-    """
-    # --- 2. 环境初始化 ---
-    try:
-        # 使用 Humanoid-v4 匹配 376 维观测空间
-        env = gym.make("Humanoid-v4", render_mode="human")
-        print("物理环境已启动，正在准备演示...")
-    except Exception as e:
-        print(f"环境启动失败: {e}")
+def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
+    zip_path = Path(zip_path_str)
+    extract_dir = Path("temp_model_extract")
+    
+    if not zip_path.exists():
+        print(f"致命错误：未找到权重包 {zip_path.name}")
         return
 
-    # --- 3. 动态提取与兼容性加载 ---
-    extract_dir = "temp_model_extract"
-    if not os.path.exists(extract_dir):
-        os.makedirs(extract_dir)
-    
-    target_pth = os.path.join(extract_dir, "policy.pth")
-
+    # --- 2. 环境与模型架构初始化 ---
     try:
-        print(f"正在从 {zip_container} 中提取权重文件...")
-        with zipfile.ZipFile(zip_container, 'r') as zip_ref:
-            # 提取压缩包内的原始权重文件
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        env = gym.make("Humanoid-v4", render_mode="human")
+        model = SAC("MlpPolicy", env, verbose=0, device=device)
+    except Exception as e:
+        print(f"初始化失败: {e}")
+        return
+
+    # --- 3. 权重提取与对齐 ---
+    try:
+        if extract_dir.exists():
+            shutil.rmtree(extract_dir)
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extract("policy.pth", extract_dir)
         
-        print("正在构建模型大脑并注入权重...")
-        # 先建立 SAC 模型结构
-        model = SAC("MlpPolicy", env, verbose=1)
-        
-        # 加载提取出的 pth 数据
-        state_dict = torch.load(target_pth, map_location="cuda" if torch.cuda.is_available() else "cpu")
-        
-        # 核心修改：使用 strict=False 强制兼容不同版本的权重命名规则
-        # 解决 Missing key(s) in state_dict: "actor.mu.weight" 等报错
+        state_dict = torch.load(extract_dir / "policy.pth", map_location=device, weights_only=True)
         model.policy.load_state_dict(state_dict, strict=False)
-        print("模型加载成功（已开启兼容模式）！")
-
+        print("✅ 权重加载成功")
     except Exception as e:
-        print(f"加载过程中发生错误: {e}")
+        print(f"❌ 加载故障: {e}")
         env.close()
         return
 
-    # --- 4. 运行逻辑 ---
-    obs, info = env.reset()
-    
-    # 针对视频中机器人“过度补偿/扭动”现象的平滑因子
-    action_scale = 0.85 
-    
-    print("开始演示！请观察窗口。按 Ctrl+C 退出。")
+    # --- 4. 增强型性能评价循环 (本次修改重点) ---
+    # 【新增】性能统计变量
+    session_rewards = []
+    episode_counts = 0
+    total_steps = 0
+    start_wall_time = time.time()
+
     try:
+        obs, _ = env.reset()
+        env.render()
+        
+        current_ep_reward = 0
+        current_ep_steps = 0
+        ACTION_SCALE = 0.88
+        SMOOTH_FACTOR = 0.7
+        prev_action = np.zeros(env.action_space.shape)
+        dt = 0.005
+        
+        print(f"演示开始：已启用性能监控系统。按 Ctrl+C 结束并查看报告。")
+        
         while True:
-            # 使用确定性预测获取最稳定的步态
-            action, _states = model.predict(obs, deterministic=True)
+            step_start = time.perf_counter()
             
-            # 对动作进行缩放和限幅，增加关节稳定性
-            action = np.clip(action * action_scale, -1.0, 1.0)
+            # 控制逻辑
+            action, _ = model.predict(obs, deterministic=True)
+            smoothed_action = SMOOTH_FACTOR * prev_action + (1 - SMOOTH_FACTOR) * (action * ACTION_SCALE)
+            prev_action = smoothed_action
             
-            # 执行环境步进
-            obs, reward, terminated, truncated, info = env.step(action)
+            obs, reward, terminated, truncated, _ = env.step(np.clip(smoothed_action, -1.0, 1.0))
             
-            # 渲染画面
-            env.render()
+            # 【新增】实时数据累加
+            current_ep_reward += reward
+            current_ep_steps += 1
+            total_steps += 1
             
-            # 匹配物理模拟步长 (200Hz)
-            time.sleep(0.005) 
+            try:
+                env.render()
+            except:
+                break
+                
+            # 时间同步
+            elapsed = time.perf_counter() - step_start
+            if elapsed < dt:
+                time.sleep(dt - elapsed)
             
-            # 摔倒或越界后自动重置
+            # 【新增】回合结束统计
             if terminated or truncated:
-                obs, info = env.reset()
+                session_rewards.append(current_ep_reward)
+                episode_counts += 1
+                print(f"回合 {episode_counts} 结束 | 得分: {current_ep_reward:.2f} | 步数: {current_ep_steps}")
+                
+                # 重置
+                obs, _ = env.reset()
+                prev_action = np.zeros(env.action_space.shape)
+                current_ep_reward = 0
+                current_ep_steps = 0
                 
     except KeyboardInterrupt:
-        print("\n模拟已手动停止。")
+        print("\n检测到用户中断，正在汇总分析数据...")
     finally:
-        # --- 5. 资源释放 ---
+        # --- 5. 【新增】生成最终评价报告 ---
+        duration = time.time() - start_wall_time
+        print("\n" + "="*30)
+        print("      仿真性能报告")
+        print("="*30)
+        print(f"总运行时间: {duration:.2f} 秒")
+        print(f"物理步总计: {total_steps} 步")
+        print(f"完成回合数: {episode_counts} 次")
+        if session_rewards:
+            print(f"平均每回合得分: {np.mean(session_rewards):.2f}")
+            print(f"单回合最高得分: {np.max(session_rewards):.2f}")
+        print(f"控制平滑系数: {SMOOTH_FACTOR}")
+        print("="*30)
+
         env.close()
-        print("环境已安全关闭。")
+        if extract_dir.exists():
+            shutil.rmtree(extract_dir)
+        print("资源已回收。")
 
 if __name__ == "__main__":
-    # 确保当前目录下有 humanoid_final_walking.zip 文件
-    run_simulation("humanoid_final_walking.zip")
+    run_simulation()
