@@ -1,35 +1,55 @@
+import os
 import torch
 import torch.nn as nn
 import numpy as np
 import random
-from collections import deque  # 高效内存操作
+from collections import deque
 from .pruning import prune_model
 from .quantization import quantize_model
+
 
 class DQNAgent:
     def __init__(self, state_shape, action_size, config):
         """
-        初始化DQN智能体（适配CARLA图像输入，修复卷积维度计算错误）
-        :param state_shape: 图像形状 (128, 128, 3)
-        :param action_size: 动作维度（4：前进/左转/右转/后退）
-        :param config: 配置字典
-        """
-        self.state_shape = state_shape  # (128, 128, 3)
-        self.action_size = action_size
-        self.memory = deque(maxlen=config.get('agent', {}).get('memory_capacity', 10000))  # 经验池
-        self.gamma = 0.95  # 折扣因子
-        self.epsilon = 1.0  # 初始探索率
-        self.epsilon_decay = config['agent']['epsilon_decay']  # 探索率衰减
-        self.epsilon_min = config['agent']['epsilon_min']      # 最小探索率
-        self.learning_rate = config['train']['learning_rate']  # 学习率
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 设备
-        
-        # 构建CNN模型（自适应池化解决维度计算错误）并移到指定设备
-        self.model = self._build_model().to(self.device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)  # 优化器
-        self.loss_fn = nn.MSELoss()  # 损失函数
+        初始化DQN智能体（含Target Network，适配CARLA图像输入）
 
-        # 模型输入输出校验（新增：验证维度匹配）
+        Args:
+            state_shape: 图像形状 (128, 128, 3)
+            action_size: 动作维度（4：前进/左转/右转/后退）
+            config: 配置字典
+        """
+        self.state_shape = state_shape
+        self.action_size = action_size
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # ── 超参数（从config读取，提供默认值） ──
+        agent_cfg = config.get('agent', {})
+        train_cfg = config.get('train', {})
+
+        self.memory = deque(maxlen=agent_cfg.get('memory_capacity', 10000))
+        self.gamma = agent_cfg.get('gamma', 0.95)
+        self.epsilon = agent_cfg.get('epsilon_start', 1.0)
+        self.epsilon_decay = agent_cfg['epsilon_decay']
+        self.epsilon_min = agent_cfg['epsilon_min']
+        self.learning_rate = train_cfg['learning_rate']
+        self.batch_size = train_cfg.get('batch_size', 64)
+
+        # Target Network 更新频率
+        self.target_update_freq = train_cfg.get('target_update_freq', 100)
+        self.train_step_counter = 0
+
+        # ── 构建双网络（Online + Target） ──
+        self.model = self._build_model().to(self.device)           # Online Q-network
+        self.target_model = self._build_model().to(self.device)    # Target Q-network
+        self.update_target_model()  # 初始同步
+
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.loss_fn = nn.MSELoss()
+
+        # 模型保存路径
+        self.model_dir = config.get('model_dir', './models')
+        os.makedirs(self.model_dir, exist_ok=True)
+
         self._validate_model_dim()
 
     def _build_model(self):
@@ -55,15 +75,48 @@ class DQNAgent:
         )
 
     def _validate_model_dim(self):
-        """验证模型输入输出维度是否匹配（新增）"""
+        """模型维度校验（可选，用于调试）"""
         try:
-            # 构建测试输入：(batch, 3, H, W)
+            import torch
             dummy_input = torch.randn(1, 3, self.state_shape[0], self.state_shape[1]).to(self.device)
             with torch.no_grad():
                 dummy_output = self.model(dummy_input)
-            print(f"✅ 模型维度校验通过 | 输入维度：{dummy_input.shape} | 输出维度：{dummy_output.shape}")
+            print(f"模型维度校验通过 | 输入: {dummy_input.shape} | 输出: {dummy_output.shape}")
         except Exception as e:
-            raise ValueError(f"❌ 模型维度校验失败：{e}")
+            raise ValueError(f"模型维度校验失败: {e}")
+
+    # ── 网络管理 ──────────────────────────────────────────
+
+    def update_target_model(self):
+        """将 Online Network 的权重复制到 Target Network（硬更新）"""
+        self.target_model.load_state_dict(self.model.state_dict())
+
+    def save_model(self, filename: str = "dqn_model.pth"):
+        """保存模型权重"""
+        path = os.path.join(self.model_dir, filename)
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'target_model_state_dict': self.target_model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'epsilon': self.epsilon,
+            'train_step': self.train_step_counter,
+        }, path)
+        print(f"模型已保存至: {path}")
+
+    def load_model(self, filename: str = "dqn_model.pth"):
+        """加载模型权重"""
+        path = os.path.join(self.model_dir, filename)
+        if not os.path.exists(path):
+            print(f"模型文件不存在: {path}")
+            return False
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.target_model.load_state_dict(checkpoint['target_model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.epsilon = checkpoint.get('epsilon', self.epsilon)
+        self.train_step_counter = checkpoint.get('train_step', 0)
+        print(f"模型已从 {path} 加载 (epsilon={self.epsilon:.4f}, step={self.train_step_counter})")
+        return True
 
     def remember(self, state, action, reward, next_state, done):
         """存储经验到回放池（标准化数据格式）"""
@@ -87,36 +140,36 @@ class DQNAgent:
         # 返回Q值最大的动作
         return np.argmax(q_values.cpu().detach().numpy()[0])
 
-    def replay(self, batch_size):
-        """批量经验回放（GPU加速，替换逐样本更新）"""
+    def replay(self, batch_size=None):
+        """批量经验回放（使用Target Network稳定训练）"""
+        batch_size = batch_size or self.batch_size
         if len(self.memory) < batch_size:
             return
-        
-        # 随机采样批次经验
+
+        # 随机采样
         minibatch = random.sample(self.memory, batch_size)
-        # 拆分批次数据
-        states = np.array([exp[0] for exp in minibatch])  # (batch, 128, 128, 3)
+        states = np.array([exp[0] for exp in minibatch])
         actions = np.array([exp[1] for exp in minibatch])
         rewards = np.array([exp[2] for exp in minibatch])
-        next_states = np.array([exp[3] for exp in minibatch])  # (batch, 128, 128, 3)
+        next_states = np.array([exp[3] for exp in minibatch])
         dones = np.array([exp[4] for exp in minibatch])
 
-        # 维度转换：HWC → CHW + 移到设备 + 归一化
-        states_tensor = torch.FloatTensor(states).permute(0, 3, 1, 2).to(self.device) / 255.0  # (batch, 3, 128, 128)
+        # 维度转换：HWC → CHW + 归一化
+        states_tensor = torch.FloatTensor(states).permute(0, 3, 1, 2).to(self.device) / 255.0
         next_states_tensor = torch.FloatTensor(next_states).permute(0, 3, 1, 2).to(self.device) / 255.0
         actions_tensor = torch.LongTensor(actions).to(self.device)
         rewards_tensor = torch.FloatTensor(rewards).to(self.device)
         dones_tensor = torch.FloatTensor(dones).to(self.device)
 
-        # 计算当前Q值（仅选执行动作的Q值）
+        # 当前 Q 值（Online Network）
         current_q = self.model(states_tensor).gather(1, actions_tensor.unsqueeze(1)).squeeze(1)
-        
-        # 计算目标Q值（Bellman方程）
-        with torch.no_grad():
-            next_q = self.model(next_states_tensor).max(1)[0]  # 下一个状态的最大Q值
-            target_q = rewards_tensor + self.gamma * next_q * (1 - dones_tensor)  # 目标Q值
 
-        # 梯度下降更新
+        # 目标 Q 值（使用 Target Network 计算，减少估计偏差）
+        with torch.no_grad():
+            next_q = self.target_model(next_states_tensor).max(1)[0]
+            target_q = rewards_tensor + self.gamma * next_q * (1 - dones_tensor)
+
+        # 梯度更新
         self.optimizer.zero_grad()
         loss = self.loss_fn(current_q, target_q)
         loss.backward()
@@ -125,6 +178,11 @@ class DQNAgent:
         # 衰减探索率
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+
+        # 定期同步 Target Network
+        self.train_step_counter += 1
+        if self.train_step_counter % self.target_update_freq == 0:
+            self.update_target_model()
 
     def calculate_reward(self, current_position, target_position, road_position, done):
         """奖励函数（适配CARLA环境）"""
