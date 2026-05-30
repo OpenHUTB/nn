@@ -1,8 +1,13 @@
 
 import os
+import sys
 import numpy as np
+import mujoco
 from collections import defaultdict
 from gymnasium import spaces
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from controllers.operational_space_controller import OSC
 from controllers.joint_effort_controller import GripperEffortCtrl
 from renderer.mujoco_env import MujocoPhyEnv
@@ -31,9 +36,9 @@ class GraspRobot(MujocoPhyEnv):
         self.SUCCESS_REWARD = 100.0
 
         self.arm_joints_names = list(self.model_names.joint_names[:6])
-        self.arm_joints = [self.mjcf_model.find('joint', name) for name in self.arm_joints_names]
+        self.arm_joints = [self.find('joint', name) for name in self.arm_joints_names]
         self.eef_name = self.model_names.site_names[1]
-        self.eef_site = self.mjcf_model.find('site', self.eef_name)
+        self.eef_site = self.find('site', self.eef_name)
 
         self.controller = OSC(
             physics=self.physics,
@@ -43,6 +48,8 @@ class GraspRobot(MujocoPhyEnv):
             kp=80, ko=80, kv=50,
             vmax_xyz=1, vmax_abg=2
         )
+        self.gripper = self.gripper_id  # 使用父类中定义的 gripper_id
+        self.grp_ctrl = GripperEffortCtrl(physics=self.physics, gripper=self.gripper, effort=35.0)  # 增加抓取力度
         self.grp_ctrl = GripperEffortCtrl(physics=self.physics, gripper=self.gripper, effort=35.0)  # 增加抓取力度
         self.grp_ctrl = GripperEffortCtrl(physics=self.physics, gripper=self.gripper, effort=15.0)
         self.target_objects = _target_box
@@ -57,15 +64,15 @@ class GraspRobot(MujocoPhyEnv):
             setattr(self.physics.data, attr, np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0))
 
     def get_ee_pos(self):
-        return self.physics.bind(self.eef_site).xpos.copy()
+        return self.physics.bind(self.eef_site, obj_type='site').xpos.copy()
 
     def get_body_com(self, body_name):
-        body_id = self.physics.model.name2id(body_name, 'body')
+        body_id = mujoco.mj_name2id(self.physics.model, mujoco.mjtObj.mjOBJ_BODY, body_name)
         return self.physics.data.xpos[body_id].copy()
 
     def set_body_pos(self, body_name, pos):
-        body_id = self.physics.model.name2id(body_name, 'body')
-        self.physics.model.body_pos[body_id] = pos
+        body_id = mujoco.mj_name2id(self.physics.model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        self.physics.data.xpos[body_id] = pos
 
     def world2pixel(self, cam_id, x, y, z):
         fx = fy = 500
@@ -129,12 +136,34 @@ class GraspRobot(MujocoPhyEnv):
         up_pose = list(self.get_ee_pos())
         up_pose[2] += self.LIFT_HEIGHT
         self.move_eef(up_pose)
-        
+
         grasp_success = self.check_grasp_success()
-        
+
         if grasp_success:
             self.grasped_num += 1
+
             self.move_eef(self.drop_area)
+
+            for _ in range(self.frame_skip * 3):
+                self.grp_ctrl.run(signal=0)
+                self.step_mujoco_simulation()
+
+            for _ in range(self.frame_skip // 2):
+                self.step_mujoco_simulation()
+
+            right = self.get_body_com(_right_finger_name)
+            left = self.get_body_com(_left_finger_name)
+            finger_dist = np.linalg.norm(right - left)
+            if finger_dist < 0.15:
+                for _ in range(self.frame_skip):
+                    current_pos = self.get_ee_pos()
+                    shake_left = current_pos[:2] + np.array([-0.05, 0.0])
+                    shake_right = current_pos[:2] + np.array([0.05, 0.0])
+                    self.move_eef(list(shake_left) + [current_pos[2]])
+                    self.move_eef(list(shake_right) + [current_pos[2]])
+                    self.grp_ctrl.run(signal=0)
+                    self.step_mujoco_simulation()
+
             for _ in range(self.frame_skip * 2):
                 self.grp_ctrl.run(signal=0)
                 self.step_mujoco_simulation()
@@ -172,6 +201,12 @@ class GraspRobot(MujocoPhyEnv):
             self.grp_ctrl.run(signal=0)
             self.step_mujoco_simulation()
 
+    def step_test(self, action, fail_count=0):
+        obs, reward, done, info = self.step(action)
+        completed = self.grasped_num == _grasp_target_num
+        info["completion"] = "Success" if completed else "InProgress"
+        return obs, reward, done, info
+
     def step(self, action):
         self.info = {}
         self.open_gripper()
@@ -189,6 +224,15 @@ class GraspRobot(MujocoPhyEnv):
                 closest_dist = dist
 
         reward = 10.0 - closest_dist * 5.0
+        
+        # 添加夹爪闭合奖励
+        right = self.get_body_com(_right_finger_name)
+        left = self.get_body_com(_left_finger_name)
+        finger_dist = np.linalg.norm(right - left)
+        # 夹爪越闭合，奖励越高（最大距离约0.3，最小约0.02）
+        gripper_reward = (0.3 - finger_dist) * 10.0
+        reward += gripper_reward
+        
         if success:
             reward += self.SUCCESS_REWARD
             self.info["grasp"] = "Success"

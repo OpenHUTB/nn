@@ -1,3 +1,6 @@
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
 import torch.nn as nn
 import numpy as np
 import torch
@@ -6,7 +9,6 @@ import torchvision.transforms as T
 from torch.utils.tensorboard import SummaryWriter
 import math
 import random
-import os
 import sys
 import cv2
 #改成相对路径 
