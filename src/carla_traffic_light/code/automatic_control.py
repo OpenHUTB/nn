@@ -238,9 +238,49 @@ class KeyboardControl(object):
                     self.world.hud.notification("Pedestrian spawned", seconds=1.0)
 
     def spawn_random_pedestrian(self):
-        """在车辆附近生成一个随机行人的方法"""
+        """在车辆附近的人行道上生成一个随机行人"""
         world = self.world.world
         player_transform = self.world.player.get_transform()
+        player_location = player_transform.location
+
+        # 获取地图和车辆所在路点
+        carla_map = world.get_map()
+        vehicle_waypoint = carla_map.get_waypoint(player_location, project_to_road=True,
+                                                  lane_type=carla.LaneType.Driving)
+
+        # 搜索附近人行道（半径 20 米，角度范围 -45° 到 +45° 前方）
+        sidewalk_waypoint = None
+        search_radius = 20.0
+        angles = [-45, 0, 45]  # 搜索角度（度）
+
+        for angle in angles:
+            # 计算方向向量（相对于车辆朝向）
+            yaw_rad = math.radians(player_transform.rotation.yaw + angle)
+            direction = carla.Vector3D(x=math.cos(yaw_rad), y=math.sin(yaw_rad), z=0.0)
+            # 按固定步长向外搜索，使用整数步长
+            for dist in range(2, int(search_radius), 3):  # 从 2 米开始，步长 3 米
+                check_location = player_location + direction * dist
+                # 获取该位置附近的路点（优先人行道）
+                waypoint = carla_map.get_waypoint(check_location, project_to_road=True, lane_type=carla.LaneType.Any)
+                if waypoint and waypoint.lane_type == carla.LaneType.Sidewalk:
+                    sidewalk_waypoint = waypoint
+                    break
+            if sidewalk_waypoint:
+                break
+
+        if sidewalk_waypoint is None:
+            # 没找到人行道，降级到在车辆前方 5-10 米路面生成
+            self.world.hud.notification("No sidewalk found, spawning on road", seconds=2.0)
+            spawn_offset = carla.Location(
+                x=random.uniform(5.0, 10.0),
+                y=random.uniform(-2.0, 2.0),
+                z=0.0
+            )
+            spawn_location = player_transform.transform(spawn_offset)
+        else:
+            spawn_location = sidewalk_waypoint.transform.location
+            # 微调 Z 轴避免卡地
+            spawn_location.z += 0.5
 
         # 获取行人蓝图
         blueprint_library = world.get_blueprint_library()
@@ -249,32 +289,20 @@ class KeyboardControl(object):
             self.world.hud.notification("No pedestrian blueprints found", seconds=2.0)
             return
 
-        # 随机选择一个行人类型
         pedestrian_bp = random.choice(pedestrian_bps)
 
-        # 在车辆前方 5-10 米，侧方随机偏移的位置生成
-        spawn_offset = carla.Location(
-            x=random.uniform(5.0, 10.0),
-            y=random.uniform(-3.0, 3.0),
-            z=0.0
-        )
-        spawn_location = player_transform.transform(spawn_offset)
-        spawn_location.z += 0.5  # 抬高一点，防止卡地
-
-        # 调整旋转角度，使其面向车辆或随机方向
+        # 随机旋转
         rotation = carla.Rotation(yaw=random.uniform(0, 360))
         transform = carla.Transform(spawn_location, rotation)
 
-        # 尝试生成行人
         pedestrian = world.try_spawn_actor(pedestrian_bp, transform)
         if pedestrian is None:
             self.world.hud.notification("Failed to spawn pedestrian", seconds=2.0)
             return
 
-        # 给行人设置行走控制（随机速度 0.5-2.0 m/s，随机方向）
+        # 给行人设置行走控制
         walker_control = carla.WalkerControl()
-        walker_control.speed = random.uniform(0.5, 2.0)
-        # 随机行走方向（偏航角）
+        walker_control.speed = random.uniform(0.8, 2.0)
         direction_angle = random.uniform(-180, 180)
         walker_control.direction = carla.Vector3D(
             x=math.cos(math.radians(direction_angle)),
@@ -283,12 +311,12 @@ class KeyboardControl(object):
         )
         pedestrian.apply_control(walker_control)
 
-        # 保存到一个列表中，以便后续清理（可选）
+        # 存储以便清理
         if not hasattr(self, 'spawned_pedestrians'):
             self.spawned_pedestrians = []
         self.spawned_pedestrians.append(pedestrian)
 
-        self.world.hud.notification(f"Pedestrian: {pedestrian.type_id.split('.')[-1]}", seconds=1.0)
+        self.world.hud.notification(f"Pedestrian on sidewalk: {pedestrian.type_id.split('.')[-1]}", seconds=1.5)
 
     @staticmethod
     def _is_quit_shortcut(key):
