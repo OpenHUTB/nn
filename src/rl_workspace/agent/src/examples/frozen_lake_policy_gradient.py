@@ -67,32 +67,45 @@ def train_policy_gradient(
         state = env.reset()[0]
         done = False
         episode_reward = 0
-        trajectory = []
         
         if algorithm == 'reinforce':
+            trajectory = []
             while not done:
                 action, log_prob = agent.select_action(np.array([state]))
                 next_state, reward, done, trunc, info = env.step(action)
                 trajectory.append((state, action, reward))
                 episode_reward += reward
                 state = next_state
-            
             agent.update(trajectory)
         
-        elif algorithm in ['actor_critic', 'a2c']:
+        elif algorithm == 'actor_critic':
             action, _ = agent.select_action(np.array([state]))
-            
             while not done:
                 next_state, reward, done, trunc, info = env.step(action)
-                
                 advantage = agent.compute_advantage(state, reward, next_state, done)
                 agent.update(state, action, advantage)
+                episode_reward += reward
+                state = next_state
+                if not done:
+                    action, _ = agent.select_action(np.array([state]))
+                    
+        elif algorithm == 'a2c':
+            # 激活 A2C 专用的多步轨迹同步收集流
+            ep_states, ep_actions, ep_rewards, ep_dones = [], [], [], []
+            while not done:
+                action, _ = agent.select_action(np.array([state]))
+                next_state, reward, done, trunc, info = env.step(action)
+                
+                ep_states.append(state)
+                ep_actions.append(action)
+                ep_rewards.append(reward)
+                ep_dones.append(done)
                 
                 episode_reward += reward
                 state = next_state
-                
-                if not done:
-                    action, _ = agent.select_action(np.array([state]))
+            
+            # 完整 Episode 结束后单次触发批量 GAE 更新
+            agent.update(ep_states, ep_actions, ep_rewards, ep_dones)
         
         rewards.append(episode_reward)
         if episode_reward > 0:
@@ -110,7 +123,6 @@ def train_policy_gradient(
             }, step=episode)
     
     tracker.end_experiment(success=True)
-    
     env.close()
     
     final_success_rate = success_count / config.epochs * 100

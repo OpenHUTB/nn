@@ -76,7 +76,7 @@ class PolicyNetwork:
         return int(action), float(probs[action])
     
     def update(self, states, actions, advantages, learning_rate: float = 0.001):
-        """策略梯度更新"""
+        """策略梯度更新（修正激活值索引对齐）"""
         for i in range(len(states)):
             state = states[i]
             action = int(actions[i])
@@ -93,23 +93,27 @@ class PolicyNetwork:
             
             delta = advantage * grad_log_prob
             
-            x = self._preprocess_state(state)
+            x = self._preprocess_state(state).flatten()
             activations = [x]
             
-            for i in range(len(self.weights['W']) - 1):
-                x = np.dot(x, self.weights['W'][i]) + self.weights['b'][i]
+            for j in range(len(self.weights['W']) - 1):
+                x = np.dot(x, self.weights['W'][j]) + self.weights['b'][j].flatten()
                 x = self._relu(x)
                 activations.append(x)
             
-            for i in range(len(self.weights['W']) - 1, -1, -1):
-                if i == len(self.weights['W']) - 1:
-                    grad = delta.reshape(1, -1)
+            for j in range(len(self.weights['W']) - 1, -1, -1):
+                if j == len(self.weights['W']) - 1:
+                    layer_error = delta
                 else:
-                    grad = np.dot(delta.reshape(1, -1), self.weights['W'][i+1].T)
-                    grad = grad * (activations[i] > 0)
+                    layer_error = np.dot(layer_error, self.weights['W'][j+1].T)
+                    # 👇 终极修复：将 activations[j] 修改为 activations[j+1]，完美匹配当前隐藏层的维度
+                    layer_error = layer_error * (activations[j+1] > 0)
                 
-                self.weights['W'][i] += learning_rate * np.dot(activations[i].T, grad)
-                self.weights['b'][i] += learning_rate * grad
+                dw = np.outer(activations[j], layer_error)
+                db = layer_error.reshape(1, -1)
+                
+                self.weights['W'][j] += learning_rate * dw
+                self.weights['b'][j] += learning_rate * db
 
 
 class ValueNetwork:
@@ -168,7 +172,7 @@ class ValueNetwork:
         return float(x.flatten()[0])
     
     def update(self, states, targets, learning_rate: float = 0.001):
-        """价值网络更新"""
+        """价值网络更新（修正激活值索引对齐）"""
         for i in range(len(states)):
             state = states[i]
             target = float(targets[i])
@@ -176,25 +180,29 @@ class ValueNetwork:
             current_value = self.forward(state)
             error = target - current_value
             
-            delta = error
-            
-            x = self._preprocess_state(state)
+            x = self._preprocess_state(state).flatten()
             activations = [x]
             
             for j in range(len(self.weights['W']) - 1):
-                x = np.dot(x, self.weights['W'][j]) + self.weights['b'][j]
+                x = np.dot(x, self.weights['W'][j]) + self.weights['b'][j].flatten()
                 x = self._relu(x)
                 activations.append(x)
             
+            layer_error = np.array([error])
+            
             for j in range(len(self.weights['W']) - 1, -1, -1):
                 if j == len(self.weights['W']) - 1:
-                    grad = delta
+                    pass
                 else:
-                    grad = np.dot(delta.reshape(1, -1), self.weights['W'][j+1].T)
-                    grad = grad * (activations[j] > 0)
+                    layer_error = np.dot(layer_error, self.weights['W'][j+1].T)
+                    # 👇 终极修复：同样将 activations[j] 修改为 activations[j+1]
+                    layer_error = layer_error * (activations[j+1] > 0)
                 
-                self.weights['W'][j] += learning_rate * np.dot(activations[j].T, grad)
-                self.weights['b'][j] += learning_rate * grad
+                dw = np.outer(activations[j], layer_error)
+                db = layer_error.reshape(1, -1)
+                
+                self.weights['W'][j] += learning_rate * dw
+                self.weights['b'][j] += learning_rate * db
 
 
 class REINFORCEAgent:

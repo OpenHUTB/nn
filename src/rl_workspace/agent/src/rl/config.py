@@ -127,7 +127,8 @@ def get_config_parser(env_name: str) -> argparse.ArgumentParser:
         parser.add_argument('--test', action='store_true', help='测试已训练的模型')
         parser.add_argument('--render', action='store_true', help='渲染测试过程')
         parser.add_argument('--save-path', type=str, default='frozen_lake_q_table.npy', help='Q表保存路径')
-        parser.add_argument('--algorithm', type=str, default='q_learning', choices=['q_learning', 'sarsa'], help='算法选择')
+        # 解锁 'reinforce' 和 'a2c'
+        parser.add_argument('--algorithm', type=str, default='q_learning', choices=['q_learning', 'sarsa', 'reinforce', 'a2c'], help='算法选择')
     
     elif env_name.lower() == 'cartpole':
         parser.add_argument('--epochs', type=int, default=50000, help='训练轮数')
@@ -139,6 +140,7 @@ def get_config_parser(env_name: str) -> argparse.ArgumentParser:
         parser.add_argument('--testing', action='store_true', help='进行测试')
         parser.add_argument('--render', action='store_true', help='渲染环境')
         parser.add_argument('--save-path', type=str, default='cartpole_q_table.npy', help='Q表保存路径')
-        parser.add_argument('--algorithm', type=str, default='q_learning', choices=['q_learning', 'sarsa'], help='算法选择')
+        # 解锁 'reinforce' 和 'a2c'
+        parser.add_argument('--algorithm', type=str, default='q_learning', choices=['q_learning', 'sarsa', 'reinforce', 'a2c'], help='算法选择')
     
     return parser
