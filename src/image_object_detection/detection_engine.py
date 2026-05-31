@@ -9,6 +9,7 @@ import os
 import cv2
 import numpy as np
 from typing import List, Tuple, Optional, Callable, Dict
+from scipy.optimize import linear_sum_assignment
 
 
 class ModelLoadError(Exception):
@@ -49,6 +50,10 @@ class DetectionEngine:
         
         self.model = None
         self.tracker = None
+        # 👇 新增：自定义追踪器开关与初始化，默认不干扰原系统的原生 tracking 变量
+        self.enable_custom_tracking = True 
+        if self.enable_custom_tracking:
+            self.custom_tracker = SimpleTracker(iou_threshold=0.3, max_lost=5, alpha=0.7)
         self.detection_callbacks = []
         
         self.stats = {
@@ -193,29 +198,46 @@ class DetectionEngine:
             detection_data = []
             
             if draw and results[0].boxes is not None:
+                # 1. 依旧使用官方默认 plot 绘制基础检测框（避开画布渲染冲突）
                 annotated_frame = results[0].plot()
-                boxes = results[0].boxes
                 
-                for box in boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                # 2. 收集本帧的原始检测框数据，准备送入追踪器
+                raw_detections = []
+                for box in results[0].boxes:
+                    raw_detections.append({
+                        'class_id': int(box.cls),
+                        'class_name': box.name,
+                        'confidence': float(box.conf),
+                        'bbox': [int(x) for x in box.xyxy[0]]
+                    })
+                
+                # 3. 如果开启了自定义追踪，进行 ID 全局最优指派
+                if self.enable_custom_tracking and hasattr(self, 'custom_tracker'):
+                    raw_detections = self.custom_tracker.update(raw_detections)
+                
+                # 4. 统一在画布上二次绘制文字（ID + 距离 + 危险等级）并打包回传数据
+                for det in raw_detections:
+                    x1, y1, x2, y2 = det['bbox']
                     box_height = y2 - y1
                     distance = self._estimate_distance(box_height)
                     danger = self._get_danger_level(distance)
                     danger_color = self._get_danger_color(danger)
                     
-                    info_text = f"{danger} {distance:.1f}m"
+                    # 生成文本：如果带有追踪ID则前缀显示 ID
+                    track_id = det.get('id', None)
+                    if track_id is not None:
+                        info_text = f"ID:{track_id} {danger} {distance:.1f}m"
+                    else:
+                        info_text = f"{danger} {distance:.1f}m"
+                    
+                    # 绘制青色（0, 255, 255）文字，位于框的上方
                     cv2.putText(annotated_frame, info_text, (x1, y1 - 15),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, danger_color, 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
                     
                     if return_data:
-                        detection_data.append({
-                            'class_id': int(box.cls),
-                            'class_name': box.name,
-                            'confidence': float(box.conf),
-                            'bbox': [int(x) for x in box.xyxy[0]],
-                            'distance': distance,
-                            'danger_level': danger
-                        })
+                        det['distance'] = distance
+                        det['danger_level'] = danger
+                        detection_data.append(det)
 
             self._invoke_callbacks(results, frame)
             
@@ -398,3 +420,88 @@ class DetectionEngine:
 
     def __repr__(self):
         return f"DetectionEngine(model={self.model_path}, conf={self.conf_threshold})"
+
+
+class SimpleTracker:
+    """
+    轻量级多目标跟踪器（增强版）
+    采用匈牙利算法进行全局最优匹配，并使用一阶低通滤波（EMA）平滑 Carla 仿真环境中的抖动。
+    """
+    def __init__(self, iou_threshold=0.3, max_lost=5, alpha=0.7):
+        self.iou_threshold = iou_threshold
+        self.max_lost = max_lost
+        self.alpha = alpha  # 平滑系数，越接近1越信任当前帧，越接近0越平滑
+        self.active_tracks = []
+        self.next_id = 1
+
+    def _box_iou(self, box1, box2):
+        """计算两个边界框的交并比 (IoU)"""
+        x1 = max(box1[0], box2[0])
+        y1 = max(box1[1], box2[1])
+        x2 = min(box1[2], box2[2])
+        y2 = min(box1[3], box2[3])
+        
+        inter_area = max(0, x2 - x1) * max(0, y2 - y1)
+        box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+        
+        union_area = box1_area + box2_area - inter_area
+        return inter_area / union_area if union_area > 0 else 0
+
+    def _smooth_bbox(self, old_bbox, new_bbox):
+        """一阶低通滤波，用于平滑车辆或视角颠簸造成的框抖动"""
+        return [int(self.alpha * n + (1 - self.alpha) * o) for o, n in zip(old_bbox, new_bbox)]
+
+    def update(self, detections: List[Dict]) -> List[Dict]:
+        """更新跟踪状态"""
+        if not self.active_tracks:
+            for det in detections:
+                det['id'] = self.next_id
+                self.active_tracks.append({
+                    'id': self.next_id, 'bbox': det['bbox'], 
+                    'class_id': det['class_id'], 'lost_count': 0
+                })
+                self.next_id += 1
+            return detections
+
+        num_tracks = len(self.active_tracks)
+        num_dets = len(detections)
+        cost_matrix = np.zeros((num_tracks, num_dets))
+        
+        for t_idx, track in enumerate(self.active_tracks):
+            for d_idx, det in enumerate(detections):
+                cost_matrix[t_idx, d_idx] = 1.0 - self._box_iou(track['bbox'], det['bbox'])
+
+        # 匈牙利算法全局最优匹配
+        track_indices, det_indices = linear_sum_assignment(cost_matrix)
+        
+        matched_tracks = set()
+        matched_dets = set()
+        
+        for t, d in zip(track_indices, det_indices):
+            iou = 1.0 - cost_matrix[t, d]
+            if iou >= self.iou_threshold:
+                if self.active_tracks[t]['class_id'] == detections[d]['class_id']:
+                    self.active_tracks[t]['bbox'] = self._smooth_bbox(self.active_tracks[t]['bbox'], detections[d]['bbox'])
+                    self.active_tracks[t]['lost_count'] = 0
+                    detections[d]['bbox'] = self.active_tracks[t]['bbox'] 
+                    detections[d]['id'] = self.active_tracks[t]['id']
+                    matched_tracks.add(t)
+                    matched_dets.add(d)
+
+        for t_idx, track in enumerate(self.active_tracks):
+            if t_idx not in matched_tracks:
+                track['lost_count'] += 1
+
+        self.active_tracks = [t for t in self.active_tracks if t['lost_count'] <= self.max_lost]
+
+        for d_idx, det in enumerate(detections):
+            if d_idx not in matched_dets:
+                det['id'] = self.next_id
+                self.active_tracks.append({
+                    'id': self.next_id, 'bbox': det['bbox'], 
+                    'class_id': det['class_id'], 'lost_count': 0
+                })
+                self.next_id += 1
+
+        return detections
