@@ -239,7 +239,7 @@ class ComprehensiveBenchmark:
             action, _ = agent.select_action(np.array([state]))
             while not done:
                 new_state, reward, done, trunc, info = env.step(action)
-                advantage = agent.compute_advantage(state, reward, new_state, done)
+                advantage = agent.compute_advantage(state, reward, next_state, done)
                 agent.update(state, action, advantage)
                 state = new_state
                 total_rewards += reward
@@ -263,17 +263,70 @@ class ComprehensiveBenchmark:
             'training_time': training_time
         }
     
+    def benchmark_a2c(self, epochs: int = 3000) -> dict:
+        """A2C基准测试（全新集成，支持批量GAE更新）"""
+        print(f"\n{'='*50}")
+        print("测试 A2C 算法")
+        print(f"{'='*50}")
+        
+        env = self._create_env()
+        agent = A2CAgent(
+            state_dim=env.observation_space.n,
+            action_dim=env.action_space.n,
+            learning_rate=0.001, gamma=0.99
+        )
+        
+        rewards = []
+        start_time = time.time()
+        
+        for episode in range(epochs):
+            state = env.reset()[0]
+            done = False
+            total_rewards = 0
+            
+            ep_states, ep_actions, ep_rewards, ep_dones = [], [], [], []
+            while not done:
+                action, _ = agent.select_action(np.array([state]))
+                new_state, reward, done, trunc, info = env.step(action)
+                
+                ep_states.append(state)
+                ep_actions.append(action)
+                ep_rewards.append(reward)
+                ep_dones.append(done)
+                
+                state = new_state
+                total_rewards += reward
+                
+            agent.update(ep_states, ep_actions, ep_rewards, ep_dones)
+            rewards.append(total_rewards)
+            
+            if episode % 1000 == 0 and episode > 0:
+                success_rate = np.mean(rewards[-1000:]) * 100
+                print(f"Episode {episode:5d}: 成功率={success_rate:.1f}%")
+        
+        env.close()
+        training_time = time.time() - start_time
+        
+        return {
+            'algorithm': 'A2C',
+            'rewards': rewards,
+            'final_success_rate': np.mean(rewards[-1000:]) * 100,
+            'training_time': training_time
+        }
+    
     def run_all(self, epochs: int = 3000, algorithms: list = None):
         """运行所有算法基准测试"""
         if algorithms is None:
-            algorithms = ['q_learning', 'sarsa', 'dqn', 'reinforce', 'actor_critic']
+            # 默认启动列表扩增 a2c
+            algorithms = ['q_learning', 'sarsa', 'dqn', 'reinforce', 'actor_critic', 'a2c']
         
         algorithm_map = {
             'q_learning': self.benchmark_q_learning,
             'sarsa': self.benchmark_sarsa,
             'dqn': self.benchmark_dqn,
             'reinforce': self.benchmark_reinforce,
-            'actor_critic': self.benchmark_actor_critic
+            'actor_critic': self.benchmark_actor_critic,
+            'a2c': self.benchmark_a2c
         }
         
         print(f"\n{'='*60}")
@@ -341,8 +394,8 @@ def main():
     parser.add_argument('--epochs', type=int, default=3000, help='训练轮数')
     parser.add_argument('--map-size', type=int, default=4, help='地图大小')
     parser.add_argument('--algorithms', nargs='+',
-                       choices=['q_learning', 'sarsa', 'dqn', 'reinforce', 'actor_critic'],
-                       default=['q_learning', 'sarsa'],
+                       choices=['q_learning', 'sarsa', 'dqn', 'reinforce', 'actor_critic', 'a2c'],
+                       default=['q_learning', 'sarsa', 'a2c'],
                        help='要测试的算法')
     
     args = parser.parse_args()
