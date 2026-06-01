@@ -39,6 +39,14 @@
 
 256x256 输入的模型比 512x512 的快 ~2.6 倍；512x512 的三个变体（基础、focal+权重、focal 无权重）速度几乎一致——它们计算量相同，差异仅在训练目标。
 
+`--heatmap` 模式把模型 softmax 输出的 8 个类概率分别画成灰度热力图（亮 = 模型认为这里更可能属于该类），用来诊断模型对各类的把握程度：
+
+<p align="center">
+<img width="700px" src="examples/result_heatmap.png"/>
+</p>
+
+从上图可以直观看出 256x256 模型在 CARLA 示例上的偏置：对 Vehicles 和 Ground 高度自信（max≈1.0），但对 Roads（max≈0.09）和 Road Lines（max≈0.03）几乎检测不到，Pedestrians 的最高置信度也仅约 0.5——这与训练时类别极度不平衡（行人/标志像素数远少于道路）相吻合，也直接说明了项目使用 Focal Loss + 类别权重的必要性。
+
 ## 运行环境
 
 - 平台：Windows 10/11（Linux 同理）
@@ -134,6 +142,23 @@ python main.py --benchmark examples/sample_input.png
 ```
 
 运行后在输入图同目录生成 `*_benchmark.png`，控制台同时打印一份按平均耗时排序的表格（含每个模型的均值/最快/最慢/相对速度倍数）。
+
+### 类别概率热力图（--heatmap）
+
+把模型 softmax 输出的 8 个类（未标注/交通标志/道路/车道线/人行道/地面/车辆/行人）概率分别画成灰度热力图，每张面板带类名以及该类在整张图上的均值/最大值，便于判断模型对哪些类有把握、哪些类几乎检测不到：
+
+```bash
+# 默认示例图 + 默认 256x256 模型
+python main.py --heatmap
+
+# 指定输入图
+python main.py --heatmap examples/sample_input.png
+
+# 指定输入图与模型
+python main.py --heatmap examples/sample_input.png models/unet_model_512x512_50
+```
+
+运行后在输入图同目录生成 `*_heatmap.png`（4 列 × 2 行的 8 类概率热力图）。
 
 ## 目录说明
 
