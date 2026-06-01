@@ -1,55 +1,66 @@
 <mujoco model="standing_humanoid">
-  <compiler angle="radian"/>
-  <option gravity="0 0 -9.81" timestep="0.01"/>
-
+  <compiler angle="radian" coordinate="local"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+  <default>
+    <geom condim="3" friction="1 0.1 0.1"/>
+    <joint damping="0.1"/>
+  </default>
   <worldbody>
-    <geom name="ground" type="plane" size="10 10 0.1" rgba="0.8 0.8 0.8 1"/>
+    <light pos="0 0 3" dir="0 0 -1" diffuse="1 1 1" specular="0.1 0.1 0.1"/>
+    <geom name="floor" type="plane" size="10 10 0.1" rgba="0.8 0.8 0.8 1"/>
 
-    <!-- 根节点：把初始位置直接设为站立状态 -->
-    <body name="root" pos="0 0 1.0" quat="1 0 0 0">
-      <joint name="root_x" type="slide" axis="1 0 0"/>
-      <joint name="root_y" type="slide" axis="0 1 0"/>
-      <joint name="root_z" type="slide" axis="0 0 1"/>
-      <joint name="root_rot_x" type="hinge" axis="1 0 0"/>
-      <joint name="root_rot_y" type="hinge" axis="0 1 0"/>
-      <joint name="root_rot_z" type="hinge" axis="0 0 1"/>
-
-      <!-- 躯干 -->
-      <geom type="capsule" size="0.15 0.3" fromto="0 0 -0.3 0 0 0.3" rgba="0.2 0.6 1 1"/>
-
-      <!-- 头部 -->
-      <body name="head" pos="0 0 0.4">
-        <geom type="sphere" size="0.12" rgba="0.9 0.7 0.5 1"/>
+    <body name="torso" pos="0 0 1.2">
+      <joint name="root" type="free"/>
+      <geom name="torso" type="capsule" fromto="0 0 0 0 0 -0.3" size="0.12" rgba="0.2 0.5 0.8 1"/>
+      
+      <body name="head" pos="0 0 0.15">
+        <geom name="head" type="sphere" size="0.08" rgba="0.8 0.6 0.4 1"/>
       </body>
 
-      <!-- 右臂 -->
-      <body name="right_arm" pos="0.18 0 0.1">
-        <geom type="capsule" size="0.04 0.22" fromto="0 0 0 0 0 -0.25" rgba="0.9 0.9 0.9 1"/>
+      <!-- 左臂：自然下垂初始姿态 + 前后摆动轴 -->
+      <body name="left_shoulder" pos="-0.12 0 0">
+        <joint name="left_shoulder_pitch" type="hinge" axis="1 0 0" range="-1.0 1.0"/>
+        <geom name="left_upper_arm" type="capsule" fromto="0 0 0 0 0 -0.25" size="0.035" rgba="0.5 0.5 0.5 1"/>
+        <body name="left_elbow" pos="0 0 -0.25">
+          <joint name="left_elbow" type="hinge" axis="1 0 0" range="0 1.0"/>
+          <geom name="left_lower_arm" type="capsule" fromto="0 0 0 0 0 -0.25" size="0.03" rgba="0.5 0.5 0.5 1"/>
+        </body>
       </body>
 
-      <!-- 左臂 -->
-      <body name="left_arm" pos="-0.18 0 0.1">
-        <geom type="capsule" size="0.04 0.22" fromto="0 0 0 0 0 -0.25" rgba="0.9 0.9 0.9 1"/>
-      </body>
-
-      <!-- 右腿 -->
-      <body name="right_leg" pos="0.12 0 -0.35">
-        <geom type="capsule" size="0.06 0.25" fromto="0 0 0 0 0 -0.3" rgba="0.9 0.9 0.9 1"/>
-        <body name="right_shin" pos="0 0 -0.3">
-          <geom type="capsule" size="0.05 0.25" fromto="0 0 0 0 0 -0.3" rgba="0.9 0.9 0.9 1"/>
-          <body name="right_foot" pos="0 0 -0.3">
-            <geom type="box" size="0.08 0.05 0.03" rgba="0.6 0.6 0.6 1"/>
-          </body>
+      <!-- 右臂：自然下垂初始姿态 + 前后摆动轴 -->
+      <body name="right_shoulder" pos="0.12 0 0">
+        <joint name="right_shoulder_pitch" type="hinge" axis="1 0 0" range="-1.0 1.0"/>
+        <geom name="right_upper_arm" type="capsule" fromto="0 0 0 0 0 -0.25" size="0.035" rgba="0.5 0.5 0.5 1"/>
+        <body name="right_elbow" pos="0 0 -0.25">
+          <joint name="right_elbow" type="hinge" axis="1 0 0" range="0 1.0"/>
+          <geom name="right_lower_arm" type="capsule" fromto="0 0 0 0 0 -0.25" size="0.03" rgba="0.5 0.5 0.5 1"/>
         </body>
       </body>
 
       <!-- 左腿 -->
-      <body name="left_leg" pos="-0.12 0 -0.35">
-        <geom type="capsule" size="0.06 0.25" fromto="0 0 0 0 0 -0.3" rgba="0.9 0.9 0.9 1"/>
-        <body name="left_shin" pos="0 0 -0.3">
-          <geom type="capsule" size="0.05 0.25" fromto="0 0 0 0 0 -0.3" rgba="0.9 0.9 0.9 1"/>
-          <body name="left_foot" pos="0 0 -0.3">
-            <geom type="box" size="0.08 0.05 0.03" rgba="0.6 0.6 0.6 1"/>
+      <body name="left_hip" pos="-0.08 0 -0.3">
+        <joint name="left_hip_pitch" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
+        <geom name="left_thigh" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.05" rgba="0.5 0.5 0.5 1"/>
+        <body name="left_knee" pos="0 0 -0.35">
+          <joint name="left_knee" type="hinge" axis="1 0 0" range="0 2.09"/>
+          <geom name="left_shin" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.045" rgba="0.5 0.5 0.5 1"/>
+          <body name="left_ankle" pos="0 0 -0.35">
+            <joint name="left_ankle" type="hinge" axis="1 0 0" range="-0.785 0.785"/>
+            <geom name="left_foot" type="box" size="0.07 0.03 0.02" pos="0 0.08 -0.02" rgba="0.3 0.3 0.3 1"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 右腿 -->
+      <body name="right_hip" pos="0.08 0 -0.3">
+        <joint name="right_hip_pitch" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
+        <geom name="right_thigh" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.05" rgba="0.5 0.5 0.5 1"/>
+        <body name="right_knee" pos="0 0 -0.35">
+          <joint name="right_knee" type="hinge" axis="1 0 0" range="0 2.09"/>
+          <geom name="right_shin" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.045" rgba="0.5 0.5 0.5 1"/>
+          <body name="right_ankle" pos="0 0 -0.35">
+            <joint name="right_ankle" type="hinge" axis="1 0 0" range="-0.785 0.785"/>
+            <geom name="right_foot" type="box" size="0.07 0.03 0.02" pos="0 0.08 -0.02" rgba="0.3 0.3 0.3 1"/>
           </body>
         </body>
       </body>
