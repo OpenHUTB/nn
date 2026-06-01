@@ -7,17 +7,19 @@
   </default>
   <worldbody>
     <light pos="0 0 3" dir="0 0 -1" diffuse="1 1 1" specular="0.1 0.1 0.1"/>
-    <geom name="floor" type="plane" size="10 10 0.1" rgba="0.8 0.8 0.8 1"/>
+    <geom name="floor" type="plane" size="15 10 0.1" rgba="0.8 0.8 0.8 1"/>
 
+    <!-- 躯干 -->
     <body name="torso" pos="0 0 1.2">
       <joint name="root" type="free"/>
       <geom name="torso" type="capsule" fromto="0 0 0 0 0 -0.3" size="0.12" rgba="0.2 0.5 0.8 1"/>
       
+      <!-- 头部 -->
       <body name="head" pos="0 0 0.15">
         <geom name="head" type="sphere" size="0.08" rgba="0.8 0.6 0.4 1"/>
       </body>
 
-      <!-- 左臂：自然下垂初始姿态 + 前后摆动轴 -->
+      <!-- 左臂：自然下垂，前后摆动轴（X轴） -->
       <body name="left_shoulder" pos="-0.12 0 0">
         <joint name="left_shoulder_pitch" type="hinge" axis="1 0 0" range="-1.0 1.0"/>
         <geom name="left_upper_arm" type="capsule" fromto="0 0 0 0 0 -0.25" size="0.035" rgba="0.5 0.5 0.5 1"/>
@@ -27,7 +29,7 @@
         </body>
       </body>
 
-      <!-- 右臂：自然下垂初始姿态 + 前后摆动轴 -->
+      <!-- 右臂：自然下垂，前后摆动轴（X轴） -->
       <body name="right_shoulder" pos="0.12 0 0">
         <joint name="right_shoulder_pitch" type="hinge" axis="1 0 0" range="-1.0 1.0"/>
         <geom name="right_upper_arm" type="capsule" fromto="0 0 0 0 0 -0.25" size="0.035" rgba="0.5 0.5 0.5 1"/>
@@ -37,7 +39,7 @@
         </body>
       </body>
 
-      <!-- 左腿 -->
+      <!-- 左腿：前后迈步轴（X轴） -->
       <body name="left_hip" pos="-0.08 0 -0.3">
         <joint name="left_hip_pitch" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
         <geom name="left_thigh" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.05" rgba="0.5 0.5 0.5 1"/>
@@ -51,7 +53,7 @@
         </body>
       </body>
 
-      <!-- 右腿 -->
+      <!-- 右腿：前后迈步轴（X轴） -->
       <body name="right_hip" pos="0.08 0 -0.3">
         <joint name="right_hip_pitch" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
         <geom name="right_thigh" type="capsule" fromto="0 0 0 0 0 -0.35" size="0.05" rgba="0.5 0.5 0.5 1"/>
