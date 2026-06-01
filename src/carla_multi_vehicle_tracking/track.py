@@ -7,6 +7,8 @@ YOLO + DeepSort 多车跟踪系统
 【新增：轨迹预测+提前碰撞预警模块】
 【新增：车速估算 + 超速报警】
 【新增：违章行为检测】
+【新增：UI界面增强模块】
+【新增：车辆轨迹绘制模块】
 
 功能说明：
 1. 实时跟踪多个车辆目标
@@ -15,6 +17,8 @@ YOLO + DeepSort 多车跟踪系统
 4. 检测潜在的碰撞风险并预警
 5. 估算车辆行驶速度，超速时报警
 6. 检测逆行和拥堵违章行为
+7. 实时显示统计信息面板
+8. 绘制车辆运动轨迹
 """
 
 from __future__ import print_function, absolute_import
@@ -81,6 +85,11 @@ SPEED_LIMIT = 60  # 限速60公里/小时
 vehicle_trajectories = {}
 
 # ==================== 【原有】基础配置常量 ====================
+# 【新增：车辆轨迹绘制模块】轨迹绘制配置
+MAX_TRAJECTORY_POINTS = 15  # 轨迹保留15帧
+TRAJECTORY_LINE_WIDTH = 2  # 轨迹线宽度
+TRAJECTORY_LINE_ALPHA = 0.8  # 轨迹线透明度
+
 class_id = [2, 3, 5, 7]
 class_name = {2: 'car', 3: 'motobike', 5: 'bus', 7: 'truck'}
 
@@ -198,6 +207,101 @@ def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, 
         
         # 【新增：UI界面增强模块】移动到下一个信息项的位置
         current_x += text_widths[i] + int(spacing)
+    
+    return frame
+
+# ==================== 【新增：车辆轨迹绘制模块】函数定义 ====================
+
+def initialize_vehicle_path():
+    """
+    【新增：车辆轨迹绘制模块】
+    初始化车辆轨迹字典
+    
+    返回:
+        dict: 存储每辆车的轨迹点 {track_id: [(cx, cy), ...]}
+    """
+    return {}
+
+def update_vehicle_path(traj_dict, tracked_vehicles, max_points):
+    """
+    【新增：车辆轨迹绘制模块】
+    更新车辆轨迹点，记录最近若干帧的中心点坐标
+    
+    参数:
+        traj_dict: 轨迹字典 {track_id: [(cx, cy), ...]}
+        tracked_vehicles: DeepSort输出的跟踪结果
+        max_points: 最大保留点数
+    """
+    # 【新增：车辆轨迹绘制模块】遍历所有跟踪车辆
+    for output in tracked_vehicles:
+        if len(output) >= 5:
+            try:
+                x1, y1, x2, y2 = map(int, output[0:4])
+                track_id = int(output[4])
+                
+                # 【新增：车辆轨迹绘制模块】计算中心点坐标
+                center_x = (x1 + x2) / 2
+                center_y = (y1 + y2) / 2
+                
+                # 【新增：车辆轨迹绘制模块】更新轨迹字典
+                if track_id not in traj_dict:
+                    traj_dict[track_id] = []
+                traj_dict[track_id].append((center_x, center_y))
+                
+                # 【新增：车辆轨迹绘制模块】超过最大帧数自动删除最早的点
+                if len(traj_dict[track_id]) > max_points:
+                    traj_dict[track_id].pop(0)
+                    
+            except (ValueError, TypeError, IndexError):
+                continue
+
+def draw_vehicle_trajectories(frame, traj_dict, colour_func):
+    """
+    【新增：车辆轨迹绘制模块】
+    在画面上绘制车辆运动轨迹（连线形式）
+    
+    参数:
+        frame: 视频帧
+        traj_dict: 轨迹字典 {track_id: [(cx, cy), ...]}
+        colour_func: 用于生成车辆颜色的函数
+    
+    返回:
+        frame: 绘制了轨迹的帧
+    """
+    # 【新增：车辆轨迹绘制模块】遍历所有车辆的轨迹
+    for track_id, trajectory in traj_dict.items():
+        # 【新增：车辆轨迹绘制模块】至少需要2个点才能绘制轨迹线
+        if len(trajectory) < 2:
+            continue
+        
+        # 【新增：车辆轨迹绘制模块】获取车辆对应的颜色
+        colour = colour_func(track_id)
+        
+        # 【新增：车辆轨迹绘制模块】绘制轨迹线
+        for i in range(1, len(trajectory)):
+            # 【新增：车辆轨迹绘制模块】获取当前点和前一个点
+            pt1 = trajectory[i-1]
+            pt2 = trajectory[i]
+            
+            # 【新增：车辆轨迹绘制模块】绘制线段
+            cv2.line(
+                frame, 
+                (int(pt1[0]), int(pt1[1])), 
+                (int(pt2[0]), int(pt2[1])), 
+                colour, 
+                TRAJECTORY_LINE_WIDTH
+            )
+        
+        # 【新增：车辆轨迹绘制模块】绘制轨迹起点（小圆点）
+        if len(trajectory) > 0:
+            start_pt = trajectory[0]
+            cv2.circle(
+                frame, 
+                (int(start_pt[0]), int(start_pt[1])), 
+                3,  # 圆点半径
+                colour, 
+                -1  # 填充
+            )
     
     return frame
 
@@ -729,6 +833,9 @@ class VehicleTracker:
         # 用于统计累计碰撞预警次数，在UI信息条中显示
         self.collision_warning_count = 0
         
+        # 【新增：车辆轨迹绘制模块】初始化车辆轨迹绘制字典
+        self.vehicle_path = initialize_vehicle_path()
+        
         if ULTRALYTICS_AVAILABLE:
             self._load_yolo_model()
         
@@ -932,6 +1039,7 @@ class VehicleTracker:
             5. 【新增：违章行为检测】更新违章检测轨迹
             6. 【新增：违章行为检测】检测逆行和拥堵
             7. 绘制预警信息
+            8. 【新增：车辆轨迹绘制模块】绘制车辆运动轨迹
         """
         frame, bbox_xyxy, conf_score, cls_id = self.yolo_details(frame)
         
@@ -948,6 +1056,9 @@ class VehicleTracker:
                     
                     # 【新增：违章行为检测】更新违章检测轨迹
                     update_violation_trajectories(outputs, self.violation_traj)
+                    
+                    # 【新增：车辆轨迹绘制模块】更新车辆轨迹点
+                    update_vehicle_path(self.vehicle_path, outputs, MAX_TRAJECTORY_POINTS)
                     
                     # 【新增：车速估算 + 超速报警】估算车辆速度，判断是否超速
                     speed_dict, overspeed_ids = estimate_vehicle_speeds(
@@ -980,6 +1091,10 @@ class VehicleTracker:
                     # 如果本帧检测到碰撞风险，则计数器加1
                     if len(collision_risk_ids) > 0:
                         self.collision_warning_count += 1
+                    
+                    # 【新增：车辆轨迹绘制模块】绘制车辆运动轨迹
+                    # 在其他绘制之前先绘制轨迹线，避免被边框遮挡
+                    frame = draw_vehicle_trajectories(frame, self.vehicle_path, self.colour_label)
                     
                     # 【新增：轨迹预测+提前碰撞预警】绘制预警信息
                     frame = draw_collision_warning(frame, collision_risk_ids, outputs)
@@ -1236,7 +1351,9 @@ def parse_args():
                    '兼容 Python 3.8.10 + CARLA 0.9.13\n\n'
                    '【新增功能】轨迹预测 + 提前碰撞预警\n'
                    '【新增功能】车速估算 + 超速报警\n'
-                   '【新增功能】违章行为检测',
+                   '【新增功能】违章行为检测\n'
+                   '【新增功能】UI界面增强\n'
+                   '【新增功能】车辆轨迹绘制',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -1257,6 +1374,8 @@ def check_environment():
     print("【新增：轨迹预测+提前碰撞预警模块】")
     print("【新增：车速估算 + 超速报警】")
     print("【新增：违章行为检测】")
+    print("【新增：UI界面增强模块】")
+    print("【新增：车辆轨迹绘制模块】")
     print("=" * 60)
     print(f"Python: {sys.version}")
     print(f"平台: {sys.platform}")
@@ -1278,6 +1397,11 @@ def check_environment():
     # 显示【新增：违章行为检测】配置
     print("\n【新增：违章行为检测】当前配置:")
     print(f"  - 拥堵阈值: {CONGESTION_THRESHOLD} 辆")
+    
+    # 显示【新增：车辆轨迹绘制模块】配置
+    print("\n【新增：车辆轨迹绘制模块】当前配置:")
+    print(f"  - 轨迹保留帧数: {MAX_TRAJECTORY_POINTS} 帧")
+    print(f"  - 轨迹线宽度: {TRAJECTORY_LINE_WIDTH} 像素")
     print("=" * 60)
 
 
