@@ -16,6 +16,7 @@ class CarlaEnv(object):
         self.vehicle_control = None
         self.actor_list_env = []
         self.spectator = self.world.get_spectator()
+        self.spectator_mode = 'follow'
         self.spectator_offset = carla.Location(x=-8.0, y=0, z=5.0)
         self.spectator_rotation = carla.Rotation(pitch=-20, yaw=0, roll=0)
         self.bp = self.world.get_blueprint_library()
@@ -143,17 +144,33 @@ class CarlaEnv(object):
             vehicle_location = vehicle_transform.location
             vehicle_rotation = vehicle_transform.rotation
 
-            forward_vec = carla.Vector3D(x=vehicle_location.x + self.spectator_offset.x,
-                                        y=vehicle_location.y + self.spectator_offset.y,
-                                        z=vehicle_location.z + self.spectator_offset.z)
-
-            new_transform = carla.Transform(
-                forward_vec,
-                carla.Rotation(pitch=self.spectator_rotation.pitch + vehicle_rotation.pitch,
-                              yaw=vehicle_rotation.yaw + self.spectator_rotation.yaw,
-                              roll=self.spectator_rotation.roll + self.spectator_rotation.roll)
-            )
+            if self.spectator_mode == 'top':
+                new_transform = carla.Transform(
+                    carla.Location(x=vehicle_location.x, y=vehicle_location.y, z=50),
+                    carla.Rotation(pitch=-90, yaw=vehicle_rotation.yaw, roll=0)
+                )
+            elif self.spectator_mode == 'first':
+                cam_transform = carla.Transform(carla.Location(x=1.2, z=1.5))
+                new_transform = vehicle_transform.transform(cam_transform)
+                new_transform.rotation.roll = 0
+            else:
+                forward_vec = carla.Vector3D(x=vehicle_location.x + self.spectator_offset.x,
+                                            y=vehicle_location.y + self.spectator_offset.y,
+                                            z=vehicle_location.z + self.spectator_offset.z)
+                new_transform = carla.Transform(
+                    forward_vec,
+                    carla.Rotation(pitch=self.spectator_rotation.pitch + vehicle_rotation.pitch,
+                                  yaw=vehicle_rotation.yaw + self.spectator_rotation.yaw,
+                                  roll=vehicle_rotation.roll + self.spectator_rotation.roll)
+                )
             self.spectator.set_transform(new_transform)
+
+    def set_spectator_mode(self, mode):
+        if mode in ['follow', 'top', 'first']:
+            self.spectator_mode = mode
+            print(f"Spectator mode changed to: {mode}")
+        else:
+            print(f"Invalid mode: {mode}. Use 'follow', 'top', or 'first'")
 
     def exit_env(self):
         self.cleanup_world()
