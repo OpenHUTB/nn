@@ -2,11 +2,12 @@
 自动驾驶车辆语义分割 —— 推理入口
 
 加载预训练 U-Net 模型，对 CARLA 街景做 8 类语义分割。
-支持四种模式，按扩展名/参数自动识别：
+支持五种模式，按扩展名/参数自动识别：
   - 图片 (.png/.jpg/...)：输出叠加图 (overlay) 和纯掩码图 (mask)
   - 视频 (.mp4/.avi/...)：逐帧分割，输出叠加视频，并生成采样帧拼图
   - --augment 图片：对同一张图分别施加 6 种训练时用到的数据增强并排展示（不需要模型）
   - --benchmark 图片：测量 models/ 下所有预训练模型的推理延迟，输出柱状图
+  - --heatmap 图片：把模型 softmax 输出的 8 个类概率分别画成灰度热力图
 
 用法：
     python main.py                                   # 用默认示例图 + 默认模型
@@ -17,6 +18,8 @@
     python main.py --augment <输入图>                 # 指定输入图做增强可视化
     python main.py --benchmark                       # 默认示例图，基准测试所有模型推理延迟
     python main.py --benchmark <输入图>               # 指定输入图做基准测试
+    python main.py --heatmap                         # 默认示例图 + 默认模型，输出 8 类概率热力图
+    python main.py --heatmap <输入图> [<模型目录>]    # 指定输入图（与模型）做热力图
 
 模型说明：
     预训练模型为二进制大文件（每个约 17MB），未随仓库提交。
@@ -256,6 +259,56 @@ def run_benchmark(input_path, n_runs=BENCHMARK_RUNS, n_warmup=BENCHMARK_WARMUP):
     print(f"\n      已写出基准测试图: {out_path}")
 
 
+def run_heatmap(input_path, model_dir):
+    """对输入图运行推理，把 softmax 输出的 8 类概率分别画成灰度热力图（4x2 网格）。"""
+    img = Image.open(input_path).convert("RGB")
+    print(f"      输入图片: {input_path}  尺寸: {img.size}")
+
+    print(f"[1/2] 加载模型并推理: {model_dir}")
+    model = load_segmentation_model(model_dir)
+    labels = infer(model, img)  # (H, W, 8)
+    h, w, n_classes = labels.shape
+    print(f"      softmax 输出形状: {labels.shape}")
+
+    from semantic.carla_controller.labels import SEMANTIC_CATEGORIES
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    print(f"[2/2] 生成 {n_classes} 类概率热力图 ...")
+    cols = 4
+    rows = (n_classes + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 3 * rows))
+    axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
+    for c in range(n_classes):
+        ax = axes_flat[c]
+        prob = labels[:, :, c]
+        mean_conf = float(prob.mean())
+        max_conf = float(prob.max())
+        ax.imshow(prob, cmap="hot", vmin=0.0, vmax=1.0)
+        ax.set_title(
+            f"{c}: {SEMANTIC_CATEGORIES.get(c, str(c))}\nmean={mean_conf:.3f}  max={max_conf:.3f}",
+            fontsize=10,
+        )
+        ax.axis("off")
+    # 隐藏多余的子图
+    for c in range(n_classes, rows * cols):
+        axes_flat[c].axis("off")
+
+    model_label = os.path.basename(os.path.normpath(model_dir))
+    fig.suptitle(
+        f"Per-class probability heatmaps (model: {model_label})", fontsize=12
+    )
+    fig.tight_layout()
+
+    base, _ = os.path.splitext(input_path)
+    out_path = f"{base}_heatmap.png"
+    fig.savefig(out_path, dpi=100)
+    print(f"      已写出概率热力图: {out_path}")
+
+
 def run_image(model, img_path):
     print(f"[2/3] 读取图片: {img_path}")
     img = Image.open(img_path).convert("RGB")
@@ -340,6 +393,17 @@ def main():
             print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
             sys.exit(1)
         run_benchmark(input_path)
+        print("完成。")
+        return
+
+    if args and args[0] == "--heatmap":
+        rest = args[1:]
+        input_path = rest[0] if rest else DEFAULT_INPUT
+        model_dir = rest[1] if len(rest) >= 2 else DEFAULT_MODEL
+        if not os.path.isfile(input_path):
+            print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
+            sys.exit(1)
+        run_heatmap(input_path, model_dir)
         print("完成。")
         return
 
