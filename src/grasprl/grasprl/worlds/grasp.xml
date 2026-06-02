@@ -48,6 +48,7 @@
     </default>
     <site size="0.001" rgba="0.5 0.5 0.5 0.3" group="4"/>
   </default>
+  </default>
 
     <asset>
       <material class="ur5e" name="ur5e:black" rgba="0.033 0.033 0.033 1"/>

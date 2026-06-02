@@ -4,16 +4,27 @@ import numpy as np
 from utils import lr_schedule
 
 algorithm_params = {
+    # "PPO": dict(
+    #     learning_rate=lr_schedule(1e-4, 1e-6, 2),
+    #     gamma=0.98,
+    #     gae_lambda=0.95,
+    #     clip_range=0.2,
+    #     ent_coef=0.05,
+    #     n_epochs=10,
+    #     n_steps=1024,
+    #     policy_kwargs=dict(activation_fn=torch.nn.ReLU,
+    #                        net_arch=[dict(pi=[500, 300], vf=[500, 300])])
+    # ),
     "PPO": dict(
-        learning_rate=lr_schedule(1e-4, 1e-6, 2),
+        learning_rate=3e-4,
         gamma=0.98,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.05,
-        n_epochs=10,
-        n_steps=1024,
+        ent_coef=0.01,
+        n_epochs=5,
+        n_steps=2048,
         policy_kwargs=dict(activation_fn=torch.nn.ReLU,
-                           net_arch=[dict(pi=[500, 300], vf=[500, 300])])
+                           net_arch=[dict(pi=[256, 256], vf=[256, 256])])
     ),
     "SAC": dict(
         learning_rate=lr_schedule(5e-4, 1e-6, 2),

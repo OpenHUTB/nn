@@ -2,8 +2,57 @@
 # YOLOv8 检测系统配置文件
 # 所有字段均为可选项；未指定时将使用内置默认值
 
-model_path: "yolov8n.pt"
-confidence_threshold: 0.3
-camera_index: 0
-output_interval: 1.0
-default_image_path: "data/test.jpg"
+# 模型配置
+model:
+  path: "yolov8n.pt"              # YOLO模型路径或名称
+  confidence_threshold: 0.25      # 置信度阈值 (0.0-1.0)
+  iou_threshold: 0.45             # IOU阈值 (NMS)
+  device: "auto"                  # 设备类型: auto, cpu, cuda, mps
+  half_precision: false           # 是否使用半精度推理
+
+# 输入配置
+input:
+  default_image_path: "data/test.jpg"  # 默认测试图像路径
+  camera_index: 0                      # 摄像头设备索引
+  input_dir: "data/input"              # 默认输入目录
+  supported_formats:                   # 支持的图像格式
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+    - ".tiff"
+    - ".webp"
+
+# 输出配置
+output:
+  output_dir: "data/output"       # 默认输出目录
+  save_results: true              # 是否保存检测结果
+  output_format: "jpg"            # 输出图像格式
+  auto_create_dir: true           # 是否自动创建输出目录
+
+# 性能配置
+performance:
+  num_threads: 4                  # 线程数
+  batch_size: 1                   # 批处理大小
+  warmup_runs: 3                  # 预热运行次数
+
+# 显示配置
+display:
+  show_confidence: true           # 显示置信度
+  show_distance: true             # 显示距离信息
+  show_danger_level: true         # 显示危险等级
+  show_fps: false                 # 显示帧率
+  window_size: [1280, 720]        # 窗口大小
+
+# 危险等级配置
+danger:
+  danger_threshold: 10.0          # 危险阈值 (米)
+  warning_threshold: 20.0         # 警告阈值 (米)
+  known_height: 1.6               # 已知目标高度 (米，用于距离估算)
+  focal_length: 700               # 相机焦距 (像素)
+
+# 日志配置
+logging:
+  log_level: "INFO"               # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: null                  # 日志文件路径 (null表示不输出到文件)
+  log_to_console: true            # 是否输出到控制台

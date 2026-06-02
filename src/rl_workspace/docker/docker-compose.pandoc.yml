@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+  pandoc:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    entrypoint: ["sh"]
+    image: pandoc/latex:latest
+    command: |
+      -c "
+        mkdir -p rendered &&
+        cd doc &&
+        pandoc --citeproc --csl=ieee.csl -o ../rendered/report.pdf report.md
+      "
+    volumes:
+      - ../:/data
