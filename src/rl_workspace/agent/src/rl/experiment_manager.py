@@ -2,6 +2,7 @@
 实验管理和超参数优化模块
 
 提供实验跟踪、结果保存和自动超参数搜索功能
+扩展：自动保存 matplotlib 图表到实验目录
 """
 
 import os
@@ -39,6 +40,7 @@ class ExperimentTracker:
     实验跟踪器
     
     记录每次实验的配置、指标和结果
+    扩展：自动保存图表到实验子目录
     """
     
     def __init__(self, experiment_dir: str = "experiments"):
@@ -56,6 +58,10 @@ class ExperimentTracker:
             'metrics': {},
             'checkpoints': []
         }
+        # 创建实验专属的 figures 子目录
+        exp_id = self._generate_exp_id(config)
+        self.current_experiment['figure_dir'] = os.path.join(self.experiment_dir, exp_id, 'figures')
+        os.makedirs(self.current_experiment['figure_dir'], exist_ok=True)
     
     def log_metric(self, name: str, value: float, step: Optional[int] = None):
         """记录指标"""
@@ -87,6 +93,20 @@ class ExperimentTracker:
             'timestamp': time.time() - self.current_experiment['start_time']
         }
         self.current_experiment['checkpoints'].append(checkpoint)
+    
+    def save_figure(self, fig, filename: str):
+        """
+        自动保存 matplotlib 图表到当前实验的 figures 目录
+        参数：
+            fig: matplotlib.figure.Figure 对象
+            filename: 文件名（如 'training_curve.png'）
+        """
+        if self.current_experiment is None:
+            raise RuntimeError("没有正在进行的实验，请先调用 start_experiment")
+        filepath = os.path.join(self.current_experiment['figure_dir'], filename)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        fig.savefig(filepath, dpi=150)
+        print(f"图表已保存到: {filepath}")
     
     def end_experiment(self, success: bool = True, error_message: Optional[str] = None):
         """结束实验"""
@@ -175,6 +195,8 @@ class ExperimentTracker:
         
         return summary
 
+
+# ========== 以下 HyperparameterOptimizer 和 ExperimentSuite 保持不变 ==========
 
 class HyperparameterOptimizer:
     """
