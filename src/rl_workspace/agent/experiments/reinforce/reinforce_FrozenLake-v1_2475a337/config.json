@@ -1,0 +1,11 @@
+{
+  "algorithm": "reinforce",
+  "env_name": "FrozenLake-v1",
+  "hyperparameters": {
+    "alpha": 0.1,
+    "gamma": 0.99,
+    "epochs": 2000
+  },
+  "seed": 42,
+  "timestamp": "2026-05-30T20:59:26.251833"
+}
