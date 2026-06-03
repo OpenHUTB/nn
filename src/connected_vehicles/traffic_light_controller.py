@@ -1,40 +1,73 @@
 import carla
+import math
 
-def set_all_traffic_lights(world, green_time=10.0, red_time=10.0, yellow_time=2.0):
+def get_vehicle_traffic_light(world: carla.World, vehicle: carla.Vehicle) -> carla.TrafficLight:
     """
-    统一设置地图中所有红绿灯的切换时间
-    :param world: CARLA world 对象
-    :param green_time: 绿灯时长
-    :param red_time: 红灯时长
-    :param yellow_time: 黄灯时长
+    （兼容版）获取车辆当前接近的红绿灯
+    :param world: CARLA World对象
+    :param vehicle: 车辆Actor
+    :return: 红绿灯Actor（无则返回None）
     """
-    try:
-        traffic_lights = world.get_actors().filter('traffic.traffic_light*')
-        for tl in traffic_lights:
-            tl.set_green_time(green_time)
-            tl.set_red_time(red_time)
-            tl.set_yellow_time(yellow_time)
-    except:
-        print("⚠️ 红绿灯设置失败")
+    # 获取所有红绿灯
+    traffic_lights = world.get_actors().filter("traffic.traffic_light")
+    if not traffic_lights:
+        return None
 
-def get_current_light_state(car):
+    vehicle_loc = vehicle.get_transform().location
+    min_distance = float('inf')
+    target_light = None
+
+    # 遍历红绿灯，找到距离最近且处于红灯状态的
+    for light in traffic_lights:
+        if light.get_state() != carla.TrafficLightState.Red:
+            continue  # 只检测红灯
+
+        # 计算车辆与红绿灯的距离
+        light_loc = light.get_transform().location
+        distance = math.sqrt(
+            (vehicle_loc.x - light_loc.x)**2 +
+            (vehicle_loc.y - light_loc.y)**2 +
+            (vehicle_loc.z - light_loc.z)**2
+        )
+
+        # 只检测距离<50米的红绿灯（避免跨路口误判）
+        if distance < 50 and distance < min_distance:
+            min_distance = distance
+            target_light = light
+
+    return target_light
+
+def get_traffic_light_state(light: carla.TrafficLight) -> str:
     """
-    获取车辆前方红绿灯状态
-    :return: 红灯/绿灯/黄灯/无
+    获取红绿灯状态（字符串格式）
+    :param light: 红绿灯Actor
+    :return: red/yellow/green/off
     """
-    light_state = "无"
-    try:
-        tl = car.get_traffic_light()
-        if tl:
-            dis = car.get_transform().location.distance(tl.get_transform().location)
-            if dis < 20:
-                state = tl.get_state()
-                if state == carla.TrafficLightState.Red:
-                    light_state = "红灯"
-                elif state == carla.TrafficLightState.Green:
-                    light_state = "绿灯"
-                elif state == carla.TrafficLightState.Yellow:
-                    light_state = "黄灯"
-    except:
-        light_state = "无"
-    return light_state
+    if not light:
+        return "off"
+    state = light.get_state()
+    if state == carla.TrafficLightState.Red:
+        return "red"
+    elif state == carla.TrafficLightState.Yellow:
+        return "yellow"
+    elif state == carla.TrafficLightState.Green:
+        return "green"
+    else:
+        return "off"
+
+def check_red_light_violation(world: carla.World, vehicle: carla.Vehicle) -> bool:
+    """
+    （兼容版）检测车辆是否闯红灯
+    :param world: CARLA World对象
+    :param vehicle: 车辆Actor
+    :return: True=闯红灯，False=未闯红灯
+    """
+    light = get_vehicle_traffic_light(world, vehicle)
+    if light and get_traffic_light_state(light) == "red":
+        # 车辆在红灯时仍在移动（速度>0）则判定为闯红灯
+        from utils import calculate_vehicle_speed_kmh
+        speed = calculate_vehicle_speed_kmh(vehicle)
+        if speed > 0:
+            print(f"\n🚦 闯红灯检测：车速 {speed} km/h | 位置 {vehicle.get_transform().location}")
+            return True
+    return False

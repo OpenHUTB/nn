@@ -1,39 +1,36 @@
-import time
-import mujoco
-from mujoco import viewer
-import numpy as np
+# main.py（单文件，训练/测试自动判断）
+import os
+import gymnasium as gym
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv
 
-def main():
-    # 加载模型
-    try:
-        model = mujoco.MjModel.from_xml_path("humanoid.xml")
-    except Exception as e:
-        print(f"模型加载失败: {e}")
-        return
+MODEL_PATH = "ppo_humanoid_balance"
 
-    data = mujoco.MjData(model)
+# 1. 创建环境
+env = gym.make("Humanoid-v4", render_mode="human")
+env = DummyVecEnv([lambda: env])
 
-    # 1. 加载站立关键帧
-    mujoco.mj_resetDataKeyframe(model, data, 0)
-    
-    # 2. 保存初始关节位置（PD控制目标）
-    qpos0 = data.qpos.copy()
+if os.path.exists(MODEL_PATH + ".zip"):
+    # 已有模型：直接测试
+    print("发现已训练模型，进入测试模式...")
+    model = PPO.load(MODEL_PATH)
+    obs = env.reset()
+    for _ in range(3000):
+        action, _states = model.predict(obs, deterministic=True)
+        obs, rewards, dones, info = env.step(action)
+        env.render()
+        if dones:
+            obs = env.reset()
+else:
+    # 没有模型：开始训练
+    print("未找到模型，开始训练...")
+    model = PPO(
+        "MlpPolicy", env, verbose=1,
+        learning_rate=3e-4, gamma=0.99, clip_range=0.2,
+        n_steps=2048, batch_size=64, n_epochs=10
+    )
+    model.learn(total_timesteps=3_000_000)
+    model.save(MODEL_PATH)
+    print("训练完成，模型已保存！")
 
-    print("✅ 启动PD控制，人形将永久站立")
-
-    # 运行仿真
-    with viewer.launch_passive(model, data) as v:
-        while True:
-            # PD控制：让关节保持初始位置
-            kp = 100.0  # 比例增益
-            kd = 10.0   # 微分增益
-            data.ctrl[:] = kp * (qpos0[7:] - data.qpos[7:]) - kd * data.qvel[6:]
-
-            mujoco.mj_step(model, data)
-            
-            print(f"时间: {data.time:.2f}s | 身高: {data.qpos[2]:.2f}m")
-            v.sync()
-            time.sleep(0.01)
-
-if __name__ == "__main__":
-    main()
+env.close()

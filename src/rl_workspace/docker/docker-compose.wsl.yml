@@ -1,0 +1,12 @@
+# Launch a ros master with the controller manager and associated services
+version: "3.8"
+
+x-base: &base
+  volumes:
+    - /usr/lib/wsl:/usr/lib/wsl:ro
+  environment:
+    LD_LIBRARY_PATH: /usr/lib/wsl/lib
+
+services:
+  base-gpu: *base
+  gazebo: *base

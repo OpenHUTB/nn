@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<package format="2">
+  <name>handy_environment</name>
+  <version>0.0.0</version>
+  <description>Package for simulating handy</description>
+  <maintainer email="acmiyaguchi@gatech.edu">Anthony Miyaguchi</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>roslaunch</build_depend>
+  <build_depend>gazebo_ros</build_depend>
+
+  <exec_depend>roslaunch</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>finalarm_description</exec_depend>
+  <exec_depend>realsense2_custom_description</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>moveit_commander</exec_depend>
+
+  <test_depend>ros_pytest</test_depend>
+
+  <export>
+    <!--
+    https://answers.gazebosim.org/question/6568/uri-paths-to-packages-in-the-sdf-model-file/?answer=7664#post-id-7664 -->
+    <!-- gazebo_ros_paths_plugin automatically adds these to
+        GAZEBO_PLUGIN_PATH and GAZEBO_MODEL_PATH when you do this export inside
+        the package.xml file. You can than use URIs of type model://my_package/stuff. -->
+    <gazebo_ros gazebo_model_path="${prefix}/models" />
+  </export>
+</package>

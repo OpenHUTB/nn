@@ -1,0 +1,65 @@
+# Launch a ros master with the controller manager and associated services
+version: "3.8"
+
+# we can use the x prefix for docker compose to ignore these settings
+x-base: &base
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: autobots-visman/reinforcement-learning:latest
+  network_mode: host
+  # We also add some settings for WSL2 opengl gpu acceleration, which should
+  # be ignored by other platforms
+  # https://github.com/microsoft/wslg/blob/main/samples/container/Containers.md
+  volumes:
+    - ../:/catkin_ws/src/app
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  environment: &env
+    DISPLAY: $DISPLAY
+    QT_X11_NO_MITSHM: 1
+
+services:
+  base: *base
+
+  base-gpu: &base-gpu
+    <<: *base
+
+  core: &core
+    command: stdbuf -o L roscore
+    image: ros:noetic-ros-core-focal
+    network_mode: host
+
+  set-sim-time:
+    <<: *core
+    restart: on-failure
+    command: stdbuf -o L rosparam set use_sim_time true
+    depends_on:
+      - core
+
+  gazebo:
+    <<: *base-gpu
+    command: roslaunch --wait handy_environment gazebo.launch rviz:=false
+    depends_on: &depends-on-sim
+      set-sim-time:
+        condition: service_completed_successfully
+
+  moveit-rviz:
+    # NOTE: WSL2 is not playing nicely rendering meshes in rviz, so we run this
+    # with software rendering. This runs incredibly slow inside of docker, so
+    # prefer running rviz outside of docker.
+    <<: *base-gpu
+    command: roslaunch --wait finalarm_moveit_config moveit_rviz.launch
+    depends_on:
+      - gazebo
+
+  state-controller:
+    <<: *base
+    command: roslaunch --wait state_controller serve.launch
+    depends_on:
+      - gazebo
+
+  img2vec:
+    <<: *base-gpu
+    command: roslaunch --wait img2vec img2vec.launch camera_topic:=image_raw dest_topic:=image_embeddings
+    depends_on:
+      - gazebo

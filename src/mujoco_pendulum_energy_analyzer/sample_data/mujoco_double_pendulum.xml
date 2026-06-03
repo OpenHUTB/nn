@@ -1,0 +1,17 @@
+<mujoco model="double_pendulum_energy">
+  <option timestep="0.01" gravity="0 0 -9.81"/>
+  <worldbody>
+    <body name="link1" pos="0 0 0.8">
+      <joint name="shoulder" type="hinge" axis="0 1 0" damping="0.08"/>
+      <geom name="link1_geom" type="capsule" fromto="0 0 0 0 0 -0.45" size="0.035" mass="1.2"/>
+      <body name="link2" pos="0 0 -0.45">
+        <joint name="elbow" type="hinge" axis="0 1 0" damping="0.06"/>
+        <geom name="link2_geom" type="capsule" fromto="0 0 0 0 0 -0.42" size="0.03" mass="0.8"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="shoulder_motor" joint="shoulder" gear="1.2"/>
+    <motor name="elbow_motor" joint="elbow" gear="0.9"/>
+  </actuator>
+</mujoco>
