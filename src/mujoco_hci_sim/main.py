@@ -1,45 +1,36 @@
-import time
-import mujoco
-from mujoco import viewer
-import numpy as np
-import math
+# main.py（单文件，训练/测试自动判断）
+import os
+import gymnasium as gym
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv
 
-def main():
-    # 加载模型
-    try:
-        model = mujoco.MjModel.from_xml_path("humanoid.xml")
-    except Exception as e:
-        print(f"模型加载失败: {e}")
-        return
+MODEL_PATH = "ppo_humanoid_balance"
 
-    data = mujoco.MjData(model)
+# 1. 创建环境
+env = gym.make("Humanoid-v4", render_mode="human")
+env = DummyVecEnv([lambda: env])
 
-    # 加载站立姿势
-    mujoco.mj_resetDataKeyframe(model, data, 0)
-    qpos0 = data.qpos.copy()
+if os.path.exists(MODEL_PATH + ".zip"):
+    # 已有模型：直接测试
+    print("发现已训练模型，进入测试模式...")
+    model = PPO.load(MODEL_PATH)
+    obs = env.reset()
+    for _ in range(3000):
+        action, _states = model.predict(obs, deterministic=True)
+        obs, rewards, dones, info = env.step(action)
+        env.render()
+        if dones:
+            obs = env.reset()
+else:
+    # 没有模型：开始训练
+    print("未找到模型，开始训练...")
+    model = PPO(
+        "MlpPolicy", env, verbose=1,
+        learning_rate=3e-4, gamma=0.99, clip_range=0.2,
+        n_steps=2048, batch_size=64, n_epochs=10
+    )
+    model.learn(total_timesteps=3_000_000)
+    model.save(MODEL_PATH)
+    print("训练完成，模型已保存！")
 
-    print("✅ 稳定站立 + 大幅快速挥手启动！")
-
-    with viewer.launch_passive(model, data) as v:
-        while True:
-            # ========== 核心：保持站立 ==========
-            kp = 100.0
-            kd = 10.0
-            data.ctrl[:] = kp * (qpos0[7:] - data.qpos[7:]) - kd * data.qvel[6:]
-
-            # ========== 大幅+快速挥手 ==========
-            # 1. 幅度 1.4（挥手抬得更高）
-            # 2. 速度从 10（挥得更快）
-            wave = math.sin(data.time * 10) * 1.4
-
-            # 只控制肩膀关节，这样挥手更明显
-            data.ctrl[16] = wave  # 右肩（大臂）
-            # 小臂不动，只挥大臂，动作更像真实挥手
-            # data.ctrl[17] = wave
-
-            mujoco.mj_step(model, data)
-            v.sync()
-            time.sleep(0.01)
-
-if __name__ == "__main__":
-    main()
+env.close()
