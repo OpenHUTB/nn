@@ -45,6 +45,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- 车道线检测: 'lane_detection/README.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 
 

@@ -114,6 +114,9 @@ screenshots/
 !docs/carla_CAM/
 !docs/carla_CAM/images/
 !docs/carla_CAM/images/*.png
+!docs/lane_detection/
+!docs/lane_detection/images/
+!docs/lane_detection/images/*.jpg
 # ========================================
 # Jupyter Notebook
 # ========================================

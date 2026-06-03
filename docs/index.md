@@ -55,6 +55,8 @@ title: 主页
 ---
 ## 感知 <span id="perception"></span>
 
+[__车道线检测__](./lane_detection/README.md) - 基于 OpenCV 的 Carla 场景车道线检测（分步实现）
+
 [__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
 
 [__V2X路侧智能感知__](./edge_intelligence_V2X/README.md) - 基于YOLOv8n的V2X路侧智能感知系统优化与实现
