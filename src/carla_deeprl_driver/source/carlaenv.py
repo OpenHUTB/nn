@@ -1,5 +1,6 @@
 import carla
 import random
+import math
 from source.agent import ActorCar
 from source.utility import get_env_settings, map2action
 
@@ -68,13 +69,13 @@ class CarlaEnv(object):
     def step(self, action_index):
         action = map2action(action_index)
         assert isinstance(action, carla.VehicleControl), "action type is not vehicle control"
-        print("take: ", action)
         self.vehicle_control(action)
         frame_index = self.world.tick()
         self.update_spectator()
-        print(f"after step, current frame is: {frame_index}")
+        self.draw_speed_hud()
         observation, collision = self.agent.retrieve_data(frame_index)
         reward = self.get_reward(action_index, collision)
+        self.draw_reward_hud(reward, collision)
         done = 1 if collision != 0 else 0
         return observation, reward, done
 
@@ -172,6 +173,69 @@ class CarlaEnv(object):
         else:
             print(f"Invalid mode: {mode}. Use 'follow', 'top', or 'first'")
 
+    def get_speed(self):
+        if self.agent and self.agent.actor_car:
+            velocity = self.agent.actor_car.get_velocity()
+            speed_ms = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+            speed_kmh = speed_ms * 3.6
+            return speed_kmh, speed_ms
+        return 0.0, 0.0
+
+    def print_speed(self):
+        speed_kmh, speed_ms = self.get_speed()
+        print(f"Speed: {speed_kmh:.1f} km/h ({speed_ms:.1f} m/s)")
+        return speed_kmh, speed_ms
+
+    def draw_speed_hud(self):
+        if self.agent and self.agent.actor_car:
+            speed_kmh, speed_ms = self.get_speed()
+            vehicle_transform = self.agent.actor_car.get_transform()
+            hud_location = vehicle_transform.location + carla.Location(x=0, y=0, z=5)
+            
+            self.world.debug.draw_string(
+                hud_location,
+                f"Speed: {speed_kmh:.1f} km/h",
+                color=carla.Color(255, 255, 0),
+                life_time=0.1,
+                draw_shadow=True
+            )
+
+    def draw_reward_hud(self, reward, collision):
+        if self.agent and self.agent.actor_car:
+            vehicle_transform = self.agent.actor_car.get_transform()
+            vehicle_location = vehicle_transform.location
+            
+            # Draw reward info behind the vehicle
+            behind_dir = carla.Vector3D(
+                x=-math.cos(math.radians(vehicle_transform.rotation.yaw)) * 8,
+                y=-math.sin(math.radians(vehicle_transform.rotation.yaw)) * 8,
+                z=3
+            )
+            hud_location = carla.Location(
+                x=vehicle_location.x + behind_dir.x,
+                y=vehicle_location.y + behind_dir.y,
+                z=vehicle_location.z + behind_dir.z
+            )
+            
+            # Color based on reward
+            if collision != 0:
+                text = f"COLLISION! Reward: {reward:.1f}"
+                color = carla.Color(255, 0, 0)
+            elif reward > 0:
+                text = f"Reward: +{reward:.1f}"
+                color = carla.Color(0, 255, 0)
+            else:
+                text = f"Reward: {reward:.1f}"
+                color = carla.Color(255, 255, 0)
+            
+            self.world.debug.draw_string(
+                hud_location,
+                text,
+                color=color,
+                life_time=0.5,
+                draw_shadow=True
+            )
+
     def exit_env(self):
         self.cleanup_world()
         settings = self.world.get_settings()
@@ -188,12 +252,12 @@ class CarlaEnv(object):
 
     def step_sac(self, action):
         assert isinstance(action, carla.VehicleControl), "action is not the carla type."
-        print("take: ", action)
         self.vehicle_control(action)
         frame_index = self.world.tick()
         self.update_spectator()
-        print(f"after step, current frame is: {frame_index}")
+        self.draw_speed_hud()
         observation, collision = self.agent.retrieve_data(frame_index)
         reward = self.reward_sac(collision)
+        self.draw_reward_hud(reward, collision)
         done = 1 if collision != 0 else 0
         return observation, reward, done
