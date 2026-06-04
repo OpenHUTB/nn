@@ -47,6 +47,14 @@
 
 从上图可以直观看出 256x256 模型在 CARLA 示例上的偏置：对 Vehicles 和 Ground 高度自信（max≈1.0），但对 Roads（max≈0.09）和 Road Lines（max≈0.03）几乎检测不到，Pedestrians 的最高置信度也仅约 0.5——这与训练时类别极度不平衡（行人/标志像素数远少于道路）相吻合，也直接说明了项目使用 Focal Loss + 类别权重的必要性。
 
+`--frequency` 模式将训练数据 8 类像素分布与训练实际使用的 Focal Loss 权重一并量化展示，用以解释"为什么需要 Focal Loss + 类别权重"：
+
+<p align="center">
+<img width="800px" src="examples/result_frequency.png"/>
+</p>
+
+左图（对数纵轴）显示 Unlabeled 与 Roads 合计占 80% 以上的像素，而 Pedestrians 仅占约 0.066%、Traffic Sign/Lights 约 0.195%，**最多类与最少类的像素数比约 817:1**。如果用普通交叉熵直接训练，模型会被多数类主导、几乎不学少数类。右图显示训练时实际应用的权重——通过 `2·sigmoid(像素比例)` 把跨度 818:1 的不平衡压缩成 1.12-2.00 的温和加权（少数类 ≈2.0，多数类 ≈1.1），让模型在每张图的梯度中也能感知到少数类的存在。
+
 ## 运行环境
 
 - 平台：Windows 10/11（Linux 同理）
@@ -159,6 +167,18 @@ python main.py --heatmap examples/sample_input.png models/unet_model_512x512_50
 ```
 
 运行后在输入图同目录生成 `*_heatmap.png`（4 列 × 2 行的 8 类概率热力图）。
+
+### 类别频率分析（--frequency）
+
+不依赖任何模型或输入图，直接读取 `semantic/unet/train.py` 中由原始项目从 CARLA 训练集统计得到的 `CLASS_PIXEL_RATIOS`，量化展示数据极度不平衡，以及 Focal Loss 应用权重如何缓解：
+
+```bash
+python main.py --frequency
+```
+
+运行后：
+- 控制台打印 8 类的 markdown 表格（每类的像素比例常量、估计像素占比、训练实际使用的 Focal Loss 权重）以及最大/最小类的比例
+- 在 `examples/sample_input_frequency.png` 生成两栏柱状图（左：log 纵轴的像素占比；右：训练时使用的类别权重）
 
 ## 目录说明
 
