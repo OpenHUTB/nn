@@ -9,7 +9,7 @@
     <light pos="0 0 5" dir="0 0 -1" diffuse="1 1 1" specular="0.1 0.1 0.1"/>
     <geom name="floor" type="plane" size="10 10 0.1" rgba="0.8 0.8 0.8 1"/>
 
-    <!-- 三个下落小球 -->
+    <!-- 三个随机下落小球 -->
     <body name="ball1" pos="0 0 4.0">
       <geom type="sphere" size="0.14" rgba="1 0 0 1"/>
       <joint type="free"/>
@@ -23,19 +23,18 @@
       <joint type="free"/>
     </body>
 
-    <!-- 滑动底座：仅左右平移，保证不倒地 -->
+    <!-- 底座：X+Y双轴滑动，实现前后左右全向移动 -->
     <body name="base" pos="0 0 0">
       <joint name="slide_x" type="slide" axis="1 0 0"/>
+      <joint name="slide_y" type="slide" axis="0 1 0"/>
       <body name="torso" pos="0 0 1.1">
-        <!-- 躯干：标准直立胶囊 -->
         <geom type="capsule" fromto="0 0 0 0 0 -0.32" size="0.12" rgba="0.2 0.5 0.8 1"/>
         
-        <!-- 头部：比例协调，位置正确 -->
         <body name="head" pos="0 0 0.22">
           <geom type="sphere" size="0.11" rgba="0.8 0.6 0.4 1"/>
         </body>
 
-        <!-- 手臂：自然下垂，不会外扩 -->
+        <!-- 手臂 -->
         <body name="left_shoulder" pos="-0.14 0 0">
           <joint name="left_shoulder" type="hinge" axis="1 0 0" range="-0.4 0.4"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
@@ -45,7 +44,7 @@
           <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
         </body>
 
-        <!-- 左腿：大腿+小腿，标准直立结构 -->
+        <!-- 双腿膝盖锁死，永久直立站直 -->
         <body name="left_hip" pos="-0.11 0 -0.32">
           <joint name="left_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
@@ -59,7 +58,6 @@
           </body>
         </body>
 
-        <!-- 右腿：与左腿对称，膝盖锁死，强制伸直 -->
         <body name="right_hip" pos="0.11 0 -0.32">
           <joint name="right_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
