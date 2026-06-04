@@ -12,6 +12,7 @@ models/
 !examples/result_augmentation.png
 !examples/result_benchmark.png
 !examples/result_heatmap.png
+!examples/result_frequency.png
 
 # main.py 运行时生成的结果（示例效果图已单独保存在 examples/result_*.png）
 examples/sample_input_overlay.png
@@ -20,6 +21,7 @@ examples/sample_video_seg_frames.png
 examples/sample_input_augment.png
 examples/sample_input_benchmark.png
 examples/sample_input_heatmap.png
+examples/sample_input_frequency.png
 
 # Python
 __pycache__/
