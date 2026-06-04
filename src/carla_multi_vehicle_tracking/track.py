@@ -10,6 +10,7 @@ YOLO + DeepSort 多车跟踪系统
 【新增：UI界面增强模块】
 【新增：车辆轨迹绘制模块】
 【新增：第六模块 车流量统计】
+【新增：第七模块 车辆属性识别】
 
 功能说明：
 1. 实时跟踪多个车辆目标
@@ -21,6 +22,7 @@ YOLO + DeepSort 多车跟踪系统
 7. 实时显示统计信息面板
 8. 绘制车辆运动轨迹
 9. 统计车流量（驶入/驶出）
+10. 识别车辆属性（车型、颜色）
 """
 
 from __future__ import print_function, absolute_import
@@ -105,6 +107,20 @@ TRAFFIC_UI_TEXT_COLOR = (255, 255, 0)  # 黄色文字 (BGR)
 TRAFFIC_UI_BG_COLOR = (50, 50, 50)  # 半透明背景
 TRAFFIC_UI_BG_ALPHA = 0.7
 
+# ==================== 【新增：第七模块 车辆属性识别】配置参数 ====================
+# 定义车型列表
+car_type = ["轿车", "SUV", "面包车", "货车"]
+# 定义车身颜色列表
+car_color = ["白色", "黑色", "红色", "蓝色", "黄色", "灰色"]
+# 建立字典：key=跟踪ID，value=[车型,颜色]，保存每辆车识别结果，避免重复识别
+car_attr = {}
+
+# 车辆属性识别UI配置
+CAR_ATTR_FONT = cv2.FONT_HERSHEY_SIMPLEX
+CAR_ATTR_FONT_SCALE = 0.4
+CAR_ATTR_FONT_THICKNESS = 1
+CAR_ATTR_TEXT_COLOR = (255, 255, 255)  # 白色文字
+
 # ==================== 【原有】基础配置常量 ====================
 # 【新增：车辆轨迹绘制模块】轨迹绘制配置
 MAX_TRAJECTORY_POINTS = 15  # 轨迹保留15帧
@@ -163,7 +179,7 @@ UI_TEXT_FONT = cv2.FONT_HERSHEY_SIMPLEX  # 使用的字体
 
 # ==================== 【新增：UI界面增强模块】函数定义 ====================
 
-def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, retrograde_count, is_congested):
+def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, retrograde_count, is_congested, car_type_stats=None, car_color_stats=None):
     """
     【新增：UI界面增强模块】
     在画面顶部绘制黑色半透明信息条，显示实时数据
@@ -175,6 +191,8 @@ def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, 
         overspeed_count: 超速车辆数量
         retrograde_count: 逆行车辆数量
         is_congested: 是否拥堵
+        car_type_stats: 【新增：第七模块 车辆属性识别】车型统计字典
+        car_color_stats: 【新增：第七模块 车辆属性识别】颜色统计字典
     
     返回:
         frame: 绘制了信息条的帧
@@ -202,6 +220,25 @@ def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, 
         f"拥堵状态: {congestion_status}"
     ]
     
+    # 【新增：第七模块 车辆属性识别】添加车型统计信息
+    if car_type_stats:
+        type_text = "车型:"
+        for t in car_type:
+            count = car_type_stats.get(t, 0)
+            if count > 0:
+                type_text += f" {t}{count}"
+        info_items.append(type_text)
+    
+    # 【新增：第七模块 车辆属性识别】添加颜色统计信息
+    if car_color_stats and vehicle_count > 0:
+        color_text = "颜色:"
+        for c in car_color:
+            count = car_color_stats.get(c, 0)
+            if count > 0:
+                ratio = (count / vehicle_count) * 100
+                color_text += f" {c}{int(ratio)}%"
+        info_items.append(color_text)
+    
     # 【新增：UI界面增强模块】计算每个信息项的文本宽度
     total_width = 0
     text_widths = []
@@ -219,7 +256,7 @@ def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, 
     
     for i, item in enumerate(info_items):
         # 【新增：UI界面增强模块】最后一项（拥堵状态）使用特殊颜色，其他项用白色
-        if i == len(info_items) - 1:
+        if i == 4:  # 拥堵状态
             cv2.putText(frame, item, (current_x, text_y), 
                        UI_TEXT_FONT, UI_TEXT_SCALE, congestion_color, UI_TEXT_THICKNESS, cv2.LINE_AA)
         else:
@@ -228,6 +265,239 @@ def draw_ui_info_bar(frame, vehicle_count, collision_warnings, overspeed_count, 
         
         # 【新增：UI界面增强模块】移动到下一个信息项的位置
         current_x += text_widths[i] + int(spacing)
+    
+    return frame
+
+# ==================== 【新增：第七模块 车辆属性识别】函数定义 ====================
+
+def initialize_car_attr():
+    """
+    【新增：第七模块 车辆属性识别】
+    初始化车辆属性字典
+    
+    返回:
+        dict: 车辆属性字典 {track_id: [车型, 颜色]}
+    """
+    return {}
+
+def classify_car_type(bbox):
+    """
+    【新增：第七模块 车辆属性识别】
+    根据检测框长宽比区分车型
+    
+    参数:
+        bbox: 检测框 [x1, y1, x2, y2]
+    
+    返回:
+        str: 车型（轿车/SUV/面包车/货车）
+    """
+    x1, y1, x2, y2 = bbox
+    width = x2 - x1
+    height = y2 - y1
+    
+    if width <= 0 or height <= 0:
+        return "轿车"
+    
+    # 计算框高/框宽比值
+    ratio = float(height) / float(width)
+    
+    # 根据长宽比分类车型
+    if ratio < 0.7:
+        return "轿车"
+    elif 0.7 <= ratio < 1.1:
+        return "SUV"
+    elif 1.1 <= ratio < 1.5:
+        return "面包车"
+    else:
+        return "货车"
+
+def classify_car_color(frame, bbox):
+    """
+    【新增：第七模块 车辆属性识别】
+    截取车辆框内中心区域像素，统计RGB均值匹配车身主色
+    
+    参数:
+        frame: 视频帧
+        bbox: 检测框 [x1, y1, x2, y2]
+    
+    返回:
+        str: 车身颜色（白色/黑色/红色/蓝色/黄色/灰色）
+    """
+    x1, y1, x2, y2 = map(int, bbox)
+    
+    # 确保边界在图像范围内
+    frame_height, frame_width = frame.shape[:2]
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(frame_width - 1, x2)
+    y2 = min(frame_height - 1, y2)
+    
+    # 截取中心区域（约占整个框的40%）
+    width = x2 - x1
+    height = y2 - y1
+    margin_x = int(width * 0.3)
+    margin_y = int(height * 0.3)
+    
+    crop_x1 = x1 + margin_x
+    crop_y1 = y1 + margin_y
+    crop_x2 = x2 - margin_x
+    crop_y2 = y2 - margin_y
+    
+    if crop_x1 >= crop_x2 or crop_y1 >= crop_y2:
+        # 如果中心区域太小，使用整个框
+        crop_x1, crop_y1, crop_x2, crop_y2 = x1, y1, x2, y2
+    
+    # 提取中心区域
+    roi = frame[crop_y1:crop_y2, crop_x1:crop_x2]
+    
+    # 计算RGB均值
+    avg_b = np.mean(roi[:, :, 0])
+    avg_g = np.mean(roi[:, :, 1])
+    avg_r = np.mean(roi[:, :, 2])
+    
+    # 根据RGB均值判断颜色
+    total = avg_r + avg_g + avg_b
+    
+    # 判断白色（高亮度，RGB接近）
+    if avg_r > 180 and avg_g > 180 and avg_b > 180:
+        return "白色"
+    
+    # 判断黑色（低亮度）
+    if total < 100:
+        return "黑色"
+    
+    # 判断灰色（中等亮度，RGB接近）
+    diff_rg = abs(avg_r - avg_g)
+    diff_rb = abs(avg_r - avg_b)
+    diff_gb = abs(avg_g - avg_b)
+    if diff_rg < 30 and diff_rb < 30 and diff_gb < 30 and total > 100 and total < 500:
+        return "灰色"
+    
+    # 判断红色（R明显高于其他）
+    if avg_r > avg_g + 30 and avg_r > avg_b + 30:
+        return "红色"
+    
+    # 判断黄色（R和G都较高，B较低）
+    if avg_r > 150 and avg_g > 150 and avg_b < 100:
+        return "黄色"
+    
+    # 判断蓝色（B明显高于其他）
+    if avg_b > avg_r + 30 and avg_b > avg_g + 30:
+        return "蓝色"
+    
+    # 默认返回灰色
+    return "灰色"
+
+def update_car_attr(tracked_vehicles, frame, car_attr_dict):
+    """
+    【新增：第七模块 车辆属性识别】
+    更新车辆属性，同一跟踪ID只在首次出现时识别一次
+    
+    参数:
+        tracked_vehicles: DeepSort输出的跟踪结果
+        frame: 视频帧
+        car_attr_dict: 车辆属性字典
+    
+    返回:
+        dict: 更新后的车辆属性字典
+    """
+    for output in tracked_vehicles:
+        if len(output) >= 5:
+            try:
+                x1, y1, x2, y2 = map(int, output[0:4])
+                track_id = int(output[4])
+                
+                # 【新增：第七模块 车辆属性识别】只在首次出现时识别
+                if track_id not in car_attr_dict:
+                    bbox = [x1, y1, x2, y2]
+                    car_type_result = classify_car_type(bbox)
+                    car_color_result = classify_car_color(frame, bbox)
+                    car_attr_dict[track_id] = [car_type_result, car_color_result]
+                    
+            except (ValueError, TypeError, IndexError):
+                continue
+    
+    return car_attr_dict
+
+def get_car_type_stats(car_attr_dict):
+    """
+    【新增：第七模块 车辆属性识别】
+    统计各类车型数量
+    
+    参数:
+        car_attr_dict: 车辆属性字典
+    
+    返回:
+        dict: 车型统计 {车型: 数量}
+    """
+    stats = {t: 0 for t in car_type}
+    for attr in car_attr_dict.values():
+        if attr[0] in stats:
+            stats[attr[0]] += 1
+    return stats
+
+def get_car_color_stats(car_attr_dict):
+    """
+    【新增：第七模块 车辆属性识别】
+    统计各色车辆数量
+    
+    参数:
+        car_attr_dict: 车辆属性字典
+    
+    返回:
+        dict: 颜色统计 {颜色: 数量}
+    """
+    stats = {c: 0 for c in car_color}
+    for attr in car_attr_dict.values():
+        if attr[1] in stats:
+            stats[attr[1]] += 1
+    return stats
+
+def draw_car_attr_label(frame, bbox, track_id, car_attr_dict):
+    """
+    【新增：第七模块 车辆属性识别】
+    在车辆目标框右下角标注颜色和车型
+    
+    参数:
+        frame: 视频帧
+        bbox: 检测框 [x1, y1, x2, y2]
+        track_id: 跟踪ID
+        car_attr_dict: 车辆属性字典
+    
+    返回:
+        frame: 绘制了属性标签的帧
+    """
+    if track_id not in car_attr_dict:
+        return frame
+    
+    x1, y1, x2, y2 = map(int, bbox)
+    car_type_result, car_color_result = car_attr_dict[track_id]
+    
+    # 准备标签文本
+    label_text = f"{car_color_result}{car_type_result}"
+    
+    # 计算文本尺寸
+    (text_width, text_height), _ = cv2.getTextSize(label_text, CAR_ATTR_FONT, CAR_ATTR_FONT_SCALE, CAR_ATTR_FONT_THICKNESS)
+    
+    # 计算标签位置（右下角）
+    label_x = x2 - text_width - 5
+    label_y = y2 - 5
+    
+    # 确保标签在画面内
+    label_x = max(0, label_x)
+    label_y = max(text_height + 5, label_y)
+    
+    # 绘制背景矩形
+    cv2.rectangle(frame, 
+                  (label_x - 2, label_y - text_height - 2), 
+                  (x2 - 5, y2 - 3), 
+                  (0, 0, 0),  # 黑色背景
+                  -1)
+    
+    # 绘制文本
+    cv2.putText(frame, label_text, (label_x, label_y),
+                CAR_ATTR_FONT, CAR_ATTR_FONT_SCALE,
+                CAR_ATTR_TEXT_COLOR, CAR_ATTR_FONT_THICKNESS, cv2.LINE_AA)
     
     return frame
 
@@ -260,36 +530,26 @@ def update_traffic_counting(tracked_vehicles, count_line_y, previous_positions, 
     返回:
         tuple: (current_positions, in_count, out_count, total_count)
     """
-    # 【新增：第六模块 车流量统计】当前帧车辆位置
     current_positions = {}
     
-    # 【新增：第六模块 车流量统计】遍历每个跟踪车辆
     for output in tracked_vehicles:
         if len(output) >= 5:
             try:
                 x1, y1, x2, y2 = map(int, output[0:4])
                 track_id = int(output[4])
                 
-                # 【新增：第六模块 车流量统计】计算车辆中心点Y坐标
                 center_y = (y1 + y2) / 2
                 current_positions[track_id] = center_y
                 
-                # 【新增：第六模块 车流量统计】检查是否需要计数
-                # 条件1：车辆之前出现过
-                # 条件2：该车辆之前没有被统计过
                 if track_id in previous_positions and track_id not in counted_ids:
                     prev_y = previous_positions[track_id]
                     curr_y = center_y
                     
-                    # 【新增：第六模块 车流量统计】判断是否穿过统计线
-                    # 从下往上穿过（之前在统计线下方，现在在上方）= 驶出
                     if prev_y > count_line_y and curr_y <= count_line_y:
                         out_count += 1
                         total_count += 1
                         counted_ids.add(track_id)
                     
-                    # 【新增：第六模块 车流量统计】判断是否穿过统计线
-                    # 从上往下穿过（之前在统计线上方，现在在下方）= 驶入
                     elif prev_y < count_line_y and curr_y >= count_line_y:
                         in_count += 1
                         total_count += 1
@@ -315,14 +575,12 @@ def draw_traffic_counting_ui(frame, in_count, out_count, total_count, count_line
     返回:
         frame: 绘制了车流量信息的帧
     """
-    # 【新增：第六模块 车流量统计】准备统计文本
     traffic_text = [
         f"总车流量: {total_count}",
         f"驶入车辆: {in_count}",
         f"驶出车辆: {out_count}"
     ]
     
-    # 【新增：第六模块 车流量统计】计算文本区域大小
     frame_height, frame_width = frame.shape[:2]
     max_width = 0
     text_height = 0
@@ -331,7 +589,6 @@ def draw_traffic_counting_ui(frame, in_count, out_count, total_count, count_line
         max_width = max(max_width, w)
         text_height += h + 10
     
-    # 【新增：第六模块 车流量统计】绘制半透明背景
     bg_x1 = TRAFFIC_UI_POSITION[0] - 5
     bg_y1 = TRAFFIC_UI_POSITION[1] - 20
     bg_x2 = bg_x1 + max_width + 20
@@ -341,7 +598,6 @@ def draw_traffic_counting_ui(frame, in_count, out_count, total_count, count_line
     cv2.rectangle(overlay, (bg_x1, bg_y1), (bg_x2, bg_y2), TRAFFIC_UI_BG_COLOR, -1)
     cv2.addWeighted(overlay, TRAFFIC_UI_BG_ALPHA, frame, 1 - TRAFFIC_UI_BG_ALPHA, 0, frame)
     
-    # 【新增：第六模块 车流量统计】绘制统计文本
     current_y = TRAFFIC_UI_POSITION[1]
     for text in traffic_text:
         cv2.putText(
@@ -355,9 +611,6 @@ def draw_traffic_counting_ui(frame, in_count, out_count, total_count, count_line
             cv2.LINE_AA
         )
         current_y += 25
-    
-    # 【新增：第六模块 车流量统计】绘制虚拟统计线（可选，用于调试）
-    # cv2.line(frame, (0, count_line_y), (frame_width, count_line_y), (0, 255, 255), 2)
     
     return frame
 
@@ -383,23 +636,19 @@ def update_vehicle_path(traj_dict, tracked_vehicles, max_points):
         tracked_vehicles: DeepSort输出的跟踪结果
         max_points: 最大保留点数
     """
-    # 【新增：车辆轨迹绘制模块】遍历所有跟踪车辆
     for output in tracked_vehicles:
         if len(output) >= 5:
             try:
                 x1, y1, x2, y2 = map(int, output[0:4])
                 track_id = int(output[4])
                 
-                # 【新增：车辆轨迹绘制模块】计算中心点坐标
                 center_x = (x1 + x2) / 2
                 center_y = (y1 + y2) / 2
                 
-                # 【新增：车辆轨迹绘制模块】更新轨迹字典
                 if track_id not in traj_dict:
                     traj_dict[track_id] = []
                 traj_dict[track_id].append((center_x, center_y))
                 
-                # 【新增：车辆轨迹绘制模块】超过最大帧数自动删除最早的点
                 if len(traj_dict[track_id]) > max_points:
                     traj_dict[track_id].pop(0)
                     
@@ -419,22 +668,16 @@ def draw_vehicle_trajectories(frame, traj_dict, colour_func):
     返回:
         frame: 绘制了轨迹的帧
     """
-    # 【新增：车辆轨迹绘制模块】遍历所有车辆的轨迹
     for track_id, trajectory in traj_dict.items():
-        # 【新增：车辆轨迹绘制模块】至少需要2个点才能绘制轨迹线
         if len(trajectory) < 2:
             continue
         
-        # 【新增：车辆轨迹绘制模块】获取车辆对应的颜色
         colour = colour_func(track_id)
         
-        # 【新增：车辆轨迹绘制模块】绘制轨迹线
         for i in range(1, len(trajectory)):
-            # 【新增：车辆轨迹绘制模块】获取当前点和前一个点
             pt1 = trajectory[i-1]
             pt2 = trajectory[i]
             
-            # 【新增：车辆轨迹绘制模块】绘制线段
             cv2.line(
                 frame, 
                 (int(pt1[0]), int(pt1[1])), 
@@ -443,15 +686,14 @@ def draw_vehicle_trajectories(frame, traj_dict, colour_func):
                 TRAJECTORY_LINE_WIDTH
             )
         
-        # 【新增：车辆轨迹绘制模块】绘制轨迹起点（小圆点）
         if len(trajectory) > 0:
             start_pt = trajectory[0]
             cv2.circle(
                 frame, 
                 (int(start_pt[0]), int(start_pt[1])), 
-                3,  # 圆点半径
+                3,
                 colour, 
-                -1  # 填充
+                -1
             )
     
     return frame
@@ -467,22 +709,18 @@ def update_violation_trajectories(tracked_vehicles, traj_dict):
         tracked_vehicles: DeepSort输出的跟踪结果
         traj_dict: 车辆轨迹字典
     """
-    # 遍历所有跟踪车辆
     for output in tracked_vehicles:
         if len(output) >= 5:
             try:
                 x1, y1, x2, y2 = map(int, output[0:4])
                 track_id = int(output[4])
                 
-                # 计算中心点
                 center_x = (x1 + x2) / 2
                 center_y = (y1 + y2) / 2
                 
-                # 更新轨迹字典
                 if track_id not in traj_dict:
                     traj_dict[track_id] = []
                 traj_dict[track_id].append((center_x, center_y))
-                # 只保存最近8帧
                 if len(traj_dict[track_id]) > 8:
                     traj_dict[track_id].pop(0)
                     
@@ -507,23 +745,19 @@ def detect_violations(traj_dict, tracked_vehicles, img_height, congestion_thresh
     retrograde_ids = set()
     vehicle_count = len(tracked_vehicles)
     
-    # 判断是否拥堵
     is_congested = vehicle_count >= congestion_threshold
     if is_congested:
         print(f"【拥堵警告】当前区域车辆密集，存在拥堵风险")
     
-    # 判断逆行
     for track_id, traj in traj_dict.items():
         if len(traj) >= 2:
-            # 计算车辆整体移动方向
             total_dy = 0
             for i in range(1, len(traj)):
                 prev_y = traj[i-1][1]
                 curr_y = traj[i][1]
-                total_dy += (prev_y - curr_y)  # y减少表示向上移动
+                total_dy += (prev_y - curr_y)
             
-            # 车辆整体向上移动 → 判定逆行
-            if total_dy > 0:  # 总位移是向上的
+            if total_dy > 0:
                 retrograde_ids.add(track_id)
                 print(f"【逆行警告】车辆 ID:{track_id} 存在逆行行为")
     
@@ -543,7 +777,6 @@ def draw_violation_warnings(frame, retrograde_ids, is_congested, tracked_vehicle
     返回:
         frame: 绘制了警告信息的帧
     """
-    # 准备顶部警告文字
     warning_text = ""
     if is_congested and len(retrograde_ids) > 0:
         warning_text = "逆行 / 拥堵状态"
@@ -552,7 +785,6 @@ def draw_violation_warnings(frame, retrograde_ids, is_congested, tracked_vehicle
     elif is_congested:
         warning_text = "拥堵状态"
     
-    # 绘制顶部警告文字
     if warning_text:
         cv2.putText(
             frame,
@@ -565,14 +797,12 @@ def draw_violation_warnings(frame, retrograde_ids, is_congested, tracked_vehicle
             cv2.LINE_AA
         )
     
-    # 为逆行车辆绘制红色边框
     for output in tracked_vehicles:
         if len(output) >= 5:
             try:
                 x1, y1, x2, y2 = map(int, output[0:4])
                 track_id = int(output[4])
                 
-                # 如果是逆行车辆，绘制红色边框
                 if track_id in retrograde_ids:
                     cv2.rectangle(
                         frame, 
@@ -597,22 +827,18 @@ def update_vehicle_trajectories(tracked_vehicles, traj_dict):
         tracked_vehicles: DeepSort输出的跟踪结果
         traj_dict: 车辆轨迹字典
     """
-    # 遍历所有跟踪车辆
     for output in tracked_vehicles:
         if len(output) >= 5:
             try:
                 x1, y1, x2, y2 = map(int, output[0:4])
                 track_id = int(output[4])
                 
-                # 计算中心点
                 center_x = (x1 + x2) / 2
                 center_y = (y1 + y2) / 2
                 
-                # 更新轨迹字典
                 if track_id not in traj_dict:
                     traj_dict[track_id] = []
                 traj_dict[track_id].append((center_x, center_y))
-                # 只保存最近5帧
                 if len(traj_dict[track_id]) > 5:
                     traj_dict[track_id].pop(0)
                     
@@ -635,23 +861,13 @@ def calculate_speed(traj, fps, pixel_to_meter):
     if len(traj) < 2:
         return 0.0
     
-    # 计算最近两帧的中心点
     prev_x, prev_y = traj[-2]
     curr_x, curr_y = traj[-1]
     
-    # 计算像素距离
     pixel_distance = ((curr_x - prev_x) ** 2 + (curr_y - prev_y) ** 2) ** 0.5
-    
-    # 换算成米
     meter_distance = pixel_distance * pixel_to_meter
-    
-    # 计算每秒移动时间（秒）
     time_seconds = 1 / fps
-    
-    # 计算米每秒 (m/s)
     speed_ms = meter_distance / time_seconds
-    
-    # 换算成公里每小时 (km/h)
     speed_kmh = speed_ms * 3.6
     
     return speed_kmh
@@ -678,10 +894,8 @@ def estimate_vehicle_speeds(traj_dict, fps, pixel_to_meter, speed_limit):
         speed = calculate_speed(traj, fps, pixel_to_meter)
         speed_dict[track_id] = speed
         
-        # 判断是否超速
         if speed > speed_limit:
             overspeed_ids.add(track_id)
-            # 控制台输出超速警告
             print(f"【超速警告】车辆 ID:{track_id} 当前速度：{speed:.1f} km/h")
     
     return speed_dict, overspeed_ids
@@ -698,23 +912,11 @@ def initialize_trajectory_dict():
     """
     return defaultdict(list)
 
-
 def update_trajectory(trajectory_dict, tracked_vehicles):
     """
     【新增：轨迹预测+提前碰撞预警】
     更新所有车辆的轨迹历史
-    
-    参数:
-        trajectory_dict: 轨迹历史字典 {track_id: [(cx1,cy1), (cx2,cy2), ...}
-        tracked_vehicles: DeepSort输出的跟踪结果，格式为 [x1, y1, x2, y2, track_id, ...]
-    
-    功能:
-        1. 遍历所有跟踪到的车辆
-        2. 计算每辆车的中心点 (cx, cy)
-        3. 更新该车辆的轨迹历史（只保留最近MAX_TRAJECTORY_LENGTH个点）
-        4. 清理已消失的车辆轨迹
     """
-    # 获取当前帧所有活跃的track_id
     current_ids = set()
     
     for output in tracked_vehicles:
@@ -723,39 +925,25 @@ def update_trajectory(trajectory_dict, tracked_vehicles):
                 x1, y1, x2, y2 = map(int, output[0:4])
                 track_id = int(output[4])
                 
-                # 计算中心点
                 center_x = (x1 + x2) / 2
                 center_y = (y1 + y2) / 2
                 
-                # 添加到当前活跃ID集合
                 current_ids.add(track_id)
                 
-                # 更新轨迹历史
                 if track_id in trajectory_dict:
-                    # 追加新中心点
                     trajectory_dict[track_id].append((center_x, center_y))
-                    # 只保留最近MAX_TRAJECTORY_LENGTH个点
                     if len(trajectory_dict[track_id]) > MAX_TRAJECTORY_LENGTH:
                         trajectory_dict[track_id].pop(0)
                 else:
-                    # 新车辆，初始化轨迹
                     trajectory_dict[track_id] = [(center_x, center_y)]
                     
             except (ValueError, TypeError, IndexError):
                 continue
 
-
 def predict_future_position(trajectory, predict_frames):
     """
     【新增：轨迹预测+提前碰撞预警】
     基于轨迹历史预测未来位置（线性预测）
-    
-    参数:
-        trajectory: 轨迹历史列表 [(cx1,cy1), (cx2,cy2), ...]
-        predict_frames: 预测未来多少帧
-    
-    返回:
-        tuple: 预测的未来位置 (future_cx, future_cy)，如果无法预测则返回None
     """
     if len(trajectory) < 2:
         return None
@@ -770,7 +958,6 @@ def predict_future_position(trajectory, predict_frames):
     future_cy = cy_curr + vy * predict_frames
     
     return (future_cx, future_cy)
-
 
 def check_trajectory_collision(trajectory_dict, predict_frames, collision_threshold, frame_width):
     """
@@ -821,34 +1008,6 @@ def check_trajectory_collision(trajectory_dict, predict_frames, collision_thresh
     
     return collision_risk
 
-
-def draw_trajectory_prediction(frame, trajectory_dict, collision_risk_ids):
-    """
-    【新增：轨迹预测+提前碰撞预警】
-    在画面上绘制轨迹和预测
-    """
-    for track_id, trajectory in trajectory_dict.items():
-        if len(trajectory) < 2:
-            continue
-        
-        is_risk = track_id in collision_risk_ids
-        color = (0, 0, 255) if is_risk else (0, 255, 0)
-        
-        for i, (cx, cy) in enumerate(trajectory):
-            if i > 0:
-                cx_prev, cy_prev = trajectory[i-1]
-                cv2.line(frame, (int(cx_prev), int(cy_prev)), 
-                        (int(cx), int(cy)), color, 2)
-        
-        if is_risk and len(trajectory) >= 2:
-            future_pos = predict_future_position(trajectory, PREDICT_FRAMES)
-            if future_pos:
-                fx, fy = future_pos
-                cv2.circle(frame, (int(fx), int(fy)), 10, (0, 0, 255), -1)
-                cv2.putText(frame, f"PREDICT", (int(fx)-30, int(fy)-15),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
-
 def draw_collision_warning(frame, collision_risk_ids, tracked_vehicles):
     """
     【新增：轨迹预测+提前碰撞预警】
@@ -885,7 +1044,6 @@ def draw_collision_warning(frame, collision_risk_ids, tracked_vehicles):
     
     return frame
 
-
 # ==================== 【原有】主跟踪类 ====================
 class VehicleTracker:
     def __init__(self, args):
@@ -894,34 +1052,25 @@ class VehicleTracker:
         print(f"[INFO] 使用设备: {self.device}")
         print(f"[INFO] Python 版本: {sys.version}")
         
-        # 检查依赖
         self._check_dependencies()
         
-        # 加载模型
         self.model = None
         self.deepsort = None
         
-        # 【新增：轨迹预测+提前碰撞预警】初始化轨迹历史字典
         self.trajectory_dict = initialize_trajectory_dict()
-        
-        # 【新增：车速估算 + 超速报警】初始化车辆轨迹字典
         self.vehicle_traj = {}
-        
-        # 【新增：违章行为检测】初始化违章检测轨迹字典
         self.violation_traj = {}
-        
-        # 【新增：UI界面增强模块】初始化碰撞预警计数器
         self.collision_warning_count = 0
-        
-        # 【新增：车辆轨迹绘制模块】初始化车辆轨迹绘制字典
         self.vehicle_path = initialize_vehicle_path()
         
-        # 【新增：第六模块 车流量统计】初始化车流量统计变量
-        self.traffic_previous_positions = {}  # 上帧车辆位置 {track_id: previous_y}
-        self.traffic_counted_ids = set()  # 已统计的车辆ID集合
-        self.traffic_in_count = 0  # 驶入计数
-        self.traffic_out_count = 0  # 驶出计数
-        self.traffic_total_count = 0  # 总车流量
+        self.traffic_previous_positions = {}
+        self.traffic_counted_ids = set()
+        self.traffic_in_count = 0
+        self.traffic_out_count = 0
+        self.traffic_total_count = 0
+        
+        # 【新增：第七模块 车辆属性识别】初始化车辆属性字典
+        self.car_attr = initialize_car_attr()
         
         if ULTRALYTICS_AVAILABLE:
             self._load_yolo_model()
@@ -1085,6 +1234,10 @@ class VehicleTracker:
             cv2.rectangle(frame, (x1, y1), (x1 + t_size[0] + 3, y1 + t_size[1] + 4), colour, -1)
             cv2.putText(frame, c_id, (x1, y1 + t_size[1] + 4), 
                        cv2.FONT_HERSHEY_PLAIN, 1, [255, 255, 255], 2)
+            
+            # 【新增：第七模块 车辆属性识别】绘制车辆属性标签
+            frame = draw_car_attr_label(frame, [x1, y1, x2, y2], track_id, self.car_attr)
+            
         except Exception as e:
             print(f"[ERROR] 绘制边界框失败: {str(e)}")
         
@@ -1101,19 +1254,11 @@ class VehicleTracker:
                 outputs = self.deepsort.update(bbox_xyxy, conf_score, frame)
                 
                 if len(outputs) > 0:
-                    # 【新增：轨迹预测+提前碰撞预警】更新轨迹历史
                     update_trajectory(self.trajectory_dict, outputs)
-                    
-                    # 【新增：车速估算 + 超速报警】更新车辆轨迹（用于速度计算）
                     update_vehicle_trajectories(outputs, self.vehicle_traj)
-                    
-                    # 【新增：违章行为检测】更新违章检测轨迹
                     update_violation_trajectories(outputs, self.violation_traj)
-                    
-                    # 【新增：车辆轨迹绘制模块】更新车辆轨迹点
                     update_vehicle_path(self.vehicle_path, outputs, MAX_TRAJECTORY_POINTS)
                     
-                    # 【新增：第六模块 车流量统计】更新车流量统计
                     (self.traffic_previous_positions, 
                      self.traffic_in_count, 
                      self.traffic_out_count, 
@@ -1127,7 +1272,9 @@ class VehicleTracker:
                         self.traffic_total_count
                     )
                     
-                    # 【新增：车速估算 + 超速报警】估算车辆速度，判断是否超速
+                    # 【新增：第七模块 车辆属性识别】更新车辆属性
+                    self.car_attr = update_car_attr(outputs, frame, self.car_attr)
+                    
                     speed_dict, overspeed_ids = estimate_vehicle_speeds(
                         self.vehicle_traj,
                         FPS,
@@ -1135,7 +1282,6 @@ class VehicleTracker:
                         SPEED_LIMIT
                     )
                     
-                    # 【新增：轨迹预测+提前碰撞预警】检测碰撞风险
                     collision_risk = check_trajectory_collision(
                         self.trajectory_dict,
                         PREDICT_FRAMES,
@@ -1143,7 +1289,6 @@ class VehicleTracker:
                         img_w
                     )
                     
-                    # 【新增：违章行为检测】检测逆行和拥堵
                     retrograde_ids, is_congested = detect_violations(
                         self.violation_traj,
                         outputs,
@@ -1151,23 +1296,15 @@ class VehicleTracker:
                         CONGESTION_THRESHOLD
                     )
                     
-                    # 提取风险车辆ID集合
                     collision_risk_ids = set(collision_risk.keys())
                     
-                    # 【新增：UI界面增强模块】更新碰撞预警计数器
                     if len(collision_risk_ids) > 0:
                         self.collision_warning_count += 1
                     
-                    # 【新增：车辆轨迹绘制模块】绘制车辆运动轨迹
                     frame = draw_vehicle_trajectories(frame, self.vehicle_path, self.colour_label)
-                    
-                    # 【新增：轨迹预测+提前碰撞预警】绘制预警信息
                     frame = draw_collision_warning(frame, collision_risk_ids, outputs)
-                    
-                    # 【新增：违章行为检测】绘制违章警告信息
                     frame = draw_violation_warnings(frame, retrograde_ids, is_congested, outputs)
                     
-                    # 【原有逻辑】绘制边界框
                     min_len = min(len(outputs), len(conf_score), len(cls_id))
                     for i in range(min_len):
                         frame = self.draw_bbox(
@@ -1181,7 +1318,10 @@ class VehicleTracker:
                             retrograde_ids
                         )
                     
-                    # 【新增：UI界面增强模块】绘制顶部信息条
+                    # 【新增：第七模块 车辆属性识别】获取车型和颜色统计
+                    car_type_stats = get_car_type_stats(self.car_attr)
+                    car_color_stats = get_car_color_stats(self.car_attr)
+                    
                     vehicle_count = len(outputs)
                     overspeed_count = len(overspeed_ids)
                     retrograde_count = len(retrograde_ids)
@@ -1191,10 +1331,11 @@ class VehicleTracker:
                         self.collision_warning_count, 
                         overspeed_count, 
                         retrograde_count, 
-                        is_congested
+                        is_congested,
+                        car_type_stats,
+                        car_color_stats
                     )
                     
-                    # 【新增：第六模块 车流量统计】绘制车流量统计信息
                     frame = draw_traffic_counting_ui(
                         frame,
                         self.traffic_in_count,
@@ -1408,7 +1549,6 @@ class VehicleTracker:
         else:
             self.run_carla_mode()
 
-
 # ==================== 【原有】主函数 ====================
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -1419,7 +1559,8 @@ def parse_args():
                    '【新增功能】违章行为检测\n'
                    '【新增功能】UI界面增强\n'
                    '【新增功能】车辆轨迹绘制\n'
-                   '【新增功能】第六模块 车流量统计',
+                   '【新增功能】第六模块 车流量统计\n'
+                   '【新增功能】第七模块 车辆属性识别',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -1432,7 +1573,6 @@ def parse_args():
     
     return parser.parse_args()
 
-
 def check_environment():
     """检查运行环境"""
     print("=" * 60)
@@ -1443,6 +1583,7 @@ def check_environment():
     print("【新增：UI界面增强模块】")
     print("【新增：车辆轨迹绘制模块】")
     print("【新增：第六模块 车流量统计】")
+    print("【新增：第七模块 车辆属性识别】")
     print("=" * 60)
     print(f"Python: {sys.version}")
     print(f"平台: {sys.platform}")
@@ -1468,8 +1609,11 @@ def check_environment():
     
     print("\n【新增：第六模块 车流量统计】当前配置:")
     print(f"  - 统计线Y坐标: {COUNT_LINE_Y} 像素")
+    
+    print("\n【新增：第七模块 车辆属性识别】当前配置:")
+    print(f"  - 车型列表: {', '.join(car_type)}")
+    print(f"  - 颜色列表: {', '.join(car_color)}")
     print("=" * 60)
-
 
 def main():
     """主入口函数"""
@@ -1486,7 +1630,6 @@ def main():
         print(f"\n[FATAL ERROR] 程序异常终止: {str(e)}")
         traceback.print_exc()
         sys.exit(1)
-
 
 if __name__ == '__main__':
     main()
