@@ -1,73 +1,82 @@
 import carla
 from datetime import datetime
-from utils import calculate_vehicle_speed_kmh
-import vehicle_status_gui as vsg  # 新增导入GUI模块
+import logging
+from utils import calculate_vehicle_speed_kmh, safe_update_dict
+from config import COLLISION_SENSOR_BP, COLLISION_LOG_FILE
 
-# 全局变量：仅保留碰撞状态标记
-collision_occurred = False
+logger = logging.getLogger(__name__)
 
-def create_collision_sensor(world: carla.World, vehicle: carla.Vehicle):
-    """
-    创建碰撞传感器并绑定到车辆
-    :param world: CARLA World对象
-    :param vehicle: 被监测的车辆Actor
-    :return: 碰撞传感器Actor
-    """
-    collision_bp = world.get_blueprint_library().find("sensor.other.collision")
-    collision_sensor = world.spawn_actor(
-        collision_bp,
-        carla.Transform(),
-        attach_to=vehicle
-    )
-    # 绑定碰撞回调函数
-    collision_sensor.listen(lambda event: on_collision(event, vehicle))
-    print("🔍 碰撞传感器已启动")
-    return collision_sensor
+class CollisionMonitor:
+    def __init__(self):
+        self.collision_occurred = False
+        self.collision_sensor = None
 
-def on_collision(event, vehicle: carla.Vehicle):
-    """
-    碰撞事件回调处理：记录碰撞信息、直接更新GUI碰撞车速
-    :param event: 碰撞事件对象
-    :param vehicle: 发生碰撞的车辆Actor
-    """
-    global collision_occurred
-    collision_occurred = True
+    def create_collision_sensor(self, world: carla.World, vehicle: carla.Vehicle) -> None:
+        """
+        创建碰撞传感器并绑定到车辆
+        :param world: CARLA World对象
+        :param vehicle: 被监测的车辆Actor
+        :raises RuntimeError: 传感器生成失败时抛出
+        """
+        try:
+            collision_bp = world.get_blueprint_library().find(COLLISION_SENSOR_BP)
+            self.collision_sensor = world.spawn_actor(
+                collision_bp,
+                carla.Transform(),
+                attach_to=vehicle
+            )
+            # 绑定碰撞回调函数
+            self.collision_sensor.listen(lambda event: self.on_collision(event, vehicle))
+            logger.info("碰撞传感器已启动")
+        except Exception as e:
+            raise RuntimeError(f"创建碰撞传感器失败：{e}")
 
-    # 1. 计算碰撞时车速并直接更新GUI的碰撞车速
-    collision_speed = calculate_vehicle_speed_kmh(vehicle)
-    vsg.update_vehicle_status("collision_speed", collision_speed)  # 直接更新GUI
+    def on_collision(self, event, vehicle: carla.Vehicle) -> None:
+        """碰撞事件回调处理：记录日志+更新碰撞状态"""
+        self.collision_occurred = True
+        collision_speed = calculate_vehicle_speed_kmh(vehicle)
 
-    # 2. 记录碰撞详细日志到文件
-    collision_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    collision_actor_type = event.other_actor.type_id  # 碰撞对象类型
-    collision_loc = vehicle.get_transform().location  # 碰撞位置
-    loc_str = f"({collision_loc.x:.2f}, {collision_loc.y:.2f}, {collision_loc.z:.2f})"
+        # 1. 记录碰撞详细日志
+        collision_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        collision_actor_type = event.other_actor.type_id
+        collision_loc = vehicle.get_transform().location
+        loc_str = f"({collision_loc.x:.2f}, {collision_loc.y:.2f}, {collision_loc.z:.2f})"
 
-    # 写入碰撞日志文件
-    with open("collision_logs.txt", "a", encoding="utf-8") as f:
         log_line = (
             f"[{collision_time}] 发生碰撞 | "
             f"碰撞对象：{collision_actor_type} | "
             f"位置：{loc_str} | "
-            f"碰撞车速：{collision_speed} km/h\n"
+            f"碰撞车速：{collision_speed} km/h"
         )
-        f.write(log_line)
+        # 写入日志文件
+        try:
+            with open(COLLISION_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(log_line + "\n")
+            logger.warning(log_line)
+        except IOError as e:
+            logger.error(f"写入碰撞日志失败：{e}")
 
-    # 控制台输出碰撞信息
-    print(f"\n🚨 碰撞检测：车速 {collision_speed} km/h | 碰撞对象：{collision_actor_type}")
+        # 2. 对外暴露碰撞车速
+        from vehicle_status_gui import update_vehicle_status
+        update_vehicle_status("collision_speed", collision_speed)
 
-def get_collision_occurred() -> bool:
-    """读取当前碰撞状态"""
-    global collision_occurred
-    return collision_occurred
+    def get_collision_occurred(self) -> bool:
+        """读取当前碰撞状态"""
+        return self.collision_occurred
 
-def reset_collision_occurred():
-    """重置碰撞状态"""
-    global collision_occurred
-    collision_occurred = False
+    def reset_collision_occurred(self) -> None:
+        """重置碰撞状态"""
+        self.collision_occurred = False
 
-def stop_collision_monitor():
-    """停止碰撞监测，重置全局状态"""
-    global collision_occurred
-    collision_occurred = False
-    print("\n🛑 碰撞监测已停止")
+    def destroy_sensor(self) -> None:
+        """销毁碰撞传感器"""
+        if self.collision_sensor:
+            self.collision_sensor.destroy()
+            self.collision_sensor = None
+            logger.info("碰撞传感器已销毁")
+
+    def stop(self) -> None:
+        """停止碰撞监测"""
+        self.reset_collision_occurred()
+        self.destroy_sensor()
+        logger.info("碰撞监测已停止")

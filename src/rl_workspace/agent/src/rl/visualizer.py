@@ -2,14 +2,168 @@
 可视化工具模块
 
 提供训练曲线绘制、Q表可视化、策略可视化等功能
+扩展：实时训练曲线、策略热力图、价值函数曲面图
 """
 
 import os
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D  # 用于3D曲面
 
+
+class LivePlot:
+    """
+    实时更新训练曲线，支持多条曲线
+    用法：
+        live = LivePlot(xlabel='Episode', ylabel='Reward')
+        live.add_curve('reward', color='red')
+        for episode in range(N):
+            live.update('reward', episode, episode_reward)
+    """
+
+    def __init__(self, xlabel: str = 'Episode', ylabel: str = 'Value', title: str = 'Live Plot', max_points: int = 500):
+        plt.ion()
+        self.fig, self.ax = plt.subplots(figsize=(10, 5))
+        self.ax.set_xlabel(xlabel, fontsize=12)
+        self.ax.set_ylabel(ylabel, fontsize=12)
+        self.ax.set_title(title, fontsize=14)
+        self.ax.grid(True, alpha=0.3)
+        self.lines: Dict[str, plt.Line2D] = {}
+        self.data: Dict[str, tuple] = {}  # (xs, ys)
+        self.max_points = max_points
+
+    def add_curve(self, name: str, color: Optional[str] = None):
+        """添加一条新的曲线"""
+        line, = self.ax.plot([], [], label=name, color=color, linewidth=2)
+        self.lines[name] = line
+        self.data[name] = ([], [])
+        self.ax.legend(loc='best')
+
+    def update(self, name: str, x: float, y: float):
+        """更新指定曲线的最新点"""
+        if name not in self.lines:
+            self.add_curve(name)
+        xs, ys = self.data[name]
+        xs.append(x)
+        ys.append(y)
+        if len(xs) > self.max_points:
+            xs.pop(0)
+            ys.pop(0)
+        self.lines[name].set_data(xs, ys)
+        # 自动调整坐标轴范围
+        self.ax.relim()
+        self.ax.autoscale_view()
+        plt.pause(0.001)  # 短暂暂停以刷新图形
+
+    def save(self, filepath: str, dpi: int = 150):
+        """保存当前图表（自动创建目录）"""
+        dirname = os.path.dirname(filepath)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+        self.fig.savefig(filepath, dpi=dpi)
+        print(f"实时图表已保存到: {filepath}")
+
+    def close(self):
+        plt.close(self.fig)
+
+
+class PolicyHeatmap:
+    """
+    离散动作策略热力图，实时展示各动作的概率分布
+    需要算法提供 get_action_probs(state) 方法返回概率数组 (num_actions,)
+    """
+
+    def __init__(self, num_actions: int, env_name: str = "Unknown"):
+        self.num_actions = num_actions
+        self.fig, self.ax = plt.subplots(figsize=(8, 3))
+        self.im = None
+        self.env_name = env_name
+        self.step = 0
+
+    def update(self, probs: np.ndarray, step: int):
+        """
+        probs: shape (num_actions,)，概率值，应归一化
+        step: 当前训练步数/episode数
+        """
+        self.step = step
+        if self.im is None:
+            # 初始绘制
+            self.im = self.ax.imshow([probs], aspect='auto', cmap='viridis', vmin=0, vmax=1)
+            self.ax.set_ylabel('Policy', fontsize=12)
+            self.ax.set_xlabel('Action', fontsize=12)
+            self.ax.set_title(f'Policy Probabilities at Step {step} ({self.env_name})', fontsize=14)
+            self.ax.set_yticks([])
+            self.ax.set_xticks(range(self.num_actions))
+            plt.colorbar(self.im, ax=self.ax, label='Probability')
+        else:
+            self.im.set_array([probs])
+            self.ax.set_title(f'Policy Probabilities at Step {step} ({self.env_name})')
+        plt.pause(0.001)
+
+    def save(self, filepath: str):
+        """保存当前图表（自动创建目录）"""
+        dirname = os.path.dirname(filepath)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+        self.fig.savefig(filepath, dpi=150)
+        print(f"策略热力图已保存到: {filepath}")
+
+    def close(self):
+        plt.close(self.fig)
+
+
+class ValueSurface:
+    """
+    3D价值函数曲面图，适用于2维连续状态空间（如位置+速度）
+    需要提供一个 value_function: np.ndarray -> float 的可调用对象
+    """
+
+    def __init__(self, bounds: tuple = ((-3, 3), (-3, 3)), resolution: int = 30):
+        """
+        bounds: ((x_min, x_max), (y_min, y_max))
+        resolution: 网格点数
+        """
+        self.bounds = bounds
+        self.res = resolution
+        x = np.linspace(bounds[0][0], bounds[0][1], resolution)
+        y = np.linspace(bounds[1][0], bounds[1][1], resolution)
+        self.xx, self.yy = np.meshgrid(x, y)
+        self.fig = plt.figure(figsize=(10, 8))
+        self.ax = self.fig.add_subplot(111, projection='3d')
+
+    def update(self, value_func: Callable[[np.ndarray], float], step: int):
+        """
+        value_func: 接受一个形状 (2,) 的状态数组，返回标量价值
+        step: 当前训练步数/episode数
+        """
+        zz = np.zeros_like(self.xx)
+        for i in range(self.res):
+            for j in range(self.res):
+                state = np.array([self.xx[i, j], self.yy[i, j]])
+                zz[i, j] = value_func(state)
+        self.ax.clear()
+        self.ax.plot_surface(self.xx, self.yy, zz, cmap='coolwarm', alpha=0.8)
+        self.ax.set_xlabel('State dim 1', fontsize=10)
+        self.ax.set_ylabel('State dim 2', fontsize=10)
+        self.ax.set_zlabel('Value', fontsize=10)
+        self.ax.set_title(f'Value Function Surface at Step {step}')
+        plt.pause(0.001)
+
+    def save(self, filepath: str):
+        """保存当前图表（自动创建目录）"""
+        dirname = os.path.dirname(filepath)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+        self.fig.savefig(filepath, dpi=150)
+        print(f"价值曲面图已保存到: {filepath}")
+
+    def close(self):
+        plt.close(self.fig)
+
+
+# ========== 以下是原有代码（TrainingVisualizer, QTableVisualizer, PerformanceAnalyzer）保持不变 ==========
 
 class TrainingVisualizer:
     """训练可视化器"""
