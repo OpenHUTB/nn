@@ -9,7 +9,7 @@ os.chdir(r'c:\Users\12698\Desktop\carla_deeprl_driver')
 import carla
 
 print("=" * 60)
-print("CARLA Demo - Direction Arrow + HUD")
+print("CARLA Demo - Direction Arrow + HUD + Gear")
 print("=" * 60)
 
 print("\n[1] Connecting...")
@@ -29,12 +29,22 @@ spawn_point = random.choice(spawn_points)
 vehicle = world.spawn_actor(vehicle_bp, spawn_point)
 print("    RED Tesla ready!")
 
-print("\n[3] Driving with Direction Arrow + HUD")
+print("\n[3] Driving with Direction Arrow + HUD + Gear")
 print("-" * 60)
 
 reward = 0
 for i in range(30):
-    vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0.0))
+    # 模拟换挡：前10秒前进，中间刹车，后10秒倒车
+    if i < 10:
+        vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0.0, reverse=False))
+        gear = 'D'
+    elif i < 15:
+        vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=1.0, reverse=False))
+        gear = 'N'
+    else:
+        vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0.0, reverse=True))
+        gear = 'R'
+    
     time.sleep(0.15)
     
     velocity = vehicle.get_velocity()
@@ -116,9 +126,20 @@ for i in range(30):
         life_time=0.5,
         draw_shadow=True
     )
+    
+    # Draw Gear HUD
+    gear_color = carla.Color(0, 255, 0) if gear == 'D' else (carla.Color(255, 0, 0) if gear == 'R' else carla.Color(255, 255, 0))
+    gear_location = carla.Location(x=v_loc.x, y=v_loc.y, z=v_loc.z + 3)
+    world.debug.draw_string(
+        gear_location,
+        f"[ {gear} ]",
+        color=gear_color,
+        life_time=0.5,
+        draw_shadow=True
+    )
 
     if i % 5 == 0:
-        print(f"    Step {i+1}/30: Speed = {speed_kmh:.1f} km/h")
+        print(f"    Step {i+1}/30: Speed = {speed_kmh:.1f} km/h, Gear = {gear}")
 
-print("\n[DONE] Check the CYAN arrow pointing forward!")
+print("\n[DONE] Check the GEAR display [D]/[R]/[N] on the car!")
 vehicle.destroy()
