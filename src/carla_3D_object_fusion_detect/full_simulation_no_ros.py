@@ -7,6 +7,8 @@ import numpy as np
 import sys
 import math
 import traceback
+import csv
+from datetime import datetime
 
 # ====================== 路径 ======================
 current_file = os.path.abspath(__file__)
@@ -19,10 +21,12 @@ image_folder = os.path.join(p3, "images")
 lidar_folder = os.path.join(p3, "lidar")
 collision_folder = os.path.join(p3, "collision")
 semantic_folder = os.path.join(p3, "semantic")
+trajectory_folder = os.path.join(p3, "trajectory")
 os.makedirs(image_folder, exist_ok=True)
 os.makedirs(lidar_folder, exist_ok=True)
 os.makedirs(collision_folder, exist_ok=True)
 os.makedirs(semantic_folder, exist_ok=True)
+os.makedirs(trajectory_folder, exist_ok=True)
 
 # ====================== 配置 ======================
 SAVE_INTERVAL = 5 * 60
@@ -41,6 +45,37 @@ OBSTACLE_WARNING_DISTANCE = 10.0
 OBSTACLE_DANGER_DISTANCE = 5.0
 OBSTACLE_FOV_ANGLE = 60.0
 OBSTACLE_MAX_HEIGHT = 2.0
+
+# 轨迹记录文件
+trajectory_csv_path = os.path.join(trajectory_folder, f"trajectory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+trajectory_file = None
+trajectory_writer = None
+
+# 天气预设（手动切换）
+weather_presets = {
+    "sunny": carla.WeatherParameters(
+        cloudiness=0.0, precipitation=0.0, precipitation_deposits=0.0,
+        wind_intensity=0.0, sun_azimuth_angle=0.0, sun_altitude_angle=70.0,
+        fog_density=0.0, fog_distance=0.0, wetness=0.0
+    ),
+    "rainy": carla.WeatherParameters(
+        cloudiness=90.0, precipitation=90.0, precipitation_deposits=90.0,
+        wind_intensity=20.0, sun_azimuth_angle=0.0, sun_altitude_angle=30.0,
+        fog_density=10.0, fog_distance=100.0, wetness=90.0
+    ),
+    "foggy": carla.WeatherParameters(
+        cloudiness=50.0, precipitation=0.0, precipitation_deposits=0.0,
+        wind_intensity=5.0, sun_azimuth_angle=0.0, sun_altitude_angle=20.0,
+        fog_density=80.0, fog_distance=30.0, wetness=20.0
+    ),
+    "night": carla.WeatherParameters(
+        cloudiness=20.0, precipitation=0.0, precipitation_deposits=0.0,
+        wind_intensity=5.0, sun_azimuth_angle=0.0, sun_altitude_angle=-30.0,
+        fog_density=0.0, fog_distance=0.0, wetness=0.0
+    )
+}
+weather_names = ["sunny", "rainy", "foggy", "night"]
+current_weather_idx = 1  # 初始为雨天（与之前一致）
 
 # 全局变量
 last_save_time = time.time()
@@ -67,6 +102,10 @@ last_spawn_time = time.time()
 vehicle_blueprints = []
 pedestrian_blueprints = []
 
+# GPS/IMU 数据
+latest_gnss = None
+latest_imu = None
+
 # ====================== 连接 CARLA（带重试） ======================
 def connect_carla(retries=3):
     for i in range(retries):
@@ -85,13 +124,9 @@ def connect_carla(retries=3):
 client = connect_carla()
 world = client.get_world()
 
-# 雨天天气
-weather = carla.WeatherParameters(
-    cloudiness=90.0, precipitation=90.0, precipitation_deposits=90.0,
-    wind_intensity=20.0, wetness=90.0
-)
-world.set_weather(weather)
-print("✅ 雨天天气")
+# 设置初始天气（雨天）
+world.set_weather(weather_presets["rainy"])
+print("✅ 初始天气: 雨天 (按 W 切换)")
 
 # 生成自车
 blueprint_library = world.get_blueprint_library()
@@ -216,7 +251,86 @@ def remove_far_actors(ego_location):
         except:
             pass
 
-# ====================== 传感器创建（增加重试） ======================
+# ====================== 轨迹记录初始化 ======================
+def init_trajectory_csv():
+    global trajectory_file, trajectory_writer
+    try:
+        trajectory_file = open(trajectory_csv_path, 'w', newline='')
+        trajectory_writer = csv.writer(trajectory_file)
+        # 写入表头
+        trajectory_writer.writerow([
+            "timestamp", "lat", "lon", "alt", 
+            "velocity_x", "velocity_y", "velocity_z", "speed_kmh",
+            "accel_x", "accel_y", "accel_z",
+            "gyro_x", "gyro_y", "gyro_z",
+            "compass", "roll", "pitch", "yaw"
+        ])
+        print(f"📊 轨迹记录文件: {trajectory_csv_path}")
+    except Exception as e:
+        print(f"创建轨迹文件失败: {e}")
+
+def save_trajectory_point():
+    """保存当前轨迹点到CSV"""
+    global trajectory_writer, latest_gnss, latest_imu, vehicle
+    if trajectory_writer is None:
+        return
+    try:
+        # 获取车辆状态
+        vel = vehicle.get_velocity()
+        speed_kmh = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        transform = vehicle.get_transform()
+        roll = math.radians(transform.rotation.roll)
+        pitch = math.radians(transform.rotation.pitch)
+        yaw = math.radians(transform.rotation.yaw)
+        
+        # GPS 数据
+        lat, lon, alt = 0.0, 0.0, 0.0
+        if latest_gnss is not None:
+            lat = latest_gnss.latitude
+            lon = latest_gnss.longitude
+            alt = latest_gnss.altitude
+        
+        # IMU 数据
+        accel_x, accel_y, accel_z = 0.0, 0.0, 0.0
+        gyro_x, gyro_y, gyro_z = 0.0, 0.0, 0.0
+        compass = 0.0
+        if latest_imu is not None:
+            accel_x = latest_imu.accelerometer.x
+            accel_y = latest_imu.accelerometer.y
+            accel_z = latest_imu.accelerometer.z
+            gyro_x = latest_imu.gyroscope.x
+            gyro_y = latest_imu.gyroscope.y
+            gyro_z = latest_imu.gyroscope.z
+            compass = latest_imu.compass
+        
+        row = [
+            time.time(), lat, lon, alt,
+            vel.x, vel.y, vel.z, speed_kmh,
+            accel_x, accel_y, accel_z,
+            gyro_x, gyro_y, gyro_z,
+            compass, roll, pitch, yaw
+        ]
+        trajectory_writer.writerow(row)
+        trajectory_file.flush()
+        print(f"📌 轨迹点已保存 (时间: {datetime.now().strftime('%H:%M:%S')})")
+    except Exception as e:
+        print(f"保存轨迹点失败: {e}")
+
+# ====================== 天气切换函数 ======================
+def cycle_weather():
+    global current_weather_idx
+    current_weather_idx = (current_weather_idx + 1) % len(weather_names)
+    weather_name = weather_names[current_weather_idx]
+    world.set_weather(weather_presets[weather_name])
+    print(f"🌤️ 切换天气: {weather_name.upper()}")
+    # 同时在画面上显示提示（通过变量在绘图函数中显示）
+    global weather_change_time
+    weather_change_time = time.time()
+
+weather_change_time = 0
+last_weather_display = ""
+
+# ====================== 传感器创建 ======================
 def spawn_safe_sensor(bp_name, transform, attach_to, attributes=None, retries=2):
     for attempt in range(retries):
         try:
@@ -267,6 +381,18 @@ semantic_camera = spawn_safe_sensor('sensor.camera.semantic_segmentation',
                                     carla.Transform(carla.Location(x=-5.0, y=0, z=3.0), carla.Rotation(pitch=-10)),
                                     vehicle,
                                     {'image_size_x': 1024, 'image_size_y': 768, 'fov': 90})
+
+#GPS 传感器
+gnss = spawn_safe_sensor('sensor.other.gnss',
+                         carla.Transform(carla.Location(x=0, z=1.0)),
+                         vehicle,
+                         {'sensor_tick': 1.0})  # 每秒更新一次
+
+# IMU 传感器
+imu = spawn_safe_sensor('sensor.other.imu',
+                        carla.Transform(carla.Location(x=0, z=1.0)),
+                        vehicle,
+                        {'sensor_tick': 0.05})  # 20Hz
 
 # 如果核心传感器缺失，退出
 if camera_front is None or camera_follow is None or lidar is None or semantic_camera is None:
@@ -343,6 +469,14 @@ def on_collision(event):
     except Exception as e:
         print(f"碰撞保存失败: {e}")
 
+def on_gnss(data):
+    global latest_gnss
+    latest_gnss = data
+
+def on_imu(data):
+    global latest_imu
+    latest_imu = data
+
 # 订阅传感器
 camera_front.listen(on_camera_front)
 camera_follow.listen(on_camera_follow)
@@ -350,6 +484,10 @@ semantic_camera.listen(on_semantic)
 lidar.listen(on_lidar)
 if collision_sensor:
     collision_sensor.listen(on_collision)
+if gnss:
+    gnss.listen(on_gnss)
+if imu:
+    imu.listen(on_imu)
 
 # ====================== 障碍物距离计算 ======================
 def compute_closest_obstacle(lidar_data, ego_location, ego_rotation):
@@ -382,9 +520,9 @@ def compute_closest_obstacle(lidar_data, ego_location, ego_rotation):
             min_dist = dist
     return min_dist
 
-# ====================== 绘制函数 ======================
+# ====================== 绘制函数（增加天气和轨迹提示） ======================
 def draw_speedometer(image, vehicle):
-    global closest_obstacle_distance, obstacle_warning_active
+    global closest_obstacle_distance, obstacle_warning_active, weather_change_time
     try:
         vel = vehicle.get_velocity()
         speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
@@ -403,7 +541,18 @@ def draw_speedometer(image, vehicle):
                     (x, y+bar_h+40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200,200,200), 1)
         mode_text = "SEMANTIC" if display_mode == "semantic" else "RGB"
         cv2.putText(image, f"Mode: {mode_text} (press S)", (x, y+bar_h+60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,0), 1)
+        # 显示天气和按键提示
+        cv2.putText(image, f"Weather: {weather_names[current_weather_idx].upper()} (press W)", 
+                    (x, y+bar_h+80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200,200,200), 1)
+        cv2.putText(image, f"Press R to save trajectory point", 
+                    (x, y+bar_h+100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200,200,200), 1)
         
+        # 天气切换提示（短暂显示）
+        if time.time() - weather_change_time < 2.0:
+            hint = f"Weather changed to {weather_names[current_weather_idx].upper()}"
+            cv2.putText(image, hint, (image.shape[1]//2 - 150, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,255), 2)
+        
+        # 障碍物警告
         if obstacle_warning_active:
             warn_x = image.shape[1] - 250
             warn_y = 30
@@ -431,10 +580,15 @@ if latest_follow is not None and latest_semantic is not None:
 else:
     print("⚠️ 部分传感器未就绪，继续运行")
 
+# 初始化轨迹CSV
+init_trajectory_csv()
+
 # ====================== 主循环 ======================
 print(f"每 {SAVE_INTERVAL//60} 分钟自动保存，碰撞自动保存，动态交通已启用（最多{MAX_VEHICLES}车/{MAX_PEDESTRIANS}人）")
 print("🎨 按 S 键切换显示模式（RGB / 语义分割）")
 print("⚠️ 激光雷达障碍物警告已开启（前方10米内预警，5米内危险）")
+print("🌤️ 按 W 键切换天气（晴天→雨天→雾天→夜晚）")
+print("📊 按 R 键保存当前轨迹点（GPS/IMU/车速等）到 CSV")
 print("按 Q/ESC 退出")
 
 loop_counter = 0
@@ -528,7 +682,12 @@ try:
         elif key == ord('s') or key == ord('S'):
             display_mode = "semantic" if display_mode == "rgb" else "rgb"
             print(f"🔮 切换到 {display_mode.upper()} 视图")
+        elif key == ord('w') or key == ord('W'):
+            cycle_weather()
+        elif key == ord('r') or key == ord('R'):
+            save_trajectory_point()
 
+        # 定时保存
         if now - last_save_time >= SAVE_INTERVAL:
             if latest_camera is not None and latest_lidar is not None:
                 ts = str(int(now))
@@ -548,6 +707,8 @@ except Exception as e:
     traceback.print_exc()
 finally:
     cv2.destroyAllWindows()
+    if trajectory_file:
+        trajectory_file.close()
     for actor in all_spawned_actors:
         if actor:
             try:
@@ -555,7 +716,7 @@ finally:
                 actor.destroy()
             except:
                 pass
-    for actor in [camera_front, camera_follow, semantic_camera, lidar, collision_sensor, vehicle]:
+    for actor in [camera_front, camera_follow, semantic_camera, lidar, collision_sensor, gnss, imu, vehicle]:
         if actor:
             try:
                 if hasattr(actor, 'stop'): actor.stop()

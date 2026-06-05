@@ -2,11 +2,13 @@
 自动驾驶车辆语义分割 —— 推理入口
 
 加载预训练 U-Net 模型，对 CARLA 街景做 8 类语义分割。
-支持四种模式，按扩展名/参数自动识别：
+支持六种模式，按扩展名/参数自动识别：
   - 图片 (.png/.jpg/...)：输出叠加图 (overlay) 和纯掩码图 (mask)
   - 视频 (.mp4/.avi/...)：逐帧分割，输出叠加视频，并生成采样帧拼图
   - --augment 图片：对同一张图分别施加 6 种训练时用到的数据增强并排展示（不需要模型）
   - --benchmark 图片：测量 models/ 下所有预训练模型的推理延迟，输出柱状图
+  - --heatmap 图片：把模型 softmax 输出的 8 个类概率分别画成灰度热力图
+  - --frequency：量化展示训练数据 8 类像素分布与 Focal Loss 应用权重的对比（不需要模型）
 
 用法：
     python main.py                                   # 用默认示例图 + 默认模型
@@ -17,6 +19,9 @@
     python main.py --augment <输入图>                 # 指定输入图做增强可视化
     python main.py --benchmark                       # 默认示例图，基准测试所有模型推理延迟
     python main.py --benchmark <输入图>               # 指定输入图做基准测试
+    python main.py --heatmap                         # 默认示例图 + 默认模型，输出 8 类概率热力图
+    python main.py --heatmap <输入图> [<模型目录>]    # 指定输入图（与模型）做热力图
+    python main.py --frequency                       # 类别频率分析（数据不平衡与 Focal Loss 权重）
 
 模型说明：
     预训练模型为二进制大文件（每个约 17MB），未随仓库提交。
@@ -256,6 +261,134 @@ def run_benchmark(input_path, n_runs=BENCHMARK_RUNS, n_warmup=BENCHMARK_WARMUP):
     print(f"\n      已写出基准测试图: {out_path}")
 
 
+def run_heatmap(input_path, model_dir):
+    """对输入图运行推理，把 softmax 输出的 8 类概率分别画成灰度热力图（4x2 网格）。"""
+    img = Image.open(input_path).convert("RGB")
+    print(f"      输入图片: {input_path}  尺寸: {img.size}")
+
+    print(f"[1/2] 加载模型并推理: {model_dir}")
+    model = load_segmentation_model(model_dir)
+    labels = infer(model, img)  # (H, W, 8)
+    h, w, n_classes = labels.shape
+    print(f"      softmax 输出形状: {labels.shape}")
+
+    from semantic.carla_controller.labels import SEMANTIC_CATEGORIES
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    print(f"[2/2] 生成 {n_classes} 类概率热力图 ...")
+    cols = 4
+    rows = (n_classes + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 3 * rows))
+    axes_flat = axes.flatten() if hasattr(axes, "flatten") else [axes]
+    for c in range(n_classes):
+        ax = axes_flat[c]
+        prob = labels[:, :, c]
+        mean_conf = float(prob.mean())
+        max_conf = float(prob.max())
+        ax.imshow(prob, cmap="hot", vmin=0.0, vmax=1.0)
+        ax.set_title(
+            f"{c}: {SEMANTIC_CATEGORIES.get(c, str(c))}\nmean={mean_conf:.3f}  max={max_conf:.3f}",
+            fontsize=10,
+        )
+        ax.axis("off")
+    # 隐藏多余的子图
+    for c in range(n_classes, rows * cols):
+        axes_flat[c].axis("off")
+
+    model_label = os.path.basename(os.path.normpath(model_dir))
+    fig.suptitle(
+        f"Per-class probability heatmaps (model: {model_label})", fontsize=12
+    )
+    fig.tight_layout()
+
+    base, _ = os.path.splitext(input_path)
+    out_path = f"{base}_heatmap.png"
+    fig.savefig(out_path, dpi=100)
+    print(f"      已写出概率热力图: {out_path}")
+
+
+def run_frequency():
+    """量化展示训练数据 8 类像素分布与 Focal Loss 应用权重的对比。
+
+    数据源：semantic/unet/train.py 中由原始项目从 CARLA 采集数据集统计得到的
+    CLASS_PIXEL_RATIOS 常量。本模式不依赖任何模型或输入图，纯粹将训练时的
+    类别权重计算过程可视化，便于诊断"为什么需要 Focal Loss + 类别权重"。
+    """
+    import math
+
+    from semantic.carla_controller.labels import SEMANTIC_CATEGORIES
+    from semantic.unet.train import CLASS_PIXEL_RATIOS, sigmoid
+
+    n_classes = len(CLASS_PIXEL_RATIOS)
+    names = [SEMANTIC_CATEGORIES.get(c, str(c)) for c in range(n_classes)]
+    # 像素比例的倒数 → 相对频次 → 归一化到百分比
+    inv = [1.0 / r for r in CLASS_PIXEL_RATIOS]
+    inv_sum = sum(inv)
+    freq_pct = [100.0 * v / inv_sum for v in inv]
+    # 训练时实际应用的类别权重（Focal Loss 用），公式见 train.py
+    applied_w = [2.0 * sigmoid(r) for r in CLASS_PIXEL_RATIOS]
+
+    print("\n## 类别频率与 Focal Loss 权重分析\n")
+    print("| ID | 类别 | 像素比例常量 | 估计像素占比 | Focal Loss 权重 |")
+    print("|---|---|---|---|---|")
+    for c in range(n_classes):
+        print(
+            f"| {c} | {names[c]} | {CLASS_PIXEL_RATIOS[c]:.3f} | {freq_pct[c]:.4f}% | {applied_w[c]:.3f} |"
+        )
+    most_pct = max(freq_pct)
+    least_pct = min(freq_pct)
+    print(
+        f"\n极端不平衡：最多类约占 {most_pct:.2f}%，最少类约占 {least_pct:.4f}%，"
+        f"比例 {most_pct / least_pct:.0f}:1。"
+    )
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    print("\n[1/1] 生成对比图 ...")
+    colors = ["#888888", "#dcb800", "#00aa00", "#9deb32", "#f423e8", "#6b8e23", "#0000ff", "#dc143c"]
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 5.5))
+    x = list(range(n_classes))
+
+    # 左：像素占比（对数纵轴）
+    ax_left.bar(x, freq_pct, color=colors[:n_classes])
+    ax_left.set_yscale("log")
+    ax_left.set_ylabel("Estimated pixel share (%, log scale)")
+    ax_left.set_title("Pixel frequency by class (CARLA training set)")
+    ax_left.set_xticks(x)
+    ax_left.set_xticklabels(names, rotation=20, ha="right", fontsize=9)
+    for xi, v in zip(x, freq_pct):
+        ax_left.text(xi, v * 1.15, f"{v:.3f}%", ha="center", va="bottom", fontsize=8)
+    ax_left.grid(axis="y", linestyle="--", alpha=0.4, which="both")
+
+    # 右：Focal Loss 应用权重（线性纵轴）
+    ax_right.bar(x, applied_w, color=colors[:n_classes])
+    ax_right.set_ylabel("Applied class weight (Focal Loss)")
+    ax_right.set_title("Class weights used in training (2·sigmoid)")
+    ax_right.set_xticks(x)
+    ax_right.set_xticklabels(names, rotation=20, ha="right", fontsize=9)
+    ax_right.set_ylim(0, 2.2)
+    for xi, v in zip(x, applied_w):
+        ax_right.text(xi, v + 0.03, f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+    ax_right.grid(axis="y", linestyle="--", alpha=0.4)
+
+    fig.suptitle(
+        f"Class imbalance & Focal Loss weighting (ratio ~ {most_pct / least_pct:.0f}:1)",
+        fontsize=12,
+    )
+    fig.tight_layout()
+
+    out_path = os.path.join(MODULE_DIR, "examples", "sample_input_frequency.png")
+    fig.savefig(out_path, dpi=100)
+    print(f"      已写出类别频率分析图: {out_path}")
+
+
 def run_image(model, img_path):
     print(f"[2/3] 读取图片: {img_path}")
     img = Image.open(img_path).convert("RGB")
@@ -340,6 +473,22 @@ def main():
             print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
             sys.exit(1)
         run_benchmark(input_path)
+        print("完成。")
+        return
+
+    if args and args[0] == "--heatmap":
+        rest = args[1:]
+        input_path = rest[0] if rest else DEFAULT_INPUT
+        model_dir = rest[1] if len(rest) >= 2 else DEFAULT_MODEL
+        if not os.path.isfile(input_path):
+            print(f"[错误] 找不到输入文件: {input_path}", file=sys.stderr)
+            sys.exit(1)
+        run_heatmap(input_path, model_dir)
+        print("完成。")
+        return
+
+    if args and args[0] == "--frequency":
+        run_frequency()
         print("完成。")
         return
 
