@@ -1,50 +1,63 @@
 <mujoco model="proportional_humanoid">
-  <compiler angle="radian" coordinate="local"/>
+  <compiler angle="radian"/>
   <option timestep="0.002" gravity="0 0 -9.81"/>
   <default>
-    <geom condim="3" friction="1 1 0.1"/>
+    <geom condim="3" friction="1 0.1 0.1"/>
     <joint damping="0.1"/>
   </default>
   <worldbody>
-    <light pos="0 0 5" dir="0 0 -1" diffuse="1 1 1" specular="0.1 0.1 0.1"/>
+    <light pos="0 0 5" dir="0 0 -1" diffuse="1 1 1" specular="0.3 0.3 0.3"/>
     <geom name="floor" type="plane" size="10 10 0.1" rgba="0.8 0.8 0.8 1"/>
 
-    <!-- 三个随机下落小球 -->
+    <body pos="-0.9 -0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
+    <body pos="0.9 -0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
+    <body pos="-0.9 0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
+    <body pos="0.9 0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
+
     <body name="ball1" pos="0 0 4.0">
       <geom type="sphere" size="0.14" rgba="1 0 0 1"/>
       <joint type="free"/>
     </body>
-    <body name="ball2" pos="0 0 4.0">
-      <geom type="sphere" size="0.14" rgba="0 1 0 1"/>
+    <body name="ball2" pos="0.2 0.1 4.0">
+      <geom type="sphere" size="0.14" rgba="1 0 0 1"/>
       <joint type="free"/>
     </body>
-    <body name="ball3" pos="0 0 4.0">
-      <geom type="sphere" size="0.14" rgba="0 0 1 1"/>
+    <body name="ball3" pos="-0.3 -0.2 4.0">
+      <geom type="sphere" size="0.14" rgba="1 0 0 1"/>
       <joint type="free"/>
     </body>
 
-    <!-- 底座：X+Y双轴滑动，实现前后左右全向移动 -->
+    <body name="cube_obs" pos="0.5 0.2 4.0">
+      <geom type="box" size="0.16 0.16 0.16" rgba="0.9 0.6 0.1 1"/>
+      <joint type="free"/>
+    </body>
+
     <body name="base" pos="0 0 0">
       <joint name="slide_x" type="slide" axis="1 0 0"/>
       <joint name="slide_y" type="slide" axis="0 1 0"/>
       <body name="torso" pos="0 0 1.1">
         <geom type="capsule" fromto="0 0 0 0 0 -0.32" size="0.12" rgba="0.2 0.5 0.8 1"/>
-        
         <body name="head" pos="0 0 0.22">
           <geom type="sphere" size="0.11" rgba="0.8 0.6 0.4 1"/>
         </body>
 
-        <!-- 手臂 -->
         <body name="left_shoulder" pos="-0.14 0 0">
-          <joint name="left_shoulder" type="hinge" axis="1 0 0" range="-0.4 0.4"/>
+          <joint name="j_larm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
         </body>
         <body name="right_shoulder" pos="0.14 0 0">
-          <joint name="right_shoulder" type="hinge" axis="1 0 0" range="-0.4 0.4"/>
+          <joint name="j_rarm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
         </body>
 
-        <!-- 双腿膝盖锁死，永久直立站直 -->
         <body name="left_hip" pos="-0.11 0 -0.32">
           <joint name="left_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
           <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
