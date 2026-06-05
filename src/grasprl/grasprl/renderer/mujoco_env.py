@@ -137,6 +137,19 @@ class MujocoPhyEnv(gym.Env):
 
     def reset(self):
         self._reset_simulation()
+        # 设置初始关节角度，让机械臂正常展开在桌子正上方
+        self.data.qpos[:6] = [
+            0.0,        # shoulder_pan_joint: 正前方
+            -1.0,       # shoulder_lift_joint: 抬起
+            1.0,        # elbow_joint: 轻微弯曲
+            -1.0,       # wrist_1_joint: 向下
+            -1.57,      # wrist_2_joint: 旋转
+            0.0,        # wrist_3_joint
+        ]
+        # 设置夹爪初始位置为打开状态
+        self.data.qpos[6] = 0.9  # 夹爪打开角度
+        # 确保初始状态更新
+        mujoco.mj_forward(self.model, self.data)
         self.data.qpos[:6] = [
             1.5707,
             -1.5707,
