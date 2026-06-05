@@ -33,9 +33,33 @@ class ActionSmoothingWrapper(gym.ActionWrapper):
         self.last_action = smoothed
         return smoothed
 
+# 修复后的自定义奖励包装器
+class CustomRewardWrapper(gym.RewardWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.last_action = np.zeros(env.action_space.shape)
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        data = self.env.unwrapped.data
+        # 前进奖励
+        forward_reward = data.qvel[0] * 1.2
+        # 直立高度惩罚
+        upright_penalty = -0.6 * abs(data.qpos[2] - 1.2)
+        # 功耗惩罚
+        energy_penalty = -1e-3 * np.sum(np.square(data.ctrl))
+        # 动作剧烈变化惩罚
+        action_smooth_pen = -0.01 * np.linalg.norm(action - self.last_action)
+        self.last_action = action.copy()
+        # 组合总奖励
+        total = forward_reward + upright_penalty + energy_penalty + action_smooth_pen + reward * 0.3
+        total = np.clip(total, -5.0, 10.0)
+        return obs, total, terminated, truncated, info
+
 def make_env(render_mode="human"):
     env = gym.make(ENV_NAME, render_mode=render_mode)
-    env = ActionSmoothingWrapper(env, alpha=0.8)  # 核心：动作平滑
+    env = ActionSmoothingWrapper(env, alpha=0.8)
+    env = CustomRewardWrapper(env)
     env = DummyVecEnv([lambda: env])
     return env
 
@@ -52,22 +76,21 @@ def train_model(env):
             env,
             verbose=1,
             tensorboard_log=LOG_DIR,
-            learning_rate=1e-4,          # 降低学习率，更新更保守，不容易崩
-            gamma=0.995,                 # 更看重长期平衡
-            n_steps=4096,                # 更长轨迹，学习稳定模式
+            learning_rate=1e-4,
+            gamma=0.995,
+            n_steps=4096,
             batch_size=1024,
             n_epochs=15,
-            clip_range=0.15,             # 更保守的更新，避免动作突变
+            clip_range=0.15,
             ent_coef=0.01,
             policy_kwargs=dict(
                 net_arch=dict(
-                    pi=[512, 256, 128],  # 更大的网络，学更精细的平衡
+                    pi=[512, 256, 128],
                     vf=[512, 256, 128]
                 )
             )
         )
 
-    # 回调：保存最佳模型和检查点
     eval_callback = EvalCallback(
         env, best_model_save_path=MODEL_DIR,
         log_path=LOG_DIR, eval_freq=EVAL_FREQ,
@@ -77,7 +100,6 @@ def train_model(env):
         save_freq=SAVE_FREQ, save_path=MODEL_DIR, name_prefix="chk"
     )
 
-    # 开始训练（支持断点续训）
     model.learn(
         total_timesteps=TOTAL_TIMESTEPS,
         callback=[eval_callback, checkpoint_callback],
@@ -116,10 +138,9 @@ def test_model(env):
 if __name__ == "__main__":
     try:
         env = make_env(render_mode="human")
-        # if os.path.exists(BEST_MODEL_PATH + ".zip"):
-        #     test_model(env)
-        # else:
-        train_model(env)
+        # 训练时启用下面train，测试启用testS
+        #train_model(env)
+        test_model(env)
     except KeyboardInterrupt:
         print("\n🛑 手动停止训练")
     finally:
