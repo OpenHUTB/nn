@@ -16,3 +16,7 @@
 python src/carla_lane_risk_analyzer/lane_risk.py --output docs/pr_assets/carla_lane_risk_analyzer
 python src/carla_lane_risk_analyzer/tests/test_lane_risk.py
 ```
+
+## 风险等级复核
+
+建议在查看输出图时优先核对高风险时刻对应的横向偏移、航向误差和道路曲率。如果高风险集中出现在弯道或高交通密度片段，应结合车辆速度判断是车道保持控制不足，还是场景本身需要更保守的速度策略。这样可以让风险曲线不仅用于展示，也能辅助定位控制参数需要优化的位置。

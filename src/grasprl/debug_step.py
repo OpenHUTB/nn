@@ -238,9 +238,9 @@ drop_dist = np.linalg.norm(obj_after_drop[:2] - obj_before_drop[:2])
 print(f"  物体移动: {drop_dist*1000:.1f}mm")
 
 if drop_dist > 0.02:  # 物体移动超过 2cm
-    print("  ✅ 物体已释放!")
+    print("  物体已释放!")
 else:
-    print("  ⚠️  物体可能还在夹爪中")
+    print("  物体可能还在夹爪中")
     
 # 额外等待观察
 wait("完成放置", 2.0)

@@ -142,9 +142,10 @@ class GaussianMixtureModel:
         n_jobs: int, 并行计算使用的线程数 (默认=1，即不并行；-1表示使用所有CPU核心)
         covariance_type: str, 协方差类型：'full'（完整协方差）、'tied'（共享协方差）、
                          'diagonal'（对角协方差）、'spherical'（球面协方差）(默认='full')
+        eps: float, 数值稳定性参数，用于避免除零和log(0) (默认=1e-10)
     """
     def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, 
-                 init = 'random', n_jobs = 1, covariance_type = 'full'):
+                 init = 'random', n_jobs = 1, covariance_type = 'full', eps = 1e-10):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
@@ -152,6 +153,7 @@ class GaussianMixtureModel:
         self.init = init                  # 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
         self.n_jobs = n_jobs              # 并行线程数
         self.covariance_type = covariance_type.lower()  # 协方差类型
+        self.eps = eps                    # 数值稳定性参数
         self.log_likelihoods = []         # 存储每轮迭代的对数似然值
         self.n_iters_ = 0                 # 实际收敛所用的迭代次数
         self.aic_ = None                  # AIC 值（训练后计算）
@@ -163,6 +165,29 @@ class GaussianMixtureModel:
 
         # 初始化随机数生成器（使用 numpy 新式 Generator，线程安全且可重复）
         self.rng = np.random.default_rng(random_state)
+    
+    def _safe_log(self, x):
+        """安全对数计算，避免 log(0)
+        
+        参数:
+            x: 输入值或数组
+            
+        返回:
+            log(x)，当 x <= 0 时返回 log(eps)
+        """
+        return np.log(np.maximum(x, self.eps))
+    
+    def _safe_divide(self, numerator, denominator):
+        """安全除法，避免除零
+        
+        参数:
+            numerator: 分子
+            denominator: 分母
+            
+        返回:
+            numerator / denominator，当 denominator <= 0 时返回 numerator / eps
+        """
+        return numerator / np.maximum(denominator, self.eps)
 
     def _init_covariance(self, n_features):
         """根据协方差类型初始化协方差矩阵
@@ -215,7 +240,7 @@ class GaussianMixtureModel:
 
         log_likelihood = -np.inf
 
-        log_pi = np.log(self.pi)
+        log_pi = self._safe_log(self.pi)
 
         for iteration in range(self.max_iter):
             if self.n_jobs != 1:
@@ -227,11 +252,13 @@ class GaussianMixtureModel:
             log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
 
             gamma = np.exp(log_prob - log_prob_sum)
+            # 数值稳定性：裁剪gamma值，避免极端值影响计算
+            gamma = np.clip(gamma, self.eps, 1 - self.eps)
 
             Nk, new_mu, new_sigma = self._compute_statistics_vectorized(X, gamma)
 
-            self.pi = Nk / n_samples
-            log_pi = np.log(self.pi)
+            self.pi = self._safe_divide(Nk, n_samples)
+            log_pi = self._safe_log(self.pi)
 
             current_log_likelihood = np.sum(log_prob_sum)
             self.log_likelihoods.append(current_log_likelihood)
@@ -492,7 +519,7 @@ class GaussianMixtureModel:
             return log_prob
 
     def _compute_statistics_vectorized(self, X, gamma):
-        """向量化计算 M 步的统计量
+        """向量化计算 M 步的统计量（数值稳定性增强版）
         
         参数:
             X: 输入数据，形状为(n_samples, n_features)
@@ -506,28 +533,44 @@ class GaussianMixtureModel:
         n_samples, n_features = X.shape
         n_components = gamma.shape[1]
         
+        # 计算每个成分的有效样本数，并进行数值裁剪避免除零
         Nk = np.sum(gamma, axis=0)
+        Nk = np.maximum(Nk, self.eps)
         
+        # 计算新均值，使用安全除法
         gamma_X = gamma[:, :, np.newaxis] * X[:, np.newaxis, :]
-        new_mu = np.sum(gamma_X, axis=0) / Nk[:, np.newaxis]
+        new_mu = self._safe_divide(np.sum(gamma_X, axis=0), Nk[:, np.newaxis])
         
         X_centered = X[:, np.newaxis, :] - new_mu[np.newaxis, :, :]
         gamma_X_centered = gamma[:, :, np.newaxis] * X_centered
         
         if self.covariance_type == 'full':
-            new_sigma = np.einsum('nki,nkj->kij', gamma_X_centered, X_centered) / Nk[:, np.newaxis, np.newaxis]
-            regularization = np.eye(n_features) * 1e-6
+            new_sigma = self._safe_divide(
+                np.einsum('nki,nkj->kij', gamma_X_centered, X_centered), 
+                Nk[:, np.newaxis, np.newaxis]
+            )
+            regularization = np.eye(n_features) * self.eps
             new_sigma += regularization
         elif self.covariance_type == 'tied':
-            new_sigma = np.einsum('nki,nkj->ij', gamma_X_centered, X_centered) / np.sum(gamma)
-            regularization = np.eye(n_features) * 1e-6
+            new_sigma = self._safe_divide(
+                np.einsum('nki,nkj->ij', gamma_X_centered, X_centered), 
+                np.sum(gamma)
+            )
+            regularization = np.eye(n_features) * self.eps
             new_sigma += regularization
         elif self.covariance_type == 'diagonal':
-            new_sigma = np.sum(gamma_X_centered ** 2, axis=0) / Nk[:, np.newaxis]
-            new_sigma = np.maximum(new_sigma, 1e-6)
+            new_sigma = self._safe_divide(
+                np.sum(gamma_X_centered ** 2, axis=0), 
+                Nk[:, np.newaxis]
+            )
+            new_sigma = np.maximum(new_sigma, self.eps)
         elif self.covariance_type == 'spherical':
-            new_sigma = np.sum(gamma_X_centered ** 2) / np.sum(Nk * n_features)
-            new_sigma = np.maximum(new_sigma, 1e-6)
+            # 每个成分独立的标量方差
+            new_sigma = self._safe_divide(
+                np.sum(gamma_X_centered ** 2, axis=(0, 2)), 
+                Nk * n_features
+            )
+            new_sigma = np.maximum(new_sigma, self.eps)
         
         return Nk, new_mu, new_sigma
         

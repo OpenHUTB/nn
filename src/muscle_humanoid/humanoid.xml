@@ -1,63 +1,87 @@
-<mujoco model="SimpleHumanoid">
-  <option timestep="0.005" gravity="0 0 -9.81"/>
-  <visual>
-    <map force="0.1" zfar="30"/>
-  </visual>
-  <asset>
-    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
-    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
-    <material name="body" rgba="0.3 0.6 0.9 1"/>
-    <material name="limb" rgba="0.7 0.7 0.7 1"/>
-  </asset>
-
+<mujoco model="proportional_humanoid">
+  <compiler angle="radian"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+  <default>
+    <geom condim="3" friction="1 0.1 0.1"/>
+    <joint damping="0.1"/>
+  </default>
   <worldbody>
-    <geom name="floor" type="plane" size="5 5 0.1" material="grid"/>
-    <light pos="0 -5 3" dir="0 5 -3" diffuse="1 1 1"/>
+    <light pos="0 0 5" dir="0 0 -1" diffuse="1 1 1" specular="0.3 0.3 0.3"/>
+    <geom name="floor" type="plane" size="10 10 0.1" rgba="0.8 0.8 0.8 1"/>
 
-    <body name="torso" pos="0 0 1.3">
-      <freejoint/>
-      <geom type="capsule" size="0.15 0.25" fromto="0 0 -0.1 0 0 0.3" material="body"/>
+    <body pos="-0.9 -0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
+    <body pos="0.9 -0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
+    <body pos="-0.9 0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
+    <body pos="0.9 0.9 0.12">
+      <geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/>
+    </body>
 
-      <!-- 头部 -->
-      <body name="head" pos="0 0 0.45">
-        <geom type="sphere" size="0.15" material="body"/>
-      </body>
+    <body name="ball1" pos="0 0 4.0">
+      <geom type="sphere" size="0.14" rgba="1 0 0 1"/>
+      <joint type="free"/>
+    </body>
+    <body name="ball2" pos="0.2 0.1 4.0">
+      <geom type="sphere" size="0.14" rgba="1 0 0 1"/>
+      <joint type="free"/>
+    </body>
+    <body name="ball3" pos="-0.3 -0.2 4.0">
+      <geom type="sphere" size="0.14" rgba="1 0 0 1"/>
+      <joint type="free"/>
+    </body>
 
-      <!-- 右臂 → 向外展开，像正常人 -->
-      <body name="upper_arm_R" pos="0 -0.25 0.15">
-        <joint axis="0 1 0" range="-1.5 1.5"/>
-        <geom type="capsule" size="0.05 0.22" fromto="0 0 0 -0.2 0 0" material="limb"/>
-        <body name="hand_R" pos="-0.22 0 0">
-          <geom type="sphere" size="0.06" material="limb"/>
+    <body name="cube_obs" pos="0.5 0.2 4.0">
+      <geom type="box" size="0.16 0.16 0.16" rgba="0.9 0.6 0.1 1"/>
+      <joint type="free"/>
+    </body>
+
+    <body name="base" pos="0 0 0">
+      <joint name="slide_x" type="slide" axis="1 0 0"/>
+      <joint name="slide_y" type="slide" axis="0 1 0"/>
+      <body name="torso" pos="0 0 1.1">
+        <geom type="capsule" fromto="0 0 0 0 0 -0.32" size="0.12" rgba="0.2 0.5 0.8 1"/>
+        <body name="head" pos="0 0 0.22">
+          <geom type="sphere" size="0.11" rgba="0.8 0.6 0.4 1"/>
         </body>
-      </body>
 
-      <!-- 左臂 → 向外展开，像正常人 -->
-      <body name="upper_arm_L" pos="0 0.25 0.15">
-        <joint axis="0 1 0" range="-1.5 1.5"/>
-        <geom type="capsule" size="0.05 0.22" fromto="0 0 0 0.2 0 0" material="limb"/>
-        <body name="hand_L" pos="0.22 0 0">
-          <geom type="sphere" size="0.06" material="limb"/>
+        <body name="left_shoulder" pos="-0.14 0 0">
+          <joint name="j_larm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
         </body>
-      </body>
-
-      <!-- 右腿 → 向外分开，站姿稳定 -->
-      <body name="thigh_R" pos="0 -0.22 -0.1">
-        <joint axis="0 1 0" range="-1.5 1.5"/>
-        <geom type="capsule" size="0.08 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
-        <body name="leg_R" pos="0 0 -0.55">
-          <joint axis="0 1 0" range="-2.5 0"/>
-          <geom type="capsule" size="0.07 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
+        <body name="right_shoulder" pos="0.14 0 0">
+          <joint name="j_rarm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
         </body>
-      </body>
 
-      <!-- 左腿 → 向外分开，站姿稳定 -->
-      <body name="thigh_L" pos="0 0.22 -0.1">
-        <joint axis="0 1 0" range="-1.5 1.5"/>
-        <geom type="capsule" size="0.08 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
-        <body name="leg_L" pos="0 0 -0.55">
-          <joint axis="0 1 0" range="-2.5 0"/>
-          <geom type="capsule" size="0.07 0.27" fromto="0 0 0 0 0 -0.55" material="limb"/>
+        <body name="left_hip" pos="-0.11 0 -0.32">
+          <joint name="left_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
+          <body name="left_knee" pos="0 0 -0.42">
+            <joint name="left_knee" type="hinge" axis="1 0 0" range="0 0.0"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.052" rgba="0.5 0.5 0.5 1"/>
+            <body name="left_ankle" pos="0 0 -0.42">
+              <joint name="left_ankle" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+              <geom type="box" size="0.11 0.05 0.025" pos="0 0 -0.025" rgba="0.3 0.3 0.3 1"/>
+            </body>
+          </body>
+        </body>
+
+        <body name="right_hip" pos="0.11 0 -0.32">
+          <joint name="right_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
+          <body name="right_knee" pos="0 0 -0.42">
+            <joint name="right_knee" type="hinge" axis="1 0 0" range="0 0.0"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.052" rgba="0.5 0.5 0.5 1"/>
+            <body name="right_ankle" pos="0 0 -0.42">
+              <joint name="right_ankle" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+              <geom type="box" size="0.11 0.05 0.025" pos="0 0 -0.025" rgba="0.3 0.3 0.3 1"/>
+            </body>
+          </body>
         </body>
       </body>
     </body>
