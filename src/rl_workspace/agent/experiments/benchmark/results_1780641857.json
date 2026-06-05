@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-06-05 14:44:17",
+  "map_size": 4,
+  "results": {
+    "Q-Learning": {
+      "final_success_rate": 8.0,
+      "avg_reward": 0.08,
+      "training_time": 0.03463602066040039
+    },
+    "SARSA": {
+      "final_success_rate": 5.333333333333334,
+      "avg_reward": 0.05333333333333334,
+      "training_time": 0.03825950622558594
+    }
+  }
+}
