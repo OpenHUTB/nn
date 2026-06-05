@@ -25,6 +25,36 @@
 <img width="600px" src="examples/result_video_frames.png"/>
 </p>
 
+`--augment` 模式可视化训练时使用的 6 种数据增强（翻转/亮度/对比度/模糊/椒盐噪声/中心裁剪），便于直观了解模型为何对真实道路上的扰动具备一定鲁棒性：
+
+<p align="center">
+<img width="700px" src="examples/result_augmentation.png"/>
+</p>
+
+`--benchmark` 模式测量所有预训练模型在 CPU 上的推理延迟，便于按"速度 vs 精度"取舍：
+
+<p align="center">
+<img width="700px" src="examples/result_benchmark.png"/>
+</p>
+
+256x256 输入的模型比 512x512 的快 ~2.6 倍；512x512 的三个变体（基础、focal+权重、focal 无权重）速度几乎一致——它们计算量相同，差异仅在训练目标。
+
+`--heatmap` 模式把模型 softmax 输出的 8 个类概率分别画成灰度热力图（亮 = 模型认为这里更可能属于该类），用来诊断模型对各类的把握程度：
+
+<p align="center">
+<img width="700px" src="examples/result_heatmap.png"/>
+</p>
+
+从上图可以直观看出 256x256 模型在 CARLA 示例上的偏置：对 Vehicles 和 Ground 高度自信（max≈1.0），但对 Roads（max≈0.09）和 Road Lines（max≈0.03）几乎检测不到，Pedestrians 的最高置信度也仅约 0.5——这与训练时类别极度不平衡（行人/标志像素数远少于道路）相吻合，也直接说明了项目使用 Focal Loss + 类别权重的必要性。
+
+`--frequency` 模式将训练数据 8 类像素分布与训练实际使用的 Focal Loss 权重一并量化展示，用以解释"为什么需要 Focal Loss + 类别权重"：
+
+<p align="center">
+<img width="800px" src="examples/result_frequency.png"/>
+</p>
+
+左图（对数纵轴）显示 Unlabeled 与 Roads 合计占 80% 以上的像素，而 Pedestrians 仅占约 0.066%、Traffic Sign/Lights 约 0.195%，**最多类与最少类的像素数比约 817:1**。如果用普通交叉熵直接训练，模型会被多数类主导、几乎不学少数类。右图显示训练时实际应用的权重——通过 `2·sigmoid(像素比例)` 把跨度 818:1 的不平衡压缩成 1.12-2.00 的温和加权（少数类 ≈2.0，多数类 ≈1.1），让模型在每张图的梯度中也能感知到少数类的存在。
+
 ## 运行环境
 
 - 平台：Windows 10/11（Linux 同理）
@@ -92,6 +122,63 @@ python main.py path/to/video.mp4 models/unet_model_256x256_50 120
 ```
 
 视频为二进制大文件，不随仓库提交。可用原始项目 `examples/` 目录下的 `.mp4`（如 `movie1.mp4`）作测试。运行后在视频同目录生成 `*_seg.mp4`（逐帧分割叠加视频）和 `*_seg_frames.png`（采样帧拼图）。
+
+### 数据增强可视化（--augment）
+
+`semantic/unet/dataset.py` 训练时对每张图随机施加 6 种增强以缓解过拟合。`--augment` 模式分别对单张输入图独立施加每种增强并排展示（不需要模型）：
+
+```bash
+# 默认示例图
+python main.py --augment
+
+# 指定输入图
+python main.py --augment examples/sample_input.png
+```
+
+运行后在输入图同目录生成 `*_augment.png`（4 列拼图，包含原图 + 6 种增强：水平翻转、亮度+30%、对比度-30%、高斯模糊、椒盐噪声 5%、中心裁剪 256）。
+
+### 推理延迟基准测试（--benchmark）
+
+把 `models/` 下能找到的预训练模型逐个加载（默认尝试这 4 个：`unet_model_256x256_50`、`unet_model_512x512_50`、`unet_model_512x512_focal_loss_with_weights`、`unet_512x512_focal_loss_no_weights`），每个先做 2 次预热再正式跑 10 次推理，输出柱状图与控制台 markdown 表格：
+
+```bash
+# 默认示例图
+python main.py --benchmark
+
+# 指定输入图
+python main.py --benchmark examples/sample_input.png
+```
+
+运行后在输入图同目录生成 `*_benchmark.png`，控制台同时打印一份按平均耗时排序的表格（含每个模型的均值/最快/最慢/相对速度倍数）。
+
+### 类别概率热力图（--heatmap）
+
+把模型 softmax 输出的 8 个类（未标注/交通标志/道路/车道线/人行道/地面/车辆/行人）概率分别画成灰度热力图，每张面板带类名以及该类在整张图上的均值/最大值，便于判断模型对哪些类有把握、哪些类几乎检测不到：
+
+```bash
+# 默认示例图 + 默认 256x256 模型
+python main.py --heatmap
+
+# 指定输入图
+python main.py --heatmap examples/sample_input.png
+
+# 指定输入图与模型
+python main.py --heatmap examples/sample_input.png models/unet_model_512x512_50
+```
+
+运行后在输入图同目录生成 `*_heatmap.png`（4 列 × 2 行的 8 类概率热力图）。
+
+### 类别频率分析（--frequency）
+
+不依赖任何模型或输入图，直接读取 `semantic/unet/train.py` 中由原始项目从 CARLA 训练集统计得到的 `CLASS_PIXEL_RATIOS`，量化展示数据极度不平衡，以及 Focal Loss 应用权重如何缓解：
+
+```bash
+python main.py --frequency
+```
+
+运行后：
+- 控制台打印 8 类的 markdown 表格（每类的像素比例常量、估计像素占比、训练实际使用的 Focal Loss 权重）以及最大/最小类的比例
+- 在 `examples/sample_input_frequency.png` 生成两栏柱状图（左：log 纵轴的像素占比；右：训练时使用的类别权重）
 
 ## 目录说明
 
