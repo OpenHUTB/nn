@@ -10,122 +10,182 @@ def main():
     model = mujoco.MjModel.from_xml_path(xml_path)
     data = mujoco.MjData(model)
 
-    slide_x = model.joint("slide_x").qposadr.item()
-    slide_y = model.joint("slide_y").qposadr.item()
-    arm_l = model.joint("j_larm").qposadr.item()
-    arm_r = model.joint("j_rarm").qposadr.item()
-    hip_l = model.joint("left_hip").qposadr.item()
-    hip_r = model.joint("right_hip").qposadr.item()
-    knee_l = model.joint("left_knee").qposadr.item()
-    knee_r = model.joint("right_knee").qposadr.item()
+    # 机器人1关节索引
+    r1_slide_x = model.joint("r1_slide_x").qposadr.item()
+    r1_slide_y = model.joint("r1_slide_y").qposadr.item()
+    r1_arm_l = model.joint("r1_j_larm").qposadr.item()
+    r1_arm_r = model.joint("r1_j_rarm").qposadr.item()
+    r1_hip_l = model.joint("r1_left_hip").qposadr.item()
+    r1_hip_r = model.joint("r1_right_hip").qposadr.item()
+    r1_knee_l = model.joint("r1_left_knee").qposadr.item()
+    r1_knee_r = model.joint("r1_right_knee").qposadr.item()
+
+    # 机器人2关节索引
+    r2_slide_x = model.joint("r2_slide_x").qposadr.item()
+    r2_slide_y = model.joint("r2_slide_y").qposadr.item()
+    r2_arm_l = model.joint("r2_j_larm").qposadr.item()
+    r2_arm_r = model.joint("r2_j_rarm").qposadr.item()
+    r2_hip_l = model.joint("r2_left_hip").qposadr.item()
+    r2_hip_r = model.joint("r2_right_hip").qposadr.item()
+    r2_knee_l = model.joint("r2_left_knee").qposadr.item()
+    r2_knee_r = model.joint("r2_right_knee").qposadr.item()
 
     STAND_KNEE = 0.0
     MOVE_LIMIT = 0.85
     MOVE_SPEED = 0.0001
     DANGER_Z = 0.35
     DETECT_RANGE = 0.7
+    ROBOT_SAFE_DIST = 0.42
+    ESCAPE_SPEED = 0.00035 # 脱困速度大于正常行走
+
     BALL_INTERVAL = 3.5
     CUBE_INTERVAL = 4.2
 
-    patrol_points = [
-        [-0.8, -0.3],
-        [0.8, -0.3],
-        [0.8, 0.3],
-        [-0.8, 0.3]
-    ]
-    patrol_idx = 0
-    pos_x, pos_y = 0.0, 0.0
+    patrol1 = [[-0.75, -0.25], [0.75, -0.25], [0.75, 0.25], [-0.75, 0.25]]
+    patrol2 = [[-0.6, 0.35], [0.6, 0.35], [0.6, -0.35], [-0.6, -0.35]]
+    idx1, idx2 = 0, 0
+    r1_x, r1_y = -0.5, -0.4
+    r2_x, r2_y = 0.5, 0.4
+
     last_ball = time.time()
     last_cube = time.time()
     swing_t = 0.0
 
-    data.qpos[slide_x] = pos_x
-    data.qpos[slide_y] = pos_y
-    data.qpos[arm_l] = 0.0
-    data.qpos[arm_r] = 0.0
-    data.qpos[hip_l] = 0.0
-    data.qpos[hip_r] = 0.0
-    data.qpos[knee_l] = STAND_KNEE
-    data.qpos[knee_r] = STAND_KNEE
+    # 初始位置
+    data.qpos[r1_slide_x] = r1_x
+    data.qpos[r1_slide_y] = r1_y
+    data.qpos[r2_slide_x] = r2_x
+    data.qpos[r2_slide_y] = r2_y
+    data.qpos[r1_knee_l] = STAND_KNEE
+    data.qpos[r1_knee_r] = STAND_KNEE
+    data.qpos[r2_knee_l] = STAND_KNEE
+    data.qpos[r2_knee_r] = STAND_KNEE
     data.qvel[:] = 0
 
     v = viewer.launch_passive(model, data)
-    v.cam.distance = 6.2
-    v.cam.elevation = -18
-    v.cam.lookat[:] = [0, 0, 0.6]
+    v.cam.distance = 7.2
+    v.cam.elevation = -22
+    v.cam.lookat[:] = [0, 0, 0.4]
+
+    swing_k = 0.0001
+    arm_amp = 0.45
+    leg_amp = 0.11
 
     while v.is_running():
         swing_t += 1
 
+        # 生成掉落障碍物
         if time.time() - last_ball > BALL_INTERVAL:
             last_ball = time.time()
-            idx = random.randint(0,2)
-            jid = model.joint(idx).qposadr.item()
-            data.qpos[jid]     = random.uniform(-0.75,0.75)
-            data.qpos[jid+1]   = random.uniform(-0.75,0.75)
-            data.qpos[jid+2]   = 4.2
-            data.qvel[jid:jid+3] = 0
-
+            for i in range(3):
+                jid = model.joint(i).qposadr.item()
+                data.qpos[jid] = random.uniform(-0.7, 0.7)
+                data.qpos[jid+1] = random.uniform(-0.7, 0.7)
+                data.qpos[jid+2] = 4.2
+                data.qvel[jid:jid+3] = 0
         if time.time() - last_cube > CUBE_INTERVAL:
             last_cube = time.time()
-            cube_jid = model.joint(3).qposadr.item()
-            data.qpos[cube_jid]     = random.uniform(-0.75,0.75)
-            data.qpos[cube_jid+1]   = random.uniform(-0.75,0.75)
-            data.qpos[cube_jid+2]   = 4.2
-            data.qvel[cube_jid:cube_jid+3] = 0
+            cid = model.joint(3).qposadr.item()
+            data.qpos[cid] = random.uniform(-0.7,0.7)
+            data.qpos[cid+1] = random.uniform(-0.7,0.7)
+            data.qpos[cid+2] = 4.2
+            data.qvel[cid:cid+3] = 0
 
-        dx, dy = 0, 0
-        danger_flag = False
+        # 高空障碍坐标收集
+        danger_pos = []
+        for i in range(4):
+            px,py,pz = data.xpos[model.body(i+1).id]
+            if pz > DANGER_Z:
+                danger_pos.append([px,py])
 
-        for i in range(3):
-            bx, by, bz = data.xpos[model.body(i+1).id]
-            dist = np.hypot(bx-pos_x, by-pos_y)
-            if bz > DANGER_Z and dist < DETECT_RANGE:
-                dx = -np.sign(bx-pos_x)*MOVE_SPEED
-                dy = -np.sign(by-pos_y)*MOVE_SPEED
-                danger_flag = True
+        dist_robot = np.hypot(r2_x - r1_x, r2_y - r1_y)
+
+        # =====R1控制=====
+        t1x,t1y = patrol1[idx1]
+        dx1, dy1 = np.sign(t1x-r1_x)*MOVE_SPEED, np.sign(t1y-r1_y)*MOVE_SPEED
+        danger1 = False
+
+        # 躲避空中障碍
+        for (ox,oy) in danger_pos:
+            if np.hypot(ox-r1_x, oy-r1_y) < DETECT_RANGE:
+                dx1 = -np.sign(ox-r1_x)*MOVE_SPEED
+                dy1 = -np.sign(oy-r1_y)*MOVE_SPEED
+                danger1 = True
                 break
-        if not danger_flag:
-            cx, cy, cz = data.xpos[model.body(4).id]
-            dist_cube = np.hypot(cx-pos_x, cy-pos_y)
-            if cz > DANGER_Z and dist_cube < DETECT_RANGE:
-                dx = -np.sign(cx-pos_x)*MOVE_SPEED
-                dy = -np.sign(cy-pos_y)*MOVE_SPEED
-                danger_flag = True
 
-        if not danger_flag:
-            tx, ty = patrol_points[patrol_idx]
-            dx = np.sign(tx-pos_x)*MOVE_SPEED
-            dy = np.sign(ty-pos_y)*MOVE_SPEED
-            if abs(pos_x-tx) < 0.04 and abs(pos_y-ty) <0.04:
-                patrol_idx = (patrol_idx+1) % 4
+        # 关键：距离过近，R1固定往Y+横向绕开，不再对着顶
+        if dist_robot < ROBOT_SAFE_DIST:
+            dx1 = 0
+            dy1 = ESCAPE_SPEED
+            danger1 = True
 
-        pos_x += dx
-        pos_y += dy
-        pos_x = np.clip(pos_x, -MOVE_LIMIT, MOVE_LIMIT)
-        pos_y = np.clip(pos_y, -MOVE_LIMIT, MOVE_LIMIT)
+        if abs(r1_x-t1x)<0.04 and abs(r1_y-t1y)<0.04:
+            idx1 = (idx1+1)%4
+        r1_x += dx1
+        r1_y += dy1
+        r1_x = np.clip(r1_x,-MOVE_LIMIT,MOVE_LIMIT)
+        r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
 
-        data.qpos[slide_x] = pos_x
-        data.qpos[slide_y] = pos_y
+        # =====R2控制=====
+        t2x,t2y = patrol2[idx2]
+        dx2, dy2 = np.sign(t2x-r2_x)*MOVE_SPEED, np.sign(t2y-r2_y)*MOVE_SPEED
+        danger2 = False
 
-        swing_k = 0.0001
-        arm_amp = 0.45
-        leg_amp = 0.11
+        for (ox,oy) in danger_pos:
+            if np.hypot(ox-r2_x, oy-r2_y) < DETECT_RANGE:
+                dx2 = -np.sign(ox-r2_x)*MOVE_SPEED
+                dy2 = -np.sign(oy-r2_y)*MOVE_SPEED
+                danger2 = True
+                break
 
-        data.qpos[knee_l] = STAND_KNEE
-        data.qpos[knee_r] = STAND_KNEE
+        # R2固定往Y-反向错开，一上一下彻底分离，永不互顶
+        if dist_robot < ROBOT_SAFE_DIST:
+            dx2 = 0
+            dy2 = -ESCAPE_SPEED
+            danger2 = True
 
-        if not danger_flag:
-            s = np.sin(swing_t * swing_k)
-            data.qpos[arm_l] = arm_amp * s
-            data.qpos[arm_r] = -arm_amp * s
-            data.qpos[hip_l] = leg_amp * s
-            data.qpos[hip_r] = -leg_amp * s
+        if abs(r2_x-t2x)<0.04 and abs(r2_y-t2y)<0.04:
+            idx2 = (idx2+1)%4
+        r2_x += dx2
+        r2_y += dy2
+        r2_x = np.clip(r2_x,-MOVE_LIMIT,MOVE_LIMIT)
+        r2_y = np.clip(r2_y,-MOVE_LIMIT,MOVE_LIMIT)
+
+        # 坐标赋值
+        data.qpos[r1_slide_x] = r1_x
+        data.qpos[r1_slide_y] = r1_y
+        data.qpos[r2_slide_x] = r2_x
+        data.qpos[r2_slide_y] = r2_y
+
+        # 膝盖固定
+        data.qpos[r1_knee_l] = STAND_KNEE
+        data.qpos[r1_knee_r] = STAND_KNEE
+        data.qpos[r2_knee_l] = STAND_KNEE
+        data.qpos[r2_knee_r] = STAND_KNEE
+
+        s = np.sin(swing_t*swing_k)
+        # R1肢体摆动
+        if not danger1:
+            data.qpos[r1_arm_l] = arm_amp*s
+            data.qpos[r1_arm_r] = -arm_amp*s
+            data.qpos[r1_hip_l] = leg_amp*s
+            data.qpos[r1_hip_r] = -leg_amp*s
         else:
-            data.qpos[arm_l] *= 0.92
-            data.qpos[arm_r] *= 0.92
-            data.qpos[hip_l] *= 0.92
-            data.qpos[hip_r] *= 0.92
+            data.qpos[r1_arm_l] *=0.92
+            data.qpos[r1_arm_r] *=0.92
+            data.qpos[r1_hip_l] *=0.92
+            data.qpos[r1_hip_r] *=0.92
+        # R2肢体摆动
+        if not danger2:
+            data.qpos[r2_arm_l] = arm_amp*s
+            data.qpos[r2_arm_r] = -arm_amp*s
+            data.qpos[r2_hip_l] = leg_amp*s
+            data.qpos[r2_hip_r] = -leg_amp*s
+        else:
+            data.qpos[r2_arm_l] *=0.92
+            data.qpos[r2_arm_r] *=0.92
+            data.qpos[r2_hip_l] *=0.92
+            data.qpos[r2_hip_r] *=0.92
 
         mujoco.mj_step(model, data)
         v.sync()
