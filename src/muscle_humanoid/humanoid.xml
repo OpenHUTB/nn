@@ -15,13 +15,19 @@
     <body pos="-0.9 0.9 0.12"><geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/></body>
     <body pos="0.9 0.9 0.12"><geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/></body>
 
-    <!--3红球+1方块障碍-->
+    <!--中间分隔墙体 Y轴通长，X=0 竖墙，左右严格分区-->
+    <body pos="0 0 0.4">
+      <geom type="box" size="0.06 0.92 0.4" rgba="0.45 0.32 0.22 1"/>
+    </body>
+
+    <!--3红球+1方块高空障碍-->
     <body name="ball1" pos="0 0 4.0"><geom type="sphere" size="0.14" rgba="1 0 0 1"/><joint type="free"/></body>
     <body name="ball2" pos="0.2 0.1 4.0"><geom type="sphere" size="0.14" rgba="1 0 0 1"/><joint type="free"/></body>
     <body name="ball3" pos="-0.3 -0.2 4.0"><geom type="sphere" size="0.14" rgba="1 0 0 1"/><joint type="free"/></body>
     <body name="cube_obs" pos="0.5 0.2 4.0"><geom type="box" size="0.16 0.16 0.16" rgba="0.9 0.6 0.1 1"/><joint type="free"/></body>
 
-    <!--一号机器人 r1-->
+  
+    <!--一号机器人 r1 蓝色 左半场-->
     <body name="r1_base" pos="0 0 0">
       <joint name="r1_slide_x" type="slide" axis="1 0 0"/>
       <joint name="r1_slide_y" type="slide" axis="0 1 0"/>
@@ -63,7 +69,7 @@
       </body>
     </body>
 
-    <!--二号机器人 r2 红色区分-->
+    <!--二号机器人 r2 红色 右半场-->
     <body name="r2_base" pos="0 0 0">
       <joint name="r2_slide_x" type="slide" axis="1 0 0"/>
       <joint name="r2_slide_y" type="slide" axis="0 1 0"/>
