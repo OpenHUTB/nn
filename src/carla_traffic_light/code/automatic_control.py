@@ -236,6 +236,12 @@ class KeyboardControl(object):
                     # 生成随机行人
                     self.spawn_random_pedestrian()
                     self.world.hud.notification("Pedestrian spawned", seconds=1.0)
+                elif event.key == pygame.K_t:
+                    # 生成交通车辆
+                    self.spawn_traffic_vehicles(15)  # 生成15辆车
+                elif event.key == pygame.K_y:
+                    # 清除所有交通车辆
+                    self.clear_traffic_vehicles()
 
     def spawn_random_pedestrian(self):
         """在车辆附近的人行道上生成一个随机行人"""
@@ -318,6 +324,76 @@ class KeyboardControl(object):
 
         self.world.hud.notification(f"Pedestrian on sidewalk: {pedestrian.type_id.split('.')[-1]}", seconds=1.5)
 
+    def spawn_traffic_vehicles(self, num_vehicles=10):
+        """生成多辆 NPC 车辆，模拟真实交通"""
+        world = self.world.world
+        blueprint_library = world.get_blueprint_library()
+
+        # 获取所有车辆蓝图
+        vehicle_bps = blueprint_library.filter('vehicle.*')
+
+        # 过滤掉一些特殊车辆（可选）
+        vehicle_bps = [bp for bp in vehicle_bps if
+                       'ambulance' not in bp.id and 'police' not in bp.id and 'fire' not in bp.id]
+
+        if not vehicle_bps:
+            self.world.hud.notification("No vehicle blueprints found", seconds=2.0)
+            return
+
+        # 获取所有生成点
+        spawn_points = world.get_map().get_spawn_points()
+        if not spawn_points:
+            self.world.hud.notification("No spawn points available", seconds=2.0)
+            return
+
+        # 随机打乱生成点
+        random.shuffle(spawn_points)
+
+        # 初始化存储列表
+        if not hasattr(self, 'traffic_vehicles'):
+            self.traffic_vehicles = []
+
+        spawned_count = 0
+        # 生成指定数量的车辆
+        for i, spawn_point in enumerate(spawn_points):
+            if spawned_count >= num_vehicles:
+                break
+
+            # 随机选择一辆车
+            vehicle_bp = random.choice(vehicle_bps)
+            # 设置颜色（如果有）
+            if vehicle_bp.has_attribute('color'):
+                color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
+                vehicle_bp.set_attribute('color', color)
+
+            # 生成车辆
+            vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+            if vehicle:
+                self.traffic_vehicles.append(vehicle)
+                spawned_count += 1
+
+        self.world.hud.notification(f"Spawned {spawned_count} traffic vehicles", seconds=3.0)
+
+        # 可选：让这些车辆开始自动驾驶
+        self._set_vehicles_autopilot(True)
+
+    def _set_vehicles_autopilot(self, enabled=True):
+        """设置所有交通车辆的自动驾驶状态"""
+        if not hasattr(self, 'traffic_vehicles'):
+            return
+        for vehicle in self.traffic_vehicles:
+            if vehicle is not None:
+                vehicle.set_autopilot(enabled)
+
+    def clear_traffic_vehicles(self):
+        """清除所有生成的交通车辆"""
+        if not hasattr(self, 'traffic_vehicles'):
+            return
+        for vehicle in self.traffic_vehicles:
+            if vehicle is not None:
+                vehicle.destroy()
+        self.traffic_vehicles = []
+        self.world.hud.notification("All traffic vehicles cleared", seconds=2.0)
     @staticmethod
     def _is_quit_shortcut(key):
         """Shortcut for quitting"""
@@ -538,6 +614,8 @@ class HelpText(object):
             "N        - Next Weather",
             "M        - Previous Weather",
             "G        - Spawn Random Pedestrian",
+            "T        - Spawn Traffic Vehicles (15 cars)",
+            "Y        - Clear All Traffic Vehicles",
             "Ctrl+Q   - Quit",
             "ESC      - Quit",
             "",
@@ -891,8 +969,20 @@ def game_loop(args):
                 print(f"Throttle: {control.throttle}, Steer: {control.steer}, Brake: {control.brake}")  # 添加这行
                 world.player.apply_control(control)
 
+
     finally:
+
         if world is not None:
+
+            # 清理生成的交通车辆
+
+            if hasattr(controller, 'traffic_vehicles'):
+
+                for vehicle in controller.traffic_vehicles:
+
+                    if vehicle is not None:
+                        vehicle.destroy()
+
             world.destroy()
 
         pygame.quit()
