@@ -1,9 +1,8 @@
+import numpy as np
 import torch
 import torch.nn as nn
+from torch import distributions, optim
 from torchvision import models
-from torch import distributions
-from torch import optim
-import numpy as np
 from typing import Tuple, Optional
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
