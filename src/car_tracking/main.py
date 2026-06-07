@@ -52,6 +52,32 @@ except ImportError:
     def clear_static_vehicle(world):
         pass
 
+
+    # 渐变辅助函数
+    def lerp(a, b, t):
+        return a + (b - a) * t
+
+
+    # 渐变天气函数（新加）
+    def smooth_weather(world, target_weather, step=0.05):
+        """
+        真正渐变：从当前天气 → 慢慢靠近 target_weather
+
+        """
+        current = world.get_weather()
+
+        # 所有参数 每帧慢慢靠近目标
+        current.cloudiness = lerp(current.cloudiness, target_weather.cloudiness, step)
+        current.precipitation = lerp(current.precipitation, target_weather.precipitation, step)
+        current.wetness = lerp(current.wetness, target_weather.wetness, step)
+        current.fog_density = lerp(current.fog_density, target_weather.fog_density, step)
+        current.wind_intensity = lerp(current.wind_intensity, target_weather.wind_intensity, step)
+        current.precipitation_deposits = lerp(current.precipitation_deposits, target_weather.precipitation_deposits,
+                                              step)
+        current.sun_altitude_angle = lerp(current.sun_altitude_angle, target_weather.sun_altitude_angle, step)
+
+        world.set_weather(current)
+
 # ===================== 配置常量（集中管理，便于修改，新增3D可视化配置）=====================
 # 相机配置
 CAMERA_WIDTH = 640
@@ -69,7 +95,7 @@ FONT_SCALE_MEDIUM = 0.6
 LINE_THICKNESS = 2
 POINT_RADIUS = 2
 # 天气配置（完全自定义，不依赖Carla预定义属性）
-WEATHER_SWITCH_INTERVAL = 10  # 随机天气切换间隔（秒，0表示不自动切换）
+WEATHER_SWITCH_INTERVAL = 0 # 随机天气切换间隔（秒，0表示不自动切换）
 SUPPORTED_WEATHERS = {
     1: "ClearNoon",  # 晴天正午
     2: "CloudyNoon",  # 多云正午
@@ -78,6 +104,7 @@ SUPPORTED_WEATHERS = {
     5: "Foggy",  # 雾天
     6: "Stormy"  # 暴雨
 }
+
 
 # 新增：3D可视化配置
 DISTANCE_THRESHOLD = 80  # 车辆3D框显示距离阈值（米）
@@ -422,9 +449,10 @@ def set_weather(world, weather_type):
         weather.wind_intensity = 70.0  # 大风
         weather.fog_density = 30.0  # 中度雾（暴雨伴随雾）
 
-    # 应用天气设置到世界
-    world.set_weather(weather)
+    # 应用天气设置到世界(渐变版)
+    smooth_weather(world,weather)
     print(f"当前天气已切换为：{weather_type}")
+    return weather
 
 def get_random_weather():
     """获取随机的天气类型（从SUPPORTED_WEATHERS中随机选择）"""
@@ -509,7 +537,7 @@ def main():
 
         # ========== 初始化天气（新增）==========
         current_weather = "ClearNoon"  # 默认晴天
-        set_weather(world, current_weather)
+        weather=set_weather(world, current_weather)
         last_weather_switch_time = time.time()  # 记录最后一次天气切换时间
 
         # 主循环（优化逻辑，提升可读性，加入3D可视化）
@@ -517,14 +545,15 @@ def main():
             world.tick()
             frame_counter += 1
 
-            # ========== 天气切换逻辑（新增）==========
+            # ========== 天气切换逻辑（主循环中加入渐变逻辑）==========
+            smooth_weather(world, weather)
             # 1. 自动随机切换天气（如果配置了间隔）
             auto_switch = False
             if WEATHER_SWITCH_INTERVAL > 0:
                 current_time = time.time()
                 if current_time - last_weather_switch_time >= WEATHER_SWITCH_INTERVAL:
                     current_weather = get_random_weather()
-                    set_weather(world, current_weather)
+                    weather=set_weather(world, current_weather)
                     last_weather_switch_time = current_time
                     auto_switch = True
 
@@ -536,7 +565,7 @@ def main():
             elif not auto_switch and key in [ord(str(code)) for code in SUPPORTED_WEATHERS.keys()]:
                 weather_code = int(chr(key))
                 current_weather = SUPPORTED_WEATHERS[weather_code]
-                set_weather(world, current_weather)
+                weather=set_weather(world, current_weather)
                 last_weather_switch_time = time.time()  # 重置自动切换时间
             # 新增：按键控制3D显示
             elif key == ord('v'):
@@ -582,7 +611,7 @@ def main():
                         forward_vec = vehicle.get_transform().get_forward_vector()
                         ray = npc.get_transform().location - vehicle.get_transform().location
                         if forward_vec.dot(ray) > 0:
-                            # 计算3D顶点的2D投影
+                            # 计算3D顶点的2D投影··
                             verts = [v for v in npc.bounding_box.get_world_vertices(npc.get_transform())]
                             points_2d = []
                             for vert in verts:

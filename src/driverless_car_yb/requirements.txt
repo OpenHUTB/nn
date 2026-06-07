@@ -1,0 +1,85 @@
+# ============================================================
+# 无人车项目 - 依赖配置文件
+# ============================================================
+# 包含模块：
+#   - 自动泊车仿真 (main.stopcar.py)
+#   - LSTM速度预测与异常检测 (main.ring.py)
+#   - 电池电压监测系统 (main.oic.py)
+#   - 深度学习无人车控制 (main.move.py)
+#   - 红绿灯检测 (main.light.py)
+# ============================================================
+
+# ---------- 数值计算与科学计算 ----------
+numpy>=1.24.0
+scipy>=1.10.0
+
+# ---------- 数据处理 ----------
+pandas>=2.0.0
+
+# ---------- 机器学习 ----------
+# scikit-learn 用于数据归一化和预处理 (main.ring.py)
+scikit-learn>=1.3.0
+
+# ---------- 深度学习 ----------
+# PyTorch 用于 LSTM 速度预测模型 (main.ring.py)
+# 注意：根据CUDA版本选择对应版本
+# CPU版本：pip install torch
+# CUDA 11.8：pip install torch --index-url https://download.pytorch.org/whl/cu118
+# CUDA 12.1：pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch>=2.0.0
+
+# TensorFlow 用于 CNN 无人车控制模型 (main.move.py)
+tensorflow>=2.13.0
+
+# ---------- 计算机视觉 ----------
+opencv-python>=4.8.0
+
+# ---------- 可视化与图形界面 ----------
+matplotlib>=3.7.0
+
+# pygame 用于无人车仿真环境 (main.move.py)
+pygame>=2.5.0
+
+# ---------- 硬件接口（可选）----------
+# 以下依赖仅在 main.oic.py 使用硬件模式时需要
+# 使用真实 ADC 读取电池电压时安装
+# adafruit-circuitpython-ads1x15>=2.2.0
+
+# 使用 Raspberry Pi GPIO 报警时安装
+# RPi.GPIO>=0.7.0
+
+# ============================================================
+# 安装说明
+# ============================================================
+# 
+# 1. 基础安装（全部依赖）：
+#    pip install -r requirements.txt
+#
+# 2. PyTorch GPU 版本安装（推荐）：
+#    pip install torch --index-url https://download.pytorch.org/whl/cu118
+#
+# 3. 硬件模式依赖（main.oic.py 电池监测）：
+#    如需使用真实硬件，取消注释并安装：
+#    pip install adafruit-circuitpython-ads1x15 RPi.GPIO
+#
+# 4. 各模块运行方式：
+#    - 泊车仿真：    python main.stopcar.py
+#    - 速度预测：    python main.ring.py
+#    - 电池监测：    python main.oic.py
+#    - 深度学习控制：python main.move.py
+#    - 红绿灯检测：  python main.light.py
+#
+# ============================================================
+# 环境验证
+# ============================================================
+# 
+# 验证 PyTorch：
+#   python -c "import torch; print(f'PyTorch: {torch.__version__}')"
+#
+# 验证 TensorFlow：
+#   python -c "import tensorflow as tf; print(f'TensorFlow: {tf.__version__}')"
+#
+# 验证 OpenCV：
+#   python -c "import cv2; print(f'OpenCV: {cv2.__version__}')"
+#
+# ============================================================

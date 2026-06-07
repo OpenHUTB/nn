@@ -624,6 +624,12 @@ class ArmJointPerfOptimizationController:
         write_perf_log(f"末端负载更新为{mass}kg")
         print(f"✅ 末端负载更新为{mass}kg")
 
+    def get_total_sim_time(self):
+        """获取累计仿真时间，优先使用MuJoCo内部时间"""
+        if self.data is not None:
+            return float(self.data.time)
+        return self.total_sim_time
+
     def print_perf_status(self):
         """打印运动性能状态"""
         current_time = time.time()
@@ -632,7 +638,7 @@ class ArmJointPerfOptimizationController:
 
         self.fps_counter = max(1, self.fps_counter)
         fps = self.fps_counter / (current_time - self.last_print_time)
-        self.total_sim_time = current_time - self.last_print_time
+        self.total_sim_time = self.get_total_sim_time()
         joint_angles = self.get_current_joint_angles(use_deg=True)
         joint_vels = self.get_current_joint_velocities(use_deg=True)
         pos_error_deg = rad2deg(self.position_error)
@@ -715,6 +721,7 @@ class ArmJointPerfOptimizationController:
                 write_perf_log(error_msg)
                 continue
 
+        self.total_sim_time = self.get_total_sim_time()
         # 资源清理
         self.cleanup()
         final_msg = f"仿真结束 | 总步数{self.step_count:,} | 总时间{self.total_sim_time:.2f}s | 最大定位误差{np.round(rad2deg(np.max(self.max_position_error)), 4)}°"

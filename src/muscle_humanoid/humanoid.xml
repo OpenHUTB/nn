@@ -1,0 +1,114 @@
+<mujoco model="two_humanoid">
+  <compiler angle="radian"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+  <default>
+    <geom condim="3" friction="1 0.1 0.1"/>
+    <joint damping="0.1"/>
+  </default>
+  <worldbody>
+    <light pos="0 0 5" dir="0 0 -1" diffuse="1 1 1" specular="0.3 0.3 0.3"/>
+    <geom name="floor" type="plane" size="10 10 0.1" rgba="0.8 0.8 0.8 1"/>
+
+    <!--四角围墙-->
+    <body pos="-0.9 -0.9 0.12"><geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/></body>
+    <body pos="0.9 -0.9 0.12"><geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/></body>
+    <body pos="-0.9 0.9 0.12"><geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/></body>
+    <body pos="0.9 0.9 0.12"><geom type="box" size="0.18 0.18 0.12" rgba="0.25 0.25 0.25 1"/></body>
+
+    <!--中间分隔墙体 Y轴通长，X=0 竖墙，左右严格分区-->
+    <body pos="0 0 0.4">
+      <geom type="box" size="0.06 0.92 0.4" rgba="0.45 0.32 0.22 1"/>
+    </body>
+
+    <!--3红球+1方块高空障碍-->
+    <body name="ball1" pos="0 0 4.0"><geom type="sphere" size="0.14" rgba="1 0 0 1"/><joint type="free"/></body>
+    <body name="ball2" pos="0.2 0.1 4.0"><geom type="sphere" size="0.14" rgba="1 0 0 1"/><joint type="free"/></body>
+    <body name="ball3" pos="-0.3 -0.2 4.0"><geom type="sphere" size="0.14" rgba="1 0 0 1"/><joint type="free"/></body>
+    <body name="cube_obs" pos="0.5 0.2 4.0"><geom type="box" size="0.16 0.16 0.16" rgba="0.9 0.6 0.1 1"/><joint type="free"/></body>
+
+  
+    <!--一号机器人 r1 蓝色 左半场-->
+    <body name="r1_base" pos="0 0 0">
+      <joint name="r1_slide_x" type="slide" axis="1 0 0"/>
+      <joint name="r1_slide_y" type="slide" axis="0 1 0"/>
+      <body name="r1_torso" pos="0 0 1.1">
+        <geom type="capsule" fromto="0 0 0 0 0 -0.32" size="0.12" rgba="0.2 0.5 0.8 1"/>
+        <body name="r1_head" pos="0 0 0.22"><geom type="sphere" size="0.11" rgba="0.8 0.6 0.4 1"/></body>
+        <body name="r1_lsh" pos="-0.14 0 0">
+          <joint name="r1_j_larm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
+        </body>
+        <body name="r1_rsh" pos="0.14 0 0">
+          <joint name="r1_j_rarm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
+        </body>
+        <body name="r1_lhip" pos="-0.11 0 -0.32">
+          <joint name="r1_left_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
+          <body name="r1_lknee" pos="0 0 -0.42">
+            <joint name="r1_left_knee" type="hinge" axis="1 0 0" range="0 0"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.052" rgba="0.5 0.5 0.5 1"/>
+            <body name="r1_lank" pos="0 0 -0.42">
+              <joint name="r1_left_ankle" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+              <geom type="box" size="0.11 0.05 0.025" pos="0 0 -0.025" rgba="0.3 0.3 0.3 1"/>
+            </body>
+          </body>
+        </body>
+        <body name="r1_rhip" pos="0.11 0 -0.32">
+          <joint name="r1_right_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
+          <body name="r1_rknee" pos="0 0 -0.42">
+            <joint name="r1_right_knee" type="hinge" axis="1 0 0" range="0 0"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.052" rgba="0.5 0.5 0.5 1"/>
+            <body name="r1_rank" pos="0 0 -0.42">
+              <joint name="r1_right_ankle" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+              <geom type="box" size="0.11 0.05 0.025" pos="0 0 -0.025" rgba="0.3 0.3 0.3 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!--二号机器人 r2 红色 右半场-->
+    <body name="r2_base" pos="0 0 0">
+      <joint name="r2_slide_x" type="slide" axis="1 0 0"/>
+      <joint name="r2_slide_y" type="slide" axis="0 1 0"/>
+      <body name="r2_torso" pos="0 0 1.1">
+        <geom type="capsule" fromto="0 0 0 0 0 -0.32" size="0.12" rgba="0.9 0.3 0.3 1"/>
+        <body name="r2_head" pos="0 0 0.22"><geom type="sphere" size="0.11" rgba="0.8 0.6 0.4 1"/></body>
+        <body name="r2_lsh" pos="-0.14 0 0">
+          <joint name="r2_j_larm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
+        </body>
+        <body name="r2_rsh" pos="0.14 0 0">
+          <joint name="r2_j_rarm" type="hinge" axis="1 0 0" range="-0.7 0.7"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.36" size="0.042" rgba="0.5 0.5 0.5 1"/>
+        </body>
+        <body name="r2_lhip" pos="-0.11 0 -0.32">
+          <joint name="r2_left_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
+          <body name="r2_lknee" pos="0 0 -0.42">
+            <joint name="r2_left_knee" type="hinge" axis="1 0 0" range="0 0"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.052" rgba="0.5 0.5 0.5 1"/>
+            <body name="r2_lank" pos="0 0 -0.42">
+              <joint name="r2_left_ankle" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+              <geom type="box" size="0.11 0.05 0.025" pos="0 0 -0.025" rgba="0.3 0.3 0.3 1"/>
+            </body>
+          </body>
+        </body>
+        <body name="r2_rhip" pos="0.11 0 -0.32">
+          <joint name="r2_right_hip" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.055" rgba="0.5 0.5 0.5 1"/>
+          <body name="r2_rknee" pos="0 0 -0.42">
+            <joint name="r2_right_knee" type="hinge" axis="1 0 0" range="0 0"/>
+            <geom type="capsule" fromto="0 0 0 0 0 -0.42" size="0.052" rgba="0.5 0.5 0.5 1"/>
+            <body name="r2_rank" pos="0 0 -0.42">
+              <joint name="r2_right_ankle" type="hinge" axis="1 0 0" range="-0.2 0.2"/>
+              <geom type="box" size="0.11 0.05 0.025" pos="0 0 -0.025" rgba="0.3 0.3 0.3 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

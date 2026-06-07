@@ -1,0 +1,8 @@
+numpy>=1.21.0
+torch==2.1.0
+torchvision==0.14.0
+opencv-python>=4.5.0
+tensorboard>=2.10.0
+pygame>=2.0.0
+matplotlib>=3.5.0
+pillow>=9.0.0

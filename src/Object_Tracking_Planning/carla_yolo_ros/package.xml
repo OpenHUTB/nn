@@ -3,7 +3,7 @@
   <name>carla_yolo_ros</name>
   <version>1.0.0</version>
   <description>ROS integration for CARLA autonomous vehicle with YOLOv3 object detection</description>
-  <maintainer email="lihuashi@todo.todo">lihuashi</maintainer>
+  <maintainer email="openhutb@github.com">lihuashi</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>catkin</buildtool_depend>

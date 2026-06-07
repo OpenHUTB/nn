@@ -2,6 +2,7 @@
 # 简化修复版：确保车辆正确生成
 # --------------------------
 
+import logging
 import carla
 import time
 import numpy as np
@@ -86,10 +87,23 @@ class SimpleDrivingSystem:
         self.camera = None
         self.controller = None
         self.camera_image = None
+        # 日志系统
+        self.setup_logger()
 
+    def setup_logger(self):
+        #设置日志系统
+        self.logger = logging.getLogger('CARLA_Driving')
+        self.logger.setLevel(logging.INFO)
+    
+        if not self.logger.handlers:
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.INFO)
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            ch.setFormatter(formatter)
+            self.logger.addHandler(ch)
     def connect(self):
         """连接到CARLA服务器"""
-        print("正在连接到CARLA服务器...")
+        self.logger.info("正在连接到CARLA服务器...")
 
         try:
             # 尝试多种连接方式
@@ -98,11 +112,11 @@ class SimpleDrivingSystem:
 
             # 检查可用地图
             available_maps = self.client.get_available_maps()
-            print(f"可用地图: {available_maps}")
+            self.logger.info(f"可用地图: {available_maps}")
 
             # 加载地图
             self.world = self.client.load_world('Town01')
-            print("地图加载成功")
+            self.logger.info("地图加载成功")
 
             # 设置同步模式
             settings = self.world.get_settings()
@@ -110,20 +124,20 @@ class SimpleDrivingSystem:
             settings.fixed_delta_seconds = 0.05  # 先使用异步模式确保连接
             self.world.apply_settings(settings)
             
-            print("连接成功！")
+            self.logger.info("连接成功！")
             return True
 
         except Exception as e:
-            print(f"连接失败: {e}")
-            print("请确保:")
-            print("1. CARLA服务器正在运行")
-            print("2. 服务器端口为2000")
-            print("3. 地图Town01可用")
+            self.logger.info(f"连接失败: {e}")
+            self.logger.info("请确保:")
+            self.logger.info("1. CARLA服务器正在运行")
+            self.logger.info("2. 服务器端口为2000")
+            self.logger.info("3. 地图Town01可用")
             return False
 
     def spawn_vehicle(self):
         """生成车辆 - 简化版本"""
-        print("正在生成车辆...")
+        self.logger.info("正在生成车辆...")
 
         try:
             # 获取蓝图库
@@ -132,17 +146,17 @@ class SimpleDrivingSystem:
             # 选择车辆蓝图
             vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
             if not vehicle_bp:
-                print("未找到特斯拉蓝图，尝试其他车辆...")
+                self.logger.info("未找到特斯拉蓝图，尝试其他车辆...")
                 vehicle_bp = blueprint_library.filter('vehicle.*')[0]
 
             vehicle_bp.set_attribute('color', '255,0,0')  # 红色
 
             # 获取出生点
             spawn_points = self.world.get_map().get_spawn_points()
-            print(f"找到 {len(spawn_points)} 个出生点")
+            self.logger.info(f"找到 {len(spawn_points)} 个出生点")
 
             if not spawn_points:
-                print("没有可用的出生点！")
+                self.logger.info("没有可用的出生点！")
                 return False
 
             # 选择第一个出生点
@@ -152,7 +166,7 @@ class SimpleDrivingSystem:
             self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
 
             if not self.vehicle:
-                print("无法生成车辆，尝试清理现有车辆...")
+                self.logger.info("无法生成车辆，尝试清理现有车辆...")
                 # 清理现有车辆
                 for actor in self.world.get_actors().filter('vehicle.*'):
                     actor.destroy()
@@ -162,24 +176,24 @@ class SimpleDrivingSystem:
                 self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
 
             if self.vehicle:
-                print(f"车辆生成成功！ID: {self.vehicle.id}")
-                print(f"位置: {spawn_point.location}")
+                self.logger.info(f"车辆生成成功！ID: {self.vehicle.id}")
+                self.logger.info(f"位置: {spawn_point.location}")
 
                 # 禁用自动驾驶
                 self.vehicle.set_autopilot(False)
 
                 return True
             else:
-                print("车辆生成失败")
+                self.logger.info("车辆生成失败")
                 return False
 
         except Exception as e:
-            print(f"生成车辆时出错: {e}")
+            self.logger.info(f"生成车辆时出错: {e}")
             return False
 
     def setup_camera(self):
         """设置相机"""
-        print("正在设置相机...")
+        self.logger.info("正在设置相机...")
 
         try:
             blueprint_library = self.world.get_blueprint_library()
@@ -204,11 +218,11 @@ class SimpleDrivingSystem:
             # 设置回调函数
             self.camera.listen(lambda image: self.camera_callback(image))
 
-            print("相机设置成功")
+            self.logger.info("相机设置成功")
             return True
 
         except Exception as e:
-            print(f"设置相机时出错: {e}")
+            self.logger.info(f"设置相机时出错: {e}")
             return False
 
     def camera_callback(self, image):
@@ -224,13 +238,13 @@ class SimpleDrivingSystem:
     def setup_controller(self):
         """设置控制器"""
         self.controller = SimpleController(self.world, self.vehicle)
-        print("控制器设置完成")
+        self.logger.info("控制器设置完成")
 
     def run(self):
         """主运行循环"""
-        print("\n" + "=" * 50)
-        print("简化自动驾驶系统")
-        print("=" * 50)
+        self.logger.info("\n" + "=" * 50)
+        self.logger.info("简化自动驾驶系统")
+        self.logger.info("=" * 50)
 
         # 连接服务器
         if not self.connect():
@@ -243,13 +257,13 @@ class SimpleDrivingSystem:
         # 设置相机
         if not self.setup_camera():
             # 即使相机失败也继续运行
-            print("警告：相机设置失败，继续运行...")
+            self.logger.info("警告：相机设置失败，继续运行...")
 
         # 设置控制器
         self.setup_controller()
 
         # 等待一会儿让系统稳定
-        print("系统初始化中...")
+        self.logger.info("系统初始化中...")
         time.sleep(2.0)
 
         # 设置天气
@@ -263,12 +277,12 @@ class SimpleDrivingSystem:
         # 生成一些NPC车辆
         self.spawn_npc_vehicles(2)
 
-        print("\n系统准备就绪！")
-        print("控制指令:")
-        print("  q - 退出程序")
-        print("  r - 重置车辆")
-        print("  s - 紧急停止")
-        print("\n开始自动驾驶...\n")
+        self.logger.info("\n系统准备就绪！")
+        self.logger.info("控制指令:")
+        self.logger.info("  q - 退出程序")
+        self.logger.info("  r - 重置车辆")
+        self.logger.info("  s - 紧急停止")
+        self.logger.info("\n开始自动驾驶...\n")
 
         frame_count = 0
         running = True
@@ -315,7 +329,7 @@ class SimpleDrivingSystem:
                 # 处理按键
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
-                    print("正在退出...")
+                    self.logger.info("正在退出...")
                     running = False
                 elif key == ord('r'):
                     self.reset_vehicle()
@@ -324,26 +338,26 @@ class SimpleDrivingSystem:
                     self.vehicle.apply_control(carla.VehicleControl(
                         throttle=0.0, brake=1.0, hand_brake=True
                     ))
-                    print("紧急停止")
+                    self.logger.info("紧急停止")
 
                 frame_count += 1
 
                 # 每100帧显示一次状态
                 if frame_count % 100 == 0:
-                    print(f"运行中... 帧数: {frame_count}, 速度: {speed:.1f} km/h")
+                    self.logger.info(f"运行中... 帧数: {frame_count}, 速度: {speed:.1f} km/h")
 
                 self.world.tick()
 
         except KeyboardInterrupt:
-            print("\n用户中断")
+            self.logger.info("\n用户中断")
         except Exception as e:
-            print(f"运行错误: {e}")
+            self.logger.info(f"运行错误: {e}")
         finally:
             self.cleanup()
 
     def spawn_npc_vehicles(self, count=2):
         """生成NPC车辆（简化）"""
-        print(f"正在生成 {count} 辆NPC车辆...")
+        self.logger.info(f"正在生成 {count} 辆NPC车辆...")
 
         try:
             blueprint_library = self.world.get_blueprint_library()
@@ -368,31 +382,31 @@ class SimpleDrivingSystem:
                         if npc:
                             npc.set_autopilot(True)
                             npc_vehicles.append(npc)
-                            print(f"生成NPC车辆 {len(npc_vehicles)}")
+                            self.logger.info(f"生成NPC车辆 {len(npc_vehicles)}")
                 except:
                     pass
 
-            print(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
+            self.logger.info(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
 
         except Exception as e:
-            print(f"生成NPC车辆时出错: {e}")
+            self.logger.info(f"生成NPC车辆时出错: {e}")
 
     def reset_vehicle(self):
         """重置车辆位置"""
-        print("重置车辆...")
+        self.logger.info("重置车辆...")
 
         spawn_points = self.world.get_map().get_spawn_points()
         if spawn_points:
             new_spawn_point = random.choice(spawn_points)
             self.vehicle.set_transform(new_spawn_point)
-            print(f"车辆已重置到新位置: {new_spawn_point.location}")
+            self.logger.info(f"车辆已重置到新位置: {new_spawn_point.location}")
 
             # 等待重置完成
             time.sleep(0.5)
 
     def cleanup(self):
         """清理资源"""
-        print("\n正在清理资源...")
+        self.logger.info("\n正在清理资源...")
 
         if self.camera:
             try:
@@ -411,7 +425,7 @@ class SimpleDrivingSystem:
         time.sleep(1.0)
 
         cv2.destroyAllWindows()
-        print("清理完成")
+        self.logger.info("清理完成")
 
 
 def main():

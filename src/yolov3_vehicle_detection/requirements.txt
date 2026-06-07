@@ -1,0 +1,15 @@
+# CARLA Simulator Client (版本需与你的模拟器匹配)
+carla==0.9.11
+
+# 计算机视觉与目标检测
+opencv-python>=4.5.5
+numpy>=1.21.6
+
+# 深度学习框架 (用于 YOLOv3)
+torch>=1.10.0
+torchvision>=0.11.0
+
+# 界面与可视化
+pygame>=2.1.2
+matplotlib>=3.5.1
+tensorboard>=2.8.0

@@ -1,0 +1,17 @@
+Drone_Vision_Navigation/
+├── main.py                    # 主程序
+├── config.yaml               # 配置文件
+├── requirements.txt          # 依赖包
+├── data/
+│   ├── captured/            # 捕获的图像
+│   ├── training/           # 训练数据
+│   └── models/             # 模型文件（best_model.hs）
+├── scripts/
+│   ├── droidcam_stream.py  # DroidCam集成
+│   ├── battery_manager.py  # 电池管理
+│   └── emergency_handler.py # 紧急处理
+├── utils/
+│   ├── image_processor.py  # 图像处理
+│   ├── classifier.py       # 分类器
+│   └── navigation_logic.py # 导航逻辑
+└── logs/                   # 系统日志
