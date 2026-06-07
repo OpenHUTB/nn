@@ -11,6 +11,39 @@ import math
 from collections import deque
 import random
 
+class Config:
+    """配置参数类"""
+    # 车辆参数
+    TARGET_SPEED = 30.0  # km/h
+    WAYPOINT_DISTANCE = 5.0  # 路点距离
+    
+    # 控制参数
+    THROTTLE_MAX = 0.6
+    THROTTLE_NORMAL = 0.3
+    BRAKE_STRONG = 0.3
+    STEER_MAX = 0.5
+    
+    # 相机参数
+    CAMERA_IMAGE_SIZE_X = 640
+    CAMERA_IMAGE_SIZE_Y = 480
+    CAMERA_FOV = 90
+    CAMERA_LOCATION_X = -8.0
+    CAMERA_LOCATION_Z = 6.0
+    CAMERA_PITCH = -20.0
+    
+    # 世界参数
+    WEATHER_CLOUDINESS = 30.0
+    WEATHER_PRECIPITATION = 0.0
+    WEATHER_SUN_ALTITUDE = 70.0
+    
+    # NPC参数
+    NPC_VEHICLE_COUNT = 2
+    
+    # CARLA参数
+    CARLA_HOST = 'localhost'
+    CARLA_PORT = 2000
+    TIMEOUT = 10.0
+    FIXED_DELTA_SECONDS = 0.05
 
 class SimpleController:
     """简单但可靠的控制逻辑"""
@@ -19,8 +52,8 @@ class SimpleController:
         self.world = world
         self.vehicle = vehicle
         self.map = world.get_map()
-        self.target_speed = 30.0  # km/h
-        self.waypoint_distance = 5.0
+        self.target_speed = Config.TARGET_SPEED  # km/h
+        self.waypoint_distance = Config.WAYPOINT_DISTANCE
         self.last_waypoint = None
 
     def get_control(self):
@@ -38,7 +71,7 @@ class SimpleController:
 
         if not waypoint:
             # 如果没有找到路点，返回保守控制
-            return 0.3, 0.0, 0.0
+            return Config.THROTTLE_NORMAL, 0.0, 0.0
 
         # 获取下一个路点
         next_waypoints = waypoint.next(self.waypoint_distance)
@@ -66,13 +99,12 @@ class SimpleController:
             steer = 0.0
         else:
             angle = math.atan2(local_y, local_x)
-            steer = max(-0.5, min(0.5, angle / 1.0))
-
+            steer = max(-Config.STEER_MAX, min(Config.STEER_MAX, angle / 1.0))
         # 速度控制
         if speed < self.target_speed * 0.8:
-            throttle, brake = 0.6, 0.0
+            throttle, brake = Config.THROTTLE_MAX, 0.0
         elif speed > self.target_speed * 1.2:
-            throttle, brake = 0.0, 0.3
+            throttle, brake = 0.0, Config.BRAKE_STRONG
         else:
             throttle, brake = 0.3, 0.0
 
@@ -107,8 +139,8 @@ class SimpleDrivingSystem:
 
         try:
             # 尝试多种连接方式
-            self.client = carla.Client('localhost', 2000)
-            self.client.set_timeout(10.0)
+            self.client = carla.Client(Config.CARLA_HOST, Config.CARLA_PORT)
+            self.client.set_timeout(Config.TIMEOUT)
 
             # 检查可用地图
             available_maps = self.client.get_available_maps()
@@ -121,7 +153,7 @@ class SimpleDrivingSystem:
             # 设置同步模式
             settings = self.world.get_settings()
             settings.synchronous_mode = True
-            settings.fixed_delta_seconds = 0.05  # 先使用异步模式确保连接
+            settings.fixed_delta_seconds = Config.FIXED_DELTA_SECONDS  # 先使用异步模式确保连接
             self.world.apply_settings(settings)
             
             self.logger.info("连接成功！")
@@ -200,14 +232,12 @@ class SimpleDrivingSystem:
             camera_bp = blueprint_library.find('sensor.camera.rgb')
 
             # 设置相机属性
-            camera_bp.set_attribute('image_size_x', '640')
-            camera_bp.set_attribute('image_size_y', '480')
-            camera_bp.set_attribute('fov', '90')
-
-            # 相机位置（车辆后方）
+            camera_bp.set_attribute('image_size_x', str(Config.CAMERA_IMAGE_SIZE_X))
+            camera_bp.set_attribute('image_size_y', str(Config.CAMERA_IMAGE_SIZE_Y))
+            camera_bp.set_attribute('fov', str(Config.CAMERA_FOV))
             camera_transform = carla.Transform(
-                carla.Location(x=-8.0, z=6.0),  # 在车辆后方上方
-                carla.Rotation(pitch=-20.0)  # 向下看
+                carla.Location(x=Config.CAMERA_LOCATION_X, z=Config.CAMERA_LOCATION_Z),
+                carla.Rotation(pitch=Config.CAMERA_PITCH)
             )
 
             # 生成相机
@@ -268,14 +298,14 @@ class SimpleDrivingSystem:
 
         # 设置天气
         weather = carla.WeatherParameters(
-            cloudiness=30.0,
-            precipitation=0.0,
-            sun_altitude_angle=70.0
+            cloudiness=Config.WEATHER_CLOUDINESS,
+            precipitation=Config.WEATHER_PRECIPITATION,
+            sun_altitude_angle=Config.WEATHER_SUN_ALTITUDE
         )
         self.world.set_weather(weather)
 
         # 生成一些NPC车辆
-        self.spawn_npc_vehicles(2)
+        self.spawn_npc_vehicles(Config.NPC_VEHICLE_COUNT)
 
         self.logger.info("\n系统准备就绪！")
         self.logger.info("控制指令:")
