@@ -23,21 +23,17 @@ def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
     # --- 2. 环境与模型架构初始化 ---
     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        # 显式指定渲染模式
         env = gym.make("Humanoid-v4", render_mode="human")
-        print(f"物理环境启动成功 | 运行设备: {device}")
-        
         model = SAC("MlpPolicy", env, verbose=0, device=device)
     except Exception as e:
-        print(f"环境初始化失败: {e}")
+        print(f"初始化失败: {e}")
         return
 
-    # --- 3. 权重动态提取与对齐 ---
+    # --- 3. 权重提取与对齐 ---
     try:
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
         extract_dir.mkdir(parents=True, exist_ok=True)
-
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extract("policy.pth", extract_dir)
         
@@ -45,49 +41,88 @@ def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
         model.policy.load_state_dict(state_dict, strict=False)
         print("✅ 权重加载成功")
     except Exception as e:
-        print(f"❌ 权重加载故障: {e}")
+        print(f"❌ 加载故障: {e}")
         env.close()
         return
 
-    # --- 4. 稳健仿真循环 (本次修改重点) ---
+    # --- 4. 增强型性能评价循环 (本次修改重点) ---
+    # 【新增】性能统计变量
+    session_rewards = []
+    episode_counts = 0
+    total_steps = 0
+    start_wall_time = time.time()
+
     try:
         obs, _ = env.reset()
+        env.render()
         
-        # 【新增：渲染预热】强制触发 GLFW 初始化，解决“Not Initialized”报错
-        print("正在激活渲染上下文...")
-        env.render() 
+        current_ep_reward = 0
+        current_ep_steps = 0
+        ACTION_SCALE = 0.88
+        SMOOTH_FACTOR = 0.7
+        prev_action = np.zeros(env.action_space.shape)
+        dt = 0.005
         
-        ACTION_SCALE = 0.88 
-        print("演示开始：按 Ctrl+C 停止")
+        print(f"演示开始：已启用性能监控系统。按 Ctrl+C 结束并查看报告。")
         
         while True:
+            step_start = time.perf_counter()
+            
+            # 控制逻辑
             action, _ = model.predict(obs, deterministic=True)
-            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
+            smoothed_action = SMOOTH_FACTOR * prev_action + (1 - SMOOTH_FACTOR) * (action * ACTION_SCALE)
+            prev_action = smoothed_action
             
-            obs, _, terminated, truncated, _ = env.step(action)
+            obs, reward, terminated, truncated, _ = env.step(np.clip(smoothed_action, -1.0, 1.0))
             
-            # 【优化：异常捕获】防止单帧渲染错误导致整个程序崩溃
+            # 【新增】实时数据累加
+            current_ep_reward += reward
+            current_ep_steps += 1
+            total_steps += 1
+            
             try:
                 env.render()
-            except Exception as render_err:
-                print(f"警告：单帧渲染跳过 ({render_err})")
+            except:
                 break
                 
-            time.sleep(0.005) 
+            # 时间同步
+            elapsed = time.perf_counter() - step_start
+            if elapsed < dt:
+                time.sleep(dt - elapsed)
+            
+            # 【新增】回合结束统计
             if terminated or truncated:
+                session_rewards.append(current_ep_reward)
+                episode_counts += 1
+                print(f"回合 {episode_counts} 结束 | 得分: {current_ep_reward:.2f} | 步数: {current_ep_steps}")
+                
+                # 重置
                 obs, _ = env.reset()
+                prev_action = np.zeros(env.action_space.shape)
+                current_ep_reward = 0
+                current_ep_steps = 0
                 
     except KeyboardInterrupt:
-        print("\n用户手动停止模拟。")
-    except Exception as e:
-        print(f"运行中发生异常: {e}")
+        print("\n检测到用户中断，正在汇总分析数据...")
     finally:
-        # 【关键：安全释放】确保 GLFW 句柄被正确关闭，释放窗口资源
-        print("正在清理系统资源...")
+        # --- 5. 【新增】生成最终评价报告 ---
+        duration = time.time() - start_wall_time
+        print("\n" + "="*30)
+        print("      仿真性能报告")
+        print("="*30)
+        print(f"总运行时间: {duration:.2f} 秒")
+        print(f"物理步总计: {total_steps} 步")
+        print(f"完成回合数: {episode_counts} 次")
+        if session_rewards:
+            print(f"平均每回合得分: {np.mean(session_rewards):.2f}")
+            print(f"单回合最高得分: {np.max(session_rewards):.2f}")
+        print(f"控制平滑系数: {SMOOTH_FACTOR}")
+        print("="*30)
+
         env.close()
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
-        print("资源已安全回收。")
+        print("资源已回收。")
 
 if __name__ == "__main__":
     run_simulation()
