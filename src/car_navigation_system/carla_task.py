@@ -11,6 +11,24 @@ import math
 from collections import deque
 import random
 
+class PIDController:
+    """PID控制器，用于平滑速度控制"""
+    def __init__(self, kp=0.5, ki=0.1, kd=0.05):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.integral = 0
+        self.last_error = 0
+    
+    def compute(self, target, current, dt=0.05):
+        """计算控制量"""
+        error = target - current
+        self.integral += error * dt
+        derivative = (error - self.last_error) / dt if dt > 0 else 0
+        output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        self.last_error = error
+        return max(0.0, min(1.0, output))  # 限制在0-1之间
+
 class Config:
     """配置参数类"""
     # 车辆参数
@@ -55,7 +73,8 @@ class SimpleController:
         self.target_speed = Config.TARGET_SPEED  # km/h
         self.waypoint_distance = Config.WAYPOINT_DISTANCE
         self.last_waypoint = None
-
+        # 添加 PID 控制器
+        self.pid = PIDController(kp=0.5, ki=0.1, kd=0.05)
     def get_control(self):
         """基于路点的简单控制"""
         # 获取车辆状态
@@ -100,13 +119,12 @@ class SimpleController:
         else:
             angle = math.atan2(local_y, local_x)
             steer = max(-Config.STEER_MAX, min(Config.STEER_MAX, angle / 1.0))
-        # 速度控制
-        if speed < self.target_speed * 0.8:
-            throttle, brake = Config.THROTTLE_MAX, 0.0
-        elif speed > self.target_speed * 1.2:
-            throttle, brake = 0.0, Config.BRAKE_STRONG
-        else:
-            throttle, brake = 0.3, 0.0
+        # 速度控制 - 使用 PID
+        throttle = self.pid.compute(self.target_speed, speed)
+        brake = 0.0
+        if speed > self.target_speed * 1.1:  # 超速时轻踩刹车
+           brake = min(0.3, throttle * 0.5)
+           throttle = 0.0
 
         return throttle, brake, steer
 
