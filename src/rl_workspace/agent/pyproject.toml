@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "reinforcement-learning-agent"
+version = "0.1.0"
+description = "Exploration in reinforcement with manipulators"
+authors = ["Anthony Miyaguchi <acmiyaguchi@gatech.edu>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.8"
+gymnasium = {extras = ["mujoco"], version = "^0.29.1"}
+gymnasium-robotics = "^1.2.3"
+# import-metadata when python3.8
+importlib-metadata = {version = ">=0.12", python = "<=3.8"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -72,6 +72,9 @@ def _parse_args():
     parser.add_argument("--amp", type=int, default=1, choices=[0, 1])
     parser.add_argument("--normalize-obs", type=int, default=1, choices=[0, 1])
     parser.add_argument("--double-q", type=int, default=-1, choices=[-1, 0, 1])
+    parser.add_argument("--treat-truncated-as-terminal", type=int, default=-1, choices=[-1, 0, 1])
+    parser.add_argument("--learn-start", type=int, default=-1)
+    parser.add_argument("--torch-compile", type=int, default=0, choices=[0, 1])
     return parser.parse_args()
 
 
@@ -140,15 +143,24 @@ driver = Agent(
         "amp": bool(args.amp),
         "normalize_obs": bool(args.normalize_obs),
         **({} if args.double_q < 0 else {"double_q": bool(args.double_q)}),
+        **({} if args.treat_truncated_as_terminal < 0 else {"treat_truncated_as_terminal": bool(args.treat_truncated_as_terminal)}),
     }
 )
 
 print(f"使用设备: {driver.device}")
+if hasattr(torch, "set_float32_matmul_precision"):
+    torch.set_float32_matmul_precision("high")
 print(f"折扣因子 (gamma): {driver.gamma}")
 print(f"初始探索率 (epsilon): {driver.epsilon}")
 print(f"探索率衰减: {driver.epsilon_decay}")
 print(f"最小探索率: {driver.epsilon_min}")
 print("智能体创建完成！")
+
+if args.torch_compile == 1 and hasattr(torch, "compile"):
+    try:
+        driver.policy_net = torch.compile(driver.policy_net)
+    except Exception:
+        pass
 
 
 # ================================================================================
@@ -180,6 +192,9 @@ when2learn = int(driver.hyperparameters.get("train_freq", 4))               # �
 when2sync = int(driver.hyperparameters.get("target_update", 5000))             # 每隔几步同步目标网络
 when2save = 100000           # 每隔几步保存模型
 when2log = args.log_every                # 每隔几个 episode 写入日志
+learn_start = int(driver.hyperparameters.get("warmup_steps", 0))
+if args.learn_start is not None and args.learn_start >= 0:
+    learn_start = int(args.learn_start)
 
 # 报告类型: 'plot' 显示实时曲线, 'text' 打印文字, None 静默
 report_type = None if args.report == "none" else args.report
@@ -221,15 +236,15 @@ while episode < play_n_episodes and (max_timesteps is None or timestep_n < max_t
         # -------------------------------------------------
         new_state, reward, terminated, truncated, info = env.step(action)
         episode_reward += reward
+        done = terminated or truncated
         
         # -------------------------------------------------
         # 4.3 存储经验到回放缓冲区
         # -------------------------------------------------
-        driver.store(state, action, reward, new_state, terminated)
+        driver.store(state, action, reward, new_state, terminated, truncated)
         
         # 更新状态
         state = new_state
-        done = terminated or truncated
         if max_timesteps is not None and timestep_n >= max_timesteps:
             break
         
@@ -250,7 +265,7 @@ while episode < play_n_episodes and (max_timesteps is None or timestep_n < max_t
         # 4.6 定期训练网络
         # -------------------------------------------------
         # 条件: 达到学习频率 且 回放缓冲区有足够样本
-        if timestep_n % when2learn == 0 and len(driver.buffer) >= batch_n:
+        if timestep_n >= learn_start and timestep_n % when2learn == 0 and len(driver.buffer) >= batch_n:
             q_value, loss = driver.update_net(batch_n)
             loss_list.append(loss)
             update_count += 1

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+        <arg name="camera_topic"      default="image_raw" />
+        <arg name="dest_topic"      default="image_embeddings" />
+
+        <node pkg="img2vec" 
+        type="embeddings.py" 
+        name="img2vec" 
+        output="screen">
+
+        <param name="camera_topic" value="$(arg camera_topic)" /> 
+        <param name="dest_topic" value="$(arg dest_topic)" /> 
+
+        </node>
+
+
+
+
+</launch>
+
+

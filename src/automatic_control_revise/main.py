@@ -256,6 +256,8 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
+        self.speed_history = []          # 存储最近的速度值 (km/h)
+        self.max_speed_points = 60       # 最多保存60个点
         self.last_waypoint = None
         self.current_obstacle = None
 
@@ -299,6 +301,13 @@ class HUD(object):
             'Height:  % 18.0f m' % transform.location.z,
             'Speed limit: % 10.0f km/h' % world.player.get_speed_limit(),
             '']
+        
+        # 记录速度历史（用于速度曲线）
+        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        self.speed_history.append(current_speed)
+        if len(self.speed_history) > self.max_speed_points:
+            self.speed_history.pop(0)
+
         if isinstance(control, carla.VehicleControl):
             self._info_text += [
                 ('Throttle:', control.throttle, 0.0, 1.0),
@@ -348,6 +357,9 @@ class HUD(object):
             if hasattr(actor, 'get_parent'):
                 if actor.get_parent() is not None and actor.get_parent().id == world.player.id:
                     continue
+            # 只考虑车辆和行人，忽略静态物体（路灯、路锥等）
+            if not (actor.type_id.startswith('vehicle.') or actor.type_id.startswith('walker.')):
+                continue
             # 只考虑前方30米内的物体，提高性能
             if actor.get_location().distance(vehicle_location) > 30.0:
                 continue
@@ -458,6 +470,37 @@ class HUD(object):
                 v_offset += 18
         self._notifications.render(display)
         self.help.render(display)
+        
+        # 绘制速度曲线（右下角）
+        if len(self.speed_history) > 1:
+            graph_width = 200
+            graph_height = 80
+            graph_x = self.dim[0] - graph_width - 10
+            graph_y = self.dim[1] - graph_height - 10
+            # 背景框
+            bg_rect = pygame.Rect(graph_x, graph_y, graph_width, graph_height)
+            pygame.draw.rect(display, (0, 0, 0, 100), bg_rect)
+            # 显示当前速度数值（曲线图左上角）
+            font = pygame.font.Font(None, 20)
+            speed_text = f"{self.speed_history[-1]:.0f} km/h"
+            text_surface = font.render(speed_text, True, (255, 255, 255))
+            display.blit(text_surface, (graph_x + 5, graph_y + 5))
+            # 边框
+            pygame.draw.rect(display, (255, 255, 255), bg_rect, 1)
+
+            # 计算纵坐标比例
+            max_speed = max(self.speed_history)
+            if max_speed < 1:
+                max_speed = 1
+            x_step = graph_width / (len(self.speed_history) - 1)
+            points = []
+            for i, speed in enumerate(self.speed_history):
+                x = graph_x + i * x_step
+                y = graph_y + graph_height - (speed / max_speed) * graph_height
+                points.append((x, y))
+            # 绘制折线（黄色）
+            pygame.draw.lines(display, (255, 255, 0), False, points, 2)
+
 
 # ==============================================================================
 # -- FadingText ----------------------------------------------------------------
@@ -778,6 +821,30 @@ def game_loop(args):
 
     pygame.init()
     pygame.font.init()
+    # 加载机器学习模型（如果启用）
+    ml_model = None
+    ml_scaler = None
+    if args.ml_acc:
+        try:
+            import joblib
+            ml_model = joblib.load('acc_mlp_model.pkl')
+            ml_scaler = joblib.load('acc_scaler.pkl')
+            print("Loaded MLP model for ACC")
+        except Exception as e:
+            print(f"Failed to load ML model: {e}. Falling back to rule-based ACC.")
+            args.ml_acc = False
+    # 数据记录初始化
+    data_file = None
+    data_writer = None
+    if args.record_data:
+        import csv
+        data_file = open(args.record_data, 'w', newline='')
+        data_writer = csv.writer(data_file)
+        data_writer.writerow(['current_speed', 'obstacle_dist', 'target_speed'])
+    # 如果启用了数据记录，自动开启循环模式以保证持续行驶
+    if args.record_data and not args.loop:
+        args.loop = True
+        print("Data recording enabled: forcing loop mode to keep vehicle running.")
     world = None
     tot_target_reached = 0
     num_min_waypoints = 21
@@ -919,16 +986,43 @@ def game_loop(args):
                     control.manual_gear_shift = False
                 else:
                     control = agent.run_step()
-                    # ✅ 第四次修改：速度闭环控制（P控制）
+
+                    # 获取当前速度（提前计算）
                     vel = world.player.get_velocity()
                     current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
 
-                    target_speed = args.max_speed
-                    error = target_speed - current_speed
+                    # 获取障碍物距离（用于 ACC）
+                    obs_dist = None
+                    if hasattr(world.hud, 'current_obstacle'):
+                        obs_dist = world.hud.current_obstacle
 
+                    # 计算自适应巡航目标速度（MLP 或规则）
+                    if args.acc_enable and obs_dist is not None:
+                        if args.ml_acc and ml_model is not None and ml_scaler is not None:
+                            import numpy as np
+                            features = np.array([[current_speed, obs_dist]])
+                            features_scaled = ml_scaler.transform(features)
+                            target_speed = ml_model.predict(features_scaled)[0]
+                            target_speed = max(0.0, min(target_speed, args.max_speed))
+                        else:
+                            if obs_dist < args.acc_min_dist:
+                                target_speed = 0.0
+                            elif obs_dist < args.acc_max_dist:
+                                ratio = (obs_dist - args.acc_min_dist) / (args.acc_max_dist - args.acc_min_dist)
+                                target_speed = args.max_speed * ratio
+                            else:
+                                target_speed = args.max_speed
+                    else:
+                        target_speed = args.max_speed
+
+                    # 记录数据（如果启用）
+                    if data_writer is not None:
+                        data_writer.writerow([current_speed, obs_dist if obs_dist is not None else -1.0, target_speed])
+
+                    # P 控制器（速度闭环）
+                    error = target_speed - current_speed
                     Kp = 0.05
                     base_throttle = 0.25
-
                     if error >= 0:
                         throttle = base_throttle + Kp * error
                         control.throttle = max(0.0, min(throttle, 1.0))
@@ -936,11 +1030,10 @@ def game_loop(args):
                     else:
                         control.throttle = 0.0
                         control.brake = max(0.0, min(-Kp * error, 1.0))
-                
+
                 # ===== 自动紧急制动 (AEB) 开始 =====
                 if hasattr(world.hud, 'current_obstacle') and world.hud.current_obstacle is not None:
                     if world.hud.current_obstacle < args.aeb_distance:
-                        # 强制刹车
                         control.throttle = 0.0
                         control.brake = 1.0
                         control.reverse = False
@@ -1028,6 +1121,23 @@ def main():
     argparser.add_argument(
         '--aeb_distance', type=float, default=5.0,
         help='Distance in meters to trigger Automatic Emergency Braking (default: 5.0)')
+    
+    argparser.add_argument(
+        '--acc_enable', action='store_true',
+        help='Enable Adaptive Cruise Control (ACC)')
+    argparser.add_argument(
+        '--acc_max_dist', type=float, default=15.0,
+        help='Distance (m) above which ACC resumes full speed (default: 15.0)')
+    argparser.add_argument(
+        '--acc_min_dist', type=float, default=5.0,
+        help='Distance (m) below which ACC requests full stop (default: 5.0)')
+    argparser.add_argument(
+        '--record_data', type=str, default=None,
+        help='Record ACC training data (features: current_speed, obstacle_dist; target: target_speed) to specified CSV file')
+    argparser.add_argument(
+        '--ml_acc', action='store_true',
+        help='Use MLP model for ACC (instead of rule-based linear interpolation)')
+    
     args = argparser.parse_args()
 
     args.width, args.height = [int(x) for x in args.res.split('x')]

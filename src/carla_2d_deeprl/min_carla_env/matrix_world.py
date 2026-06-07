@@ -20,7 +20,7 @@ class MatrixWorld(object):
     # hardcoded 2d view properties
     _X = 3
     _Y = 0
-    _Z = 10
+    _Z = 20
 
     def __init__(self, client, im_width=480.0, im_height=480.0, render=True,
                  weather=None, fast=False, town='Town02'):
@@ -179,7 +179,7 @@ class MatrixWorld(object):
 
         sensor_transform = carla.Transform(
             carla.Location(self._X, self._Y, self._Z),
-            carla.Rotation(pitch=-90, roll=roll, yaw=yaw)
+            carla.Rotation(pitch=-50, roll=roll, yaw=yaw)
         )
         # store yaw to use it for rotate image
         # to make car always bottom center of image
