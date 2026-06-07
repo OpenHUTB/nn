@@ -1,0 +1,110 @@
+[
+  {
+    "id": "DH-001",
+    "type": "THERMAL",
+    "subsystem": "Thermal",
+    "severity": "WATCH",
+    "start_time_s": 144.0,
+    "end_time_s": 149.0,
+    "peak_time_s": 149.0,
+    "peak_risk": 73.0,
+    "min_health_score": 72.57,
+    "recommended_action": "Reduce speed, enable cooling, inspect battery/motor loop."
+  },
+  {
+    "id": "DH-002",
+    "type": "SMOKE",
+    "subsystem": "Smoke",
+    "severity": "CRITICAL",
+    "start_time_s": 187.0,
+    "end_time_s": 201.0,
+    "peak_time_s": 194.0,
+    "peak_risk": 94.42,
+    "min_health_score": 68.32,
+    "recommended_action": "Open ventilation, isolate power module, prepare safe stop."
+  },
+  {
+    "id": "DH-003",
+    "type": "SPEED",
+    "subsystem": "Speed sensor",
+    "severity": "CRITICAL",
+    "start_time_s": 226.0,
+    "end_time_s": 241.0,
+    "peak_time_s": 230.0,
+    "peak_risk": 100.0,
+    "min_health_score": 68.62,
+    "recommended_action": "Cross-check wheel/IMU/GNSS speed and mark sensor unreliable."
+  },
+  {
+    "id": "DH-005",
+    "type": "BRAKE",
+    "subsystem": "Brake margin",
+    "severity": "WATCH",
+    "start_time_s": 292.0,
+    "end_time_s": 292.0,
+    "peak_time_s": 292.0,
+    "peak_risk": 69.74,
+    "min_health_score": 70.63,
+    "recommended_action": "Increase following distance and prepare emergency braking."
+  },
+  {
+    "id": "DH-004",
+    "type": "SPEED",
+    "subsystem": "Speed sensor",
+    "severity": "CRITICAL",
+    "start_time_s": 300.0,
+    "end_time_s": 306.0,
+    "peak_time_s": 300.0,
+    "peak_risk": 100.0,
+    "min_health_score": 47.1,
+    "recommended_action": "Cross-check wheel/IMU/GNSS speed and mark sensor unreliable."
+  },
+  {
+    "id": "DH-006",
+    "type": "BRAKE",
+    "subsystem": "Brake margin",
+    "severity": "CRITICAL",
+    "start_time_s": 294.0,
+    "end_time_s": 304.0,
+    "peak_time_s": 300.0,
+    "peak_risk": 100.0,
+    "min_health_score": 47.1,
+    "recommended_action": "Increase following distance and prepare emergency braking."
+  },
+  {
+    "id": "DH-007",
+    "type": "TAKEOVER",
+    "subsystem": "Takeover",
+    "severity": "WATCH",
+    "start_time_s": 351.0,
+    "end_time_s": 352.0,
+    "peak_time_s": 351.0,
+    "peak_risk": 65.07,
+    "min_health_score": 80.11,
+    "recommended_action": "Issue takeover warning and switch to conservative mode."
+  },
+  {
+    "id": "DH-008",
+    "type": "TAKEOVER",
+    "subsystem": "Takeover",
+    "severity": "WATCH",
+    "start_time_s": 355.0,
+    "end_time_s": 356.0,
+    "peak_time_s": 356.0,
+    "peak_risk": 68.3,
+    "min_health_score": 80.18,
+    "recommended_action": "Issue takeover warning and switch to conservative mode."
+  },
+  {
+    "id": "DH-009",
+    "type": "TAKEOVER",
+    "subsystem": "Takeover",
+    "severity": "WARNING",
+    "start_time_s": 359.0,
+    "end_time_s": 364.0,
+    "peak_time_s": 364.0,
+    "peak_risk": 77.35,
+    "min_health_score": 77.02,
+    "recommended_action": "Issue takeover warning and switch to conservative mode."
+  }
+]

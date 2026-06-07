@@ -2,7 +2,7 @@ host: localhost
 port: 2000
 tm_port: 8000
 seed: 0
-car_num: 50
+car_num: 10
 syn:
   fixed_delta_seconds: 0.05
 substepping:

@@ -49,10 +49,13 @@ pip install -r requirements.txt
 
 ### 2. 模型权重获取
 由于模型权重文件较大，未包含在 Git 仓库中，您可以通过以下方式获取：
-自动下载：运行上述 `download_weights.py` 脚本，会自动从官方源下载所需文件
+自动下载：运行上述 `download_weights.py` 脚本，会自动从官方源下载所需文件。
 
-下载 YOLO 模型权重
+下载 YOLO 模型权重：
+
+```bash
 python download_weights.py
+```
 
 下载完成后，请确保将权重文件放置在 `models/` 目录下，文件结构如下：
 ```
