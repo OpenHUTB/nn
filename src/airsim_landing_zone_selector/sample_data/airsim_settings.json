@@ -1,0 +1,32 @@
+{
+  "SettingsVersion": 1.2,
+  "SimMode": "Multirotor",
+  "Vehicles": {
+    "Drone1": {
+      "VehicleType": "SimpleFlight",
+      "Cameras": {
+        "front_center": {
+          "CaptureSettings": [
+            {
+              "ImageType": 2,
+              "Width": 640,
+              "Height": 480,
+              "FOV_Degrees": 90
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Recording": {
+    "RecordOnMove": true,
+    "RecordInterval": 0.5,
+    "Cameras": [
+      {
+        "CameraName": "front_center",
+        "ImageType": 2,
+        "PixelsAsFloat": true
+      }
+    ]
+  }
+}

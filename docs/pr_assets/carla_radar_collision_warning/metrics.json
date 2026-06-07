@@ -1,0 +1,12 @@
+{
+  "source": "CARLA RadarDetection sensor log",
+  "records": 18,
+  "min_ttc_s": 1.667,
+  "max_risk_score": 0.6944,
+  "emergency_brake_frames": 2,
+  "generated_files": [
+    "carla_radar_ttc_curve.png",
+    "carla_radar_detection_map.png",
+    "carla_radar_warning_scores.csv"
+  ]
+}

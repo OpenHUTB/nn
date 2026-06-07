@@ -17,6 +17,7 @@ sys.path.append(carla_api_path)
 
 from agents.navigation.behavior_agent import BehaviorAgent
 
+
 """Example of automatic vehicle control from client side."""
 
 
@@ -108,6 +109,37 @@ def get_actor_display_name(actor, truncate=250):
 # ==============================================================================
 # -- World ---------------------------------------------------------------
 # ==============================================================================
+def reset_vehicle(self):
+        """重置车辆到最近的生成点，并保留当前目的地"""
+        if not self.player:
+            return
+        
+        # 获取最近的生成点
+        spawn_points = self.map.get_spawn_points()
+        current_loc = self.player.get_location()
+        nearest_spawn = min(spawn_points, key=lambda p: math.hypot(p.location.x - current_loc.x, p.location.y - current_loc.y))
+        
+        # 销毁旧车辆
+        self.destroy()
+        
+        # 在最近生成点重生车辆
+        blueprint = random.choice(self.world.get_blueprint_library().filter(self._actor_filter))
+        blueprint.set_attribute('role_name', 'hero')
+        if blueprint.has_attribute('color'):
+            color = random.choice(blueprint.get_attribute('color').recommended_values)
+            blueprint.set_attribute('color', color)
+        
+        self.player = self.world.try_spawn_actor(blueprint, nearest_spawn)
+        
+        # 重新初始化传感器
+        self.collision_sensor = CollisionSensor(self.player, self.hud)
+        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
+        self.gnss_sensor = GnssSensor(self.player)
+        self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
+        self.camera_manager.set_sensor(0, notify=False)
+        
+        self.hud.notification("车辆已重置到最近生成点", seconds=3.0)
+        logger.info(f"车辆重置到生成点: ({nearest_spawn.location.x:.2f}, {nearest_spawn.location.y:.2f})")
 
 class World(object):
     """ Class representing the surrounding environment """
@@ -232,6 +264,9 @@ class KeyboardControl(object):
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+                                # 新增：按R键重置车辆
+                if event.key == pygame.K_r:
+                    self.world.reset_vehicle()
 
     @staticmethod
     def _is_quit_shortcut(key):
@@ -766,6 +801,7 @@ def game_loop(args):
                 world.render(display)
                 pygame.display.flip()
 
+                # Set new destination when target has been reached
                 # Set new destination when target has been reached
                 if len(agent.get_local_planner()._waypoints_queue) < num_min_waypoints and args.loop:
     # 重新获取并打乱生成点

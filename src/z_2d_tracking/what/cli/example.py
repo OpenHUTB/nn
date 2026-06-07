@@ -20,6 +20,6 @@ what_example_list = [
     ('     YoloX Demo    ', ' Model Inference ', 'YoloX Object Detection.', yolox_inference_demo),
     ('  FasterRCNN Demo  ', ' Model Inference ', 'FRCNN Object Detection.', frcnn_inference_demo),
     ('MobileNet SSD Demo', ' Model Inference ', 'MobileNet SSD Object Detection.', mobilenet_ssd_inference_demo),
-    (' TOG Attack Demo ', 'Adversarial Attack', 'Real-time TOG Attack against Yolov3 Tiny.', yolov3_pcb_attack_demo),
-    (' PCB Attack Demo ', 'Adversarial Attack', 'Real-time PCB Attack against Yolov3 Tiny.', yolov3_tog_attack_demo),
+    (' TOG Attack Demo ', 'Adversarial Attack', 'Real-time TOG Attack against Yolov3 Tiny.', yolov3_tog_attack_demo),
+    (' PCB Attack Demo ', 'Adversarial Attack', 'Real-time PCB Attack against Yolov3 Tiny.', yolov3_pcb_attack_demo),
 ]
