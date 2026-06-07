@@ -13,7 +13,8 @@ import sys
 
 # except IndexError:
 #     pass
-
+# 用于存储激光雷达检测到的最近障碍物距离
+nearest_obstacle_distance = None
 import carla
 import time
 import numpy as np
@@ -72,9 +73,29 @@ def update_display(world, displaymanager, weather_manager, ego_vehicle):
     # Update displays
     displaymanager.render()
 
+def lidar_callback(point_cloud):
+    """激光雷达回调函数，计算最近障碍物距离"""
+    global nearest_obstacle_distance
+    try:
+        # 解析点云数据
+        points = np.frombuffer(point_cloud.raw_data, dtype=np.dtype([
+            ('x', np.float32), ('y', np.float32), ('z', np.float32),
+            ('intensity', np.float32)]))
+        
+        # 筛选前方障碍物（x > 0 且 |y| < 2 米）
+        forward_points = [p for p in points if p['x'] > 0 and abs(p['y']) < 2.0]
+        
+        if forward_points:
+            min_distance = min(p['x'] for p in forward_points)
+            nearest_obstacle_distance = min_distance
+        else:
+            nearest_obstacle_distance = None
+    except Exception as e:
+        pass
+
 def main():
     """Main simulation loop"""
-    test_connection.run()
+   # test_connection.run()
     colorama.init()
     InfoLogger = Logger()
     
@@ -116,7 +137,10 @@ def main():
     }
     
     sensermanagers = SensorManager.setup_sensors(world, ego_vehicle, displaymanager, sensors_dict)
-    
+    # 设置激光雷达回调
+    for sm in sensermanagers:
+       if hasattr(sm, 'sensor') and 'lidar' in sm.sensor_type.lower():
+          sm.sensor.listen(lidar_callback)
     # Set data recorder for all sensor managers
     for sm in sensermanagers:
         sm.set_data_recorder(data_recorder)
@@ -178,7 +202,8 @@ def main():
                         print(f'\nRecording Status: {status}')
 
             # Update ego vehicle control
-            ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller)
+            # 更新 ego vehicle control（传入障碍物距离）
+            ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
             
             # Update data recorder with current vehicle state
             data_recorder.update_vehicle_state(ego_vehicle)
