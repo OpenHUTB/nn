@@ -9,6 +9,8 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 # 控制台仪表盘（不依赖Pygame显示）
 from console_dashboard import render_dashboard, enable_ansi_support
+# 数据记录器
+from data_logger import DataLogger
 
 # ==============================================================================
 # -- find carla module ---------------------------------------------------------
@@ -389,6 +391,9 @@ def main():
     # 启用控制台 ANSI 支持（Windows 终端）
     enable_ansi_support()
 
+    # 初始化数据记录器
+    logger = DataLogger()
+
     try:
         # 确保pygame已初始化
         if not pygame.get_init():
@@ -527,6 +532,23 @@ def main():
                     # 找出最近障碍物用于显示
                     nearest_obs = get_nearest_obstacle(signs, 600)
 
+                    # 记录数据到 CSV
+                    try:
+                        logger.record(
+                            elapsed=elapsed,
+                            speed=speed,
+                            throttle=control.throttle,
+                            brake=control.brake,
+                            steer=control.steer,
+                            signs=signs,
+                            warning_text=warning_text if 'warning_text' in dir() else None,
+                            is_emergency=is_emergency if 'is_emergency' in dir() else False,
+                            traffic_light_state=vehicle.get_traffic_light_state(),
+                            nearest_obs=nearest_obs,
+                        )
+                    except Exception:
+                        pass
+
                     # 双缓冲显示以减少画面撕裂
                     display.fill((0, 0, 0))  # 先清除屏幕
                     display.blit(surface_copy, (0, 0))
@@ -623,6 +645,12 @@ def main():
                 pass
         try:
             pygame.quit()
+        except Exception:
+            pass
+
+        # 输出数据记录报告
+        try:
+            logger.close_and_report()
         except Exception:
             pass
 
