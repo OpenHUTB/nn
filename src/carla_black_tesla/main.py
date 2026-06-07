@@ -2,9 +2,45 @@ import carla
 import sys
 import time
 
+def set_weather(world, weather_type):
+    weather = world.get_weather()
+    
+    if weather_type == "sunny":
+        weather.sun_altitude_angle = 75.0
+        weather.cloudiness = 0.0
+        weather.precipitation = 0.0
+        weather.fog_distance = 0.0
+        print("[WEATHER] Set to Sunny")
+    elif weather_type == "cloudy":
+        weather.sun_altitude_angle = 60.0
+        weather.cloudiness = 80.0
+        weather.precipitation = 0.0
+        weather.fog_distance = 0.0
+        print("[WEATHER] Set to Cloudy")
+    elif weather_type == "rainy":
+        weather.sun_altitude_angle = 45.0
+        weather.cloudiness = 100.0
+        weather.precipitation = 80.0
+        weather.fog_distance = 50.0
+        print("[WEATHER] Set to Rainy")
+    elif weather_type == "foggy":
+        weather.sun_altitude_angle = 30.0
+        weather.cloudiness = 90.0
+        weather.precipitation = 10.0
+        weather.fog_distance = 20.0
+        print("[WEATHER] Set to Foggy")
+    elif weather_type == "night":
+        weather.sun_altitude_angle = -30.0
+        weather.cloudiness = 30.0
+        weather.precipitation = 0.0
+        weather.fog_distance = 30.0
+        print("[WEATHER] Set to Night")
+    
+    world.set_weather(weather)
+
 def main():
     print("=" * 60)
-    print("CARLA - Spawn Black Tesla Model 3")
+    print("CARLA - Black Tesla with Weather Control")
     print("=" * 60)
     
     try:
@@ -46,14 +82,28 @@ def main():
         vehicle.set_autopilot(True)
         print("[INFO] Autopilot enabled - vehicle is driving")
         
+        weather_types = ["sunny", "cloudy", "rainy", "foggy", "night"]
+        current_weather = 0
+        set_weather(world, weather_types[current_weather])
+        
         print("\n[INFO] Press Ctrl+C to stop and cleanup")
+        print("[INFO] Weather will change every 5 seconds...")
+        
         try:
+            last_weather_time = time.time()
             while True:
                 location = vehicle.get_location()
                 velocity = vehicle.get_velocity()
                 speed = ((velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5) * 3.6
-                print(f"[INFO] Speed: {speed:.1f} km/h | Position: ({location.x:.1f}, {location.y:.1f})")
-                time.sleep(1)
+                print(f"\r[INFO] Speed: {speed:.1f} km/h | Position: ({location.x:.1f}, {location.y:.1f})", end="")
+                
+                current_time = time.time()
+                if current_time - last_weather_time >= 5.0:
+                    current_weather = (current_weather + 1) % len(weather_types)
+                    set_weather(world, weather_types[current_weather])
+                    last_weather_time = current_time
+                
+                time.sleep(0.1)
         except KeyboardInterrupt:
             print("\n[INFO] User interrupted the program")
         finally:

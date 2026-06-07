@@ -206,6 +206,9 @@ waypoints = FlightPath.square_path(size=15, height=-3)
 # 使用矩形路径
 waypoints = FlightPath.rectangle_path(width=20, length=10, altitude=-3)
 
+#使用三角形路径
+waypoints = FlightPath.triangle_path(size=15, height=-5)
+
 # 使用自定义路径
 waypoints = [(5, 0, -3), (5, -5, -3), (0, -5, -3), (0, 0, -3)]
 ```

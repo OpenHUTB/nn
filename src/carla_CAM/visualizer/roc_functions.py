@@ -86,7 +86,7 @@ def preprocess_image(pil_im, sendToGPU=True, resize_im=True):
 
 
 def get_image_path(path, filename):
-    if filename == None:
+    if filename is None:
         onlyimages = [path + f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) & f.endswith(('.jpg','.png'))]
         return onlyimages
     else:

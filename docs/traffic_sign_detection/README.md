@@ -95,15 +95,9 @@ CARLA 是一个面向自动驾驶研究的开源仿真平台，支持：
 - 提供交通标志的三维几何信息。
 - 提供多天气、多交通流条件下的数据采集能力。
 
-相关代码位置：
-
-- CARLA 接入与地图加载：`main.py:17-41`, `main.py:94`
-- 同步模式配置：`main.py:97-105`
-- 背景交通流生成：`main.py:48-62`, `main.py:113-118`
-
 ### 3.3 数据层：XML 标注与 YOLO 数据格式
 
-`main.py` 生成的是接近 Pascal VOC 风格的 XML 标注，其中包含：
+[main.py](https://github.com/OpenHUTB/nn/blob/main/src/driving_violation_detection/main.py) 生成的是接近 Pascal VOC 风格的 XML 标注，其中包含：
 
 - 图像名
 - 图像尺寸
@@ -111,7 +105,7 @@ CARLA 是一个面向自动驾驶研究的开源仿真平台，支持：
 - 边界框坐标
 - 天气标签
 
-`xml_to_yolo_dataset.py` 再将 VOC 风格边界框转换成 YOLO 所需的归一化格式：
+[xml_to_yolo_dataset.py](https://github.com/OpenHUTB/nn/blob/main/src/driving_violation_detection/xml_to_yolo_dataset.py) 中再将 VOC 风格边界框转换成 YOLO 所需的归一化格式：
 
 ```text
 class_id x_center y_center width height
@@ -126,8 +120,6 @@ box_width = (xmax - xmin) / width
 box_height = (ymax - ymin) / height
 ```
 
-对应代码：`xml_to_yolo_dataset.py:28-36`
-
 这里的理论基础是目标检测任务中最常用的矩形框表示与归一化编码方式，便于神经网络在不同尺寸图像上学习目标位置。
 
 ### 3.4 模型层：YOLO 检测思想
@@ -140,7 +132,7 @@ YOLO 的核心思想是：
 - 直接预测目标类别和边界框。
 - 以较高速度完成端到端检测。
 
-在 [detector_onnx.py](../../src/driving_violation_detection/detector_onnx.py) 中，ONNX 推理流程包括：
+在 [detector_onnx.py](https://github.com/OpenHUTB/nn/blob/main/src/driving_violation_detection/detector_onnx.py) 中，ONNX 推理流程包括：
 
 - 图像缩放与填充 `letterbox`
 - `blobFromImage` 预处理
@@ -148,12 +140,6 @@ YOLO 的核心思想是：
 - 置信度过滤
 - NMS 去重
 - 可视化绘制
-
-相关代码位置：
-
-- 预处理：`detector_onnx.py:37-60`
-- 输出适配：`detector_onnx.py:62-79`
-- 后处理与 NMS：`detector_onnx.py:80-143`
 
 ### 3.5 几何投影理论：3D 到 2D 映射
 
@@ -168,9 +154,9 @@ YOLO 的核心思想是：
 
 核心代码：
 
-- 相机内参构建：`main.py:205-217`
-- 点投影函数：`main.py:219-226`
-- 交通标志框提取：`main.py:247-295`
+- 相机内参构建
+- 点投影函数
+- 交通标志框提取
 
 ---
 
@@ -192,7 +178,6 @@ traffic_manager = client.get_trafficmanager(8000)
 traffic_manager.set_synchronous_mode(True)
 ```
 
-对应代码：`main.py:97-105`
 
 优化作用：
 
@@ -212,7 +197,6 @@ for v in vehicles:
     v.set_autopilot(True, traffic_manager.get_port())
 ```
 
-对应代码：`main.py:113-118`
 
 优化作用：
 
@@ -249,7 +233,6 @@ if distance < DISTANCE_THRESHOLD:
             ymin, ymax = int(min(y_coords)), int(max(y_coords))
 ```
 
-对应代码：`main.py:255-287`
 
 优化作用：
 
@@ -275,8 +258,6 @@ if current_time - last_capture_time > capture_cooldown:
     captured_sign_locations.add(sign_location_tuple)
     last_capture_time = current_time
 ```
-
-对应代码：`main.py:240-245`, `main.py:289-293`
 
 优化作用：
 
@@ -308,7 +289,6 @@ def non_maximum_suppression(bboxes, iou_threshold=0.2):
     return final_bboxes
 ```
 
-对应代码：`main.py:471-486`
 
 优化作用：
 
@@ -340,7 +320,6 @@ if current_time - last_weather_change_time >= weather_transition_interval:
     last_weather_change_time = current_time
 ```
 
-对应代码：`main.py:345-350`, `main.py:506-515`
 
 优化作用：
 
@@ -371,8 +350,6 @@ for class_name, box in labels:
     )
 ```
 
-对应代码：`xml_to_yolo_dataset.py:134-150`
-
 同时它还加入了随机种子和比例切分：
 
 ```python
@@ -381,7 +358,6 @@ random.shuffle(dataset_items)
 split_index = int(len(dataset_items) * args.train_ratio)
 ```
 
-对应代码：`xml_to_yolo_dataset.py:122-132`
 
 优化作用：
 
@@ -420,7 +396,6 @@ if preds.shape[0] < preds.shape[1] and preds.shape[0] <= 128:
     preds = preds.T
 ```
 
-对应代码：`detector_onnx.py:62-78`
 
 #### 3）推理后处理与 NMS
 
@@ -433,8 +408,6 @@ indices = cv2.dnn.NMSBoxes(
 )
 ```
 
-对应代码：`detector_onnx.py:114-137`
-
 #### 4）图像和视频双模式验证
 
 项目支持：
@@ -442,7 +415,6 @@ indices = cv2.dnn.NMSBoxes(
 - `--image` 单图检测
 - `--video` 视频或摄像头检测
 
-对应代码：`detector_onnx.py:165-222`, `detector_onnx.py:225-260`
 
 优化作用：
 
