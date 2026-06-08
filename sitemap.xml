@@ -141,6 +141,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_ad_gym_rl/carla_ad_gym_rl/</loc>
+         <lastmod>2026-06-08</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_traffic_sign_recognition/carla_traffic_sign_recognition/</loc>
          <lastmod>2026-06-08</lastmod>
          <changefreq>daily</changefreq>
