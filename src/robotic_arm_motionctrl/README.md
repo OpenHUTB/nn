@@ -8,12 +8,14 @@
 模型文件：arm6dof_final.xml
 控制末端：wrist3
 
-## git push origin main1已实现功能
+## 已实现功能
 - 多关节同步 PID 位置控制
 - 末端画圆、、8 字轨迹
 - 6D 位姿控制（位置 + 姿态保持）
 - 键盘控制机械臂
 - 机械臂关节保护等
- ## 环境依赖
-``` bash
+## 环境依赖
+
+```bash
 pip install mujoco numpy pynput glfw opencv-python
+```

@@ -1,4 +1,4 @@
-# Multisensor-fusion-based-3D-Object-Detecting-Simulation-Under-Rainy-Conditions-for-Autonomous-Vehicl
+# Multisensor-fusion-based-3D-Object-Detecting-Simulation-Under-Rainy-Conditions-for-Autonomous-Vehicle
 # 基于CARLA与ROS的雨天场景多传感器融合3D目标检测仿真项目
 
 ## 📌 项目简介
@@ -11,4 +11,4 @@
 ### 核心软件版本
 - 仿真平台：CARLA 0.9.12 (WindowsNoEditor版本)
 - ROS：Melodic/Noetic（与CARLA ROS桥兼容版本）
-- Python：3.7+（与CARLA Python API兼容
+- Python：3.7+（与 CARLA Python API 兼容）

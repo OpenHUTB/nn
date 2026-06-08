@@ -1,6 +1,0 @@
-<!-- -->
-<launch>
-  <node pkg="main" name="img_subs" type="img_subs.py"/>
-  <node pkg="main" name="pcl_subs" type="pcl_subs.py"/>
-</launch>
-
