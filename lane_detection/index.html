@@ -57,6 +57,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#2hsv">步骤2：HSV 预处理优化</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3">步骤3：透视变换 + 滑动窗口 + 多项式拟合</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#_4">参考</a>
     </li>
     </ul>
@@ -101,6 +103,7 @@
                 <h1 id="lane_detection">车道线检测（lane_detection）</h1>
 <p>基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。</p>
 <p><strong>作者</strong>：ultra223<br />
+<strong>课题进度</strong>：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
 <strong>课题进度</strong>：2/10（步骤1 基础检测 + 步骤2 HSV 优化）</p>
 <h2 id="_1">模块结构</h2>
 <table>
@@ -128,6 +131,10 @@
 <td style="text-align: left;">步骤2：HSV 黄白线、双黄线中心轴、左右车道</td>
 </tr>
 <tr>
+<td style="text-align: left;"><code>lane_advanced.py</code></td>
+<td style="text-align: left;">步骤3：透视变换、滑动窗口、二次多项式拟合</td>
+</tr>
+<tr>
 <td style="text-align: left;"><code>carla_test.jpg</code></td>
 <td style="text-align: left;">少量示例输入（运行依赖）</td>
 </tr>
@@ -148,6 +155,13 @@ python main.py
 <pre><code class="language-bash"># 步骤2：HSV 多车道检测
 python main.py --mode hsv
 
+# 步骤3：透视变换 + 滑动窗口 + 多项式拟合
+python main.py --mode advanced
+
+# 重新生成文档配图（写入 docs/lane_detection/images）
+python main.py --save-docs --no-show
+python main.py --mode hsv --save-docs --no-show
+python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
@@ -172,6 +186,18 @@ python main.py --mode hsv --save-docs --no-show
 <p><img alt="白色掩膜" src="images/step02_white_mask.jpg" /></p>
 <p><strong>多车道拟合结果</strong></p>
 <p><img alt="步骤2 检测结果" src="images/step02_result.jpg" /></p>
+<h2 id="3">步骤3：透视变换 + 滑动窗口 + 多项式拟合</h2>
+<p>在 HSV + Sobel 梯度联合二值化的基础上，通过透视变换获取鸟瞰图，利用直方图定位车道线基点，滑动窗口搜索车道像素，最后使用二次多项式拟合弯道曲线并反透视叠加回原图。</p>
+<p><strong>HSV + Sobel 二值化车道线</strong></p>
+<p><img alt="步骤3 二值化" src="images/step03_binary.jpg" /></p>
+<p><strong>鸟瞰图透视变换</strong></p>
+<p><img alt="步骤3 鸟瞰图" src="images/step03_birdseye.jpg" /></p>
+<p><strong>滑动窗口搜索</strong></p>
+<p><img alt="步骤3 滑动窗口" src="images/step03_sliding_window.jpg" /></p>
+<p><strong>二次多项式拟合结果</strong></p>
+<p><img alt="步骤3 多项式拟合" src="images/step03_poly_fit.jpg" /></p>
+<p><strong>最终检测结果</strong></p>
+<p><img alt="步骤3 检测结果" src="images/step03_result.jpg" /></p>
 <h2 id="_4">参考</h2>
 <ul>
 <li><a href="https://github.com/OpenHUTB/nn/blob/main/README.md">OpenHUTB/nn 贡献指南</a></li>
