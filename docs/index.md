@@ -203,7 +203,7 @@ title: 主页
 - [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
 
 - [__机械臂自动抓取__](./robot_arm/README.md) - 基于Franka Panda的机械臂自动抓取仿真项目
-
+- [__目标跟踪与检测__](./carla_detection_tracking/carla_2d_tracking.md)- 基于 CARLA 的 2D 检测与跟踪算法复现（Faster RCNN、YOLOv4、SORT、DeepSORT）
 
 
 
