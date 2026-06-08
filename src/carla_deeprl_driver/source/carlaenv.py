@@ -1,5 +1,6 @@
 import carla
 import random
+import math
 from source.agent import ActorCar
 from source.utility import get_env_settings, map2action
 
@@ -19,6 +20,9 @@ class CarlaEnv(object):
         self.spectator_mode = 'follow'
         self.spectator_offset = carla.Location(x=-8.0, y=0, z=5.0)
         self.spectator_rotation = carla.Rotation(pitch=-20, yaw=0, roll=0)
+        # 平滑镜头追踪参数
+        self.smooth_factor = 0.15  # 平滑系数，越小越平滑
+        self.current_spectator_transform = None
         self.bp = self.world.get_blueprint_library()
         self.spawn_points = self.world.get_map().get_spawn_points()
         self._update_settings()
@@ -68,13 +72,14 @@ class CarlaEnv(object):
     def step(self, action_index):
         action = map2action(action_index)
         assert isinstance(action, carla.VehicleControl), "action type is not vehicle control"
-        print("take: ", action)
         self.vehicle_control(action)
         frame_index = self.world.tick()
         self.update_spectator()
-        print(f"after step, current frame is: {frame_index}")
+        self.draw_speed_hud()
+        self.draw_gear_hud()
         observation, collision = self.agent.retrieve_data(frame_index)
         reward = self.get_reward(action_index, collision)
+        self.draw_reward_hud(reward, collision)
         done = 1 if collision != 0 else 0
         return observation, reward, done
 
@@ -145,25 +150,48 @@ class CarlaEnv(object):
             vehicle_rotation = vehicle_transform.rotation
 
             if self.spectator_mode == 'top':
-                new_transform = carla.Transform(
+                target_transform = carla.Transform(
                     carla.Location(x=vehicle_location.x, y=vehicle_location.y, z=50),
                     carla.Rotation(pitch=-90, yaw=vehicle_rotation.yaw, roll=0)
                 )
             elif self.spectator_mode == 'first':
                 cam_transform = carla.Transform(carla.Location(x=1.2, z=1.5))
-                new_transform = vehicle_transform.transform(cam_transform)
-                new_transform.rotation.roll = 0
+                target_transform = vehicle_transform.transform(cam_transform)
+                target_transform.rotation.roll = 0
             else:
                 forward_vec = carla.Vector3D(x=vehicle_location.x + self.spectator_offset.x,
                                             y=vehicle_location.y + self.spectator_offset.y,
                                             z=vehicle_location.z + self.spectator_offset.z)
-                new_transform = carla.Transform(
+                target_transform = carla.Transform(
                     forward_vec,
                     carla.Rotation(pitch=self.spectator_rotation.pitch + vehicle_rotation.pitch,
                                   yaw=vehicle_rotation.yaw + self.spectator_rotation.yaw,
                                   roll=vehicle_rotation.roll + self.spectator_rotation.roll)
                 )
-            self.spectator.set_transform(new_transform)
+            
+            # 平滑插值
+            if self.current_spectator_transform is None:
+                self.current_spectator_transform = target_transform
+            else:
+                # 位置插值
+                curr_loc = self.current_spectator_transform.location
+                tgt_loc = target_transform.location
+                smooth_loc = carla.Location(
+                    x=curr_loc.x + (tgt_loc.x - curr_loc.x) * self.smooth_factor,
+                    y=curr_loc.y + (tgt_loc.y - curr_loc.y) * self.smooth_factor,
+                    z=curr_loc.z + (tgt_loc.z - curr_loc.z) * self.smooth_factor
+                )
+                # 旋转插值
+                curr_rot = self.current_spectator_transform.rotation
+                tgt_rot = target_transform.rotation
+                smooth_rot = carla.Rotation(
+                    pitch=curr_rot.pitch + (tgt_rot.pitch - curr_rot.pitch) * self.smooth_factor,
+                    yaw=curr_rot.yaw + (tgt_rot.yaw - curr_rot.yaw) * self.smooth_factor,
+                    roll=curr_rot.roll + (tgt_rot.roll - curr_rot.roll) * self.smooth_factor
+                )
+                self.current_spectator_transform = carla.Transform(smooth_loc, smooth_rot)
+            
+            self.spectator.set_transform(self.current_spectator_transform)
 
     def set_spectator_mode(self, mode):
         if mode in ['follow', 'top', 'first']:
@@ -171,6 +199,118 @@ class CarlaEnv(object):
             print(f"Spectator mode changed to: {mode}")
         else:
             print(f"Invalid mode: {mode}. Use 'follow', 'top', or 'first'")
+
+    def get_speed(self):
+        if self.agent and self.agent.actor_car:
+            velocity = self.agent.actor_car.get_velocity()
+            speed_ms = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+            speed_kmh = speed_ms * 3.6
+            return speed_kmh, speed_ms
+        return 0.0, 0.0
+
+    def print_speed(self):
+        speed_kmh, speed_ms = self.get_speed()
+        print(f"Speed: {speed_kmh:.1f} km/h ({speed_ms:.1f} m/s)")
+        return speed_kmh, speed_ms
+
+    def draw_speed_hud(self):
+        if self.agent and self.agent.actor_car:
+            speed_kmh, speed_ms = self.get_speed()
+            vehicle_transform = self.agent.actor_car.get_transform()
+            hud_location = vehicle_transform.location + carla.Location(x=0, y=0, z=5)
+            
+            self.world.debug.draw_string(
+                hud_location,
+                f"Speed: {speed_kmh:.1f} km/h",
+                color=carla.Color(255, 255, 0),
+                life_time=0.1,
+                draw_shadow=True
+            )
+
+    def draw_reward_hud(self, reward, collision):
+        if self.agent and self.agent.actor_car:
+            vehicle_transform = self.agent.actor_car.get_transform()
+            vehicle_location = vehicle_transform.location
+            
+            # Draw reward info behind the vehicle
+            behind_dir = carla.Vector3D(
+                x=-math.cos(math.radians(vehicle_transform.rotation.yaw)) * 8,
+                y=-math.sin(math.radians(vehicle_transform.rotation.yaw)) * 8,
+                z=3
+            )
+            hud_location = carla.Location(
+                x=vehicle_location.x + behind_dir.x,
+                y=vehicle_location.y + behind_dir.y,
+                z=vehicle_location.z + behind_dir.z
+            )
+            
+            # Color based on reward
+            if collision != 0:
+                text = f"COLLISION! Reward: {reward:.1f}"
+                color = carla.Color(255, 0, 0)
+            elif reward > 0:
+                text = f"Reward: +{reward:.1f}"
+                color = carla.Color(0, 255, 0)
+            else:
+                text = f"Reward: {reward:.1f}"
+                color = carla.Color(255, 255, 0)
+            
+            self.world.debug.draw_string(
+                hud_location,
+                text,
+                color=color,
+                life_time=0.5,
+                draw_shadow=True
+            )
+
+    def get_gear(self):
+        """获取当前档位: D(前进), R(倒车), N(空档)"""
+        if self.agent and self.agent.actor_car:
+            velocity = self.agent.actor_car.get_velocity()
+            speed_ms = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+            
+            # 获取车辆控制状态
+            control = self.agent.actor_car.get_control()
+            
+            if control.reverse:
+                return 'R'
+            elif control.throttle > 0:
+                return 'D'
+            elif speed_ms < 0.1:
+                return 'N'
+            else:
+                return 'D'
+        return 'N'
+
+    def draw_gear_hud(self):
+        """绘制档位显示"""
+        if self.agent and self.agent.actor_car:
+            gear = self.get_gear()
+            vehicle_transform = self.agent.actor_car.get_transform()
+            vehicle_location = vehicle_transform.location
+            
+            # 档位显示位置（车顶上方偏左）
+            hud_location = carla.Location(
+                x=vehicle_location.x,
+                y=vehicle_location.y,
+                z=vehicle_location.z + 3
+            )
+            
+            # 根据档位设置颜色
+            if gear == 'D':
+                color = carla.Color(0, 255, 0)  # 绿色
+            elif gear == 'R':
+                color = carla.Color(255, 0, 0)  # 红色
+            else:
+                color = carla.Color(255, 255, 0)  # 黄色
+            
+            self.world.debug.draw_string(
+                hud_location,
+                f"[ {gear} ]",
+                color=color,
+                life_time=0.1,
+                draw_shadow=True
+            )
 
     def exit_env(self):
         self.cleanup_world()
@@ -188,12 +328,13 @@ class CarlaEnv(object):
 
     def step_sac(self, action):
         assert isinstance(action, carla.VehicleControl), "action is not the carla type."
-        print("take: ", action)
         self.vehicle_control(action)
         frame_index = self.world.tick()
         self.update_spectator()
-        print(f"after step, current frame is: {frame_index}")
+        self.draw_speed_hud()
+        self.draw_gear_hud()
         observation, collision = self.agent.retrieve_data(frame_index)
         reward = self.reward_sac(collision)
+        self.draw_reward_hud(reward, collision)
         done = 1 if collision != 0 else 0
         return observation, reward, done

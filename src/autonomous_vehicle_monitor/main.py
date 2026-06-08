@@ -9,15 +9,17 @@ from core.blackbox import Blackbox
 from core.map_drawer import MapDrawer
 from core.ui_dashboard import VirtualDashboard
 from core.traffic_light_monitor import TrafficLightMonitor
-from core.kpi_evaluator import KPIEvaluator  # <--- 导入KPI模块
+from core.kpi_evaluator import KPIEvaluator
+from core.hazard_manager import HazardManager
 
 def main():
-    # ====================== 连接CARLA ======================
+    # ====================== 连接 CARLA 模拟器 ======================
     client = carla.Client('localhost', 2000)
     client.set_timeout(15.0)
     world = client.get_world()
     tm = client.get_trafficmanager()
 
+    # 同步模式保证流畅稳定
     settings = world.get_settings()
     settings.synchronous_mode = True
     settings.fixed_delta_seconds = 0.05
@@ -41,6 +43,7 @@ def main():
     vehicle.set_autopilot(True)
     spectator = world.get_spectator()
 
+    # 俯视跟随视角
     def update_view():
         t = vehicle.get_transform()
         spectator.set_transform(carla.Transform(
@@ -64,11 +67,13 @@ def main():
     def set_rain():
         w = carla.WeatherParameters.WetNoon
         w.rain = 100
+        w.precipitation = 100
         world.set_weather(w)
 
     def set_fog():
         w = carla.WeatherParameters.ClearNoon
         w.fog_density = 70
+        w.fog_distance = 25
         world.set_weather(w)
 
     set_day()
@@ -126,7 +131,8 @@ def main():
     map_drawer = MapDrawer(world, vehicle)
     dash = VirtualDashboard()
     light_monitor = TrafficLightMonitor(world, vehicle)
-    kpi = KPIEvaluator()  # <--- KPI模块初始化
+    kpi = KPIEvaluator()
+    hazard_manager = HazardManager(world, vehicle, npc_manager, kpi)
 
     is_recording = False
     is_playing = False
@@ -142,8 +148,8 @@ def main():
             update_view()
             key = cv2.waitKey(1) & 0xFF
 
-            # 前车检测
             fcw_detect()
+            hazard_manager.tick()
 
             # 车道保持判断
             try:
@@ -153,7 +159,7 @@ def main():
             except:
                 is_in_lane = last_in_lane
 
-            # 更新KPI
+            # 更新 KPI
             kpi.update(vehicle, front_dist, is_in_lane)
 
             blackbox.record(vehicle)
@@ -190,7 +196,7 @@ def main():
                 if not player.play_frame():
                     is_playing = False
 
-            # ====================== 画面渲染 ======================
+            # ====================== 主画面渲染 ======================
             if len(sensors.frame_dict) >= 4 and sensors.lidar_data is not None:
                 f, b, l, r = sensors.frame_dict.values()
                 cam_mosaic = cv2.resize(np.vstack((np.hstack((f, b)), np.hstack((l, r)))), (1280, 960))
@@ -227,6 +233,12 @@ def main():
                 # 显示 KPI
                 kpi.draw_on_screen(full)
 
+                # 显示危险场景
+                hazard = hazard_manager.get_active_hazard()
+                if hazard:
+                    cv2.putText(full, f"HAZARD: {hazard}", (1300, 320),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 3)
+
                 cv2.putText(full, "N=夜间 R=雨 F=雾 C=晴 | R=录制", (20, 40),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
                 cv2.imshow("AD Monitor", full)
@@ -241,18 +253,23 @@ def main():
                 break
 
     finally:
-        kpi.save_report()  # <--- 退出时自动保存KPI报告
+        kpi.save_report()
         print("\n✅ KPI 报告已保存：kpi_report.txt")
 
         blackbox.close()
-        try: npc_manager.destroy_all()
-        except: pass
-        try: sensors.destroy()
-        except: pass
+        try:
+            npc_manager.destroy_all()
+        except:
+            pass
+        try:
+            sensors.destroy()
+        except:
+            pass
         try:
             if vehicle.is_alive:
                 vehicle.destroy()
-        except: pass
+        except:
+            pass
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
