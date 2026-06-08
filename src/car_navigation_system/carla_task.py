@@ -115,10 +115,12 @@ class SimpleDrivingSystem:
     def __init__(self):
         self.client = None
         self.world = None
+        self.map = None
         self.vehicle = None
         self.camera = None
         self.controller = None
         self.camera_image = None
+        self.obstacle_distance = None  # 障碍物距离
         # 日志系统
         self.setup_logger()
 
@@ -148,6 +150,7 @@ class SimpleDrivingSystem:
 
             # 加载地图
             self.world = self.client.load_world('Town01')
+            self.map = self.world.get_map()
             self.logger.info("地图加载成功")
 
             # 设置同步模式
@@ -270,6 +273,25 @@ class SimpleDrivingSystem:
         self.controller = SimpleController(self.world, self.vehicle)
         self.logger.info("控制器设置完成")
 
+    def check_obstacle(self):
+    #检测前方障碍物
+        try:
+            vehicle_location = self.vehicle.get_location()
+            vehicle = self.world.get_actors().filter('vehicle.*')
+        
+            for vehicle in vehicles:
+                if vehicle.id == self.vehicle.id:
+                   continue
+            
+                distance = vehicle_location.distance(vehicle.get_location())
+            
+                if distance < 10.0:
+                    self.logger.info(f"检测到障碍物！距离: {distance:.1f}米")
+                    return distance
+            return None
+        except:
+            return None
+
     def run(self):
         """主运行循环"""
         self.logger.info("\n" + "=" * 50)
@@ -323,8 +345,13 @@ class SimpleDrivingSystem:
                 velocity = self.vehicle.get_velocity()
                 speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
 
-                # 获取控制指令
-                throttle, brake, steer = self.controller.get_control()
+                # 障碍物检测
+                obstacle_dist = self.check_obstacle()
+                if obstacle_dist and obstacle_dist < 8.0:
+                    throttle, brake, steer = 0.0, 1.0, 0.0  # 紧急刹车
+                    self.logger.warning(f"紧急刹车！")
+                else:
+                    throttle, brake, steer = self.controller.get_control()
 
                 # 应用控制
                 control = carla.VehicleControl(
@@ -385,41 +412,44 @@ class SimpleDrivingSystem:
         finally:
             self.cleanup()
 
-    def spawn_npc_vehicles(self, count=2):
-        """生成NPC车辆（简化）"""
-        self.logger.info(f"正在生成 {count} 辆NPC车辆...")
-
+    def spawn_npc_vehicles(self, count=1):
+        #生成NPC车辆 - 调试版本
+        # 等待主车位置有效（不是原点）
+        self.logger.info("等待主车位置有效...")
+        for _ in range(20):  # 等待最多 10 秒
+            location = self.vehicle.get_location()
+            if location.x != 0 or location.y != 0:
+                self.logger.info(f"主车位置已就绪: {location}")
+                break
+            time.sleep(0.5)
+            
+        self.logger.info(f"正在生成NPC车辆...")
         try:
             blueprint_library = self.world.get_blueprint_library()
+            all_vehicles = blueprint_library.filter('vehicle.*')
+        
+            if len(all_vehicles) == 0:
+                self.logger.error("没有找到任何车辆蓝图！")
+                return
+        
+            vehicle_bp = all_vehicles[0]
             spawn_points = self.world.get_map().get_spawn_points()
-
-            npc_vehicles = []
-
-            for i in range(min(count, len(spawn_points))):
-                # 跳过主车辆的出生点
-                if i == 0:
-                    continue
-
-                try:
-                    # 随机选择车辆类型
-                    vehicle_bps = list(blueprint_library.filter('vehicle.*'))
-                    if vehicle_bps:
-                        vehicle_bp = random.choice(vehicle_bps)
-
-                        # 生成NPC
-                        npc = self.world.try_spawn_actor(vehicle_bp, spawn_points[i])
-
-                        if npc:
-                            npc.set_autopilot(True)
-                            npc_vehicles.append(npc)
-                            self.logger.info(f"生成NPC车辆 {len(npc_vehicles)}")
-                except:
-                    pass
-
-            self.logger.info(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
-
+        
+            if len(spawn_points) == 0:
+                self.logger.error("没有出生点！")
+                return
+        
+        # 避开主车的位置（用第2个出生点）
+            npc = self.world.try_spawn_actor(vehicle_bp, spawn_points[1])
+            if npc:
+                npc.set_autopilot(True)
+                self.logger.info("成功生成NPC车辆！")
+                self.logger.info(f"NPC位置: {spawn_points[1].location}")
+                self.logger.info(f"主车位置: {self.vehicle.get_location()}")
+            else:
+                self.logger.error("生成失败")
         except Exception as e:
-            self.logger.info(f"生成NPC车辆时出错: {e}")
+            self.logger.error(f"生成失败: {e}")
 
     def reset_vehicle(self):
         """重置车辆位置"""
