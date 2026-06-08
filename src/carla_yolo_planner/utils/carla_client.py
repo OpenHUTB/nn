@@ -67,6 +67,11 @@ class CarlaClient:
         self.last_velocity = 0
         self.spawn_points = None  # 保存生成点列表用于重置
         
+        # 红灯等待超时相关
+        self.red_light_wait_time = 0  # 红灯等待时间（秒）
+        self.red_light_timeout = 15.0  # 红灯超时阈值（秒），超过此时间自动闯红灯
+        self.ignore_lights = False  # 是否忽略红绿灯
+        
         # HUD显示相关
         self.hud_fps = 0
         self.hud_detection_count = 0
@@ -128,7 +133,7 @@ class CarlaClient:
             self.vehicle.set_autopilot(True, self.traffic_manager.get_port())
             
             # 设置车辆的自动驾驶行为
-            self.traffic_manager.ignore_lights_percentage(self.vehicle, 0)  # 遵守红绿灯
+            self.traffic_manager.ignore_lights_percentage(self.vehicle, 0 if not self.ignore_lights else 100)  # 遵守/忽略红绿灯
             self.traffic_manager.ignore_signs_percentage(self.vehicle, 0)   # 遵守标志
             self.traffic_manager.ignore_vehicles_percentage(self.vehicle, 0) # 不忽略其他车辆
             self.traffic_manager.ignore_walkers_percentage(self.vehicle, 0)  # 不忽略行人
@@ -560,6 +565,9 @@ class CarlaClient:
             velocity = self.vehicle.get_velocity()
             current_speed = velocity.length()
             
+            # 检测是否在红灯前等待
+            self._check_red_light_timeout()
+            
             # 判断是否卡住（速度接近0但应该在移动）
             if current_speed < 0.1:  # 速度小于0.1 m/s
                 self.stuck_counter += 1
@@ -594,3 +602,36 @@ class CarlaClient:
                 
         except Exception as e:
             print(f"[WARNING] 碰撞检测失败: {e}")
+    
+    def _check_red_light_timeout(self):
+        """检测红灯等待超时，如果超时就自动闯红灯"""
+        if not self.vehicle:
+            return
+        
+        try:
+            # 获取车辆速度
+            velocity = self.vehicle.get_velocity()
+            current_speed = velocity.length()
+            
+            # 检测是否在红灯前等待（速度很低）
+            if current_speed < 0.5:  # 速度小于0.5 m/s（约1.8 km/h）
+                self.red_light_wait_time += 0.05  # 假设每帧约0.05秒
+            else:
+                # 车辆在移动，重置等待时间
+                self.red_light_wait_time = 0
+                if self.ignore_lights:
+                    # 如果之前忽略了红绿灯，恢复遵守
+                    self.ignore_lights = False
+                    self.traffic_manager.ignore_lights_percentage(self.vehicle, 0)
+                    print("[INFO] 红灯超时已解除，恢复遵守红绿灯")
+                return
+            
+            # 检查是否超过红灯超时阈值
+            if self.red_light_wait_time >= self.red_light_timeout:
+                if not self.ignore_lights:
+                    print(f"[WARNING] 红灯等待超过 {self.red_light_timeout} 秒，自动闯红灯！")
+                    self.ignore_lights = True
+                    self.traffic_manager.ignore_lights_percentage(self.vehicle, 100)
+                    
+        except Exception as e:
+            pass
