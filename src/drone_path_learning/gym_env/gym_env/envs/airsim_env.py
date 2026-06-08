@@ -362,7 +362,7 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
                 )
 
         if self.reward_type in ("reward_distance_based", "reward_default"):
-            reward = self.compute_reward(done, action)
+            reward = self.compute_reward(done, action, info)
         elif self.reward_type == "reward_with_action":
             reward = self.compute_reward_with_action(done, action)
         elif self.reward_type == "reward_new":
@@ -372,7 +372,7 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
         elif self.reward_type == "reward_final":
             reward = self.compute_reward_final(done, action)
         else:
-            reward = self.compute_reward(done, action)
+            reward = self.compute_reward(done, action, info)
 
         self.cumulated_episode_reward += reward
 
@@ -623,7 +623,7 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
         return feature_all
 
 
-    def compute_reward(self, done, action):
+    def compute_reward(self, done, action, info=None):
         reward = 0.0
         reward_reach = 80.0
         reward_crash = -80.0
@@ -631,7 +631,7 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
         reward_timeout = -10.0
 
         if not done:
-            distance_now = self.get_distance_to_goal_3d()
+            distance_now = self.dynamic_model.get_distance_to_goal_2d()
             delta_distance = self.previous_distance_from_des_point - distance_now
             goal_distance_base = max(self.dynamic_model.goal_distance, 1e-6)
             reward_distance = float(np.clip(delta_distance / goal_distance_base * 300.0, -2.0, 2.0))
@@ -668,13 +668,14 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
             direction_bonus = 0.2 * np.tanh(delta_distance * 2.0)
             reward = reward_distance + direction_bonus - action_cost - yaw_error_cost - obs_cost
         else:
-            if self.is_in_desired_pose():
+            info = info or {}
+            if info.get("is_success", False):
                 reward = reward_reach
-            elif self.is_crashed():
+            elif info.get("is_crash", False):
                 reward = reward_crash
-            elif self.is_not_inside_workspace():
+            elif info.get("is_not_in_workspace", False):
                 reward = reward_outside
-            elif self.step_num >= self.max_episode_steps:
+            elif info.get("is_max_steps", False):
                 reward = reward_timeout
 
         return float(reward)

@@ -1,0 +1,78 @@
+<launch>
+  <!-- https://github.com/rickstaa/realsense-ros/blob/da38e309c2fbe88e45e6148bf5d944486b3e8e98/realsense2_description/launch/view_d435_model_rviz_gazebo.launch -->
+
+  <!-- arguments for the urdf xacro file, rviz visualization and namespace -->
+  <arg name="name" default="camera" />
+  <arg name="topics_ns" default="camera" />
+  <arg name="add_plug" default="false" />
+  <arg name="publish_pointcloud" default="true" />
+  <arg
+    name="model"
+    default="$(find realsense2_custom_description)/urdf/d435_camera.urdf.xacro"
+  />
+  <arg name="spawn_args" default="" />
+
+  <group ns="camera">
+    <!-- Load the sdf model only the parameter server -->
+    <param
+      name="$(arg name)_description"
+      command="$(find xacro)/xacro $(arg model)
+        use_nominal_extrinsics:=true
+        publish_pointcloud:=$(arg publish_pointcloud)
+        add_plug:=$(arg add_plug)
+        name:=$(arg name)
+        tf_prefix:=$(arg name)/
+        topics_ns:=$(arg topics_ns)
+        gravity:=0"
+    />
+
+    <node
+      name="camera_spawner"
+      pkg="gazebo_ros"
+      type="spawn_model"
+      respawn="false"
+      output="screen"
+      args="-urdf
+        -param $(arg name)_description
+        -model $(arg name)
+        -unpause $(arg spawn_args)"
+    />
+
+    <node
+      name="$(arg name)_state_publisher"
+      pkg="robot_state_publisher"
+      type="robot_state_publisher"
+    >
+      <!-- http://wiki.ros.org/robot_state_publisher/Tutorials/Using%20the%20robot%20state%20publisher%20on%20your%20own%20robot -->
+      <remap from="robot_description" to="$(arg name)_description" />
+      <param name="publish_frequency" type="double" value="5.0" />
+      <param name="tf_prefix" type="string" value="$(arg name)" />
+    </node>
+
+    <!-- https://github.com/pal-robotics/realsense_gazebo_plugin/issues/31#issuecomment-1098682872 -->
+    <node
+      pkg="nodelet"
+      type="nodelet"
+      name="$(arg name)_nodelet_manager"
+      args="manager"
+    />
+    <node
+      pkg="nodelet"
+      type="nodelet"
+      name="$(arg name)_nodelet"
+      args="load depth_image_proc/register $(arg name)_nodelet_manager"
+    >
+      <remap from="rgb/camera_info" to="color/camera_info" />
+      <remap from="depth/camera_info" to="depth/camera_info" />
+      <remap from="depth/image_rect" to="depth/image_raw" />
+      <remap
+        from="depth_registered/camera_info"
+        to="aligned_depth_to_color/camera_info"
+      />
+      <remap
+        from="depth_registered/image_rect"
+        to="aligned_depth_to_color/image_raw"
+      />
+    </node>
+  </group>
+</launch>

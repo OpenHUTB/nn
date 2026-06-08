@@ -1,0 +1,20 @@
+# Launch a ros master with the controller manager and associated services
+version: "3.8"
+
+x-base: &base
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile.gpu
+  image: autobots-visman/reinforcement-learning-gpu:latest
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+services:
+  base-gpu: *base
+  gazebo: *base
+  moveit-rviz: *base
+  img2vec: *base
