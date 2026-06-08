@@ -9,50 +9,54 @@ class CollisionDetection:
         self.has_collided = False
         self.collision_time = 0
         self.brake_active = False
+        self.collision_count = 0
 
     def setup_collision_sensor(self, world):
-        """设置碰撞传感器"""
         blueprint = world.get_blueprint_library()
         collision_bp = blueprint.find('sensor.other.collision')
         
         self.collision_sensor = world.spawn_actor(
             collision_bp,
-            carla.Transform(),
-            attach_to=self.vehicle
+            carla.Transform(carla.Location(z=2.0)),
+            attach_to=self.vehicle,
+            attachment_type=carla.AttachmentType.Rigid
         )
         
         self.collision_sensor.listen(lambda event: self._on_collision(event))
 
     def _on_collision(self, event):
-        """碰撞事件回调函数"""
-        if not self.has_collided:
-            self.has_collided = True
-            self.collision_time = time.time()
-            self.brake_active = True
-            print("[COLLISION] Detected! Activating emergency brake...")
-            
-            # 立即应用紧急制动
-            control = carla.VehicleControl(throttle=0, brake=1.0, steer=0)
-            self.vehicle.apply_control(control)
+        self.has_collided = True
+        self.collision_time = time.time()
+        self.brake_active = True
+        self.collision_count += 1
+        
+        actor_type = event.other_actor.type_id
+        impulse = event.normal_impulse
+        print(f"\n[COLLISION #{self.collision_count}] Detected!")
+        print(f"  - Object hit: {actor_type}")
+        print(f"  - Impact impulse: ({impulse.x:.2f}, {impulse.y:.2f}, {impulse.z:.2f})")
+        print("  - Activating emergency brake...")
+        
+        control = carla.VehicleControl(throttle=0, brake=1.0, steer=0, hand_brake=True)
+        self.vehicle.apply_control(control)
 
     def update(self):
-        """更新碰撞检测状态"""
-        # 如果碰撞后已经刹车2秒，解除制动状态
-        if self.brake_active and (time.time() - self.collision_time) > 2.0:
-            self.brake_active = False
-            print("[COLLISION] Brake released after 2 seconds")
+        if self.brake_active:
+            velocity = self.vehicle.get_velocity()
+            speed = ((velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5) * 3.6
+            
+            if speed < 0.5:
+                self.brake_active = False
+                print("\n[COLLISION] Vehicle stopped, brake released")
 
     def is_colliding(self):
-        """检查是否正在碰撞"""
         return self.has_collided and self.brake_active
 
     def reset(self):
-        """重置碰撞状态"""
         self.has_collided = False
         self.brake_active = False
 
     def destroy(self):
-        """销毁传感器"""
         if self.collision_sensor:
             self.collision_sensor.destroy()
 
@@ -60,44 +64,51 @@ def main():
     print("=" * 60)
     print("CARLA - Collision Detection System")
     print("=" * 60)
+    print("[TIP] Use arrow keys to drive and test collision!")
+    print("=" * 60)
     
     try:
         client = carla.Client("localhost", 2000)
         client.set_timeout(10.0)
-        print("[INFO] Connected to CARLA server successfully")
+        print("[INFO] Connected to CARLA server")
         
         world = client.get_world()
         blueprint_library = world.get_blueprint_library()
         
-        # 生成车辆
         tesla_bp = blueprint_library.find("vehicle.tesla.model3")
         tesla_bp.set_attribute("color", "0, 0, 0")
         
         spawn_points = world.get_map().get_spawn_points()
         vehicle = world.spawn_actor(tesla_bp, spawn_points[0])
         
-        # 设置碰撞检测
         collision_detector = CollisionDetection(vehicle)
         collision_detector.setup_collision_sensor(world)
         
-        # 开启自动驾驶
-        vehicle.set_autopilot(True)
-        print("[INFO] Autopilot enabled")
-        print("[INFO] Collision detection system activated")
+        print("[INFO] Vehicle spawned")
+        print("[INFO] Collision sensor activated")
+        print("[INFO] Manual control mode - use WASD/arrow keys")
         print("[INFO] Press Ctrl+C to stop")
+        
+        control = carla.VehicleControl()
         
         try:
             while True:
                 collision_detector.update()
                 
-                if collision_detector.is_colliding():
-                    print("\r[EMERGENCY] BRAKING - Collision detected!", end="")
-                else:
-                    velocity = vehicle.get_velocity()
-                    speed = ((velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5) * 3.6
-                    print(f"\r[INFO] Speed: {speed:.1f} km/h | Collision: {'DETECTED' if collision_detector.has_collided else 'Safe'}", end="")
+                control.throttle = 0.5
+                control.steer = 0.0
+                control.brake = 0.0
                 
-                time.sleep(0.1)
+                vehicle.apply_control(control)
+                
+                velocity = vehicle.get_velocity()
+                speed = ((velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5) * 3.6
+                
+                status = "[EMERGENCY BRAKE]" if collision_detector.is_colliding() else "[DRIVING]"
+                print(f"\r{status} Speed: {speed:.1f} km/h | Collisions: {collision_detector.collision_count}", end="")
+                
+                time.sleep(0.05)
+                
         except KeyboardInterrupt:
             print("\n[INFO] User interrupted")
         finally:
