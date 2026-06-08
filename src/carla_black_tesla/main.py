@@ -1,6 +1,78 @@
+"""
+CARLA - Black Tesla with Weather Control and Auto Camera Tracking
+"""
 import carla
 import sys
 import time
+
+
+class AutoCamera:
+    """Automatically make your CARLA view follow the vehicle"""
+    
+    def __init__(self, world, vehicle):
+        self.world = world
+        self.vehicle = vehicle
+        self.spectator = world.get_spectator()
+        
+    def follow_vehicle(self, mode="third_person"):
+        """Update your view to follow the vehicle
+        
+        Args:
+            mode: "third_person" (default), "first_person", "top_down", or "chase"
+        """
+        vehicle_transform = self.vehicle.get_transform()
+        
+        if mode == "third_person":
+            spectator_location = (
+                vehicle_transform.location + 
+                vehicle_transform.get_forward_vector() * -6.0 + 
+                carla.Location(z=3.5)
+            )
+            spectator_rotation = carla.Rotation(
+                pitch=vehicle_transform.rotation.pitch - 12.0,
+                yaw=vehicle_transform.rotation.yaw,
+                roll=vehicle_transform.rotation.roll
+            )
+        elif mode == "first_person":
+            spectator_location = (
+                vehicle_transform.location + 
+                vehicle_transform.get_forward_vector() * 1.5 + 
+                carla.Location(z=1.3)
+            )
+            spectator_rotation = carla.Rotation(
+                pitch=vehicle_transform.rotation.pitch,
+                yaw=vehicle_transform.rotation.yaw,
+                roll=vehicle_transform.rotation.roll
+            )
+        elif mode == "top_down":
+            spectator_location = vehicle_transform.location + carla.Location(z=25.0)
+            spectator_rotation = carla.Rotation(pitch=-90.0, yaw=vehicle_transform.rotation.yaw)
+        elif mode == "chase":
+            spectator_location = (
+                vehicle_transform.location + 
+                vehicle_transform.get_forward_vector() * -3.5 + 
+                carla.Location(z=2.0)
+            )
+            spectator_rotation = carla.Rotation(
+                pitch=vehicle_transform.rotation.pitch - 8.0,
+                yaw=vehicle_transform.rotation.yaw,
+                roll=vehicle_transform.rotation.roll
+            )
+        else:
+            spectator_location = (
+                vehicle_transform.location + 
+                vehicle_transform.get_forward_vector() * -6.0 + 
+                carla.Location(z=3.5)
+            )
+            spectator_rotation = carla.Rotation(
+                pitch=vehicle_transform.rotation.pitch - 12.0,
+                yaw=vehicle_transform.rotation.yaw,
+                roll=vehicle_transform.rotation.roll
+            )
+        
+        spectator_transform = carla.Transform(spectator_location, spectator_rotation)
+        self.spectator.set_transform(spectator_transform)
+
 
 def set_weather(world, weather_type):
     weather = world.get_weather()
@@ -37,6 +109,7 @@ def set_weather(world, weather_type):
         print("[WEATHER] Set to Night")
     
     world.set_weather(weather)
+
 
 def main():
     print("=" * 60)
@@ -82,6 +155,10 @@ def main():
         vehicle.set_autopilot(True)
         print("[INFO] Autopilot enabled - vehicle is driving")
         
+        # Set up auto camera tracking
+        auto_camera = AutoCamera(world, vehicle)
+        print("[INFO] Auto camera tracking enabled - your view follows the car!")
+        
         weather_types = ["sunny", "cloudy", "rainy", "foggy", "night"]
         current_weather = 0
         set_weather(world, weather_types[current_weather])
@@ -92,6 +169,9 @@ def main():
         try:
             last_weather_time = time.time()
             while True:
+                # Update camera to follow vehicle
+                auto_camera.follow_vehicle(mode="third_person")
+                
                 location = vehicle.get_location()
                 velocity = vehicle.get_velocity()
                 speed = ((velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5) * 3.6
@@ -118,6 +198,7 @@ def main():
     except Exception as e:
         print(f"[ERROR] Unexpected error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

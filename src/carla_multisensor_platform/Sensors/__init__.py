@@ -1,5 +1,5 @@
 # Constants
-WINDOW_SIZE = (1920, 960)
+WINDOW_SIZE = (1600, 896)
 
 # RGBcamera
 from .RGBcamera.CarLaneDetector import LaneDetector, CarDetector
