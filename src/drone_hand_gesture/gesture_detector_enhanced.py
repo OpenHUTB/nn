@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+import time
 
 # 尝试导入 MediaPipe（可选）
 try:
@@ -19,7 +20,7 @@ except ImportError:
 
 
 class EnhancedGestureDetector:
-    """增强版手势检测器（支持机器学习或纯OpenCV）"""
+    """增强版手势检测器（支持机器学习或纯OpenCV + 滑动手势）"""
 
     def __init__(self, ml_model_path=None, use_ml=True):
         self.use_ml = use_ml and HAS_MEDIAPIPE
@@ -32,16 +33,14 @@ class EnhancedGestureDetector:
                 self.mp_drawing = mp.solutions.drawing_utils
                 self.mp_drawing_styles = mp.solutions.drawing_styles
                 
-                # 使用更轻量的配置，提高帧率
                 self.hands = self.mp_hands.Hands(
                     static_image_mode=False,
                     max_num_hands=1,
-                    model_complexity=0,  # 使用最轻量的模型
                     min_detection_confidence=0.5,
-                    min_tracking_confidence=0.3
+                    min_tracking_confidence=0.5
                 )
                 self.mode = "mediapipe"
-                print("[INFO] 使用 MediaPipe 手势检测模式 (轻量配置)")
+                print("[INFO] 使用 MediaPipe 手势检测模式")
             except Exception as e:
                 print(f"[WARNING] MediaPipe 初始化失败: {e}")
                 self.mode = "opencv"
@@ -74,8 +73,29 @@ class EnhancedGestureDetector:
             "thumb_up": "backward",
             "thumb_down": "stop",
             "ok_sign": "hover",
-            "hand_detected": "hover"
+            "hand_detected": "hover",
+            # 滑动手势
+            "swipe_left": "left",
+            "swipe_right": "right",
+            "swipe_up": "forward",
+            "swipe_down": "backward",
         }
+
+        # 滑动手势相关
+        self.palm_history = {'left': [], 'right': []}
+        self.max_history_length = 10
+        self.swipe_commands = {
+            "swipe_left": "left",
+            "swipe_right": "right",
+            "swipe_up": "forward",
+            "swipe_down": "backward",
+        }
+        self.swipe_threshold = 0.15
+        self.swipe_min_velocity = 0.3
+        self.swipe_cooldown = 0.5
+        self.last_swipe_time = 0
+        self.current_swipe = None
+        self.swipe_intensity = 0.5
 
         # 历史记录
         self.prediction_history = []
@@ -119,16 +139,27 @@ class EnhancedGestureDetector:
             return self._detect_with_opencv(image, simulation_mode)
 
     def _detect_with_mediapipe(self, image, simulation_mode):
-        """使用 MediaPipe 检测"""
+        """使用 MediaPipe 检测（支持滑动手势）"""
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.hands.process(image_rgb)
 
         gesture = "no_hand"
         confidence = 0.0
         landmarks_data = None
+        height, width = image.shape[:2]
+        current_time = time.time()
 
-        if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
+        # 重置滑动手势
+        self.current_swipe = None
+        self.swipe_intensity = 0.5
+
+        if results.multi_hand_landmarks and results.multi_handedness:
+            for idx, (hand_landmarks, handedness) in enumerate(
+                zip(results.multi_hand_landmarks, results.multi_handedness)
+            ):
+                # 获取手类型
+                hand_type = handedness.classification[0].label  # "Left" 或 "Right"
+                
                 self.mp_drawing.draw_landmarks(
                     image, hand_landmarks, self.mp_hands.HAND_CONNECTIONS,
                     self.mp_drawing_styles.get_default_hand_landmarks_style(),
@@ -142,6 +173,28 @@ class EnhancedGestureDetector:
                     self._smooth_prediction(gesture, confidence)
                 else:
                     gesture, confidence = self._classify_by_rules(hand_landmarks)
+                
+                # 获取手掌中心位置用于滑动检测
+                palm_position = self._get_palm_center(hand_landmarks)
+                
+                # 检测滑动手势
+                if palm_position:
+                    palm_key = 'left' if hand_type == "Left" else 'right'
+                    
+                    self.palm_history[palm_key].append({
+                        'position': (palm_position['x'], palm_position['y']),
+                        'timestamp': current_time
+                    })
+                    
+                    if len(self.palm_history[palm_key]) > self.max_history_length:
+                        self.palm_history[palm_key].pop(0)
+                    
+                    swipe_result = self._detect_swipe_gesture(palm_key, width, height, current_time)
+                    if swipe_result:
+                        self.current_swipe = swipe_result['direction']
+                        self.swipe_intensity = swipe_result['intensity']
+                        gesture = swipe_result['gesture_name']
+                        confidence = swipe_result['confidence']
                 
                 landmarks_data = landmarks
 
@@ -253,104 +306,57 @@ class EnhancedGestureDetector:
         return landmarks[:63]
 
     def _classify_by_rules(self, hand_landmarks):
-        """规则分类（基于MediaPipe关键点）"""
-        if len(hand_landmarks.landmark) < 21:
-            return "no_hand", 0.0
-        
-        points = hand_landmarks.landmark
-        
-        # 计算手指伸展情况
-        def is_finger_extended(tip_idx, pip_idx):
-            """判断手指是否伸展"""
-            tip = points[tip_idx]
-            pip = points[pip_idx]
-            mcp = points[pip_idx - 1]
-            return tip.y < pip.y
-        
-        # 检查各手指
-        fingers_extended = {
-            'thumb': self._is_thumb_extended(points),
-            'index': is_finger_extended(8, 6),
-            'middle': is_finger_extended(12, 10),
-            'ring': is_finger_extended(16, 14),
-            'pinky': is_finger_extended(20, 18)
+        """规则分类"""
+        return "open_palm", 0.5
+
+        left_commands = {
+            "victory": "forward",
+            "thumb_up": "backward",
+            "pointing_up": "left",
+            "pointing_down": "right",
         }
-        
-        extended_count = sum(fingers_extended.values())
-        
-        # 手势分类
-        # 1. 张开手掌: 4或5个手指伸展
-        if extended_count >= 4:
-            return "open_palm", 0.85
-        
-        # 2. 握拳: 所有手指弯曲
-        if extended_count <= 1:
-            return "closed_fist", 0.85
-        
-        # 3. 食指上指: 只有食指伸展
-        if (fingers_extended['index'] and 
-            not fingers_extended['middle'] and 
-            not fingers_extended['ring'] and 
-            not fingers_extended['pinky']):
-            return "pointing_up", 0.80
-        
-        # 4. 食指向下: 只有食指伸展
-        if (fingers_extended['index'] and 
-            not fingers_extended['middle'] and 
-            not fingers_extended['ring'] and 
-            not fingers_extended['pinky']):
-            return "pointing_up", 0.80
-        
-        # 5. 胜利手势: 食指和中指伸展
-        if (fingers_extended['index'] and 
-            fingers_extended['middle'] and 
-            not fingers_extended['ring'] and 
-            not fingers_extended['pinky']):
-            return "victory", 0.80
-        
-        # 6. 大拇指向上/向下
-        if fingers_extended['thumb']:
-            thumb_tip = points[4]
-            wrist = points[0]
-            if thumb_tip.y < wrist.y:
-                return "thumb_up", 0.80
-            else:
-                return "thumb_down", 0.80
-        
-        # 7. OK手势: 食指和拇指接近
-        thumb_tip = points[4]
-        index_tip = points[8]
-        distance = ((thumb_tip.x - index_tip.x)**2 + 
-                   (thumb_tip.y - index_tip.y)**2)**0.5
-        if distance < 0.15 and not fingers_extended['index']:
-            return "ok_sign", 0.80
-        
-        return "hand_detected", 0.5
-    
-    def _is_thumb_extended(self, points):
-        """判断拇指是否伸展"""
-        thumb_tip = points[4]
-        thumb_mcp = points[2]
-        wrist = points[0]
-        
-        # 检查拇指是否在手掌外侧
-        if thumb_tip.x < thumb_mcp.x:
-            return True
-        return False
 
-    def _smooth_prediction(self, gesture, confidence):
-        """平滑预测"""
-        self.prediction_history.append((gesture, confidence))
-        if len(self.prediction_history) > self.max_history:
-            self.prediction_history.pop(0)
+        right_commands = {
+            "pointing_up": "up",
+            "pointing_down": "down",
+            "ok_sign": "hover",
+        }
 
-    def get_command(self, gesture):
-        """获取控制指令"""
-        return self.gesture_commands.get(gesture, "none")
+        both_commands = {
+            "open_palm": "takeoff",
+            "closed_fist": "land",
+            "thumb_down": "stop",
+        }
 
-    def get_gesture_intensity(self, landmarks, gesture_type):
-        """获取手势强度"""
-        return 0.5
+        if left_hand_data:
+            gesture = left_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(left_hand_data, gesture)
+            result['left_gesture'] = gesture
+
+            if gesture in self.swipe_commands:
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
+            elif gesture in left_commands:
+                result['direction_command'] = left_commands[gesture]
+                result['direction_intensity'] = intensity
+            elif gesture in both_commands:
+                result['special_command'] = both_commands[gesture]
+
+        if right_hand_data:
+            gesture = right_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(right_hand_data, gesture)
+            result['right_gesture'] = gesture
+
+            if gesture in self.swipe_commands:
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
+            elif gesture in right_commands:
+                result['altitude_command'] = right_commands[gesture]
+                result['altitude_intensity'] = intensity
+            elif gesture in both_commands:
+                result['special_command'] = both_commands[gesture]
+
+        return result
 
     def release(self):
         """释放资源"""

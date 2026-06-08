@@ -1,0 +1,11 @@
+{
+  "source": "AirSim battery telemetry log",
+  "records": 12,
+  "min_battery_margin": -14.46,
+  "return_now_frames": 3,
+  "generated_files": [
+    "airsim_battery_requirement.png",
+    "airsim_battery_margin.png",
+    "airsim_rth_advice.csv"
+  ]
+}

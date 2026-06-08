@@ -86,6 +86,18 @@ openpilot-model/                  # 项目根目录
 python main.py ./test_video.mp4
 ```
 
+无界面运行并保存截图：
+
+```bash
+python main.py ./test_video.mp4 --no-display --max-frames 120 --save-every 60
+```
+
+使用 CARLA RGB 图片序列测试：
+
+```bash
+python main.py ./carla_rgb_frames --carla-test --no-display --max-frames 120 --save-every 60
+```
+
 ### 4. 操作说明
 - 程序运行后会弹出两个窗口：  
   1. **原始帧窗口**：显示缩小后的视频原始帧（480×270）；  
@@ -101,6 +113,31 @@ python main.py ./test_video.mp4
 | `model_path`  | `main` 函数         | "models/supercombo.h5" | 模型文件路径（若模型放在其他位置，需同步修改）                       |
 | `cv2.waitKey` | 可视化循环中        | 100    | 帧间等待时间（单位：ms，增大此值可降低窗口刷新频率，减少资源占用）   |
 | 预测窗口尺寸  | `plt.subplots`      | (8,6)  | 可修改 `figsize=(6,4)` 缩小窗口，进一步降低渲染压力                  |
+
+## 新增运行指标
+
+当前版本在输出视频和截图中新增了车道检测状态 HUD，并在 CSV 中记录以下指标：
+
+- `confidence`：车道检测置信度，综合左右车道线是否存在、Hough 线段数量和车道几何合理性计算，范围为 0~1。
+- `lane_deviation`：车辆相对车道中心的横向偏移比例，负值表示偏左，正值表示偏右。
+- `departure_status`：车道偏离状态，包括 `CENTERED`、`CAUTION`、`LEFT_DEPARTURE`、`RIGHT_DEPARTURE` 和 `LOW_CONF`。
+
+当偏移比例超过阈值时，画面底部会显示黄色或红色偏离提示，便于快速判断车辆是否偏离当前车道。
+
+## CARLA 测试模式
+
+通过 `--carla-test` 可以启用 CARLA 测试模式。该模式支持两类输入：
+
+1. CARLA 导出的 RGB 视频文件。
+2. CARLA 相机逐帧保存的图片目录，支持 `.jpg`、`.jpeg`、`.png` 和 `.bmp`。
+
+当输入为图片目录时，程序会按文件名排序读取图片序列，生成同样的检测视频、截图和 CSV 指标报告。
+
+## 异常处理优化
+
+- 输入文件无法打开、图片目录为空、首帧读取失败或输出视频无法创建时，会给出明确错误提示。
+- 单帧车道检测失败时，会跳过当前帧并继续处理后续帧，避免整段测试中断。
+- 程序退出时会统一释放视频输入、输出写入器和 OpenCV 窗口资源。
 
 
 ## 常见问题解决

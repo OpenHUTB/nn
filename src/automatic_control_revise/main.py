@@ -10,18 +10,6 @@
 
 from __future__ import print_function
 
-import argpars#!/usr/bin/env python
-
-# Copyright (c) 2018 Intel Labs.
-# authors: German Ros (german.ros@intel.com)
-#
-# This work is licensed under the terms of the MIT license.
-# For a copy, see <https://opensource.org/licenses/MIT>.
-
-"""Example of automatic vehicle control from client side."""
-
-from __future__ import print_function
-
 import argparse
 import collections
 import datetime
@@ -215,6 +203,7 @@ class KeyboardControl(object):
     def __init__(self, world):
         self.world = world
         self.manual_mode = False
+        self.reroute_requested = False
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self):
@@ -226,6 +215,13 @@ class KeyboardControl(object):
                     self.manual_mode = not self.manual_mode
                     mode_str = "Manual" if self.manual_mode else "Auto"
                     self.world.hud.notification("Switched to {} mode".format(mode_str), seconds=2.0)
+                if event.key == pygame.K_r:      # 新增
+                    self.reroute_requested = True
+                    self.world.hud.notification("Reroute requested", seconds=1.5)
+                if event.key == pygame.K_v:      # 新增截图功能
+                    if self.world.camera_manager is not None:
+                        self.world.camera_manager.request_screenshot = True
+                        self.world.hud.notification("Screenshot requested", seconds=1.0)
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
@@ -260,7 +256,11 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
+        self.speed_history = []          # 存储最近的速度值 (km/h)
+        self.max_speed_points = 60       # 最多保存60个点
         self.last_waypoint = None
+        self.current_obstacle = None
+        self.overspeed = False   # 超速标志
 
     def on_world_tick(self, timestamp):
         """Gets informations from the world at every tick"""
@@ -286,6 +286,10 @@ class HUD(object):
         max_col = max(1.0, max(collision))
         collision = [x / max_col for x in collision]
         vehicles = world.world.get_actors().filter('vehicle.*')
+        # 判断是否超速（当前速度 > 道路限速）
+        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        road_limit = world.player.get_speed_limit()
+        self.overspeed = current_speed > road_limit
 
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
@@ -300,7 +304,15 @@ class HUD(object):
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % transform.location.z,
+            'Speed limit: % 10.0f km/h' % world.player.get_speed_limit(),
             '']
+        
+        # 记录速度历史（用于速度曲线）
+        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        self.speed_history.append(current_speed)
+        if len(self.speed_history) > self.max_speed_points:
+            self.speed_history.pop(0)
+
         if isinstance(control, carla.VehicleControl):
             self._info_text += [
                 ('Throttle:', control.throttle, 0.0, 1.0),
@@ -334,7 +346,51 @@ class HUD(object):
                 break
             vehicle_type = get_actor_display_name(vehicle, truncate=22)
             self._info_text.append('% 4dm %s' % (dist, vehicle_type))
+                
+        # 新增：基于Actor的最近障碍物距离检测（车辆、行人、交通锥、路灯等）
+        obstacle_distance = None
+        vehicle_location = world.player.get_location()
+        vehicle_transform = world.player.get_transform()
+        forward_vector = vehicle_transform.get_forward_vector()
 
+        all_actors = world.world.get_actors()
+        for actor in all_actors:
+            # 排除玩家车自身
+            if actor.id == world.player.id:
+                continue
+            # 排除所有附着在玩家车上的传感器（安全检查父级）
+            if hasattr(actor, 'get_parent'):
+                if actor.get_parent() is not None and actor.get_parent().id == world.player.id:
+                    continue
+            # 只考虑车辆和行人，忽略静态物体（路灯、路锥等）
+            if not (actor.type_id.startswith('vehicle.') or actor.type_id.startswith('walker.')):
+                continue
+            # 只考虑前方30米内的物体，提高性能
+            if actor.get_location().distance(vehicle_location) > 30.0:
+                continue
+            # 计算相对向量
+            delta = actor.get_location() - vehicle_location
+            # 判断是否在前方：点积 > 0
+            dot = forward_vector.x * delta.x + forward_vector.y * delta.y + forward_vector.z * delta.z
+            if dot < 0:
+                continue
+            # 计算距离
+            dist = math.sqrt(delta.x**2 + delta.y**2 + delta.z**2)
+            # 忽略距离小于 3.5 米的物体（自身传感器）
+            if dist < 3.5:
+                continue
+            if obstacle_distance is None or dist < obstacle_distance:
+                obstacle_distance = dist
+
+        if obstacle_distance is not None:
+            self._info_text.append('Obstacle: % 5.1f m' % obstacle_distance)
+        else:
+            self._info_text.append('Obstacle: None')
+        
+        # 将当前障碍物距离保存到实例变量，供 AEB 使用
+        self.current_obstacle = obstacle_distance
+
+        
         # 新增：显示下一个路径点的距离，并在到达新路径点时提示
         if hasattr(world, 'agent') and world.agent is not None:
             try:
@@ -414,893 +470,47 @@ class HUD(object):
                         pygame.draw.rect(display, (255, 255, 255), rect)
                     item = item[0]
                 if item:  # At this point has to be a str.
-                    surface = self._font_mono.render(item, True, (255, 255, 255))
-                    display.blit(surface, (8, v_offset))
-                v_offset += 18
-        self._notifications.render(display)
-        self.help.render(display)
-
-# ==============================================================================
-# -- FadingText ----------------------------------------------------------------
-# ==============================================================================
-
-
-class FadingText(object):
-    """ Class for fading text """
-
-    def __init__(self, font, dim, pos):
-        """Constructor method"""
-        self.font = font
-        self.dim = dim
-        self.pos = pos
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
-
-    def set_text(self, text, color=(255, 255, 255), seconds=2.0):
-        """Set fading text"""
-        text_texture = self.font.render(text, True, color)
-        self.surface = pygame.Surface(self.dim)
-        self.seconds_left = seconds
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_texture, (10, 11))
-
-    def tick(self, _, clock):
-        """Fading text method for every tick"""
-        delta_seconds = 1e-3 * clock.get_time()
-        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
-        self.surface.set_alpha(500.0 * self.seconds_left)
-
-    def render(self, display):
-        """Render fading text method"""
-        display.blit(self.surface, self.pos)
-
-# ==============================================================================
-# -- HelpText ------------------------------------------------------------------
-# ==============================================================================
-
-
-class HelpText(object):
-    """ Helper class for text render"""
-
-    def __init__(self, font, width, height):
-        """Constructor method"""
-        lines = __doc__.split('\n')
-        self.font = font
-        self.dim = (680, len(lines) * 22 + 12)
-        self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
-        self.surface.fill((0, 0, 0, 0))
-        for i, line in enumerate(lines):
-            text_texture = self.font.render(line, True, (255, 255, 255))
-            self.surface.blit(text_texture, (22, i * 22))
-            self._render = False
-        self.surface.set_alpha(220)
-
-    def toggle(self):
-        """Toggle on or off the render help"""
-        self._render = not self._render
-
-    def render(self, display):
-        """Render help text method"""
-        if self._render:
-            display.blit(self.surface, self.pos)
-
-# ==============================================================================
-# -- CollisionSensor -----------------------------------------------------------
-# ==============================================================================
-
-
-class CollisionSensor(object):
-    """ Class for collision sensors"""
-
-    def __init__(self, parent_actor, hud):
-        """Constructor method"""
-        self.sensor = None
-        self.history = []
-        self._parent = parent_actor
-        self.hud = hud
-        world = self._parent.get_world()
-        blueprint = world.get_blueprint_library().find('sensor.other.collision')
-        self.sensor = world.spawn_actor(blueprint, carla.Transform(), attach_to=self._parent)
-        # We need to pass the lambda a weak reference to
-        # self to avoid circular reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
-
-    def get_collision_history(self):
-        """Gets the history of collisions"""
-        history = collections.defaultdict(int)
-        for frame, intensity in self.history:
-            history[frame] += intensity
-        return history
-
-    @staticmethod
-    def _on_collision(weak_self, event):
-        """On collision method"""
-        self = weak_self()
-        if not self:
-            return
-        actor_type = get_actor_display_name(event.other_actor)
-        self.hud.notification('Collision with %r' % actor_type)
-        impulse = event.normal_impulse
-        intensity = math.sqrt(impulse.x ** 2 + impulse.y ** 2 + impulse.z ** 2)
-        self.history.append((event.frame, intensity))
-        if len(self.history) > 4000:
-            self.history.pop(0)
-
-# ==============================================================================
-# -- LaneInvasionSensor --------------------------------------------------------
-# ==============================================================================
-
-
-class LaneInvasionSensor(object):
-    """Class for lane invasion sensors"""
-
-    def __init__(self, parent_actor, hud):
-        """Constructor method"""
-        self.sensor = None
-        self._parent = parent_actor
-        self.hud = hud
-        world = self._parent.get_world()
-        bp = world.get_blueprint_library().find('sensor.other.lane_invasion')
-        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
-        # We need to pass the lambda a weak reference to self to avoid circular
-        # reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
-
-    @staticmethod
-    def _on_invasion(weak_self, event):
-        """On invasion method"""
-        self = weak_self()
-        if not self:
-            return
-        lane_types = set(x.type for x in event.crossed_lane_markings)
-        text = ['%r' % str(x).split()[-1] for x in lane_types]
-        self.hud.notification('Crossed line %s' % ' and '.join(text))
-
-# ==============================================================================
-# -- GnssSensor --------------------------------------------------------
-# ==============================================================================
-
-
-class GnssSensor(object):
-    """ Class for GNSS sensors"""
-
-    def __init__(self, parent_actor):
-        """Constructor method"""
-        self.sensor = None
-        self._parent = parent_actor
-        self.lat = 0.0
-        self.lon = 0.0
-        world = self._parent.get_world()
-        blueprint = world.get_blueprint_library().find('sensor.other.gnss')
-        self.sensor = world.spawn_actor(blueprint, carla.Transform(carla.Location(x=1.0, z=2.8)),
-                                        attach_to=self._parent)
-        # We need to pass the lambda a weak reference to
-        # self to avoid circular reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: GnssSensor._on_gnss_event(weak_self, event))
-
-    @staticmethod
-    def _on_gnss_event(weak_self, event):
-        """GNSS method"""
-        self = weak_self()
-        if not self:
-            return
-        self.lat = event.latitude
-        self.lon = event.longitude
-
-# ==============================================================================
-# -- CameraManager -------------------------------------------------------------
-# ==============================================================================
-
-
-class CameraManager(object):
-    """ Class for camera management"""
-
-    def __init__(self, parent_actor, hud, gamma_correction):
-        """Constructor method"""
-        self.sensor = None
-        self.surface = None
-        self._parent = parent_actor
-        self.hud = hud
-        self.recording = False
-        bound_y = 0.5 + self._parent.bounding_box.extent.y
-        attachment = carla.AttachmentType
-        self._camera_transforms = [
-            (carla.Transform(
-                carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=8.0)), attachment.SpringArm),
-            (carla.Transform(
-                carla.Location(x=1.6, z=1.7)), attachment.Rigid),
-            (carla.Transform(
-                carla.Location(x=5.5, y=1.5, z=1.5)), attachment.SpringArm),
-            (carla.Transform(
-                carla.Location(x=-8.0, z=6.0), carla.Rotation(pitch=6.0)), attachment.SpringArm),
-            (carla.Transform(
-                carla.Location(x=-1, y=-bound_y, z=0.5)), attachment.Rigid)]
-        self.transform_index = 1
-        self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB'],
-            ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)'],
-            ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)'],
-            ['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)'],
-            ['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)'],
-            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette,
-             'Camera Semantic Segmentation (CityScapes Palette)'],
-            ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)']]
-        world = self._parent.get_world()
-        bp_library = world.get_blueprint_library()
-        for item in self.sensors:
-            blp = bp_library.find(item[0])
-            if item[0].startswith('sensor.camera'):
-                blp.set_attribute('image_size_x', str(hud.dim[0]))
-                blp.set_attribute('image_size_y', str(hud.dim[1]))
-                if blp.has_attribute('gamma'):
-                    blp.set_attribute('gamma', str(gamma_correction))
-            elif item[0].startswith('sensor.lidar'):
-                blp.set_attribute('range', '50')
-            item.append(blp)
-        self.index = None
-
-    def toggle_camera(self):
-        """Activate a camera"""
-        self.transform_index = (self.transform_index + 1) % len(self._camera_transforms)
-        self.set_sensor(self.index, notify=False, force_respawn=True)
-
-    def set_sensor(self, index, notify=True, force_respawn=False):
-        """Set a sensor"""
-        index = index % len(self.sensors)
-        needs_respawn = True if self.index is None else (
-            force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
-        if needs_respawn:
-            if self.sensor is not None:
-                self.sensor.destroy()
-                self.surface = None
-            self.sensor = self._parent.get_world().spawn_actor(
-                self.sensors[index][-1],
-                self._camera_transforms[self.transform_index][0],
-                attach_to=self._parent,
-                attachment_type=self._camera_transforms[self.transform_index][1])
-
-            # We need to pass the lambda a weak reference to
-            # self to avoid circular reference.
-            weak_self = weakref.ref(self)
-            self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
-        if notify:
-            self.hud.notification(self.sensors[index][2])
-        self.index = index
-
-    def next_sensor(self):
-        """Get the next sensor"""
-        self.set_sensor(self.index + 1)
-
-    def toggle_recording(self):
-        """Toggle recording on or off"""
-        self.recording = not self.recording
-        self.hud.notification('Recording %s' % ('On' if self.recording else 'Off'))
-
-    def render(self, display):
-        """Render method"""
-        if self.surface is not None:
-            display.blit(self.surface, (0, 0))
-
-    @staticmethod
-    def _parse_image(weak_self, image):
-        self = weak_self()
-        if not self:
-            return
-        if self.sensors[self.index][0].startswith('sensor.lidar'):
-            points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
-            points = np.reshape(points, (int(points.shape[0] / 4), 4))
-            lidar_data = np.array(points[:, :2])
-            lidar_data *= min(self.hud.dim) / 100.0
-            lidar_data += (0.5 * self.hud.dim[0], 0.5 * self.hud.dim[1])
-            lidar_data = np.fabs(lidar_data)  # pylint: disable=assignment-from-no-return
-            lidar_data = lidar_data.astype(np.int32)
-            lidar_data = np.reshape(lidar_data, (-1, 2))
-            lidar_img_size = (self.hud.dim[0], self.hud.dim[1], 3)
-            lidar_img = np.zeros(lidar_img_size)
-            lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
-            self.surface = pygame.surfarray.make_surface(lidar_img)
-        else:
-            image.convert(self.sensors[self.index][1])
-            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-            array = np.reshape(array, (image.height, image.width, 4))
-            array = array[:, :, :3]
-            array = array[:, :, ::-1]
-            self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        if self.recording:
-            image.save_to_disk('_out/%08d' % image.frame)
-
-# ==============================================================================
-# -- Game Loop ---------------------------------------------------------
-# ==============================================================================
-
-
-def game_loop(args):
-    """ Main loop for agent"""
-
-    pygame.init()
-    pygame.font.init()
-    world = None
-    tot_target_reached = 0
-    num_min_waypoints = 21
-
-    try:
-        client = carla.Client(args.host, args.port)
-        client.set_timeout(4.0)
-
-        display = pygame.display.set_mode(
-            (args.width, args.height),
-            pygame.HWSURFACE | pygame.DOUBLEBUF)
-
-        hud = HUD(args.width, args.height)
-        world = World(client.get_world(), hud, args)
-        controller = KeyboardControl(world)
-
-        if args.agent == "Roaming":
-            agent = RoamingAgent(world.player)
-            world.agent = agent
-        elif args.agent == "Basic":
-            agent = BasicAgent(world.player)
-            world.agent = agent
-            spawn_point = world.map.get_spawn_points()[0]
-            agent.set_destination((spawn_point.location.x,
-                                   spawn_point.location.y,
-                                   spawn_point.location.z))
-        else:
-            agent = BehaviorAgent(world.player, behavior=args.behavior)
-            world.agent = agent
-            spawn_points = world.map.get_spawn_points()
-            random.shuffle(spawn_points)
-
-            if spawn_points[0].location != agent.vehicle.get_location():
-                destination = spawn_points[0].location
-            else:
-                destination = spawn_points[1].location
-
-            agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
-
-        clock = pygame.time.Clock()
-
-        while True:
-            clock.tick_busy_loop(60)
-            if controller.parse_events():
-                return
-
-            # As soon as the server is ready continue!
-            if not world.world.wait_for_tick(10.0):
-                continue
-
-            if args.agent == "Roaming" or args.agent == "Basic":
-                if controller.parse_events():
-                    return
-
-                # as soon as the server is ready continue!
-                world.world.wait_for_tick(10.0)
-
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
-                control = agent.run_step()
-                control.manual_gear_shift = False
-
-                # 限速功能
-                if args.max_speed > 0:
-                    vel = world.player.get_velocity()
-                    current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-                    if current_speed > args.max_speed:
-                        control.throttle = 0.0
-                        overshoot = (current_speed - args.max_speed) / args.max_speed
-                        control.brake = min(1.0, overshoot)
-
-                world.player.apply_control(control)
-            else:
-                agent.update_information()
-
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
-
-                # Set new destination when target has been reached
-                if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
-                    agent.reroute(spawn_points)
-                    tot_target_reached += 1
-                    world.hud.notification("The target has been reached " +
-                                           str(tot_target_reached) + " times.", seconds=4.0)
-
-                elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
-                    print("Target reached, mission accomplished...")
-                    break
-
-                speed_limit = world.player.get_speed_limit()
-                agent.get_local_planner().set_speed(speed_limit)
-
-                # 手动/自动模式切换
-                if controller.manual_mode:
-                    # 手动控制：读取键盘输入生成 control
-                    keys = pygame.key.get_pressed()
-                    control = carla.VehicleControl()
-                    control.throttle = 1.0 if (keys[pygame.K_UP] or keys[pygame.K_w]) else 0.0
-                    control.brake = 1.0 if (keys[pygame.K_DOWN] or keys[pygame.K_s]) else 0.0
-                    # 转向：左负右正，范围 -1.0 到 1.0
-                    steer = 0.0
-                    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-                        steer = -1.0
-                    elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-                        steer = 1.0
-                    control.steer = steer
-                    control.reverse = keys[pygame.K_q]
-                    control.hand_brake = keys[pygame.K_SPACE]
-                    control.manual_gear_shift = False
-                else:
-                    control = agent.run_step()
-                    # 限速功能（新增）
-                    if args.max_speed > 0:
-                        vel = world.player.get_velocity()
-                        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-                        if current_speed > args.max_speed:
-                            control.throttle = 0.0
-                            overshoot = (current_speed - args.max_speed) / args.max_speed
-                            control.brake = min(1.0, overshoot)
-
-                world.player.apply_control(control)
-
-    finally:
-        if world is not None:
-            world.destroy()
-
-        pygame.quit()
-
-
-# ==============================================================================
-# -- main() --------------------------------------------------------------
-# ==============================================================================
-
-
-def main():
-    """Main method"""
-
-    argparser = argparse.ArgumentParser(
-        description='CARLA Automatic Control Client')
-    argparser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        dest='debug',
-        help='Print debug information')
-    argparser.add_argument(
-        '--host',
-        metavar='H',
-        default='127.0.0.1',
-        help='IP of the host server (default: 127.0.0.1)')
-    argparser.add_argument(
-        '-p', '--port',
-        metavar='P',
-        default=2000,
-        type=int,
-        help='TCP port to listen to (default: 2000)')
-    argparser.add_argument(
-        '--res',
-        metavar='WIDTHxHEIGHT',
-        default='1280x720',
-        help='Window resolution (default: 1280x720)')
-    argparser.add_argument(
-        '--filter',
-        metavar='PATTERN',
-        default='vehicle.*',
-        help='Actor filter (default: "vehicle.*")')
-    argparser.add_argument(
-        '--gamma',
-        default=2.2,
-        type=float,
-        help='Gamma correction of the camera (default: 2.2)')
-    argparser.add_argument(
-        '-l', '--loop',
-        action='store_true',
-        dest='loop',
-        help='Sets a new random destination upon reaching the previous one (default: False)')
-    argparser.add_argument(
-        '-b', '--behavior', type=str,
-        choices=["cautious", "normal", "aggressive"],
-        help='Choose one of the possible agent behaviors (default: normal) ',
-        default='normal')
-    argparser.add_argument("-a", "--agent", type=str,
-                           choices=["Behavior", "Roaming", "Basic"],
-                           help="select which agent to run",
-                           default="Behavior")
-    argparser.add_argument(
-        '-s', '--seed',
-        help='Set seed for repeating executions (default: None)',
-        default=None,
-        type=int)
-
-    argparser.add_argument(
-        '--max_speed', type=float, default=100.0,
-        help='Maximum speed in km/h for the autonomous agent (default: 100.0)')
-
-    args = argparser.parse_args()
-
-    args.width, args.height = [int(x) for x in args.res.split('x')]
-
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
-
-    logging.info('listening to server %s:%s', args.host, args.port)
-
-    print(__doc__)
-
-    try:
-        game_loop(args)
-
-    except KeyboardInterrupt:
-        print('\nCancelled by user. Bye!')
-
-
-if __name__ == '__main__':
-    main()
-import collections
-import datetime
-import glob
-import logging
-import math
-import os
-import random
-import re
-import sys
-import weakref
-
-try:
-    import pygame
-    from pygame.locals import KMOD_CTRL
-    from pygame.locals import K_ESCAPE
-    from pygame.locals import K_q
-except ImportError:
-    raise RuntimeError('cannot import pygame, make sure pygame package is installed')
-
-try:
-    import numpy as np
-except ImportError:
-    raise RuntimeError(
-        'cannot import numpy, make sure numpy package is installed')
-
-# ==============================================================================
-# -- Find CARLA module ---------------------------------------------------------
-# ==============================================================================
-try:
-    sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
-        sys.version_info.major,
-        sys.version_info.minor,
-        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
-except IndexError:
-    pass
-
-# ==============================================================================
-# -- Add PythonAPI for release mode --------------------------------------------
-# ==============================================================================
-try:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/carla')
-except IndexError:
-    pass
-
-import carla
-from carla import ColorConverter as cc
-
-from agents.navigation.behavior_agent import BehaviorAgent  # pylint: disable=import-error
-from agents.navigation.roaming_agent import RoamingAgent  # pylint: disable=import-error
-from agents.navigation.basic_agent import BasicAgent  # pylint: disable=import-error
-
-
-# ==============================================================================
-# -- Global functions ----------------------------------------------------------
-# ==============================================================================
-
-
-def find_weather_presets():
-    """Method to find weather presets"""
-    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
-    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
-    return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
-
-
-def get_actor_display_name(actor, truncate=250):
-    """Method to get actor display name"""
-    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
-    return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
-
-
-# ==============================================================================
-# -- World ---------------------------------------------------------------
-# ==============================================================================
-
-class World(object):
-    """ Class representing the surrounding environment """
-
-    def __init__(self, carla_world, hud, args):
-        """Constructor method"""
-        self.world = carla_world
-        try:
-            self.map = self.world.get_map()
-        except RuntimeError as error:
-            print('RuntimeError: {}'.format(error))
-            print('  The server could not send the OpenDRIVE (.xodr) file:')
-            print('  Make sure it exists, has the same name of your town, and is correct.')
-            sys.exit(1)
-        self.hud = hud
-        self.player = None
-        self.collision_sensor = None
-        self.lane_invasion_sensor = None
-        self.gnss_sensor = None
-        self.camera_manager = None
-        self._weather_presets = find_weather_presets()
-        self._weather_index = 0
-        self._actor_filter = args.filter
-        self._gamma = args.gamma
-        self.restart(args)
-        self.world.on_tick(hud.on_world_tick)
-        self.recording_enabled = False
-        self.recording_start = 0
-
-    def restart(self, args):
-        """Restart the world"""
-        # Keep same camera config if the camera manager exists.
-        cam_index = self.camera_manager.index if self.camera_manager is not None else 0
-        cam_pos_id = self.camera_manager.transform_index if self.camera_manager is not None else 0
-        # Set the seed if requested by user
-        if args.seed is not None:
-            random.seed(args.seed)
-
-        # Get a random blueprint.
-        blueprint = random.choice(self.world.get_blueprint_library().filter(self._actor_filter))
-        blueprint.set_attribute('role_name', 'hero')
-        if blueprint.has_attribute('color'):
-            color = random.choice(blueprint.get_attribute('color').recommended_values)
-            blueprint.set_attribute('color', color)
-        # Spawn the player.
-        print("Spawning the player")
-        if self.player is not None:
-            spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
-            spawn_point.rotation.roll = 0.0
-            spawn_point.rotation.pitch = 0.0
-            self.destroy()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-
-        while self.player is None:
-            if not self.map.get_spawn_points():
-                print('There are no spawn points available in your map/town.')
-                print('Please add some Vehicle Spawn Point to your UE4 scene.')
-                sys.exit(1)
-            spawn_points = self.map.get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-        # Set up the sensors.
-        self.collision_sensor = CollisionSensor(self.player, self.hud)
-        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
-        self.gnss_sensor = GnssSensor(self.player)
-        self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
-        self.camera_manager.transform_index = cam_pos_id
-        self.camera_manager.set_sensor(cam_index, notify=False)
-        actor_type = get_actor_display_name(self.player)
-        self.hud.notification(actor_type)
-
-    def next_weather(self, reverse=False):
-        """Get next weather setting"""
-        self._weather_index += -1 if reverse else 1
-        self._weather_index %= len(self._weather_presets)
-        preset = self._weather_presets[self._weather_index]
-        self.hud.notification('Weather: %s' % preset[1])
-        self.player.get_world().set_weather(preset[0])
-
-    def tick(self, clock):
-        """Method for every tick"""
-        self.hud.tick(self, clock)
-
-    def render(self, display):
-        """Render world"""
-        self.camera_manager.render(display)
-        self.hud.render(display)
-
-    def destroy_sensors(self):
-        """Destroy sensors"""
-        self.camera_manager.sensor.destroy()
-        self.camera_manager.sensor = None
-        self.camera_manager.index = None
-
-    def destroy(self):
-        """Destroys all actors"""
-        actors = [
-            self.camera_manager.sensor,
-            self.collision_sensor.sensor,
-            self.lane_invasion_sensor.sensor,
-            self.gnss_sensor.sensor,
-            self.player]
-        for actor in actors:
-            if actor is not None:
-                actor.destroy()
-
-
-# ==============================================================================
-# -- KeyboardControl -----------------------------------------------------------
-# ==============================================================================
-
-
-class KeyboardControl(object):
-    def __init__(self, world):
-        self.world = world
-        self.manual_mode = False
-        world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-
-    def parse_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return True
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_p:
-                    self.manual_mode = not self.manual_mode
-                    mode_str = "Manual" if self.manual_mode else "Auto"
-                    self.world.hud.notification("Switched to {} mode".format(mode_str), seconds=2.0)
-            if event.type == pygame.KEYUP:
-                if self._is_quit_shortcut(event.key):
-                    return True
-
-    @staticmethod
-    def _is_quit_shortcut(key):
-        return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
-
-# ==============================================================================
-# -- HUD -----------------------------------------------------------------------
-# ==============================================================================
-
-
-class HUD(object):
-    """Class for HUD text"""
-
-    def __init__(self, width, height):
-        """Constructor method"""
-        self.dim = (width, height)
-        font = pygame.font.Font(pygame.font.get_default_font(), 20)
-        font_name = 'courier' if os.name == 'nt' else 'mono'
-        fonts = [x for x in pygame.font.get_fonts() if font_name in x]
-        default_font = 'ubuntumono'
-        mono = default_font if default_font in fonts else fonts[0]
-        mono = pygame.font.match_font(mono)
-        self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
-        self._notifications = FadingText(font, (width, 40), (0, height - 40))
-        self.help = HelpText(pygame.font.Font(mono, 24), width, height)
-        self.server_fps = 0
-        self.frame = 0
-        self.simulation_time = 0
-        self._show_info = True
-        self._info_text = []
-        self._server_clock = pygame.time.Clock()
-
-    def on_world_tick(self, timestamp):
-        """Gets informations from the world at every tick"""
-        self._server_clock.tick()
-        self.server_fps = self._server_clock.get_fps()
-        self.frame = timestamp.frame_count
-        self.simulation_time = timestamp.elapsed_seconds
-
-    def tick(self, world, clock):
-        """HUD method for every tick"""
-        self._notifications.tick(world, clock)
-        if not self._show_info:
-            return
-        transform = world.player.get_transform()
-        vel = world.player.get_velocity()
-        control = world.player.get_control()
-        heading = 'N' if abs(transform.rotation.yaw) < 89.5 else ''
-        heading += 'S' if abs(transform.rotation.yaw) > 90.5 else ''
-        heading += 'E' if 179.5 > transform.rotation.yaw > 0.5 else ''
-        heading += 'W' if -0.5 > transform.rotation.yaw > -179.5 else ''
-        colhist = world.collision_sensor.get_collision_history()
-        collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
-        max_col = max(1.0, max(collision))
-        collision = [x / max_col for x in collision]
-        vehicles = world.world.get_actors().filter('vehicle.*')
-
-        self._info_text = [
-            'Server:  % 16.0f FPS' % self.server_fps,
-            'Client:  % 16.0f FPS' % clock.get_fps(),
-            '',
-            'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
-            'Map:     % 20s' % world.map.name,
-            'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
-            '',
-            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)),
-            u'Heading:% 16.0f\N{DEGREE SIGN} % 2s' % (transform.rotation.yaw, heading),
-            'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
-            'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
-            'Height:  % 18.0f m' % transform.location.z,
-            '']
-        if isinstance(control, carla.VehicleControl):
-            self._info_text += [
-                ('Throttle:', control.throttle, 0.0, 1.0),
-                ('Steer:', control.steer, -1.0, 1.0),
-                ('Brake:', control.brake, 0.0, 1.0),
-                ('Reverse:', control.reverse),
-                ('Hand brake:', control.hand_brake),
-                ('Manual:', control.manual_gear_shift),
-                'Gear:        %s' % {-1: 'R', 0: 'N'}.get(control.gear, control.gear)]
-        elif isinstance(control, carla.WalkerControl):
-            self._info_text += [
-                ('Speed:', control.speed, 0.0, 5.556),
-                ('Jump:', control.jump)]
-        self._info_text += [
-            '',
-            'Collision:',
-            collision,
-            '',
-            'Number of vehicles: % 8d' % len(vehicles)]
-
-        if len(vehicles) > 1:
-            self._info_text += ['Nearby vehicles:']
-
-        def dist(l):
-            return math.sqrt((l.x - transform.location.x)**2 + (l.y - transform.location.y)
-                             ** 2 + (l.z - transform.location.z)**2)
-        vehicles = [(dist(x.get_location()), x) for x in vehicles if x.id != world.player.id]
-
-        for dist, vehicle in sorted(vehicles):
-            if dist > 200.0:
-                break
-            vehicle_type = get_actor_display_name(vehicle, truncate=22)
-            self._info_text.append('% 4dm %s' % (dist, vehicle_type))
-
-    def toggle_info(self):
-        """Toggle info on or off"""
-        self._show_info = not self._show_info
-
-    def notification(self, text, seconds=2.0):
-        """Notification text"""
-        self._notifications.set_text(text, seconds=seconds)
-
-    def error(self, text):
-        """Error text"""
-        self._notifications.set_text('Error: %s' % text, (255, 0, 0))
-
-    def render(self, display):
-        """Render for HUD class"""
-        if self._show_info:
-            info_surface = pygame.Surface((220, self.dim[1]))
-            info_surface.set_alpha(100)
-            display.blit(info_surface, (0, 0))
-            v_offset = 4
-            bar_h_offset = 100
-            bar_width = 106
-            for item in self._info_text:
-                if v_offset + 18 > self.dim[1]:
-                    break
-                if isinstance(item, list):
-                    if len(item) > 1:
-                        points = [(x + 8, v_offset + 8 + (1 - y) * 30) for x, y in enumerate(item)]
-                        pygame.draw.lines(display, (255, 136, 0), False, points, 2)
-                    item = None
-                    v_offset += 18
-                elif isinstance(item, tuple):
-                    if isinstance(item[1], bool):
-                        rect = pygame.Rect((bar_h_offset, v_offset + 8), (6, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect, 0 if item[1] else 1)
+                    # 超速时速度文字变红
+                    if item.startswith('Speed:') and self.overspeed:
+                        color = (255, 0, 0)
                     else:
-                        rect_border = pygame.Rect((bar_h_offset, v_offset + 8), (bar_width, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect_border, 1)
-                        fig = (item[1] - item[2]) / (item[3] - item[2])
-                        if item[2] < 0.0:
-                            rect = pygame.Rect(
-                                (bar_h_offset + fig * (bar_width - 6), v_offset + 8), (6, 6))
-                        else:
-                            rect = pygame.Rect((bar_h_offset, v_offset + 8), (fig * bar_width, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect)
-                    item = item[0]
-                if item:  # At this point has to be a str.
-                    surface = self._font_mono.render(item, True, (255, 255, 255))
+                        color = (255, 255, 255)
+                    surface = self._font_mono.render(item, True, color)
                     display.blit(surface, (8, v_offset))
                 v_offset += 18
         self._notifications.render(display)
         self.help.render(display)
+        
+        # 绘制速度曲线（右下角）
+        if len(self.speed_history) > 1:
+            graph_width = 200
+            graph_height = 80
+            graph_x = self.dim[0] - graph_width - 10
+            graph_y = self.dim[1] - graph_height - 10
+            # 背景框
+            bg_rect = pygame.Rect(graph_x, graph_y, graph_width, graph_height)
+            pygame.draw.rect(display, (0, 0, 0, 100), bg_rect)
+            # 显示当前速度数值（曲线图左上角）
+            font = pygame.font.Font(None, 20)
+            speed_text = f"{self.speed_history[-1]:.0f} km/h"
+            text_surface = font.render(speed_text, True, (255, 255, 255))
+            display.blit(text_surface, (graph_x + 5, graph_y + 5))
+            # 边框
+            pygame.draw.rect(display, (255, 255, 255), bg_rect, 1)
+
+            # 计算纵坐标比例
+            max_speed = max(self.speed_history)
+            if max_speed < 1:
+                max_speed = 1
+            x_step = graph_width / (len(self.speed_history) - 1)
+            points = []
+            for i, speed in enumerate(self.speed_history):
+                x = graph_x + i * x_step
+                y = graph_y + graph_height - (speed / max_speed) * graph_height
+                points.append((x, y))
+            # 绘制折线（黄色）
+            pygame.draw.lines(display, (255, 255, 0), False, points, 2)
+
 
 # ==============================================================================
 # -- FadingText ----------------------------------------------------------------
@@ -1489,6 +699,7 @@ class CameraManager(object):
         self._parent = parent_actor
         self.hud = hud
         self.recording = False
+        self.request_screenshot = False   # 新增：截图请求标志
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         attachment = carla.AttachmentType
         self._camera_transforms = [
@@ -1593,6 +804,20 @@ class CameraManager(object):
             array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        
+        # 截图请求处理
+        if self.request_screenshot:
+            self.request_screenshot = False
+            # 生成时间戳文件名
+            import datetime
+            import os
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 创建 _screenshots 目录（如果不存在）
+            os.makedirs("_screenshots", exist_ok=True)
+            filename = f"_screenshots/screenshot_{timestamp}.png"
+            pygame.image.save(self.surface, filename)
+            self.hud.notification(f"Screenshot saved: {filename}", seconds=2.0)
+
         if self.recording:
             image.save_to_disk('_out/%08d' % image.frame)
 
@@ -1606,6 +831,30 @@ def game_loop(args):
 
     pygame.init()
     pygame.font.init()
+    # 加载机器学习模型（如果启用）
+    ml_model = None
+    ml_scaler = None
+    if args.ml_acc:
+        try:
+            import joblib
+            ml_model = joblib.load('acc_mlp_model.pkl')
+            ml_scaler = joblib.load('acc_scaler.pkl')
+            print("Loaded MLP model for ACC")
+        except Exception as e:
+            print(f"Failed to load ML model: {e}. Falling back to rule-based ACC.")
+            args.ml_acc = False
+    # 数据记录初始化
+    data_file = None
+    data_writer = None
+    if args.record_data:
+        import csv
+        data_file = open(args.record_data, 'w', newline='')
+        data_writer = csv.writer(data_file)
+        data_writer.writerow(['current_speed', 'obstacle_dist', 'target_speed'])
+    # 如果启用了数据记录，自动开启循环模式以保证持续行驶
+    if args.record_data and not args.loop:
+        args.loop = True
+        print("Data recording enabled: forcing loop mode to keep vehicle running.")
     world = None
     tot_target_reached = 0
     num_min_waypoints = 21
@@ -1620,21 +869,25 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
+        world.aeb_triggered = False   # 初始化自动紧急制动触发标志
         controller = KeyboardControl(world)
 
         if args.agent == "Roaming":
             agent = RoamingAgent(world.player)
+            world.agent = agent
         elif args.agent == "Basic":
             agent = BasicAgent(world.player)
+            world.agent = agent
             spawn_point = world.map.get_spawn_points()[0]
             agent.set_destination((spawn_point.location.x,
                                    spawn_point.location.y,
                                    spawn_point.location.z))
         else:
             agent = BehaviorAgent(world.player, behavior=args.behavior)
-
+            world.agent = agent
             spawn_points = world.map.get_spawn_points()
             random.shuffle(spawn_points)
+            world.spawn_points = spawn_points
 
             if spawn_points[0].location != agent.vehicle.get_location():
                 destination = spawn_points[0].location
@@ -1675,9 +928,34 @@ def game_loop(args):
                         control.throttle = 0.0
                         overshoot = (current_speed - args.max_speed) / args.max_speed
                         control.brake = min(1.0, overshoot)
+                
+                # ===== 自动紧急制动 (AEB) 开始 =====
+                if hasattr(world.hud, 'current_obstacle') and world.hud.current_obstacle is not None:
+                    if world.hud.current_obstacle < args.aeb_distance:
+                        # 强制刹车
+                        control.throttle = 0.0
+                        control.brake = 1.0
+                        control.reverse = False
+                        if not world.aeb_triggered:
+                            world.hud.notification("AEB engaged!", seconds=1.0)
+                            world.aeb_triggered = True
+                    else:
+                        world.aeb_triggered = False
+                # ===== AEB 结束 =====
 
                 world.player.apply_control(control)
             else:
+                # 重规划请求处理
+                if controller.reroute_requested:
+                    controller.reroute_requested = False
+                    if hasattr(world, 'spawn_points') and world.spawn_points:
+                        agent.reroute(world.spawn_points)
+                        world.hud.notification("Rerouting...", seconds=1.5)
+                    else:
+                        temp_spawn = world.map.get_spawn_points()
+                        if temp_spawn:
+                            agent.reroute(temp_spawn)
+                            world.hud.notification("Rerouting...", seconds=1.5)
                 agent.update_information()
 
                 world.tick(clock)
@@ -1703,6 +981,7 @@ def game_loop(args):
                     # 手动控制：读取键盘输入生成 control
                     keys = pygame.key.get_pressed()
                     control = carla.VehicleControl()
+
                     control.throttle = 1.0 if (keys[pygame.K_UP] or keys[pygame.K_w]) else 0.0
                     control.brake = 1.0 if (keys[pygame.K_DOWN] or keys[pygame.K_s]) else 0.0
                     # 转向：左负右正，范围 -1.0 到 1.0
@@ -1717,14 +996,63 @@ def game_loop(args):
                     control.manual_gear_shift = False
                 else:
                     control = agent.run_step()
-                    # 限速功能（新增）
-                    if args.max_speed > 0:
-                        vel = world.player.get_velocity()
-                        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-                        if current_speed > args.max_speed:
-                            control.throttle = 0.0
-                            overshoot = (current_speed - args.max_speed) / args.max_speed
-                            control.brake = min(1.0, overshoot)
+
+                    # 获取当前速度（提前计算）
+                    vel = world.player.get_velocity()
+                    current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+
+                    # 获取障碍物距离（用于 ACC）
+                    obs_dist = None
+                    if hasattr(world.hud, 'current_obstacle'):
+                        obs_dist = world.hud.current_obstacle
+
+                    # 计算自适应巡航目标速度（MLP 或规则）
+                    if args.acc_enable and obs_dist is not None:
+                        if args.ml_acc and ml_model is not None and ml_scaler is not None:
+                            import numpy as np
+                            features = np.array([[current_speed, obs_dist]])
+                            features_scaled = ml_scaler.transform(features)
+                            target_speed = ml_model.predict(features_scaled)[0]
+                            target_speed = max(0.0, min(target_speed, args.max_speed))
+                        else:
+                            if obs_dist < args.acc_min_dist:
+                                target_speed = 0.0
+                            elif obs_dist < args.acc_max_dist:
+                                ratio = (obs_dist - args.acc_min_dist) / (args.acc_max_dist - args.acc_min_dist)
+                                target_speed = args.max_speed * ratio
+                            else:
+                                target_speed = args.max_speed
+                    else:
+                        target_speed = args.max_speed
+
+                    # 记录数据（如果启用）
+                    if data_writer is not None:
+                        data_writer.writerow([current_speed, obs_dist if obs_dist is not None else -1.0, target_speed])
+
+                    # P 控制器（速度闭环）
+                    error = target_speed - current_speed
+                    Kp = 0.05
+                    base_throttle = 0.25
+                    if error >= 0:
+                        throttle = base_throttle + Kp * error
+                        control.throttle = max(0.0, min(throttle, 1.0))
+                        control.brake = 0.0
+                    else:
+                        control.throttle = 0.0
+                        control.brake = max(0.0, min(-Kp * error, 1.0))
+
+                # ===== 自动紧急制动 (AEB) 开始 =====
+                if hasattr(world.hud, 'current_obstacle') and world.hud.current_obstacle is not None:
+                    if world.hud.current_obstacle < args.aeb_distance:
+                        control.throttle = 0.0
+                        control.brake = 1.0
+                        control.reverse = False
+                        if not world.aeb_triggered:
+                            world.hud.notification("AEB engaged!", seconds=3.0)
+                            world.aeb_triggered = True
+                    else:
+                        world.aeb_triggered = False
+                # ===== AEB 结束 =====
 
                 world.player.apply_control(control)
 
@@ -1800,6 +1128,26 @@ def main():
         '--max_speed', type=float, default=100.0,
         help='Maximum speed in km/h for the autonomous agent (default: 100.0)')
 
+    argparser.add_argument(
+        '--aeb_distance', type=float, default=5.0,
+        help='Distance in meters to trigger Automatic Emergency Braking (default: 5.0)')
+    
+    argparser.add_argument(
+        '--acc_enable', action='store_true',
+        help='Enable Adaptive Cruise Control (ACC)')
+    argparser.add_argument(
+        '--acc_max_dist', type=float, default=15.0,
+        help='Distance (m) above which ACC resumes full speed (default: 15.0)')
+    argparser.add_argument(
+        '--acc_min_dist', type=float, default=5.0,
+        help='Distance (m) below which ACC requests full stop (default: 5.0)')
+    argparser.add_argument(
+        '--record_data', type=str, default=None,
+        help='Record ACC training data (features: current_speed, obstacle_dist; target: target_speed) to specified CSV file')
+    argparser.add_argument(
+        '--ml_acc', action='store_true',
+        help='Use MLP model for ACC (instead of rule-based linear interpolation)')
+    
     args = argparser.parse_args()
 
     args.width, args.height = [int(x) for x in args.res.split('x')]

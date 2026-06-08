@@ -8,6 +8,7 @@ import csv
 import pickle
 import math
 import json
+import argparse
 from datetime import datetime
 
 import gym
@@ -49,9 +50,7 @@ SAVE_SUMMARY_CSV = True
 SAVE_TRAJECTORY_CSV = True
 DEBUG_DRAW_EVERY = 5
 NUM_EPISODES = 5
-
-# 运行批次编号
-RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
+SEED = 42
 
 # 手动驾驶相关参数
 MANUAL_STEER_CACHE = 0.0
@@ -63,17 +62,138 @@ MANUAL_STEER_STEP = 0.04
 MANUAL_STEER_DECAY = 0.85
 
 
-# 创建环境
-env = gym.make('carla-v0', params=params)
+def parse_args():
+    """
+    解析命令行参数。
+    """
+    parser = argparse.ArgumentParser(description="EasyCarla-RL demo script")
+
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default=CONTROL_MODE,
+        choices=["autopilot", "random", "safe_random", "manual"],
+        help="控制模式"
+    )
+
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        default=NUM_EPISODES,
+        help="运行 episode 数量"
+    )
+
+    parser.add_argument(
+        "--town",
+        type=str,
+        default=params["town"],
+        help="CARLA 地图名称"
+    )
+
+    parser.add_argument(
+        "--vehicles",
+        type=int,
+        default=params["number_of_vehicles"],
+        help="周围车辆数量"
+    )
+
+    parser.add_argument(
+        "--walkers",
+        type=int,
+        default=params["number_of_walkers"],
+        help="行人数量"
+    )
+
+    parser.add_argument(
+        "--traffic",
+        type=str,
+        default=params["traffic"],
+        choices=["on", "off"],
+        help="交通灯设置"
+    )
+
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=params["port"],
+        help="CARLA 连接端口"
+    )
+
+    parser.add_argument(
+        "--save-root",
+        type=str,
+        default="collected_episodes",
+        help="数据保存根目录"
+    )
+
+    parser.add_argument(
+        "--debug-draw-every",
+        type=int,
+        default=DEBUG_DRAW_EVERY,
+        help="CARLA 画面调试信息绘制间隔"
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=SEED,
+        help="随机种子"
+    )
+
+    parser.add_argument(
+        "--no-save-episodes",
+        action="store_true",
+        help="不保存 episode pkl 数据"
+    )
+
+    parser.add_argument(
+        "--no-save-summary",
+        action="store_true",
+        help="不保存 summary.csv"
+    )
+
+    parser.add_argument(
+        "--no-save-trajectory",
+        action="store_true",
+        help="不保存 trajectory csv 数据"
+    )
+
+    return parser.parse_args()
+
+
+# 读取命令行参数
+args = parse_args()
+
+CONTROL_MODE = args.mode
+NUM_EPISODES = args.episodes
+DEBUG_DRAW_EVERY = args.debug_draw_every
+SEED = args.seed
+SAVE_EPISODES = not args.no_save_episodes
+SAVE_SUMMARY_CSV = not args.no_save_summary
+SAVE_TRAJECTORY_CSV = not args.no_save_trajectory
+
+params["town"] = args.town
+params["number_of_vehicles"] = args.vehicles
+params["number_of_walkers"] = args.walkers
+params["traffic"] = args.traffic
+params["port"] = args.port
+
+# 设置随机种子
+random.seed(SEED)
+np.random.seed(SEED)
+
+# 运行批次编号
+RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
 
 
 # 数据保存目录
-save_root_dir = "collected_episodes"
+save_root_dir = args.save_root
 save_dir = os.path.join(save_root_dir, CONTROL_MODE, RUN_ID)
 os.makedirs(save_dir, exist_ok=True)
 
 summary_csv_path = os.path.join(save_dir, "summary.csv")
 config_json_path = os.path.join(save_dir, "config.json")
+run_summary_json_path = os.path.join(save_dir, "run_summary.json")
 
 
 if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
@@ -84,7 +204,9 @@ if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
             "control_mode",
             "steps",
             "total_reward",
+            "avg_reward",
             "total_cost",
+            "avg_cost",
             "end_reason",
             "collision",
             "off_road",
@@ -103,6 +225,7 @@ def save_config_json(save_path):
         "run_id": RUN_ID,
         "control_mode": CONTROL_MODE,
         "num_episodes": NUM_EPISODES,
+        "seed": SEED,
         "save_episodes": SAVE_EPISODES,
         "save_summary_csv": SAVE_SUMMARY_CSV,
         "save_trajectory_csv": SAVE_TRAJECTORY_CSV,
@@ -115,11 +238,81 @@ def save_config_json(save_path):
             "manual_steer_step": MANUAL_STEER_STEP,
             "manual_steer_decay": MANUAL_STEER_DECAY
         },
+        "command_args": {
+            "mode": args.mode,
+            "episodes": args.episodes,
+            "town": args.town,
+            "vehicles": args.vehicles,
+            "walkers": args.walkers,
+            "traffic": args.traffic,
+            "port": args.port,
+            "save_root": args.save_root,
+            "debug_draw_every": args.debug_draw_every,
+            "seed": args.seed,
+            "no_save_episodes": args.no_save_episodes,
+            "no_save_summary": args.no_save_summary,
+            "no_save_trajectory": args.no_save_trajectory
+        },
         "params": params
     }
 
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
+
+
+def save_run_summary_json(save_path, run_records):
+    """
+    保存本次运行的总体统计结果。
+    """
+    num_finished_episodes = len(run_records)
+
+    if num_finished_episodes > 0:
+        avg_steps = float(np.mean([record["steps"] for record in run_records]))
+        avg_total_reward = float(np.mean([record["total_reward"] for record in run_records]))
+        avg_reward = float(np.mean([record["avg_reward"] for record in run_records]))
+        avg_total_cost = float(np.mean([record["total_cost"] for record in run_records]))
+        avg_cost = float(np.mean([record["avg_cost"] for record in run_records]))
+        avg_speed = float(np.mean([record["avg_speed"] for record in run_records]))
+        avg_total_distance = float(np.mean([record["total_distance"] for record in run_records]))
+        max_total_distance = float(np.max([record["total_distance"] for record in run_records]))
+        min_total_distance = float(np.min([record["total_distance"] for record in run_records]))
+        collision_episodes = int(sum(1 for record in run_records if record["collision"]))
+        off_road_episodes = int(sum(1 for record in run_records if record["off_road"]))
+    else:
+        avg_steps = 0.0
+        avg_total_reward = 0.0
+        avg_reward = 0.0
+        avg_total_cost = 0.0
+        avg_cost = 0.0
+        avg_speed = 0.0
+        avg_total_distance = 0.0
+        max_total_distance = 0.0
+        min_total_distance = 0.0
+        collision_episodes = 0
+        off_road_episodes = 0
+
+    run_summary = {
+        "run_id": RUN_ID,
+        "control_mode": CONTROL_MODE,
+        "seed": SEED,
+        "num_episodes_config": NUM_EPISODES,
+        "num_finished_episodes": num_finished_episodes,
+        "avg_steps": avg_steps,
+        "avg_total_reward": avg_total_reward,
+        "avg_reward": avg_reward,
+        "avg_total_cost": avg_total_cost,
+        "avg_cost": avg_cost,
+        "avg_speed": avg_speed,
+        "avg_total_distance": avg_total_distance,
+        "max_total_distance": max_total_distance,
+        "min_total_distance": min_total_distance,
+        "collision_episodes": collision_episodes,
+        "off_road_episodes": off_road_episodes,
+        "episode_records": run_records
+    }
+
+    with open(save_path, "w", encoding="utf-8") as f:
+        json.dump(run_summary, f, ensure_ascii=False, indent=4)
 
 
 def handle_reset_result(reset_result):
@@ -364,8 +557,10 @@ def set_control_mode(env, control_mode):
         raise ValueError(f"Unsupported CONTROL_MODE: {control_mode}")
 
 
-# 定义一个简单的动作策略
 def get_action(env, obs, control_mode="autopilot"):
+    """
+    根据控制模式生成动作。
+    """
     if control_mode == "autopilot":
         control = env.ego.get_control()
         action = [control.throttle, control.steer, control.brake]
@@ -410,8 +605,13 @@ def get_action(env, obs, control_mode="autopilot"):
 # 保存本次运行配置
 save_config_json(config_json_path)
 print(f"Run ID: {RUN_ID}")
+print(f"Seed: {SEED}")
 print(f"Save directory: {save_dir}")
 print(f"Config saved to: {config_json_path}")
+
+
+# 创建环境
+env = gym.make('carla-v0', params=params)
 
 
 # 初始化手动驾驶窗口
@@ -419,6 +619,8 @@ init_manual_control()
 
 
 # 与环境交互
+run_records = []
+
 try:
     for episode in range(NUM_EPISODES):
         reset_result = env.reset()
@@ -565,14 +767,43 @@ try:
             max_speed = 0.0
             min_speed = 0.0
 
+        if len(episode_data) > 0:
+            avg_reward = float(total_reward / len(episode_data))
+            avg_cost = float(total_cost / len(episode_data))
+        else:
+            avg_reward = 0.0
+            avg_cost = 0.0
+
+        episode_record_summary = {
+            "episode_id": episode,
+            "control_mode": CONTROL_MODE,
+            "steps": len(episode_data),
+            "total_reward": float(total_reward),
+            "avg_reward": avg_reward,
+            "total_cost": float(total_cost),
+            "avg_cost": avg_cost,
+            "end_reason": end_reason,
+            "collision": bool(episode_collision),
+            "off_road": bool(episode_off_road),
+            "avg_speed": avg_speed,
+            "max_speed": max_speed,
+            "min_speed": min_speed,
+            "total_distance": float(total_distance)
+        }
+
+        run_records.append(episode_record_summary)
+
         if SAVE_EPISODES:
             episode_record = {
                 "episode_id": episode,
                 "control_mode": CONTROL_MODE,
                 "run_id": RUN_ID,
+                "seed": SEED,
                 "params": params,
                 "total_reward": float(total_reward),
+                "avg_reward": avg_reward,
                 "total_cost": float(total_cost),
+                "avg_cost": avg_cost,
                 "num_steps": len(episode_data),
                 "end_reason": end_reason,
                 "collision": bool(episode_collision),
@@ -603,7 +834,9 @@ try:
                     CONTROL_MODE,
                     len(episode_data),
                     float(total_reward),
+                    avg_reward,
                     float(total_cost),
+                    avg_cost,
                     end_reason,
                     bool(episode_collision),
                     bool(episode_off_road),
@@ -617,7 +850,9 @@ try:
             f"Episode {episode} finished. "
             f"Steps: {len(episode_data)} | "
             f"Total reward: {total_reward:.2f} | "
+            f"Avg reward: {avg_reward:.2f} | "
             f"Total cost: {total_cost:.2f} | "
+            f"Avg cost: {avg_cost:.2f} | "
             f"End reason: {end_reason} | "
             f"Avg speed: {avg_speed:.2f} m/s | "
             f"Max speed: {max_speed:.2f} m/s | "
@@ -626,6 +861,9 @@ try:
 
         if CONTROL_MODE == "manual" and MANUAL_QUIT:
             break
+
+    save_run_summary_json(run_summary_json_path, run_records)
+    print(f"Run summary saved to: {run_summary_json_path}")
 
 finally:
     close_manual_control()

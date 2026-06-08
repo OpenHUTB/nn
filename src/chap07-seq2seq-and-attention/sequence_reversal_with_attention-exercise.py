@@ -10,12 +10,9 @@
 
 import numpy as np  # 导入NumPy库
 import tensorflow as tf  # 导入TensorFlow库
-import collections  # 导入collections模块
 from tensorflow import keras  # 从TensorFlow中导入Keras API，用于构建和训练深度学习模型
 from tensorflow.keras import layers, optimizers, datasets  # 从Keras中导入层、优化器和数据集模块
 import os  # 导入操作系统接口模块
-import sys  # 导入系统相关参数和函数模块
-import tqdm  # 导入tqdm库，用于显示进度条
 import random  # 导入随机数生成模块
 import string  # 导入字符串模块
 
@@ -99,9 +96,6 @@ class mySeq2SeqModel(keras.Model):
                                            return_sequences=True, return_state=True)
         self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
                                            return_sequences=True, return_state=True)
-        
-        # 注意力机制相关的全连接层
-        self.dense_attn = tf.keras.layers.Dense(self.hidden)
         
         # 输出层，将解码器状态映射到词汇表大小的输出
         self.dense = tf.keras.layers.Dense(self.v_sz)

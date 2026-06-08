@@ -28,7 +28,11 @@ class LaneDetector:
 
             left_lines, right_lines = self._classify_and_filter(lines, image.shape[1])
 
-            # 新增：选择主车道和邻车道
+            # 新增：合并相似的线段
+            left_lines = self._merge_similar_lines(left_lines)
+            right_lines = self._merge_similar_lines(right_lines)
+
+            # 选择主车道和邻车道
             primary_left, primary_right, neighbor_left, neighbor_right = \
                 self._select_primary_lanes(left_lines, right_lines, image.shape[1], image.shape[0])
 
@@ -41,7 +45,7 @@ class LaneDetector:
             future_path = self._predict_future_path(left_lane, right_lane, image.shape)
             detection_quality = self._calculate_detection_quality(left_lane, right_lane)
 
-            # 新增：计算车道统计信息
+            # 计算车道统计信息
             all_lines = left_lines + right_lines
             lane_stats = self._calculate_lane_statistics(all_lines, image.shape)
 
@@ -66,6 +70,66 @@ class LaneDetector:
         except Exception as e:
             print(f"车道线检测失败: {e}")
             return self._create_empty_result()
+
+    def _merge_similar_lines(self, lines: List[Dict], distance_threshold: float = 20.0, angle_threshold: float = 0.1) -> \
+    List[Dict]:
+        """合并相似的车道线段
+
+        Args:
+            lines: 待合并的线段列表
+            distance_threshold: 距离阈值（像素）
+            angle_threshold: 角度阈值（斜率差）
+
+        Returns:
+            合并后的线段列表
+        """
+        if len(lines) < 2:
+            return lines
+
+        merged_lines = []
+        used_indices = set()
+
+        for i, line1 in enumerate(lines):
+            if i in used_indices:
+                continue
+
+            similar_lines = [line1]
+            used_indices.add(i)
+
+            for j, line2 in enumerate(lines):
+                if j in used_indices or j == i:
+                    continue
+
+                # 检查斜率是否相似
+                if abs(line1['slope'] - line2['slope']) > angle_threshold:
+                    continue
+
+                # 检查中点距离
+                mid1 = np.array(line1['midpoint'])
+                mid2 = np.array(line2['midpoint'])
+                distance = np.linalg.norm(mid1 - mid2)
+
+                if distance <= distance_threshold:
+                    similar_lines.append(line2)
+                    used_indices.add(j)
+
+            # 合并相似线段：取平均斜率和端点
+            if len(similar_lines) > 0:
+                avg_slope = np.mean([l['slope'] for l in similar_lines])
+                avg_midpoint = np.mean([l['midpoint'] for l in similar_lines], axis=0)
+                avg_length = np.mean([l['length'] for l in similar_lines])
+
+                # 使用最长的线段作为代表
+                representative = max(similar_lines, key=lambda x: x['length'])
+
+                merged_lines.append({
+                    'points': representative['points'],
+                    'slope': avg_slope,
+                    'length': avg_length,
+                    'midpoint': tuple(avg_midpoint)
+                })
+
+        return merged_lines
 
     def _preprocess_for_lanes(self, image: np.ndarray, roi_mask: np.ndarray, light_condition: str) -> np.ndarray:
         """为车道线检测预处理图像"""
@@ -105,30 +169,34 @@ class LaneDetector:
             maxLineGap=self.config.hough_max_gap
         )
         return lines
-    
+
     def _classify_and_filter(self, lines: np.ndarray, image_width: int) -> Tuple[List, List]:
         """分类和过滤车道线"""
         left_lines, right_lines = [], []
-        
+
         for line in lines:
             x1, y1, x2, y2 = line[0]
-            
+
             if x2 == x1:
-                continue  # 跳过垂直线
-            
+                continue
+
             dx = x2 - x1
             dy = y2 - y1
             slope = dy / dx
-            length = np.sqrt(dx**2 + dy**2)
-            
-            # 过滤条件
-            if abs(slope) < 0.3 or length < 20:
+            length = np.sqrt(dx ** 2 + dy ** 2)
+
+            # 过滤条件 - 提高阈值减少碎片
+            if abs(slope) < 0.3 or length < 30:
                 continue
-            
+
+            # 增加：过滤过于水平的线段（可能是横向标记）
+            if abs(slope) > 3.0:
+                continue
+
             midpoint_x = (x1 + x2) / 2
-            
+
             # 分类
-            if slope < 0:  # 左车道线
+            if slope < 0:
                 if midpoint_x < image_width * 0.6:
                     left_lines.append({
                         'points': [(x1, y1), (x2, y2)],
@@ -136,7 +204,7 @@ class LaneDetector:
                         'length': length,
                         'midpoint': (midpoint_x, (y1 + y2) / 2)
                     })
-            else:  # 右车道线
+            else:
                 if midpoint_x > image_width * 0.4:
                     right_lines.append({
                         'points': [(x1, y1), (x2, y2)],
@@ -144,7 +212,7 @@ class LaneDetector:
                         'length': length,
                         'midpoint': (midpoint_x, (y1 + y2) / 2)
                     })
-        
+
         return left_lines, right_lines
 
     def _select_primary_lanes(self, left_lines: List[Dict], right_lines: List[Dict],
@@ -189,18 +257,38 @@ class LaneDetector:
                 'lane_positions': []
             }
 
-        # 按X坐标排序所有车道线的中点
         midpoints = sorted([line['midpoint'][0] for line in all_lines])
 
-        # 估算车道数量（每2条线形成一个车道）
-        estimated_lanes = max(1, len(all_lines) // 2)
+        # 基于相邻车道线间距分组判断车道数量
+        # 合理车道宽度为图像宽度的8%-35%
+        min_lane_width = width * 0.08
+        max_lane_width = width * 0.35
 
-        # 计算平均车道宽度
+        lane_groups = []
+        current_group = [midpoints[0]]
+
+        for i in range(1, len(midpoints)):
+            gap = midpoints[i] - midpoints[i - 1]
+
+            if min_lane_width <= gap <= max_lane_width:
+                current_group.append(midpoints[i])
+            else:
+                if len(current_group) >= 2:
+                    lane_groups.append(current_group)
+                current_group = [midpoints[i]]
+
+        if len(current_group) >= 2:
+            lane_groups.append(current_group)
+
+        if not lane_groups:
+            estimated_lanes = 1
+        else:
+            estimated_lanes = min(len(lane_groups), 4)
+
         lane_widths = []
-        for i in range(len(midpoints) - 1):
-            width_diff = abs(midpoints[i + 1] - midpoints[i])
-            if width_diff > width * 0.05 and width_diff < width * 0.4:
-                lane_widths.append(width_diff)
+        for group in lane_groups:
+            for i in range(len(group) - 1):
+                lane_widths.append(group[i + 1] - group[i])
 
         avg_lane_width = np.mean(lane_widths) if lane_widths else 0
 
@@ -211,48 +299,51 @@ class LaneDetector:
             'avg_lane_width': avg_lane_width,
             'lane_positions': midpoints
         }
-    
+
     def _fit_lane_model(self, lines: List[Dict], image_shape: Tuple[int, ...]) -> Optional[Dict]:
         """拟合车道线模型"""
         if len(lines) < 2:
             return None
-        
+
         # 收集所有点
         x_points, y_points = [], []
         for line in lines:
             for (x, y) in line['points']:
                 x_points.append(x)
                 y_points.append(y)
-        
+
         # 多项式拟合
         try:
             coeffs = np.polyfit(y_points, x_points, 2)
             model_type = 'quadratic'
-        except:
+        except (ValueError, TypeError):
             try:
                 coeffs = np.polyfit(y_points, x_points, 1)
                 model_type = 'linear'
-            except:
+            except (ValueError, TypeError):
                 return None
-        
+
         poly_func = np.poly1d(coeffs)
-        
+
         # 生成车道线点
         height, width = image_shape[:2]
         y_bottom = height
         y_top = int(height * 0.4)
-        
+
         try:
             x_bottom = int(poly_func(y_bottom))
             x_top = int(poly_func(y_top))
-            
+
             # 限制范围
             x_bottom = max(0, min(width, x_bottom))
             x_top = max(0, min(width, x_top))
-            
-            # 计算置信度
-            confidence = min(len(lines) / 10.0, 1.0)
-            
+
+            # 计算置信度 - 基于线段数量和长度
+            avg_length = np.mean([line['length'] for line in lines])
+            length_score = min(avg_length / 100.0, 1.0)
+            count_score = min(len(lines) / 8.0, 1.0)
+            confidence = 0.6 * count_score + 0.4 * length_score
+
             return {
                 'func': poly_func,
                 'coeffs': coeffs.tolist(),
@@ -261,9 +352,9 @@ class LaneDetector:
                 'confidence': confidence,
                 'num_lines': len(lines)
             }
-        except:
+        except (IndexError, OverflowError):
             return None
-    
+
     def _validate_lanes(self, left_lane: Optional[Dict], right_lane: Optional[Dict],
                        image_shape: Tuple[int, ...]) -> Tuple[Optional[Dict], Optional[Dict]]:
         """验证车道线合理性"""

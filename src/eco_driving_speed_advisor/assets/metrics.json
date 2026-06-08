@@ -1,0 +1,30 @@
+{
+  "signals": 4,
+  "corridor_length_m": 1500.0,
+  "eco_travel_time_s": 103.0,
+  "baseline_travel_time_s": 180.167,
+  "eco_energy": 538.62,
+  "baseline_energy": 1425.082,
+  "energy_saving_percent": 62.2,
+  "eco_stops": 0,
+  "baseline_stops": 1,
+  "eco_green_passes": 4,
+  "baseline_green_passes": 4,
+  "eco_pass_times": {
+    "S1": 18.0,
+    "S2": 40.0,
+    "S3": 62.0,
+    "S4": 83.0
+  },
+  "baseline_pass_times": {
+    "S1": 23.333,
+    "S2": 106.0,
+    "S3": 133.5,
+    "S4": 160.167
+  },
+  "outputs": {
+    "speed_profile": "assets\\speed_profile.png",
+    "time_space_diagram": "assets\\time_space_diagram.png",
+    "metrics_chart": "assets\\eco_metrics.png"
+  }
+}
