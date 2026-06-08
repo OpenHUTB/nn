@@ -59,6 +59,8 @@ title: 主页
 
 [__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
 
+[__自动驾驶车辆语义分割__](./auto_drive_seg/README.md) - 基于 U-Net + Focal Loss 的 CARLA 街景 8 类语义分割（含数据增强、速度基准、概率热力图、类别频率分析）
+
 [__V2X路侧智能感知__](./edge_intelligence_V2X/README.md) - 基于YOLOv8n的V2X路侧智能感知系统优化与实现
 
 [__目标检测__](./test/object_detection.md) - 目标检测与危险评估
