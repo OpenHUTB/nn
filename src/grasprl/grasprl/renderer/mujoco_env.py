@@ -150,14 +150,6 @@ class MujocoPhyEnv(gym.Env):
         self.data.qpos[6] = 0.9  # 夹爪打开角度
         # 确保初始状态更新
         mujoco.mj_forward(self.model, self.data)
-        self.data.qpos[:6] = [
-            1.5707,
-            -1.5707,
-            1.5707,
-            -1.5707,
-            -1.5707,
-            0.0,
-        ]
         return self.get_observation()
 
     def close(self):

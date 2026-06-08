@@ -48,7 +48,6 @@
     </default>
     <site size="0.001" rgba="0.5 0.5 0.5 0.3" group="4"/>
   </default>
-  </default>
 
     <asset>
       <material class="ur5e" name="ur5e:black" rgba="0.033 0.033 0.033 1"/>
@@ -102,9 +101,9 @@
         </body>
 
         <body name="cylinder_base" pos="0 -0.45 0">
-            <geom size="0.08 0.95" type="cylinder"/>
+            <geom size="0.08 0.80" type="cylinder"/>
         </body>
-        <body name="ur5e:base"  pos="0 -0.45 0.95" childclass="ur5e">
+        <body name="ur5e:base"  pos="0 -0.45 0.80" childclass="ur5e">
             <inertial mass="4.0" pos="0 0 0" diaginertia="0.00443333156 0.00443333156 0.0072"/>
             <geom mesh="base_0" material="ur5e:black" class="ur5e_visual"/>
             <geom mesh="base_1" material="jointgray" class="ur5e_visual"/>
@@ -154,7 +153,7 @@
                                     <joint name="wrist_3_joint" class="ur5e_size1"/>
                                     <geom material="linkgray" mesh="wrist3" class="ur5e_visual"/>
                                     <geom class="eef_collision" pos="0 0.08 0" quat="1 1 0 0" size="0.04 0.02"/>
-                                    <body name="tool0_link" pos="0 0.1 0" quat="-1 1 0 0" childclass="ag95">
+                                    <body name="tool0_link" pos="0 0 0" quat="-1 1 0 0" childclass="ag95">
                                       <site name="attachment_site" pos="0 0 0" quat="1 0 0 0"/>
                                       <site name="eef_site" pos="0 0 0.05" quat="0 0.7071068 -0.7071068 0"/>
                                       <body name="ag95:base">
@@ -221,56 +220,56 @@
             </body>
         </body>
         <body name="box_1" pos=".0 .0 1.1">
-            <joint armature="0" axis="1 0 0" damping="0" limited="true" name="box_1_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 1 0" damping="0" limited="true" name="box_1_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 0 1" damping="0" limited="true" name="box_1_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
+            <joint armature="0" axis="1 0 0" damping="5" limited="true" name="box_1_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 1 0" damping="5" limited="true" name="box_1_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 0 1" damping="5" limited="true" name="box_1_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
             <joint armature="0" damping="0" name="box_1_rot" pos="0 0 0" stiffness="0" type="ball"/>
-            <geom name="box_1" pos="0 0 0" material="tablecube" size="0.02 0.02 0.02" type="box"/>
+            <geom name="box_1" pos="0 0 0" material="tablecube" size="0.025 0.025 0.025" type="box" friction="2.0 0.5 0.001"/>
         </body>
 
         <body name="box_2" pos=".1 .0 1.1">
-            <joint armature="0" axis="1 0 0" damping="0" limited="true" name="box_2_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide" />
-            <joint armature="0" axis="0 1 0" damping="0" limited="true" name="box_2_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide" />
-            <joint armature="0" axis="0 0 1" damping="0" limited="true" name="box_2_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide" />
+            <joint armature="0" axis="1 0 0" damping="5" limited="true" name="box_2_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide" />
+            <joint armature="0" axis="0 1 0" damping="5" limited="true" name="box_2_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide" />
+            <joint armature="0" axis="0 0 1" damping="5" limited="true" name="box_2_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide" />
             <joint armature="0" damping="0" name="box_2_rot" pos="0 0 0" stiffness="0" type="ball"/>
-            <geom name="box_2" pos="0 0 0" rgba="0.0 0.5 0.8 1" size="0.015 0.015 0.015" type="box"/>
+            <geom name="box_2" pos="0 0 0" rgba="0.0 0.5 0.8 1" size="0.02 0.02 0.02" type="box" friction="2.0 0.5 0.001"/>
         </body>
 
         <body name="box_3" pos="-0.1 .0 1.2">
-            <joint armature="0" axis="1 0 0" damping="0" limited="true" name="box_3_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 1 0" damping="0" limited="true" name="box_3_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 0 1" damping="0" limited="true" name="box_3_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
+            <joint armature="0" axis="1 0 0" damping="5" limited="true" name="box_3_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 1 0" damping="5" limited="true" name="box_3_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 0 1" damping="5" limited="true" name="box_3_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
             <joint armature="0" damping="0" name="box_3_rot" pos="0 0 0" stiffness="0" type="ball"/>
-            <geom name="box_3" pos="0 0 0" rgba="0.8 0.8 0.1 1" size="0.025 0.025 0.025" type="box"/>
+            <geom name="box_3" pos="0 0 0" rgba="0.8 0.8 0.1 1" size="0.03 0.03 0.03" type="box" friction="2.0 0.5 0.001"/>
         </body>
         <body name="ball_1" pos=".1 0.1 1.2">
-            <joint armature="0" axis="1 0 0" damping="0" limited="true" name="ball_1_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 1 0" damping="0" limited="true" name="ball_1_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 0 1" damping="0" limited="true" name="ball_1_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
+            <joint armature="0" axis="1 0 0" damping="5" limited="true" name="ball_1_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 1 0" damping="5" limited="true" name="ball_1_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 0 1" damping="5" limited="true" name="ball_1_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
             <joint armature="0" damping="0.001" name="ball_1_rot" pos="0 0 0" stiffness="0" type="ball"/>
-            <geom name="ball_1" pos="0 0 0" rgba="0.9 0.2 0.2 1" size=".03" type="sphere"/>
+            <geom name="ball_1" pos="0 0 0" rgba="0.9 0.2 0.2 1" size=".035" type="sphere" friction="2.0 0.5 0.001"/>
         </body>
 
         <body name="ball_2" pos="0 0.1 1.2">
-            <joint armature="0" axis="1 0 0" damping="0" limited="true" name="ball_2_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 1 0" damping="0" limited="true" name="ball_2_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 0 1" damping="0" limited="true" name="ball_2_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
+            <joint armature="0" axis="1 0 0" damping="5" limited="true" name="ball_2_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 1 0" damping="5" limited="true" name="ball_2_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 0 1" damping="5" limited="true" name="ball_2_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
             <joint armature="0" damping="0.001" name="ball_2_rot" pos="0 0 0" stiffness="0" type="ball"/>
-            <geom name="ball_2" pos="0 0 0" material="geom" size=".025" type="sphere"/>
+            <geom name="ball_2" pos="0 0 0" material="geom" size=".03" type="sphere" friction="2.0 0.5 0.001"/>
         </body>
 
         <body name="ball_3" pos="-.1 0.1 1.2">
-            <joint armature="0" axis="1 0 0" damping="0" limited="true" name="ball_3_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 1 0" damping="0" limited="true" name="ball_3_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
-            <joint armature="0" axis="0 0 1" damping="0" limited="true" name="ball_3_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
+            <joint armature="0" axis="1 0 0" damping="5" limited="true" name="ball_3_x" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 1 0" damping="5" limited="true" name="ball_3_y" pos="0 0 0" range="-5. 5." stiffness="0" type="slide"/>
+            <joint armature="0" axis="0 0 1" damping="5" limited="true" name="ball_3_z" pos="0 0 0" range="-2. 2." stiffness="0" type="slide"/>
             <joint armature="0" damping="0.001" name="ball_3_rot" pos="0 0 0" stiffness="0" type="ball"/>
-            <geom name="ball_3" pos="0 0 0" rgba="0.2 0.2 0.5 1" size=".02" type="sphere"/>
+            <geom name="ball_3" pos="0 0 0" rgba="0.2 0.2 0.5 1" size=".025" type="sphere" friction="2.0 0.5 0.001"/>
         </body>
 
     </worldbody>
     <actuator>
-      <position name="left_finger_act" joint="left_outer_knuckle_joint" kp="500" kv="50"/>
-      <position name="right_finger_act" joint="right_outer_knuckle_joint" kp="500" kv="50"/>
+          <position name="left_finger_act" joint="left_outer_knuckle_joint" kp="50" kv="5"/>
+          <position name="right_finger_act" joint="right_outer_knuckle_joint" kp="50" kv="5"/>
     </actuator> 
 
     <contact>

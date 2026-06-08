@@ -17,8 +17,17 @@ def main():
     print(f"模型路径: {model_path}")
 
     # 新增：加载配置文件（给任务传参）
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        print("[OK] 配置文件加载成功")
+    except FileNotFoundError:
+        print(f"[错误] 找不到配置文件 {config_path}")
+        print("请检查文件是否存在，或路径是否正确")
+        return
+    except Exception as e:
+        print(f"[错误] 配置文件加载失败: {e}")
+        return
 
     # 2. 初始化仿真器+任务实例
     sim = IndexSimulator(config_path, model_path)
