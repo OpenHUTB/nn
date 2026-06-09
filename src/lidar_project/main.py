@@ -1,0 +1,354 @@
+import carla
+import random
+import time
+import os
+import json
+import numpy as np
+import pandas as pd
+import cv2
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.model_selection import cross_val_score
+import pickle
+import datetime
+
+class TrafficDQNAgent:
+    def __init__(self):
+        self.q_table = {}
+        self.lr = 0.1
+        self.gamma = 0.9
+        self.actions = [0, 1, 2]
+
+    def get_state(self, speed, acc, distance):
+        return (round(speed, 1), round(acc, 1), round(distance, 1))
+
+    def choose_action(self, state):
+        if state not in self.q_table:
+            self.q_table[state] = np.zeros(len(self.actions))
+        return np.argmax(self.q_table[state])
+
+    def learn(self, state, action, reward, next_state):
+        if next_state not in self.q_table:
+            self.q_table[next_state] = np.zeros(len(self.actions))
+        
+        old_q = self.q_table[state][action]
+        target_q = reward + self.gamma * np.max(self.q_table[next_state])
+        self.q_table[state][action] = old_q + self.lr * (target_q - old_q)
+
+# -------------------------- 辅助函数 --------------------------
+def set_random_weather(world):
+    weathers = [
+        carla.WeatherParameters.ClearNoon,
+        carla.WeatherParameters.CloudyNoon,
+        carla.WeatherParameters.WetNoon
+    ]
+    world.set_weather(random.choice(weathers))
+    print("🌤️ 已设置随机天气")
+
+def clean_old_files():
+    files_to_clean = ["congestion_video.mp4"]
+    for f in files_to_clean:
+        if os.path.exists(f):
+            os.remove(f)
+
+def get_current_time():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# -------------------------- 机器学习增强函数（修复空白图） --------------------------
+def plot_feature_importance(model, feature_names):
+    if hasattr(model, 'feature_importances_'):
+        plt.figure(figsize=(10,5))
+        importance = model.feature_importances_
+        plt.barh(feature_names, importance)
+        plt.title("Feature Importance")
+        plt.tight_layout()
+        plt.savefig("feature_importance.png", dpi=150)
+        plt.close()
+
+def plot_training_curve(acc_rf, acc_log, acc_mlp, acc_ensemble):
+    models = ["RandomForest", "LogisticRegression", "MLP", "Ensemble"]
+    accuracies = [acc_rf, acc_log, acc_mlp, acc_ensemble]
+
+    plt.figure(figsize=(8,5))
+    plt.bar(models, accuracies, color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
+    plt.ylim(0, 1.05)
+    plt.title("Model Training Performance")
+    plt.ylabel("Accuracy")
+    plt.xticks(rotation=15)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig("training_curve.png", dpi=150)
+    plt.close()
+
+# -------------------------- 主程序 --------------------------
+def main():
+    client = carla.Client('localhost', 2000)
+    client.set_timeout(30.0)
+    world = client.get_world()
+    tm = client.get_trafficmanager(8000)
+    tm.set_global_distance_to_leading_vehicle(0.4)
+    tm.set_random_device_seed(42)
+
+    settings = world.get_settings()
+    settings.synchronous_mode = True
+    settings.fixed_delta_seconds = 0.05
+    world.apply_settings(settings)
+
+    blueprint_library = world.get_blueprint_library()
+    vehicle_list = []
+    camera = None
+    video_writer = None
+
+    video_filename = "congestion_video.mp4"
+    frame_width = 1280
+    frame_height = 720
+    fps = 15
+    clean_old_files()
+    set_random_weather(world)
+
+    rl_agent = TrafficDQNAgent()
+    total_reward = 0
+
+    try:
+        print("🚗 正在生成高密度交通拥堵场景...")
+        spawn_points = world.get_map().get_spawn_points()
+        random.shuffle(spawn_points)
+
+        count = 0
+        for spawn_point in spawn_points:
+            if count >= 25:
+                break
+            bp = random.choice(blueprint_library.filter('vehicle.*'))
+            try:
+                vehicle = world.spawn_actor(bp, spawn_point)
+                vehicle_list.append(vehicle)
+                vehicle.set_autopilot(True)
+
+                tm.ignore_lights_percentage(vehicle, 100)
+                tm.vehicle_percentage_speed_difference(vehicle, -92)
+                tm.distance_to_leading_vehicle(vehicle, 0.4)
+                tm.set_desired_speed(vehicle, 4)
+
+                count += 1
+            except:
+                continue
+
+        print("⏳ 等待车流稳定拥堵...")
+        for _ in range(250):
+            world.tick()
+
+        if vehicle_list:
+            cam_bp = blueprint_library.find('sensor.camera.rgb')
+            cam_bp.set_attribute('image_size_x', str(frame_width))
+            cam_bp.set_attribute('image_size_y', str(frame_height))
+            cam_bp.set_attribute('fov', '115')
+
+            cam_tf = carla.Transform(carla.Location(x=-14, y=0, z=11), carla.Rotation(pitch=-55))
+            camera = world.spawn_actor(cam_bp, cam_tf, attach_to=vehicle_list[0], attachment_type=carla.AttachmentType.SpringArm)
+
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            video_writer = cv2.VideoWriter(video_filename, fourcc, fps, (frame_width, frame_height))
+
+            def write_video_frame(img):
+                array = np.frombuffer(img.raw_data, dtype=np.uint8)
+                array = array.reshape((img.height, img.width, 4))
+                frame = array[:, :, :3]
+                frame = frame[:, :, ::-1]
+                video_writer.write(frame)
+
+            camera.listen(write_video_frame)
+            print("📸 相机已启动 → 录制堵车视频")
+
+        print("📹 开始录制仿真 + 深度强化学习控制...")
+        log_file = "block_log.rec"
+        client.start_recorder(log_file)
+
+        congestion_frames = {i:0 for i in range(len(vehicle_list))}
+        stop_and_go = {i:0 for i in range(len(vehicle_list))}
+
+        for frame_idx in range(1400):
+            world.tick()
+            for idx, veh in enumerate(vehicle_list):
+                if veh.is_alive:
+                    speed = np.sqrt(veh.get_velocity().x**2 + veh.get_velocity().y**2)
+                    acc = np.sqrt(veh.get_acceleration().x**2 + veh.get_acceleration().y**2)
+                    dist = random.uniform(0.4, 1.8)
+                    state = rl_agent.get_state(speed, acc, dist)
+
+                    action = rl_agent.choose_action(state)
+
+                    if action == 0:
+                        tm.set_desired_speed(veh, 2.0)
+                    elif action == 1:
+                        tm.set_desired_speed(veh, 5.0)
+                    else:
+                        tm.set_desired_speed(veh, 8.0)
+
+                    if 0.5 < speed < 2.0:
+                        reward = 5
+                    elif speed < 0.2:
+                        reward = -5
+                    else:
+                        reward = 1
+                    total_reward += reward
+
+                    next_speed = np.sqrt(veh.get_velocity().x**2 + veh.get_velocity().y**2)
+                    next_state = rl_agent.get_state(next_speed, acc, dist)
+                    rl_agent.learn(state, action, reward, next_state)
+
+                    if speed < 1.2:
+                        congestion_frames[idx] += 1
+                    if speed < 0.2:
+                        stop_and_go[idx] += 1
+
+        client.stop_recorder()
+        print(f"✅ 日志已保存")
+        print(f"🧠 深度强化学习累计奖励：{total_reward:.2f}")
+
+
+        print("\n==== 📊 多维度特征采集 ====")
+        data = []
+        speeds = []
+        accels = []
+        congestion_times = []
+        stop_times = []
+
+        feature_names = [
+            "speed", "acceleration", "dist_to_front",
+            "lane_offset", "yaw", "congestion_time", "stop_time"
+        ]
+
+        for idx, veh in enumerate(vehicle_list):
+            vel = veh.get_velocity()
+            speed = np.sqrt(vel.x**2 + vel.y**2)
+            accel = veh.get_acceleration()
+            acc = np.sqrt(accel.x**2 + accel.y**2)
+            dist_to_front = random.uniform(0.4, 1.8)
+            lane_offset = random.uniform(-1.0, 1.0)
+            yaw = veh.get_transform().rotation.yaw
+            congestion_time = round(congestion_frames[idx] * 0.05, 2)
+            stop_time = round(stop_and_go[idx] * 0.05, 2)
+
+            speeds.append(speed)
+            accels.append(acc)
+            congestion_times.append(congestion_time)
+            stop_times.append(stop_time)
+            data.append([speed, acc, dist_to_front, lane_offset, yaw, congestion_time, stop_time])
+
+        labels = [1 if s < 1.2 else 0 for s in speeds]
+        congestion_levels = ["严重拥堵" if s < 0.4 else "中度拥堵" if s < 1.5 else "轻微拥堵" if s < 3 else "畅通" for s in speeds]
+
+        df = pd.DataFrame(data, columns=feature_names)
+        df["label"] = labels
+        df["congestion_level"] = congestion_levels
+        df.to_csv("congestion_data.csv", index=False)
+        print("✅ 数据集已保存：congestion_data.csv")
+
+        print("\n==== 🤖 三模型训练（RF + LR + MLP深度学习）====")
+        X = np.array(data)
+        y = np.array(labels)
+
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
+        rf = RandomForestClassifier(n_estimators=150, random_state=42)
+        rf.fit(X_scaled, y)
+
+        logreg = LogisticRegression(max_iter=500)
+        logreg.fit(X_scaled, y)
+
+        mlp = MLPClassifier(hidden_layer_sizes=(32,16), max_iter=800, random_state=42)
+        mlp.fit(X_scaled, y)
+
+        pred_rf = rf.predict(X_scaled)
+        pred_log = logreg.predict(X_scaled)
+        pred_mlp = mlp.predict(X_scaled)
+
+        pred_ensemble = np.round((pred_rf + pred_log + pred_mlp)/3).astype(int)
+
+        acc_rf = accuracy_score(y, pred_rf)
+        acc_log = accuracy_score(y, pred_log)
+        acc_mlp = accuracy_score(y, pred_mlp)
+        acc_ensemble = accuracy_score(y, pred_ensemble)
+
+        cv_rf = cross_val_score(rf, X_scaled, y, cv=3).mean()
+
+        print(f"🌲 随机森林: {acc_rf:.2%}")
+        print(f"📈 逻辑回归: {acc_log:.2%}")
+        print(f"🧠 深度学习MLP: {acc_mlp:.2%}")
+        print(f"🔗 三模型融合: {acc_ensemble:.2%}")
+        print(f"✅ 交叉验证均值: {cv_rf:.2%}")
+
+        plot_feature_importance(rf, feature_names)
+        plot_training_curve(acc_rf, acc_log, acc_mlp, acc_ensemble)
+
+        for idx, veh in enumerate(vehicle_list):
+            speed = speeds[idx]
+            final_pred = pred_ensemble[idx]
+            level = congestion_levels[idx]
+            print(f"🚗 车辆{idx} | 速度={speed:.2f} | {level} | 拥堵={final_pred}")
+
+        with open("congestion_rf_model.pkl", "wb") as f:
+            pickle.dump(rf, f)
+        with open("congestion_mlp_model.pkl", "wb") as f:
+            pickle.dump(mlp, f)
+        with open("scaler.pkl", "wb") as f:
+            pickle.dump(scaler, f)
+        with open("drl_agent.pkl", "wb") as f:
+            pickle.dump(rl_agent, f)
+
+        result = {
+            "create_time": get_current_time(),
+            "total_vehicles": len(vehicle_list),
+            "congested_count": int(sum(pred_ensemble)),
+            "avg_speed": round(float(np.mean(speeds)), 2),
+            "avg_congestion_time": round(float(np.mean(congestion_times)), 2),
+            "avg_stop_time": round(float(np.mean(stop_times)), 2),
+            "rf_accuracy": round(float(acc_rf), 4),
+            "mlp_accuracy": round(float(acc_mlp), 4),
+            "ensemble_accuracy": round(float(acc_ensemble), 4),
+            "drl_total_reward": round(total_reward, 2),
+            "congestion_level": "严重拥堵" if sum(pred_ensemble)/len(vehicle_list) > 0.6 else "中度拥堵"
+        }
+        with open("congestion_result.json", "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+
+        # ======================
+        # 完整报告
+        # ======================
+        with open("congestion_report.txt", "w", encoding="utf-8") as f:
+            f.write("==== 交通拥堵检测分析报告 ====\n")
+            f.write(f"生成时间：{get_current_time()}\n")
+            f.write(f"总车辆数：{len(vehicle_list)}\n")
+            f.write(f"拥堵车辆数：{sum(pred_ensemble)}\n")
+            f.write(f"平均车速：{np.mean(speeds):.2f} m/s\n")
+            f.write(f"融合模型准确率：{acc_ensemble:.2%}\n")
+            f.write(f"深度学习MLP准确率：{acc_mlp:.2%}\n")
+            f.write(f"DRL总奖励：{total_reward:.2f}\n")
+            f.write(f"拥堵等级：{result['congestion_level']}\n")
+
+        print("\n🎉 全部功能执行完毕！")
+        print(f"🎬 视频：congestion_video.mp4")
+        print(f"📊 数据集：congestion_data.csv")
+        print(f"📄 报告：congestion_result.json")
+        print(f"🤖 模型：rf / mlp / drl")
+        print(f"📈 图片：feature_importance.png, training_curve.png\n")
+
+    finally:
+        if camera and camera.is_alive:
+            camera.destroy()
+        if video_writer:
+            video_writer.release()
+        for v in vehicle_list:
+            if v.is_alive:
+                v.destroy()
+        settings.synchronous_mode = False
+        world.apply_settings(settings)
+        cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main()

@@ -10,6 +10,7 @@ import os
 import cv2
 from pathlib import Path
 from detection_engine import DetectionEngine, ModelLoadError
+from result_saver import ResultSaver
 
 
 class BatchDetector:
@@ -43,12 +44,19 @@ class BatchDetector:
         if not self.input_dir.is_dir():
             raise ValueError(f"Input directory does not exist: {self.input_dir}")
 
-    def run(self):
+        # 初始化结果保存器
+        self.result_saver = ResultSaver(str(output_dir))
+
+    def run(self, save_detections=True, save_csv=False):
         """
         执行批量检测流程。
 
         遍历输入目录中所有支持格式的图像文件，调用检测引擎进行推理，
         将带标注的图像保存到输出目录，并打印处理进度与结果统计。
+
+        参数:
+            save_detections: 是否保存检测数据JSON
+            save_csv: 是否保存CSV报告
         """
         # 筛选出输入目录中所有符合支持扩展名的图像文件
         image_files = [
@@ -75,22 +83,35 @@ class BatchDetector:
                     continue
 
                 # 调用检测引擎进行目标检测
-                # 返回值：annotated_frame（带标注的图像），_（检测结果元数据，此处未使用）
-                annotated_frame, _ = self.engine.detect(frame)
+                # 返回值：annotated_frame（带标注的图像），results（检测结果）
+                annotated_frame, results = self.engine.detect(frame)
 
-                # 构造输出文件路径：保留原文件名，在扩展名前加 "_detected"
-                output_path = self.output_dir / f"{img_path.stem}_detected{img_path.suffix}"
+                # 保存带标注的图像
+                saved_path = self.result_saver.save_image(
+                    annotated_frame, 
+                    img_path.name,
+                    suffix="detected"
+                )
+                print(f"✅ Saved: {os.path.basename(saved_path)}")
 
-                # 尝试将标注后的图像写入磁盘
-                if cv2.imwrite(str(output_path), annotated_frame):
-                    print(f"✅ Saved: {output_path.name}")
-                    success_count += 1
-                else:
-                    print(f"❌ Failed to save: {output_path}")
+                # 保存检测数据JSON
+                if save_detections:
+                    self.result_saver.save_detection_data(
+                        img_path.name,
+                        results[0].boxes if results and results[0].boxes else []
+                    )
+
+                success_count += 1
 
             except Exception as e:
                 # 捕获并报告处理单张图像时发生的任何异常
                 print(f"💥 Error processing {img_path.name}: {e}")
 
+        # 保存CSV报告
+        if save_csv and success_count > 0:
+            csv_path = self.result_saver.save_csv_report()
+            print(f"📊 CSV report saved: {os.path.basename(csv_path)}")
+
         # 打印最终处理统计信息
         print(f"\n🎉 Batch detection completed. {success_count}/{len(image_files)} images processed successfully.")
+        print(f"📁 Output directory: {self.output_dir}")

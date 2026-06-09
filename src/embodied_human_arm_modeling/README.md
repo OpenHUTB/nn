@@ -1,5 +1,6 @@
-Shadow Hand 手部动画演示项目
-📋 项目概述
+# Shadow Hand 手部动画演示项目
+
+## 项目概述
 本项目基于 Shadow Robot Company 开源的 Shadow Hand E3M5 左手模型（Apache 2.0 License），使用 MuJoCo 物理引擎开发了一个交互式的手部动画演示系统。该系统可以展示多种预设手部姿态，并支持用户通过命令行进行实时控制。
 
 🚀 快速开始

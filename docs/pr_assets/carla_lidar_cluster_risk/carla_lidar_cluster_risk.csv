@@ -1,0 +1,4 @@
+cluster_id,points,center_x_m,center_y_m,distance_m,risk_score,risk_level
+0,48,8.572,1.825,8.765,0.5389,danger
+1,24,17.857,-2.252,17.998,0.2098,safe
+2,24,26.198,0.218,26.199,0.1438,safe

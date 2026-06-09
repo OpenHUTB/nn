@@ -1,12 +1,9 @@
-from tracemalloc import start
 import gym
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch.nn as nn
 import torch as th
-from torch.nn.modules.linear import Linear
 
 import torchvision.models as pre_models
-import numpy as np
 import torch.nn.functional as F
 
 """
@@ -16,23 +13,21 @@ import torch.nn.functional as F
     不使用CNN层
     仅用最大池化层生成25个特征
 
-2. CNN_GAP
-    3层CNN
-    以AvgPool2d结束
-    1*8 -> 8*16 -> 16*25
-
-3. CNN_GAP_BN
+2. CNN_GAP_BN
     3层CNN，并在每层CNN后使用BN
     以AvgPool2d结束
 
-4. CNN_FC
+3. CNN_FC
     3层CNN
     以Flatten结束
     通过FC得到CNN特征 (960 100 25)
 
-5. CNN_MobileNet
+4. CNN_MobileNet
     使用预训练MobileNet作为特征生成器
     以Flatten结束 (576 -> 25)
+
+5. CNN_GAP_new
+    当前 policy_name = CNN_GAP 时实际使用的轻量CNN
 """
 
 
@@ -80,93 +75,6 @@ class No_CNN(BaseFeaturesExtractor):
         # print(state_feature.size(), cnn_feature.size())
         x = th.cat((cnn_feature, state_feature), dim=1)
         # print(x)
-        self.feature_all = x  # use  to update feature before FC
-
-        return x
-
-
-class CNN_GAP(BaseFeaturesExtractor):
-    """
-    :param observation_space: (gym.Space)
-    :param features_dim: (int) 提取后的特征维度。
-        对应最后一层的单元数。
-    """
-
-    def __init__(
-        self,
-        observation_space: gym.spaces.Box,
-        features_dim: int = 256,
-        state_feature_dim=0,
-    ):
-        super(CNN_GAP, self).__init__(observation_space, features_dim)
-        # 可用 model.actor.features_extractor.feature_all 打印全部特征
-        # 设置CNN特征数和状态特征数
-        assert state_feature_dim > 0
-        self.feature_num_state = state_feature_dim
-        self.feature_num_cnn = features_dim - state_feature_dim
-        self.feature_all = None
-
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=3, stride=1, padding="same"),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),  # [1, 8, 40, 48]
-        )
-
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding="same"),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),  # [1, 8, 20, 24]
-            # nn.BatchNorm2d(8, affine=False)
-        )
-
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(
-                16, self.feature_num_cnn, kernel_size=3, stride=1, padding="same"
-            ),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),  # [1, 8, 10, 12]
-        )
-        self.gap_layer = nn.AvgPool2d(kernel_size=(10, 12), stride=1)
-
-        self.batch_layer = nn.BatchNorm1d(self.feature_num_cnn)
-
-        # nn.init.kaiming_normal_(self.conv1[0].weight, a=0, mode='fan_in')
-        # nn.init.kaiming_normal_(self.conv2[0].weight, a=0, mode='fan_in')
-        # nn.init.kaiming_normal_(self.conv3[0].weight, a=0, mode='fan_in')
-        # nn.init.constant(self.conv1[0].bias, 0.0)
-        # nn.init.constant(self.conv2[0].bias, 0.0)
-        # nn.init.constant(self.conv3[0].bias, 0.0)
-
-        # nn.init.xavier_uniform(self.conv1[0].weight)
-        # nn.init.xavier_uniform(self.conv2[0].weight)
-        # nn.init.xavier_uniform(self.conv3[0].weight)
-        # self.conv1[0].bias.data.fill_(0)
-        # self.conv2[0].bias.data.fill_(0)
-        # self.conv3[0].bias.data.fill_(0)
-        # self.soft_max_layer = nn.Softmax(dim=1)
-        # self.batch_norm_layer = nn.BatchNorm1d(16, affine=False)
-
-        # self.linear = self.cnn
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        depth_img = observations[:, 0:1, :, :]
-
-        self.layer_1_out = self.conv1(depth_img)
-        self.layer_2_out = self.conv2(self.layer_1_out)
-        self.layer_3_out = self.conv3(self.layer_2_out)
-        self.gap_layer_out = self.gap_layer(self.layer_3_out)
-
-        cnn_feature = self.gap_layer_out  # [1, 8, 1, 1]
-        cnn_feature = cnn_feature.squeeze(dim=3)  # [1, 8, 1]
-        cnn_feature = cnn_feature.squeeze(dim=2)  # [1, 8]
-        # cnn_feature = th.clamp(cnn_feature,-1,2)
-        # cnn_feature = self.batch_layer(cnn_feature)
-
-        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
-        # 将状态特征从0~1映射到-1~1
-        # state_feature = state_feature*2 - 1
-
-        x = th.cat((cnn_feature, state_feature), dim=1)
         self.feature_all = x  # use  to update feature before FC
 
         return x
@@ -239,49 +147,6 @@ class CNN_GAP_BN(BaseFeaturesExtractor):
         # state_feature = state_feature*2 - 1
 
         x = th.cat((cnn_feature, state_feature), dim=1)
-        self.feature_all = x  # use  to update feature before FC
-
-        return x
-
-
-class CustomNoCNN(BaseFeaturesExtractor):
-    """
-    :param observation_space: (gym.Space)
-    :param features_dim: (int) 提取后的特征维度。
-        对应最后一层的单元数。
-    """
-
-    def __init__(
-        self,
-        observation_space: gym.spaces.Box,
-        features_dim: int = 256,
-        state_feature_dim=4,
-    ):
-        super(CustomNoCNN, self).__init__(observation_space, features_dim)
-        # 假设输入图像为CxHxW（通道在前）
-        # 若需重排通道顺序，可在预处理或wrapper中完成
-        # 可用 model.actor.features_extractor.feature_all 打印全部特征
-
-        # 设置CNN特征数和状态特征数
-        assert state_feature_dim > 0
-        self.feature_num_state = state_feature_dim
-        self.feature_all = None
-
-        # 输入尺寸 80*100
-        # 缩小5倍
-        self.cnn = nn.Sequential(nn.MaxPool2d(kernel_size=(16, 20)), nn.Flatten())
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        depth_img = observations[:, 0:1, :, :]
-
-        cnn_feature = self.cnn(depth_img)  # [1, 25, 1, 1]
-
-        state_feature = observations[:, 1, 0, 0 : self.feature_num_state]
-        # 将状态特征从0~1映射到-1~1
-        # state_feature = state_feature*2 - 1
-        # print(state_feature.size(), cnn_feature.size())
-        x = th.cat((cnn_feature, state_feature), dim=1)
-        # print(x)
         self.feature_all = x  # use  to update feature before FC
 
         return x
@@ -491,3 +356,7 @@ class CNN_GAP_new(BaseFeaturesExtractor):
         self.feature_all = x  # use  to update feature before FC
 
         return x
+
+
+# Backward-compatible name for older scripts; policy_name="CNN_GAP" uses CNN_GAP_new.
+CNN_GAP = CNN_GAP_new
