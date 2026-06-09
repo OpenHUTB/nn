@@ -46,6 +46,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- 车道线检测: 'lane_detection/README.md'
 - CarRacing DQN/DoubleDQN：训练改进与可视化对比: 'car_racing_dqn_improvements.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 - 自动驾驶车辆语义分割: 'auto_drive_seg/README.md'

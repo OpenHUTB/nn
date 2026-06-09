@@ -260,6 +260,7 @@ class HUD(object):
         self.max_speed_points = 60       # 最多保存60个点
         self.last_waypoint = None
         self.current_obstacle = None
+        self.overspeed = False   # 超速标志
 
     def on_world_tick(self, timestamp):
         """Gets informations from the world at every tick"""
@@ -285,6 +286,10 @@ class HUD(object):
         max_col = max(1.0, max(collision))
         collision = [x / max_col for x in collision]
         vehicles = world.world.get_actors().filter('vehicle.*')
+        # 判断是否超速（当前速度 > 道路限速）
+        current_speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        road_limit = world.player.get_speed_limit()
+        self.overspeed = current_speed > road_limit
 
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
@@ -465,7 +470,12 @@ class HUD(object):
                         pygame.draw.rect(display, (255, 255, 255), rect)
                     item = item[0]
                 if item:  # At this point has to be a str.
-                    surface = self._font_mono.render(item, True, (255, 255, 255))
+                    # 超速时速度文字变红
+                    if item.startswith('Speed:') and self.overspeed:
+                        color = (255, 0, 0)
+                    else:
+                        color = (255, 255, 255)
+                    surface = self._font_mono.render(item, True, color)
                     display.blit(surface, (8, v_offset))
                 v_offset += 18
         self._notifications.render(display)
