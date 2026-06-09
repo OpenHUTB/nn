@@ -17,16 +17,32 @@ def main():
     print(f"模型路径: {model_path}")
 
     # 新增：加载配置文件（给任务传参）
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        print("[OK] 配置文件加载成功")
+    except FileNotFoundError:
+        print(f"[错误] 找不到配置文件 {config_path}")
+        print("请检查文件是否存在，或路径是否正确")
+        return
+    except Exception as e:
+        print(f"[错误] 配置文件加载失败: {e}")
+        return
 
-    # 2. 初始化仿真器+任务实例
-    sim = IndexSimulator(config_path, model_path)
-    task = ChoicePanelTask(config, sim)  # 关联配置和仿真器
+    # 2. 初始化仿真器+任务实例（带异常处理）
+    try:
+        sim = IndexSimulator(config_path, model_path)
+        print("[OK] 仿真器初始化成功")
+        task = ChoicePanelTask(config, sim)  # 关联配置和仿真器
+        print("[OK] 任务模块初始化成功")
+    except Exception as e:
+        print(f"[错误] 仿真器/任务初始化失败: {e}")
+        return
 
     # 3. 重置仿真和任务
     sim.reset()
     task.reset()
+    print("[OK] 仿真环境重置完成，准备开始运行")
 
     # 4. 仿真循环（整合任务逻辑，替代sim.run_simulation()）
     try:

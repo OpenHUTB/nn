@@ -188,7 +188,30 @@ class SimpleDrivingSystem:
         self.parking_target_angle = 0.0  # 目标停车角度
         self.parking_step = 0  # 当前泊车步骤
         self.parking_timer = 0.0  # 泊车计时器
+        
+        # 地图切换相关
+        self.available_maps = []  # 动态获取可用地图列表
+        self.current_map_index = 0  # 当前地图索引
+        self.current_map_name = 'Town01'  # 当前地图名称
 
+    def init_available_maps(self):
+        """初始化可用地图列表（动态获取CARLA服务器上的地图）"""
+        try:
+            # 获取服务器上所有可用的地图
+            maps = self.client.get_available_maps()
+            # 过滤出 Town 系列地图
+            town_maps = [m for m in maps if 'Town' in m]
+            # 按名称排序
+            town_maps.sort()
+            self.available_maps = town_maps
+            print(f"\n检测到 {len(town_maps)} 个可用地图:")
+            for i, map_name in enumerate(town_maps):
+                print(f"  {i+1}. {map_name}")
+        except Exception as e:
+            print(f"获取可用地图失败: {e}")
+            # 如果获取失败，使用默认列表
+            self.available_maps = ['Town01', 'Town02', 'Town03', 'Town04', 'Town05', 'Town06', 'Town07']
+    
     def init_available_models(self):
         """初始化可用车型列表（检查哪些车型在CARLA中存在）"""
         blueprint_library = self.world.get_blueprint_library()
@@ -231,6 +254,66 @@ class SimpleDrivingSystem:
         if self.current_model_name not in self.available_models and self.available_models:
             self.current_model_name = self.available_models[0]
             self.current_model_index = 0
+
+    def change_map(self, direction='next'):
+        """切换地图"""
+        # 尝试多次切换，直到找到可用的地图
+        max_attempts = len(self.available_maps)
+        attempts = 0
+        
+        while attempts < max_attempts:
+            if direction == 'next':
+                self.current_map_index = (self.current_map_index + 1) % len(self.available_maps)
+            elif direction == 'prev':
+                self.current_map_index = (self.current_map_index - 1) % len(self.available_maps)
+            
+            new_map = self.available_maps[self.current_map_index]
+            self.current_map_name = new_map
+            
+            print(f"\n正在切换到地图: {new_map}")
+            
+            try:
+                # 清理现有资源
+                self.cleanup()
+                
+                # 加载新地图
+                self.world = self.client.load_world(new_map)
+                print(f"地图 {new_map} 加载成功！")
+                
+                # 等待地图加载
+                time.sleep(0.5)
+                
+                # 重新生成车辆
+                if self.spawn_vehicle():
+                    # 重新设置传感器
+                    self.setup_camera()
+                    self.setup_speed_sensor()
+                    
+                    # 设置控制器
+                    self.setup_controller()
+                    
+                    # 生成NPC车辆
+                    self.spawn_npc_vehicles(2)
+                    
+                    print(f"地图切换完成！当前地图: {new_map}")
+                    return  # 成功切换，退出函数
+                else:
+                    print(f"地图 {new_map} 车辆生成失败，尝试下一个地图...")
+                    attempts += 1
+                    
+            except Exception as e:
+                print(f"地图 {new_map} 加载失败: {e}")
+                import traceback
+                traceback.print_exc()
+                attempts += 1
+        
+        # 如果所有地图都失败了，回退到原始地图
+        print("警告：所有地图切换都失败了，保持当前地图")
+        if direction == 'next':
+            self.current_map_index = (self.current_map_index - 1) % len(self.available_maps)
+        else:
+            self.current_map_index = (self.current_map_index + 1) % len(self.available_maps)
+        self.current_map_name = self.available_maps[self.current_map_index]
 
     def auto_parking_control(self, vehicle):
         """完整倒车入库控制逻辑 - 模拟真实倒车入库动作"""
@@ -405,6 +488,9 @@ class SimpleDrivingSystem:
 
             # 初始化可用车型列表
             self.init_available_models()
+            
+            # 初始化可用地图列表（动态获取服务器上的地图）
+            self.init_available_maps()
             
             print("连接成功！")
             return True
@@ -1186,6 +1272,8 @@ class SimpleDrivingSystem:
         print("  r - 重置车辆")
         print("  s - 紧急停止")
         print("  m - 切换车辆型号")
+        print("  , - 切换到上一个地图")
+        print("  . - 切换到下一个地图")
         print("  l - 切换车道保持辅助(LKA)")
         print("  k - 切换交通标志识别(TSR)")
         print("  w - 切换自动天气变化")
@@ -1199,6 +1287,7 @@ class SimpleDrivingSystem:
         print("\n视角: 1-前视 2-后视 3-左视 4-右视 5-鸟瞰 6-第三人称")
         print("\n天气控制: W-切换自动天气 7-晴天 8-雨天 9-雾天 0-白天/黑夜")
         print("\n车辆型号: M-切换车型 切换后按R重置车辆")
+        print("\n地图切换: ,-上一个地图 .-下一个地图 (Town01-Town10)")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -1276,6 +1365,14 @@ class SimpleDrivingSystem:
                 elif key == ord('m'):
                     # 切换车辆型号
                     model_name = self.change_vehicle_model('next')
+                elif key == 44:  # 逗号的ASCII码
+                    # 切换到上一个地图
+                    print("检测到逗号键，切换到上一个地图")
+                    self.change_map('prev')
+                elif key == 46:  # 句号的ASCII码
+                    # 切换到下一个地图
+                    print("检测到句号键，切换到下一个地图")
+                    self.change_map('next')
                 elif key == ord('l'):
                     # 切换车道保持辅助(LKA)
                     self.lka_enabled = not self.lka_enabled
