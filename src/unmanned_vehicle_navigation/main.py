@@ -96,6 +96,232 @@ class SimpleController:
             print("退出倒车模式，恢复前进")
 
 
+class WeatherManager:
+    """天气管理器 - 提供多种天气模式"""
+    
+    def __init__(self, world):
+        self.world = world
+        self.weather_configs = {
+            'sunny': {
+                'cloudiness': 10.0,
+                'precipitation': 0.0,
+                'precipitation_deposits': 0.0,
+                'wind_intensity': 10.0,
+                'sun_altitude_angle': 75.0,
+                'fog_density': 0.0,
+                'fog_distance': 1000.0,
+                'fog_falloff': 1.0,
+                'wetness': 0.0
+            },
+            'cloudy': {
+                'cloudiness': 80.0,
+                'precipitation': 0.0,
+                'precipitation_deposits': 0.0,
+                'wind_intensity': 20.0,
+                'sun_altitude_angle': 75.0,
+                'fog_density': 0.0,
+                'fog_distance': 1000.0,
+                'fog_falloff': 1.0,
+                'wetness': 0.0
+            },
+            'rainy': {
+                'cloudiness': 90.0,
+                'precipitation': 80.0,
+                'precipitation_deposits': 50.0,
+                'wind_intensity': 40.0,
+                'sun_altitude_angle': 45.0,
+                'fog_density': 30.0,
+                'fog_distance': 50.0,
+                'fog_falloff': 0.1,
+                'wetness': 80.0
+            },
+            'stormy': {
+                'cloudiness': 100.0,
+                'precipitation': 100.0,
+                'precipitation_deposits': 80.0,
+                'wind_intensity': 80.0,
+                'sun_altitude_angle': 30.0,
+                'fog_density': 50.0,
+                'fog_distance': 30.0,
+                'fog_falloff': 0.05,
+                'wetness': 100.0
+            },
+            'snowy': {
+                'cloudiness': 95.0,
+                'precipitation': 0.0,
+                'precipitation_deposits': 100.0,
+                'wind_intensity': 30.0,
+                'sun_altitude_angle': 45.0,
+                'fog_density': 40.0,
+                'fog_distance': 40.0,
+                'fog_falloff': 0.1,
+                'wetness': 0.0,
+                'snow_intensity': 100.0
+            },
+            'foggy': {
+                'cloudiness': 90.0,
+                'precipitation': 10.0,
+                'precipitation_deposits': 0.0,
+                'wind_intensity': 5.0,
+                'sun_altitude_angle': 45.0,
+                'fog_density': 80.0,
+                'fog_distance': 20.0,
+                'fog_falloff': 0.02,
+                'wetness': 20.0
+            },
+            'night': {
+                'cloudiness': 30.0,
+                'precipitation': 0.0,
+                'precipitation_deposits': 0.0,
+                'wind_intensity': 10.0,
+                'sun_altitude_angle': -15.0,
+                'fog_density': 20.0,
+                'fog_distance': 80.0,
+                'fog_falloff': 0.1,
+                'wetness': 50.0
+            }
+        }
+        self.current_weather = 'sunny'
+        self.frame_counter = 0
+    
+    def _apply_weather(self, config):
+        """内部方法：应用天气参数到CARLA天气对象"""
+        weather = carla.WeatherParameters()
+        weather.cloudiness = config['cloudiness']
+        weather.precipitation = config['precipitation']
+        weather.precipitation_deposits = config['precipitation_deposits']
+        weather.wind_intensity = config['wind_intensity']
+        weather.sun_altitude_angle = config['sun_altitude_angle']
+        weather.fog_density = config['fog_density']
+        weather.fog_distance = config['fog_distance']
+        weather.fog_falloff = config['fog_falloff']
+        weather.wetness = config['wetness']
+        if 'snow_intensity' in config:
+            weather.snow_intensity = config['snow_intensity']
+        self.world.set_weather(weather)
+    
+    def set_weather(self, weather_name):
+        """设置天气模式"""
+        if weather_name in self.weather_configs:
+            self._apply_weather(self.weather_configs[weather_name])
+            self.current_weather = weather_name
+            print(f"天气已切换为: {self.get_weather_name(weather_name)}")
+            return True
+        else:
+            print(f"未知天气模式: {weather_name}")
+            return False
+    
+    def tick(self):
+        """每帧调用：定期刷新天气参数，防止CARLA自动改变天气"""
+        self.frame_counter += 1
+        if self.frame_counter % 50 == 0:
+            self._apply_weather(self.weather_configs[self.current_weather])
+    
+    def cycle_weather(self):
+        """循环切换天气"""
+        weather_list = list(self.weather_configs.keys())
+        current_index = weather_list.index(self.current_weather)
+        next_index = (current_index + 1) % len(weather_list)
+        return self.set_weather(weather_list[next_index])
+    
+    def get_weather_name(self, weather_key):
+        """获取天气中文名"""
+        names = {
+            'sunny': '晴天',
+            'cloudy': '多云',
+            'rainy': '雨天',
+            'stormy': '暴风雨',
+            'snowy': '雪天',
+            'foggy': '雾天',
+            'night': '夜晚'
+        }
+        return names.get(weather_key, weather_key)
+    
+    def get_current_weather_display(self):
+        """获取当前天气显示名称"""
+        return self.get_weather_name(self.current_weather)
+
+
+class LiDARManager:
+    """LiDAR传感器管理器 - 实现障碍物检测和避障"""
+    
+    def __init__(self, world, vehicle):
+        self.world = world
+        self.vehicle = vehicle
+        self.lidar = None
+        self.lidar_data = None
+        self.min_distance = float('inf')  # 最近障碍物距离
+        self.obstacle_detected = False
+        self.warning_distance = 15.0  # 警告距离（米）
+        self.stop_distance = 5.0  # 停止距离（米）
+        
+        # 初始化LiDAR传感器
+        self._setup_lidar()
+    
+    def _setup_lidar(self):
+        """设置LiDAR传感器"""
+        blueprint_library = self.world.get_blueprint_library()
+        lidar_bp = blueprint_library.find('sensor.lidar.ray_cast')
+        
+        lidar_bp.set_attribute('range', '50')
+        lidar_bp.set_attribute('rotation_frequency', '20')
+        lidar_bp.set_attribute('channels', '32')
+        lidar_bp.set_attribute('points_per_second', '500000')
+        
+        lidar_transform = carla.Transform(carla.Location(x=0.8, z=1.5))
+        
+        self.lidar = self.world.spawn_actor(lidar_bp, lidar_transform, attach_to=self.vehicle)
+        
+        self.lidar.listen(lambda data: self._process_lidar_data(data))
+        
+        print("LiDAR传感器已启用")
+    
+    def _process_lidar_data(self, data):
+        """处理LiDAR点云数据"""
+        self.lidar_data = data
+        
+        points = np.frombuffer(data.raw_data, dtype=np.float32).reshape(-1, 4)
+        
+        front_points = []
+        for point in points:
+            x, y, z = point[0], point[1], point[2]
+            
+            angle = math.atan2(y, x) * 180 / math.pi
+            if -45 < angle < 45 and z > -0.5 and z < 2.0:
+                distance = math.sqrt(x**2 + y**2 + z**2)
+                front_points.append(distance)
+        
+        if front_points:
+            self.min_distance = min(front_points)
+            self.obstacle_detected = self.min_distance < self.warning_distance
+        else:
+            self.min_distance = float('inf')
+            self.obstacle_detected = False
+    
+    def get_min_distance(self):
+        """获取最近障碍物距离"""
+        return self.min_distance
+    
+    def is_obstacle_detected(self):
+        """是否检测到障碍物"""
+        return self.obstacle_detected
+    
+    def get_warning_level(self):
+        """获取警告级别"""
+        if self.min_distance < self.stop_distance:
+            return 'danger'
+        elif self.min_distance < self.warning_distance:
+            return 'warning'
+        else:
+            return 'safe'
+    
+    def destroy(self):
+        """销毁LiDAR传感器"""
+        if self.lidar:
+            self.lidar.destroy()
+            print("LiDAR传感器已销毁")
+
+
 class SimpleDrivingSystem:
     def __init__(self):
         self.client = None
@@ -105,6 +331,8 @@ class SimpleDrivingSystem:
         self.controller = None
         self.camera_image = None
         self.current_view = 'third_person'  # 当前视角模式：'first_person', 'third_person', 'birdseye'
+        self.weather_manager = None  # 天气管理器
+        self.lidar_manager = None  # LiDAR传感器管理器
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -338,6 +566,13 @@ class SimpleDrivingSystem:
         )
         self.world.set_weather(weather)
 
+        # 初始化天气管理器
+        self.weather_manager = WeatherManager(self.world)
+        self.weather_manager.set_weather('sunny')
+
+        # 初始化LiDAR传感器
+        self.lidar_manager = LiDARManager(self.world, self.vehicle)
+
         # 生成一些NPC车辆
         self.spawn_npc_vehicles(2)
 
@@ -348,6 +583,11 @@ class SimpleDrivingSystem:
         print("  s - 紧急停止")
         print("  x - 切换倒车/前进模式（速度为0时生效）")
         print("  v - 切换视角（第一人称/第三人称/鸟瞰图）")
+        print("  w - 切换天气（晴天/多云/雨天/暴风雨/雪天/雾天/夜晚）")
+        print("\n感知与避障系统已启用:")
+        print("  - LiDAR检测范围: 50米")
+        print("  - 警告距离: 15米")
+        print("  - 自动刹车距离: 5米")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -355,6 +595,10 @@ class SimpleDrivingSystem:
 
         try:
             while running:
+                # 定期刷新天气，防止CARLA自动改变天气参数
+                if self.weather_manager:
+                    self.weather_manager.tick()
+
                 # 获取车辆状态
                 velocity = self.vehicle.get_velocity()
                 speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
@@ -362,6 +606,16 @@ class SimpleDrivingSystem:
                 # 获取控制指令（现在返回4个值，原代码返回3个值）
                 # throttle, brake, steer = self.controller.get_control()  # 原代码
                 throttle, brake, steer, reverse = self.controller.get_control()  # 新代码
+
+                # LiDAR避障控制
+                if self.lidar_manager:
+                    warning_level = self.lidar_manager.get_warning_level()
+                    if warning_level == 'danger':
+                        throttle = 0.0
+                        brake = 1.0
+                    elif warning_level == 'warning':
+                        throttle = throttle * 0.3
+                        brake = brake + 0.2
 
                 # 应用控制
                 control = carla.VehicleControl(
@@ -402,6 +656,30 @@ class SimpleDrivingSystem:
                     cv2.putText(display_img, f"View: {self.get_view_name()}",
                                 (20, 240), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (0, 255, 0), 2)  # 绿色显示
+                    
+                    # 显示当前天气
+                    if self.weather_manager:
+                        cv2.putText(display_img, f"Weather: {self.weather_manager.get_current_weather_display()}",
+                                    (20, 280), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8, (255, 165, 0), 2)  # 橙色显示
+                    
+                    # 显示LiDAR距离和警告
+                    if self.lidar_manager:
+                        min_dist = self.lidar_manager.get_min_distance()
+                        warning_level = self.lidar_manager.get_warning_level()
+                        
+                        if warning_level == 'danger':
+                            cv2.putText(display_img, f"⚠️ OBSTACLE! {min_dist:.1f}m",
+                                        (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.8, (0, 0, 255), 2)  # 红色警告
+                        elif warning_level == 'warning':
+                            cv2.putText(display_img, f"⚠️ Warning: {min_dist:.1f}m",
+                                        (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.8, (0, 255, 255), 2)  # 黄色警告
+                        else:
+                            cv2.putText(display_img, f"Distance: {min_dist:.1f}m",
+                                        (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.8, (0, 255, 0), 2)  # 绿色安全
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
@@ -431,6 +709,10 @@ class SimpleDrivingSystem:
                     next_index = (current_index + 1) % len(view_modes)
                     self.current_view = view_modes[next_index]
                     self.update_camera_view()
+                elif key == ord('w'):
+                    # 切换天气模式
+                    if self.weather_manager:
+                        self.weather_manager.cycle_weather()
 
                 frame_count += 1
 
@@ -499,6 +781,13 @@ class SimpleDrivingSystem:
     def cleanup(self):
         """清理资源"""
         print("\n正在清理资源...")
+
+        # 清理LiDAR传感器
+        if self.lidar_manager:
+            try:
+                self.lidar_manager.destroy()
+            except:
+                pass
 
         # 清理所有相机
         for view_mode, camera in self.cameras.items():
