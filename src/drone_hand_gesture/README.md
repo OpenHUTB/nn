@@ -149,6 +149,7 @@ python train_deep_gesture.py --model_type cnn --epochs 100
 python main_deep_learning.py --model_path dataset/models/gesture_deep_cnn.pth --show_charts
 ```
 
+<<<<<<< main
 ---
 
 ## 🎮 控制指南
@@ -243,6 +244,18 @@ python main_deep_learning.py --model_path dataset/models/gesture_deep_cnn.pth --
 | **CNN** | 1D 卷积神经网络 | 捕捉局部特征，计算效率高，适合实时场景 |
 | **Transformer** | 注意力机制模型 | 建模长距离依赖关系，准确率更高 |
 | **深度 MLP** | 多层全连接网络 | 结构简单，训练快速，适合小规模数据 |
+=======
+**控制方式**：
+- **手势控制**：张开手掌（起飞）、食指向上（上升）、握拳（降落）等
+- **键盘控制**：空格（起飞/降落）、T（起飞）、L（降落）、H（悬停）、Q/ESC（退出）
+## 深度学习功能
+
+| 模型类型 | 说明 | 优势 |
+|---------|------|------|
+| CNN | 1D卷积神经网络 | 捕捉局部特征，计算效率高 |
+| Transformer | 注意力机制模型 | 建模长距离依赖关系 |
+| MLP | 深度多层感知器 | 简单高效，适合小规模数据 |
+>>>>>>> main
 
 ### 训练命令
 
@@ -280,12 +293,15 @@ python train_deep_gesture.py --compare
 
 ## 参考项目
 
+<<<<<<< main
 本项目基于以下开源项目开发：
 
 - [Autonomous Drone Hand Gesture Project](https://github.com/chwee/AutonomusDroneHandGestureProject)
   - 原始手势控制无人机项目
   - 提供了基础架构和实现思路
 
+=======
+>>>>>>> main
 - [MediaPipe Hands](https://github.com/google/mediapipe)
   - Google开源的手部关键点检测框架
   - 本项目使用其进行实时手势识别
@@ -293,6 +309,7 @@ python train_deep_gesture.py --compare
 - [PyTorch](https://pytorch.org/)
   - Facebook开源的深度学习框架
   - 本项目使用其实现深度学习模型
+<<<<<<< main
 =======
 ## 🔧 环境兼容性
 
@@ -329,3 +346,5 @@ PyOpenGL>=3.1.0            # 3D 仿真渲染
   <sub>Made with ❤️ | 手势控制无人机项目</sub>
 </p>
 >>>>>>> c4023de5 (mkdocs修改和src文件移动)
+=======
+>>>>>>> main

@@ -19,7 +19,8 @@ cd mujoco-robotic-grasping
 
 # 安装 Python 依赖
 pip install -r requirements.txt
+```
 
-参考资料
+## 参考资料
 MuJoCo 官方文档：核心 API 说明、模型导入规范、物理参数配置指南
-MuJoCo Python 接口教程：Python 调用示例、仿真控制细节****
+MuJoCo Python 接口教程：Python 调用示例、仿真控制细节
