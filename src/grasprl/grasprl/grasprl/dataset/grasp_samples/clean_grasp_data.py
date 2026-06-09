@@ -58,6 +58,7 @@ print("清洗完成")
 print("总样本", total_count)
 print("已修复", clean_count)
 print("错误文件", len(error_files))
+print("错误文件", len(error_files))
 label_files = [f for f in os.listdir(data_path) if f.startswith("label_") and f.endswith(".npy")]
 
 print("===== 机械抓取数据清洗 =====")

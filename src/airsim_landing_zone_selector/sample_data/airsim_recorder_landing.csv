@@ -1,0 +1,11 @@
+timestamp,vehicle_name,pos_x_m,pos_y_m,pos_z_m,roll_deg,pitch_deg,yaw_deg,depth_camera,depth_image_type
+0.0,Drone1,-18.0,-8.0,-18.0,0.4,1.1,24.0,front_center,DepthPerspective
+0.5,Drone1,-15.5,-6.8,-17.2,0.6,1.4,25.0,front_center,DepthPerspective
+1.0,Drone1,-12.8,-5.4,-16.1,0.7,1.8,26.5,front_center,DepthPerspective
+1.5,Drone1,-10.1,-3.9,-14.7,0.5,2.1,28.0,front_center,DepthPerspective
+2.0,Drone1,-7.0,-2.2,-13.0,0.4,1.7,30.0,front_center,DepthPerspective
+2.5,Drone1,-4.6,-1.0,-11.2,0.2,1.2,31.0,front_center,DepthPerspective
+3.0,Drone1,-2.2,0.4,-9.4,0.1,0.8,32.0,front_center,DepthPerspective
+3.5,Drone1,-0.8,1.1,-7.6,0.0,0.5,31.0,front_center,DepthPerspective
+4.0,Drone1,0.1,1.8,-5.8,0.0,0.2,30.0,front_center,DepthPerspective
+4.5,Drone1,0.4,2.1,-4.1,0.0,0.1,30.0,front_center,DepthPerspective

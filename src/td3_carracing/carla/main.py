@@ -2,14 +2,32 @@ import os
 import time
 import torch
 import numpy as np
-from carla_env import CarlaEnv
+import argparse
+from carla_env import CarlaEnv, WeatherMode
 from td3_agent import TD3Agent
 from env_wrappers import wrap_env
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="TD3 Carla 训练参数")
+    parser.add_argument("--weather", type=str, default="clear",
+                        help="天气模式: clear, rainy, foggy, cloudy, wet, random")
+    parser.add_argument("--town", type=str, default="Town03", help="地图名称")
+    parser.add_argument("--render", type=bool, default=True, help="是否渲染")
+    return parser.parse_args()
+
+
 def train():
+    args = parse_args()
+
+    # 解析天气模式
+    weather_mode = WeatherMode(args.weather.lower() if args.weather.lower() in [mode.value for mode in WeatherMode] else "clear")
+
     # 创建环境
-    env = CarlaEnv(town="Town03", render_mode="human", max_episode_steps=1000)
+    env = CarlaEnv(town=args.town,
+                  render_mode="human" if args.render else "none",
+                  max_episode_steps=1000,
+                  weather_mode=weather_mode)
     env = wrap_env(env)
 
     state_dim = env.observation_space.shape
@@ -163,8 +181,16 @@ def train():
 
 def test():
     """测试训练好的模型"""
+    args = parse_args()
+
+    # 解析天气模式
+    weather_mode = WeatherMode(args.weather.lower() if args.weather.lower() in [mode.value for mode in WeatherMode] else "clear")
+
     # 创建环境
-    env = CarlaEnv(town="Town03", render_mode="human", max_episode_steps=1000)
+    env = CarlaEnv(town=args.town,
+                  render_mode="human" if args.render else "none",
+                  max_episode_steps=1000,
+                  weather_mode=weather_mode)
     env = wrap_env(env)
 
     state_dim = env.observation_space.shape

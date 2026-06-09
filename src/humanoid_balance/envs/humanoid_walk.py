@@ -9,132 +9,120 @@ import shutil
 from pathlib import Path
 
 # --- 1. 动态注入兼容性补丁 ---
-# 解决新版 Mujoco (3.x+) 移除 solver_iter 导致的渲染错误
 if not hasattr(mujoco.MjData, 'solver_iter'):
     mujoco.MjData.solver_iter = property(lambda self: self.solver_niter)
 
 def run_simulation(zip_path_str: str = "humanoid_final_walking.zip"):
-    """
-    改进点：
-    1. 使用 Pathlib 解决 Windows/Linux 路径斜杠差异
-    2. 增加自动清理机制，防止残留 temp 文件
-    3. 安全加载模型权重
-    """
-    # 路径对象化
     zip_path = Path(zip_path_str)
     extract_dir = Path("temp_model_extract")
     
     if not zip_path.exists():
-        print(f"致命错误：当前目录下未找到权重压缩包 {zip_path.name}")
+        print(f"致命错误：未找到权重包 {zip_path.name}")
         return
 
     # --- 2. 环境与模型架构初始化 ---
     try:
-        # 检测设备加速
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        # 显式指定渲染后端，避免部分环境崩溃
         env = gym.make("Humanoid-v4", render_mode="human")
-        print(f"物理环境启动成功 | 运行设备: {device}")
-        
-        # 预先构建 SAC 结构，verbose=0 减少无关日志干扰
         model = SAC("MlpPolicy", env, verbose=0, device=device)
     except Exception as e:
-        print(f"环境或架构初始化失败: {e}")
+        print(f"初始化失败: {e}")
         return
 
-    # --- 3. 权重动态提取与对齐 ---
+    # --- 3. 权重提取与对齐 ---
     try:
-        # 如果目录已存在则先清理，确保权重最新
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
         extract_dir.mkdir(parents=True, exist_ok=True)
-
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extract("policy.pth", extract_dir)
         
-        target_pth = extract_dir / "policy.pth"
-        
-        # weights_only=True 是 PyTorch 推荐的安全加载方式
-        state_dict = torch.load(target_pth, map_location=device, weights_only=True)
-        
-        # 强制兼容加载：strict=False 允许忽略非核心层的键名差异
+        state_dict = torch.load(extract_dir / "policy.pth", map_location=device, weights_only=True)
         model.policy.load_state_dict(state_dict, strict=False)
-        print("✅ 权重加载成功：核心控制参数已注入")
-        
+        print("✅ 权重加载成功")
     except Exception as e:
-        print(f"❌ 权重处理故障: {e}")
+        print(f"❌ 加载故障: {e}")
         env.close()
         return
 
-    # --- 4. 稳健仿真循环 ---
-    obs, _ = env.reset()
-    # 稍微提高平滑因子，平衡稳定性和响应速度
-    ACTION_SCALE = 0.88 
-    
-    print("开始演示：人形机器人动态平衡控制（按 Ctrl+C 停止）")
-    try:
-        while True:
-            # 开启确定性预测
-            action, _ = model.predict(obs, deterministic=True)
-            
-            # 联合缩放与限幅，抑制高频抖动
-            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
-            
-            obs, _, terminated, truncated, _ = env.step(action)
-            env.render()
-            
-            # 匹配 200Hz 物理仿真步长
-            time.sleep(0.005) 
-            
-            if terminated or truncated:
-                obs, _ = env.reset()
-                
-    except KeyboardInterrupt:
-        print("\n模拟已手动停止。")
-    finally:
-        # --- 5. 资源安全释放与文件清理 ---
-        env.close()
-        if extract_dir.exists():
-            shutil.rmtree(extract_dir) # 彻底删除临时解压文件
-        print("环境已关闭，临时资源已清理。")
+    # --- 4. 增强型性能评价循环 (本次修改重点) ---
+    # 【新增】性能统计变量
+    session_rewards = []
+    episode_counts = 0
+    total_steps = 0
+    start_wall_time = time.time()
 
-if __name__ == "__main__":
-    run_simulation()
-    # ... 前面代码保持不变 ...
-
-    # --- 4. 稳健仿真循环 ---
     try:
         obs, _ = env.reset()
-        # 【新增：渲染预热】在循环前先调用一次渲染，强制触发 GLFW 初始化
-        env.render() 
+        env.render()
         
-        ACTION_SCALE = 0.88 
-        print("开始演示：渲染上下文已激活...")
+        current_ep_reward = 0
+        current_ep_steps = 0
+        ACTION_SCALE = 0.88
+        SMOOTH_FACTOR = 0.7
+        prev_action = np.zeros(env.action_space.shape)
+        dt = 0.005
+        
+        print(f"演示开始：已启用性能监控系统。按 Ctrl+C 结束并查看报告。")
         
         while True:
+            step_start = time.perf_counter()
+            
+            # 控制逻辑
             action, _ = model.predict(obs, deterministic=True)
-            action = np.clip(action * ACTION_SCALE, -1.0, 1.0)
+            smoothed_action = SMOOTH_FACTOR * prev_action + (1 - SMOOTH_FACTOR) * (action * ACTION_SCALE)
+            prev_action = smoothed_action
             
-            obs, _, terminated, truncated, _ = env.step(action)
+            obs, reward, terminated, truncated, _ = env.step(np.clip(smoothed_action, -1.0, 1.0))
             
-            # 【优化】捕获单步渲染可能的异常
+            # 【新增】实时数据累加
+            current_ep_reward += reward
+            current_ep_steps += 1
+            total_steps += 1
+            
             try:
                 env.render()
-            except Exception as render_err:
-                print(f"渲染帧跳过: {render_err}")
+            except:
                 break
                 
-            time.sleep(0.005) 
+            # 时间同步
+            elapsed = time.perf_counter() - step_start
+            if elapsed < dt:
+                time.sleep(dt - elapsed)
+            
+            # 【新增】回合结束统计
             if terminated or truncated:
+                session_rewards.append(current_ep_reward)
+                episode_counts += 1
+                print(f"回合 {episode_counts} 结束 | 得分: {current_ep_reward:.2f} | 步数: {current_ep_steps}")
+                
+                # 重置
                 obs, _ = env.reset()
+                prev_action = np.zeros(env.action_space.shape)
+                current_ep_reward = 0
+                current_ep_steps = 0
                 
     except KeyboardInterrupt:
-        print("\n用户手动停止。")
-    except Exception as e:
-        print(f"运行中发生未知错误: {e}")
+        print("\n检测到用户中断，正在汇总分析数据...")
     finally:
-        # 【关键】无论发生什么，必须确保 env.close() 被执行，释放 GLFW 句柄
-        print("正在安全释放渲染资源...")
+        # --- 5. 【新增】生成最终评价报告 ---
+        duration = time.time() - start_wall_time
+        print("\n" + "="*30)
+        print("      仿真性能报告")
+        print("="*30)
+        print(f"总运行时间: {duration:.2f} 秒")
+        print(f"物理步总计: {total_steps} 步")
+        print(f"完成回合数: {episode_counts} 次")
+        if session_rewards:
+            print(f"平均每回合得分: {np.mean(session_rewards):.2f}")
+            print(f"单回合最高得分: {np.max(session_rewards):.2f}")
+        print(f"控制平滑系数: {SMOOTH_FACTOR}")
+        print("="*30)
+
         env.close()
         if extract_dir.exists():
             shutil.rmtree(extract_dir)
+        print("资源已回收。")
+
+if __name__ == "__main__":
+    run_simulation()

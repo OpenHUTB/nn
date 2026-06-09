@@ -1,0 +1,16 @@
+{
+  "project": "multisensor_time_sync_calibration",
+  "seed": 7,
+  "true_lidar_delay_s": 0.42,
+  "estimated_lidar_delay_s": 0.42,
+  "delay_absolute_error_s": 0.0,
+  "before_sync_rmse_m": 1.1347,
+  "after_sync_rmse_m": 0.1506,
+  "rmse_improvement_percent": 86.72,
+  "generated_files": [
+    "trajectory_alignment.png",
+    "offset_search_curve.png",
+    "rmse_comparison.png",
+    "offset_search.csv"
+  ]
+}

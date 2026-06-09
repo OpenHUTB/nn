@@ -137,7 +137,7 @@ class Lane:
                 [2]: Width-index of the location of the right lane.
         """
         hist = np.sum(img[int(img.shape[0]/2):,:], axis=0)
-        midpoint = np.int(hist.shape[0]/2)
+        midpoint = int(hist.shape[0]/2)
         left_lane = np.argmax(hist[:midpoint])
         right_lane = np.argmax(hist[midpoint:]) + midpoint
 
@@ -174,7 +174,7 @@ class Lane:
         """
         # Number of pixels to identify line.
         MINIMAL_AREA = int((1/24) * self.img_width)
-        WINDOW_HEIGHT = np.int(img.shape[0]/number_windows)       
+        WINDOW_HEIGHT = int(img.shape[0]/number_windows)       
     
         # Retrive x and y coordinates of white pixels (non-zero).
         nonzero_y, nonzero_x = img.nonzero()
@@ -212,9 +212,9 @@ class Lane:
                 
             # Recenter next window on mean position.
             if len(non_zero_left_idxs) > MINIMAL_AREA:
-                max_left_idx = np.int(np.mean(nonzero_x[non_zero_left_idxs]))
+                max_left_idx = int(np.mean(nonzero_x[non_zero_left_idxs]))
             if len(non_zero_right_idxs) > MINIMAL_AREA:        
-                max_right_idx = np.int(np.mean(nonzero_x[non_zero_right_idxs]))
+                max_right_idx = int(np.mean(nonzero_x[non_zero_right_idxs]))
                         
         left_lane_idxs = np.concatenate(left_lane_idxs)
         right_lane_idxs = np.concatenate(right_lane_idxs)

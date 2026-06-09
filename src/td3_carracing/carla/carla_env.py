@@ -3,15 +3,25 @@ import gymnasium as gym
 import numpy as np
 import cv2
 import time
+from enum import Enum
+
+class WeatherMode(Enum):
+    CLEAR = "clear"
+    RAINY = "rainy"
+    FOGGY = "foggy"
+    CLOUDY = "cloudy"
+    WET = "wet"
+    RANDOM = "random"
 
 class CarlaEnv(gym.Env):
     """Carla 模拟器环境包装器"""
-    def __init__(self, town="Town03", render_mode="human", max_episode_steps=1000):
+    def __init__(self, town="Town03", render_mode="human", max_episode_steps=1000, weather_mode=WeatherMode.CLEAR):
         super().__init__()
 
         self.town = town
         self.render_mode = render_mode
         self.max_episode_steps = max_episode_steps
+        self.weather_mode = weather_mode
 
         # 连接到 Carla 服务器
         self.client = carla.Client('localhost', 2000)
@@ -51,6 +61,9 @@ class CarlaEnv(gym.Env):
         try:
             self.world = self.client.get_world()
             self.map = self.world.get_map()
+
+            # 设置初始天气
+            self.set_weather(self.weather_mode)
 
             # 销毁所有现有车辆（可选）
             for actor in self.world.get_actors().filter('vehicle.*'):
@@ -128,8 +141,16 @@ class CarlaEnv(gym.Env):
         self.collision_data = None
         self.lane_invasion_data = None
 
+        # 如果是随机天气模式，每次重置时切换天气
+        if self.weather_mode == WeatherMode.RANDOM:
+            self.set_weather(WeatherMode.RANDOM)
+
         # 重置车辆位置
         try:
+            # 每次重置时随机选择出生点
+            spawn_points = self.map.get_spawn_points()
+            self.spawn_point = np.random.choice(spawn_points)
+
             self.vehicle.set_transform(self.spawn_point)
             self.vehicle.set_velocity(carla.Vector3D(0, 0, 0))
             self.vehicle.set_angular_velocity(carla.Vector3D(0, 0, 0))
@@ -146,6 +167,33 @@ class CarlaEnv(gym.Env):
     def get_observation(self):
         """获取观察数据"""
         return self.image_data.copy()
+
+    def set_weather(self, weather_mode):
+        """根据天气模式设置 Carla 天气"""
+        if isinstance(weather_mode, str):
+            weather_mode = WeatherMode(weather_mode.lower())
+
+        if weather_mode == WeatherMode.RANDOM:
+            weather_mode = np.random.choice(list(WeatherMode))
+            while weather_mode == WeatherMode.RANDOM:
+                weather_mode = np.random.choice(list(WeatherMode))
+
+        if weather_mode == WeatherMode.CLEAR:
+            weather = carla.WeatherParameters.ClearNoon
+        elif weather_mode == WeatherMode.RAINY:
+            weather = carla.WeatherParameters.HardRainNoon
+        elif weather_mode == WeatherMode.FOGGY:
+            weather = carla.WeatherParameters.FoggyNoon
+        elif weather_mode == WeatherMode.CLOUDY:
+            weather = carla.WeatherParameters.CloudyNoon
+        elif weather_mode == WeatherMode.WET:
+            weather = carla.WeatherParameters.WetNoon
+        else:
+            weather = carla.WeatherParameters.ClearNoon
+
+        self.world.set_weather(weather)
+        self.current_weather = weather_mode
+        print(f"天气模式设置为: {weather_mode.value}")
 
     def get_speed(self):
         """获取车辆速度（km/h）"""
