@@ -7,14 +7,15 @@ import queue
 
 from lane import Lane
 
+
 class World():
     """Environment that wraps around the Carla-API
     """
 
     def __init__(self, server_ip:str='127.0.0.1', port:int=2000,
-        timeout:float=5.0, map:str='Town04', image_height:int=480,
+        timeout:float=10.0, map:str='Town05', image_height:int=480,
         image_width:int=640, fov:int=110,
-        time_difference:float=0.01) -> None:
+        time_difference:float=0.01, x_offset:float=2.5, z_offset:float=0.7) -> None:
         """Constructor
 
         Args:
@@ -24,9 +25,9 @@ class World():
                 Defaults to 2000.
             timeout (float, optional): Time difference after which the
                 connection attempt with the server is aborted. Note that several
-                attempts may be needed. Defaults to 5.0.
+                attempts may be needed. Defaults to 10.0.
             map (str, optional): Map to be used. The available options depend on
-                the Carla simulator used. Defaults to 'Town04'.
+                the Carla simulator used. Defaults to 'Town05'.
             image_height (int, optional): Height of the image to return.
                 Defaults to 480.
             image_width (int, optional): Width of the image to return. Defaults
@@ -34,10 +35,16 @@ class World():
             fov (int, optional): Field of view of the camera. Defaults to 110.
             time_difference (float, optional): Difference of time simulated at
                 each step. Defaults to 0.01.
+            x_offset (float, optional): Camera offset in x direction relative to car.
+                Defaults to 2.5.
+            z_offset (float, optional): Camera offset in z direction relative to car.
+                Defaults to 0.7.
         """
 
         self.image_height = image_height
         self.image_width = image_width
+        self.x_offset = x_offset
+        self.z_offset = z_offset
 
         self.lane = Lane(height=self.image_height, width=self.image_width)
 
@@ -63,6 +70,34 @@ class World():
         self.image_queue = queue.Queue()
         self.collision_detected = False
         self.initialized = False
+
+    @classmethod
+    def from_config(cls, config: dict) -> 'World':
+        """Create a World instance from a configuration dictionary.
+
+        Args:
+            config (dict): Configuration dictionary containing connection,
+                simulation, and camera settings.
+
+        Returns:
+            World: A new World instance configured according to the provided config.
+        """
+        conn = config.get('connection', {})
+        sim = config.get('simulation', {})
+        cam = config.get('camera', {})
+
+        return cls(
+            server_ip=conn.get('server_ip', '127.0.0.1'),
+            port=conn.get('port', 2000),
+            timeout=conn.get('timeout', 10.0),
+            map=sim.get('map', 'Town05'),
+            time_difference=sim.get('time_difference', 0.01),
+            image_height=cam.get('image_height', 480),
+            image_width=cam.get('image_width', 640),
+            fov=cam.get('fov', 110),
+            x_offset=cam.get('x_offset', 2.5),
+            z_offset=cam.get('z_offset', 0.7)
+        )
 
     def close(self) -> None:
         """Destroys all currently used Actors
@@ -95,7 +130,7 @@ class World():
         blueprint.set_attribute('fov', f'{self.fov}')
 
         # Relative location to car
-        spawn_point = carla.Transform(carla.Location(x=2.5, z=0.7))
+        spawn_point = carla.Transform(carla.Location(x=self.x_offset, z=self.z_offset))
         self.sensor = self.world.spawn_actor(blueprint, spawn_point,
                                         attach_to=self.vehicle)
         self.sensor.listen(self.image_queue.put)
