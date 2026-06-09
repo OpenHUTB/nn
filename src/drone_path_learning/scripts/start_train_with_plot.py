@@ -12,7 +12,11 @@ except ImportError:
     from utils.ui_train import TrainingUi
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "configs\config_NH_center_Multirotor_Phase3C_Yaw90_Goal180_20m.ini"
+DEFAULT_CONFIG = (
+    PROJECT_ROOT
+    / "configs"
+    / "config_NH_center_Multirotor_Phase3D_Yaw180_Goal180_20m.ini"
+)
 
 
 def get_parser() -> argparse.ArgumentParser:
