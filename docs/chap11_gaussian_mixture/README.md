@@ -38,12 +38,17 @@
 
 基于密度估计实现异常检测，可识别远离聚类中心的离群点，拓展了 GMM 的应用场景。
 
+**数值稳定性增强**
+
+通过引入安全对数计算、安全除法和数值裁剪机制，避免 EM 算法迭代过程中可能出现的数值问题（除零、log(0)、NaN 传播等），确保模型在各种数据分布下都能稳定收敛。
+
 ### 1.3 应用场景
 
 - **数据聚类**：无监督场景下自动发现数据簇结构
 - **密度估计**：拟合数据的概率密度分布
 - **异常检测**：识别低密度区域的离群点
-- **模型选择**：自动确定最佳聚类数量
+- **信号处理**：语音识别中的声学建模、医学信号分析等
+- **数据预处理**：处理多模态数据、识别数据中的子群体
 
 ---
 
@@ -86,11 +91,30 @@ $$BIC = k \cdot \ln(n) - 2\ln(L)$$
 
 ### 3.1 优化总体原则
 
-- 保持算法的数值稳定性，使用 `logsumexp` 避免数值溢出
-- 提供多种初始化策略，支持 k-means++ 智能初始化
-- 实现 AIC/BIC 自动模型选择，提升实用性
-- 生成丰富的可视化结果，便于分析和展示
-- **向量化计算优化，减少 Python 循环，提升大规模数据处理效率**
+**数值稳定性优先**
+- 使用 `logsumexp` 技巧避免指数运算溢出
+- 协方差矩阵添加正则化项防止奇异
+- 使用 `slogdet` 替代直接行列式计算
+- 安全对数计算：`_safe_log(x) = log(max(x, eps))`，避免 log(0)
+- 安全除法：`_safe_divide(a, b) = a / max(b, eps)`，避免除零
+- 关键变量数值裁剪：对 `gamma`（后验概率）和 `Nk`（有效样本数）进行边界裁剪
+
+**向量化计算优化**
+- 使用 NumPy 广播机制和 `einsum` 操作替代 Python 循环
+- E 步、M 步全流程向量化，提升大规模数据处理效率
+
+**多层次并行加速**
+- 利用 `ThreadPoolExecutor` 实现多高斯成分并行计算
+- 支持多核 CPU 配置，可获得近线性加速比
+
+**功能灵活性扩展**
+- 支持四种协方差类型（full/tied/diagonal/spherical）
+- 提供多种初始化策略（random + k-means++）
+- 实现 AIC/BIC 自动模型选择
+
+**工程化完整性**
+- 异常检测功能拓展应用场景
+- 完整的命令行接口，便于集成和部署
 
 ### 3.2 功能特性对比
 
@@ -111,6 +135,7 @@ $$BIC = k \cdot \ln(n) - 2\ln(L)$$
 | 对角协方差 (diagonal) | ❌ | ✅ |
 | 球面协方差 (spherical) | ❌ | ✅ |
 | 异常检测功能 | ❌ | ✅ |
+| 数值稳定性增强 | ❌ | ✅（安全对数/除法+数值裁剪） |
 
 ---
 
@@ -127,7 +152,39 @@ def logsumexp(log_p, axis=1, keepdims=False):
     return max_val + np.log(sum_exp)
 ```
 
-### 4.2 k-means++ 初始化
+### 4.2 安全数学运算（数值稳定性核心）
+
+为避免 EM 算法迭代过程中的数值问题，实现了安全对数计算和安全除法：
+
+```python
+def _safe_log(self, x):
+    """安全对数计算，避免 log(0)"""
+    return np.log(np.maximum(x, self.eps))
+
+def _safe_divide(self, numerator, denominator):
+    """安全除法，避免除零"""
+    return numerator / np.maximum(denominator, self.eps)
+```
+
+**数值裁剪应用**：在 EM 算法的关键步骤中进行数值裁剪，确保数值稳定性：
+
+```python
+# E步：裁剪gamma值，避免极端值影响计算
+gamma = np.exp(log_prob - log_prob_sum)
+gamma = np.clip(gamma, self.eps, 1 - self.eps)
+
+# M步：裁剪Nk值，避免除零
+Nk = np.sum(gamma, axis=0)
+Nk = np.maximum(Nk, self.eps)
+
+# 使用安全除法计算新均值
+new_mu = self._safe_divide(np.sum(gamma_X, axis=0), Nk[:, np.newaxis])
+
+# 使用安全对数计算混合权重的对数
+log_pi = self._safe_log(self.pi)
+```
+
+### 4.3 k-means++ 初始化
 
 k-means++ 以平方距离为权重进行概率采样，使初始中心点尽量分散：
 
@@ -149,7 +206,7 @@ def _kmeans_plus_plus_init(self, X):
         centers.append(X[next_idx].copy())
 ```
 
-### 4.3 AIC/BIC 模型选择
+### 4.4 AIC/BIC 模型选择
 
 ```python
 def _compute_aic_bic(self, X):
@@ -162,7 +219,7 @@ def _compute_aic_bic(self, X):
     self.bic_ = total_params * np.log(n_samples) - 2 * log_likelihood
 ```
 
-### 4.4 向量化 EM 算法
+### 4.5 向量化 EM 算法
 
 通过批量矩阵运算替代 Python 循环，显著提升计算效率：
 
@@ -205,7 +262,7 @@ def _compute_statistics_vectorized(self, X, gamma):
 - 利用 NumPy 广播机制进行批量矩阵运算
 - 提升大规模数据（10000+ 样本）的处理速度
 
-### 4.5 多线程并行加速
+### 4.6 多线程并行加速
 
 通过 `concurrent.futures.ThreadPoolExecutor` 实现多线程并行计算，进一步提升大规模数据的处理效率：
 
@@ -240,7 +297,7 @@ def _log_gaussian_parallel(self, X, mu, sigma):
 - 在多核 CPU 上可获得近线性加速比
 - 特别适合大规模数据和多成分场景
 
-### 4.6 协方差类型扩展
+### 4.7 协方差类型扩展
 
 支持四种协方差类型，适用于不同的数据分布特性：
 
@@ -256,7 +313,7 @@ def _log_gaussian_parallel(self, X, mu, sigma):
 - 各类别分布相似 → `tied`（共享协方差）
 - 需要捕捉复杂相关性 → `full`（完整协方差）
 
-### 4.7 异常检测扩展
+### 4.8 异常检测扩展
 
 基于密度估计的异常检测功能，可识别远离聚类中心的离群点：
 
@@ -341,13 +398,12 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 
 | 文件 | 说明 |
 |---|---|
-| `comparison_benchmark.png` | 初始化方法对比图（箱线图+直方图） |
-| `cluster_comparison.png` | 聚类结果散点图对比 |
-| `convergence_comparison.png` | EM 收敛曲线对比 |
-| `bic_model_selection.png` | BIC/AIC 模型选择曲线 |
-| `anomaly_detection.png` | 异常检测结果可视化 |
-| `iteration_log.csv` | 迭代对数似然日志 |
-| `bic_aic_log.csv` | BIC/AIC 模型选择日志 |
+| `comparison_benchmark.png` | 初始化方法对比图（箱线图+直方图） ![comparison_benchmark](./img/comparison_benchmark.png) |
+| `cluster_comparison.png` | 聚类结果散点图对比 ![cluster_comparison](./img/cluster_comparison.png) |
+| `convergence_comparison.png` | EM 收敛曲线对比 ![convergence_comparison](./img/convergence_comparison.png) |
+| `bic_model_selection.png` | BIC/AIC 模型选择曲线 ![bic_model_selection](./img/bic_model_selection.png) |
+| `anomaly_detection.png` | 异常检测结果可视化 ![anomaly_detection](./img/anomaly_detection.png) |
+
 
 ### 5.5 实验结果示例
 
@@ -383,7 +439,6 @@ python GMM.py --n-samples 1000 --n-components 3 --max-iter 100 --n-trials 50 --o
 - **在线学习**：支持增量学习，动态更新模型参数
 - **变分贝叶斯高斯混合模型**：实现基于变分推断的贝叶斯高斯混合模型
 - **并行加速**：使用多线程或 GPU 加速大规模数据训练
-- **可视化工具**：添加交互式聚类结果可视化
 
 ---
 
