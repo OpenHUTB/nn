@@ -10,10 +10,9 @@ from typing import Optional
 
 from min_carla_env.matrix_world import MatrixWorld
 from min_carla_env.config import (
-    ENV_CONFIG,
     REWARD_CONFIG,
     ACTIONS,
-    CONFIG,
+    CONFIG,  # re-exported for backward compatibility
 )
 
 # 配置日志
@@ -31,7 +30,7 @@ def reconnect_carla_client(original_client, host='localhost', port=2000,
             if original_client:
                 try:
                     original_client.close()
-                except:
+                except Exception:
                     pass
             # 新建连接
             client = carla.Client(host, port)
@@ -52,7 +51,8 @@ class CarlaEnv(gym.Env):
     Unfortunately it only uses the gym environment interface.
     Its not that much compatible with gym."""
 
-    def __init__(self, client, config, world_config={}, reward_config=None, debug=False, demo=False):
+    def __init__(self, client, config, world_config=None, reward_config=None,
+                 debug=False, demo=False):
         self.debug = debug
         self.done = False
         self.rgb_data = None
@@ -84,7 +84,7 @@ class CarlaEnv(gym.Env):
         try:
             # 初始化MatrixWorld（增加重连机制）
             # 将观测尺寸从 config 注入到 world_config，确保传感器分辨率一致
-            wcfg = dict(world_config)
+            wcfg = dict(world_config) if world_config else {}
             wcfg.setdefault("im_width", self.config.get("width", 480))
             wcfg.setdefault("im_height", self.config.get("height", 480))
             self.mw = MatrixWorld(self.client, **wcfg)
