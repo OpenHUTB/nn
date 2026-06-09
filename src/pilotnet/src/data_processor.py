@@ -15,6 +15,7 @@ class DataProcessor:
         self.steering_angles = []
         self.throttles = []
         self.brakes = []
+        self.speeds = []
         self.data_stats = {}
         
     def analyze_data(self, data):
@@ -29,10 +30,20 @@ class DataProcessor:
             self.steering_angles.append(item.steering)
             self.throttles.append(item.throttle)
             self.brakes.append(item.brake)
+            self.speeds.append(item.speed)
         
         # 计算统计信息
         self.data_stats = {
             'total_samples': len(data),
+            'speed': {
+                'min': np.min(self.speeds),
+                'max': np.max(self.speeds),
+                'mean': np.mean(self.speeds),
+                'std': np.std(self.speeds),
+                'median': np.median(self.speeds),
+                'stationary_count': int(np.sum(np.array(self.speeds) == 0)),
+                'stationary_percentage': float(np.sum(np.array(self.speeds) == 0) / len(self.speeds) * 100)
+            },
             'steering': {
                 'min': np.min(self.steering_angles),
                 'max': np.max(self.steering_angles),
@@ -162,6 +173,37 @@ class DataProcessor:
         logger.info(f'Data balancing completed. Original: {len(data)}, Balanced: {len(balanced_data)}')
         return balanced_data
     
+    def filter_stationary_data(self, data, speed_threshold=0.1):
+        """
+        过滤静止数据，基于速度阈值判断
+        
+        Args:
+            data: 输入数据列表
+            speed_threshold: 速度阈值，低于此值认为是静止状态
+        
+        Returns:
+            过滤后的数据
+        """
+        message(f'正在过滤静止数据 (速度阈值 < {speed_threshold})...')
+        
+        stationary_indices = []
+        for i, item in enumerate(data):
+            if item.speed < speed_threshold:
+                stationary_indices.append(i)
+        
+        filtered_data = [item for i, item in enumerate(data) if i not in stationary_indices]
+        
+        self.data_stats['stationary_filtered'] = {
+            'total_samples': len(filtered_data),
+            'original_samples': len(data),
+            'removed_samples': len(data) - len(filtered_data),
+            'removed_percentage': float((len(data) - len(filtered_data)) / len(data) * 100),
+            'speed_threshold': speed_threshold
+        }
+        
+        logger.info(f'Stationary data filtering completed. Removed {len(stationary_indices)} stationary samples ({(len(stationary_indices)/len(data)*100):.2f}%)')
+        return filtered_data
+    
     def save_stats(self, filename=None):
         """
         保存统计信息到JSON文件
@@ -170,12 +212,25 @@ class DataProcessor:
             timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             filename = f'data_stats_{timestamp}.json'
         
-        # 确保目录存在
         os.makedirs('data_stats/', exist_ok=True)
         save_path = f'data_stats/{filename}'
         
+        def convert_to_native(obj):
+            if isinstance(obj, dict):
+                return {k: convert_to_native(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_to_native(item) for item in obj]
+            elif isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return obj
+        
         with open(save_path, 'w', encoding='utf-8') as f:
-            json.dump(self.data_stats, f, indent=4, ensure_ascii=False)
+            json.dump(convert_to_native(self.data_stats), f, indent=4, ensure_ascii=False)
         
         logger.info(f'Data statistics saved to: {save_path}')
         return save_path
@@ -192,6 +247,15 @@ class DataProcessor:
         
         print(f"\n[基本信息]")
         print(f"  总样本数: {stats['total_samples']}")
+        
+        if 'speed' in stats:
+            print(f"\n[速度分布]")
+            print(f"  最小值: {stats['speed']['min']:.4f}")
+            print(f"  最大值: {stats['speed']['max']:.4f}")
+            print(f"  平均值: {stats['speed']['mean']:.4f}")
+            print(f"  标准差: {stats['speed']['std']:.4f}")
+            print(f"  中位数: {stats['speed']['median']:.4f}")
+            print(f"  静止样本数: {stats['speed']['stationary_count']} ({stats['speed']['stationary_percentage']:.2f}%)")
         
         print(f"\n[转向角度分布]")
         print(f"  最小值: {stats['steering']['min']:.4f}")
@@ -228,10 +292,16 @@ class DataProcessor:
             print(f"\n[数据平衡后]")
             print(f"  平衡后样本数: {stats['balanced']['total_samples']}")
         
+        if 'stationary_filtered' in stats:
+            print(f"\n[静止数据过滤后]")
+            print(f"  过滤后样本数: {stats['stationary_filtered']['total_samples']}")
+            print(f"  移除样本数: {stats['stationary_filtered']['removed_samples']} ({stats['stationary_filtered']['removed_percentage']:.2f}%)")
+            print(f"  速度阈值: {stats['stationary_filtered']['speed_threshold']}")
+        
         print('\n' + '='*60)
     
     @staticmethod
-    def process(data, enable_cleaning=True, enable_balancing=True):
+    def process(data, enable_cleaning=True, enable_balancing=True, enable_stationary_filtering=False, speed_threshold=0.1):
         """
         完整的数据处理流程
         
@@ -239,6 +309,8 @@ class DataProcessor:
             data: 输入数据列表
             enable_cleaning: 是否启用数据清洗（去除异常值）
             enable_balancing: 是否启用数据平衡
+            enable_stationary_filtering: 是否启用静止数据过滤
+            speed_threshold: 静止判定速度阈值
         
         Returns:
             处理后的数据和统计信息
@@ -247,6 +319,10 @@ class DataProcessor:
         
         # 分析数据
         processor.analyze_data(data)
+        
+        # 过滤静止数据
+        if enable_stationary_filtering:
+            data = processor.filter_stationary_data(data, speed_threshold=speed_threshold)
         
         # 检测异常值
         processor.detect_outliers()

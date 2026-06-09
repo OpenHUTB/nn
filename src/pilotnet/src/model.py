@@ -206,10 +206,10 @@ class PilotNet():
         message('='*60)
         
         # Process training data
-        training_frames, _ = DataProcessor.process(training_frames)
+        training_frames, _ = DataProcessor.process(training_frames, enable_stationary_filtering=True)
         
         # Process testing data (only analyze, no balancing needed)
-        testing_frames, _ = DataProcessor.process(testing_frames, enable_balancing=False, enable_cleaning=False)
+        testing_frames, _ = DataProcessor.process(testing_frames, enable_balancing=False, enable_cleaning=False, enable_stationary_filtering=True)
         
         message('数据预处理完成！')
         message('='*60 + '\n')

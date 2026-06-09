@@ -1,0 +1,26 @@
+site_name: PilotNet 自动驾驶系统课程设计报告
+docs_dir: docs
+
+nav:
+  - 课程设计报告: index.md
+
+theme:
+  name: readthedocs
+  language: zh
+  highlightjs: true
+  hljs_languages:
+    - python
+    - yaml
+    - bash
+  navigation_depth: 0
+
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - tables
+  - fenced_code
+
+site_dir: site
+
+use_directory_urls: false
