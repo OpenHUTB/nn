@@ -34,6 +34,13 @@ plugins:
       lang: zh
       separator: '[\s\-\.]+'
       min_search_length: 3
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [./src]
+          options:
+            show_source: true
 
 extra:
   generator: false
@@ -50,6 +57,12 @@ nav:
 - CarRacing DQN/DoubleDQN：训练改进与可视化对比: 'car_racing_dqn_improvements.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 - 自动驾驶车辆语义分割: 'auto_drive_seg/README.md'
+- MuJoCo教程:
+  - 模块简介: 'mujoco01/index.md'
+  - 快速开始: 'mujoco01/quickstart.md'
+  - API参考: 'mujoco01/api.md'
+  - 配置说明: 'mujoco01/configuration.md'
+  - 示例代码: 'mujoco01/examples.md'
 
 
 # - mdx_math 用于行内公式显示
