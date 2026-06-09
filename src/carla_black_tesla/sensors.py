@@ -1,92 +1,82 @@
+"""
+CARLA车辆传感器数据收集模块
+"""
 import carla
 import time
 
+
 class SensorCollector:
+    """车辆传感器数据收集器"""
+
     def __init__(self, vehicle):
         self.vehicle = vehicle
-        self.imu_sensor = None
-        self.gnss_sensor = None
-        self.speed = 0
-        self.acceleration = [0, 0, 0]
-        self.location = None
-        self.throttle = 0
-        self.brake = 0
-        self.steer = 0
+        self.world = vehicle.get_world()
+        self.sensors = {}
+        self.data = {
+            'velocity': 0.0,
+            'location': (0.0, 0.0, 0.0),
+            'acceleration': (0.0, 0.0, 0.0),
+            'steer': 0.0,
+            'throttle': 0.0,
+            'brake': 0.0
+        }
 
-    def setup_sensors(self, world):
-        blueprint = world.get_blueprint_library()
-        
-        imu_bp = blueprint.find('sensor.other.imu')
-        self.imu_sensor = world.spawn_actor(
-            imu_bp,
-            carla.Transform(),
-            attach_to=self.vehicle
+    def setup_sensors(self):
+        """配置传感器"""
+        blueprint_library = self.world.get_blueprint_library()
+
+        # IMU传感器
+        imu_bp = blueprint_library.find("sensor.other.imu")
+        imu_transform = carla.Transform(carla.Location(x=0.8, z=0.5))
+        self.sensors['imu'] = self.world.spawn_actor(imu_bp, imu_transform, attach_to=self.vehicle)
+        self.sensors['imu'].listen(self._imu_callback)
+
+        # 速度传感器（通过轮速传感器）
+        speed_bp = blueprint_library.find("sensor.other.speedometer")
+        self.sensors['speed'] = self.world.spawn_actor(speed_bp, carla.Transform(), attach_to=self.vehicle)
+        self.sensors['speed'].listen(self._speed_callback)
+
+        print("[SENSOR] 传感器配置完成")
+
+    def _imu_callback(self, imu_data):
+        """IMU数据回调"""
+        self.data['acceleration'] = (
+            imu_data.accelerometer.x,
+            imu_data.accelerometer.y,
+            imu_data.accelerometer.z
         )
-        self.imu_sensor.listen(lambda data: self._update_imu(data))
-        
-        gnss_bp = blueprint.find('sensor.other.gnss')
-        self.gnss_sensor = world.spawn_actor(
-            gnss_bp,
-            carla.Transform(),
-            attach_to=self.vehicle
-        )
-        self.gnss_sensor.listen(lambda data: self._update_gnss(data))
 
-    def _update_imu(self, data):
-        self.acceleration = [data.accelerometer.x, data.accelerometer.y, data.accelerometer.z]
+    def _speed_callback(self, speed_data):
+        """速度数据回调"""
+        self.data['velocity'] = speed_data.velocity
 
-    def _update_gnss(self, data):
-        self.location = (data.latitude, data.longitude, data.altitude)
-
-    def update(self):
-        velocity = self.vehicle.get_velocity()
-        self.speed = ((velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5) * 3.6
-        
-        transform = self.vehicle.get_transform()
-        if self.location is None:
-            self.location = (transform.location.x, transform.location.y, transform.location.z)
-        
+    def update_vehicle_state(self):
+        """更新车辆状态"""
         control = self.vehicle.get_control()
-        self.throttle = control.throttle
-        self.brake = control.brake
-        self.steer = control.steer
+        self.data['steer'] = control.steer
+        self.data['throttle'] = control.throttle
+        self.data['brake'] = control.brake
 
-    def display(self):
-        print(f"Speed: {self.speed:.1f} km/h | "
-              f"Accel: ({self.acceleration[0]:.1f}, {self.acceleration[1]:.1f}, {self.acceleration[2]:.1f}) | "
-              f"Throttle: {self.throttle:.2f} | Brake: {self.brake:.2f} | Steer: {self.steer:.2f}")
+        location = self.vehicle.get_location()
+        self.data['location'] = (location.x, location.y, location.z)
+
+    def get_data(self):
+        """获取所有传感器数据"""
+        self.update_vehicle_state()
+        return self.data.copy()
+
+    def display_data(self):
+        """显示传感器数据"""
+        data = self.get_data()
+        print("\r" + " " * 100, end="")
+        print(f"\r[DATA] 速度: {data['velocity']:5.1f} km/h | "
+              f"位置: ({data['location'][0]:6.1f}, {data['location'][1]:6.1f}) | "
+              f"转向: {data['steer']:+.2f} | "
+              f"油门: {data['throttle']:.2f} | "
+              f"刹车: {data['brake']:.2f}", end="")
 
     def destroy(self):
-        if self.imu_sensor:
-            self.imu_sensor.destroy()
-        if self.gnss_sensor:
-            self.gnss_sensor.destroy()
-
-def main():
-    try:
-        client = carla.Client("localhost", 2000)
-        client.set_timeout(10.0)
-        world = client.get_world()
-        
-        bp_lib = world.get_blueprint_library()
-        tesla_bp = bp_lib.find("vehicle.tesla.model3")
-        tesla_bp.set_attribute("color", "0, 0, 0")
-        
-        spawn_points = world.get_map().get_spawn_points()
-        vehicle = world.spawn_actor(tesla_bp, spawn_points[0])
-        vehicle.set_autopilot(True)
-        
-        sensors = SensorCollector(vehicle)
-        sensors.setup_sensors(world)
-        print("Sensor collection enabled!")
-        
-        while True:
-            sensors.update()
-            sensors.display()
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        sensors.destroy()
-        vehicle.destroy()
-
-if __name__ == "__main__":
-    main()
+        """销毁所有传感器"""
+        for sensor in self.sensors.values():
+            sensor.destroy()
+        print("\n[SENSOR] 传感器已销毁")
