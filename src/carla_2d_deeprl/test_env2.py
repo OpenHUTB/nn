@@ -20,7 +20,6 @@ test_env.py — 第6次提交完整测试脚本
 """
 
 import carla
-import time
 import sys
 import copy
 import logging
@@ -32,14 +31,13 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # 测试 0：配置导入验证
 # ============================================================
+
+
 def test_config_import():
     """验证所有配置项可从 config.py 正常导入"""
     from min_carla_env.config import (
         CONFIG,
-        OBS_CONFIG,
-        ENV_CONFIG,
         REWARD_CONFIG,
-        RENDER_CONFIG,
         WEATHER_PRESETS,
         MAP_OPTIONS,
         ACTIONS,
@@ -107,8 +105,8 @@ def test_weather_presets(client):
             "weather": WEATHER_PRESETS[wname]
         }, debug=False)
 
-        obs = env.reset()
         # 验证天气设置生效
+        env.reset()
         world_weather = env.mw.world.get_weather()
         logger.info(f"  天气 {wname}: sun_altitude={world_weather.sun_altitude_angle:.1f}")
         env.close()

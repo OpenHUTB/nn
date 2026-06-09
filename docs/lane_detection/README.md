@@ -3,6 +3,7 @@
 基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。
 
 **作者**：ultra223  
+**课题进度**：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
 **课题进度**：2/10（步骤1 基础检测 + 步骤2 HSV 优化）
 
 ## 模块结构
@@ -13,6 +14,7 @@
 | `config.py` | 路径与算法参数 |
 | `lane_preprocess.py` | 步骤1：灰度、Canny、ROI、霍夫 |
 | `lane_detect.py` | 步骤2：HSV 黄白线、双黄线中心轴、左右车道 |
+| `lane_advanced.py` | 步骤3：透视变换、滑动窗口、二次多项式拟合 |
 | `carla_test.jpg` | 少量示例输入（运行依赖） |
 
 ## 开发环境
@@ -37,6 +39,13 @@ python main.py
 # 步骤2：HSV 多车道检测
 python main.py --mode hsv
 
+# 步骤3：透视变换 + 滑动窗口 + 多项式拟合
+python main.py --mode advanced
+
+# 重新生成文档配图（写入 docs/lane_detection/images）
+python main.py --save-docs --no-show
+python main.py --mode hsv --save-docs --no-show
+python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
@@ -81,6 +90,30 @@ python main.py --mode hsv --save-docs --no-show
 **多车道拟合结果**
 
 ![步骤2 检测结果](images/step02_result.jpg)
+
+## 步骤3：透视变换 + 滑动窗口 + 多项式拟合
+
+在 HSV + Sobel 梯度联合二值化的基础上，通过透视变换获取鸟瞰图，利用直方图定位车道线基点，滑动窗口搜索车道像素，最后使用二次多项式拟合弯道曲线并反透视叠加回原图。
+
+**HSV + Sobel 二值化车道线**
+
+![步骤3 二值化](images/step03_binary.jpg)
+
+**鸟瞰图透视变换**
+
+![步骤3 鸟瞰图](images/step03_birdseye.jpg)
+
+**滑动窗口搜索**
+
+![步骤3 滑动窗口](images/step03_sliding_window.jpg)
+
+**二次多项式拟合结果**
+
+![步骤3 多项式拟合](images/step03_poly_fit.jpg)
+
+**最终检测结果**
+
+![步骤3 检测结果](images/step03_result.jpg)
 
 ## 参考
 
