@@ -19,6 +19,7 @@ from config import (
 # 初始化日志
 logger = logging.getLogger(__name__)
 
+
 class CarlaDriver:
     def __init__(self):
         self.exit_flag = False
@@ -28,6 +29,8 @@ class CarlaDriver:
         # 防抖标记
         self.w_key_triggered = [False]
         self.c_key_triggered = [False]
+        self.r_key_triggered = [False]
+        self.initial_spawn_point = None
         # 注册退出信号
         signal.signal(signal.SIGINT, self.handle_exit)
         signal.signal(signal.SIGTERM, self.handle_exit)
@@ -76,6 +79,7 @@ class CarlaDriver:
         carla_map = world.get_map()
         spawn_point = carla_map.get_spawn_points()[0]
         spawn_point.location -= spawn_point.get_forward_vector() * SPAWN_POINT_OFFSET
+        self.initial_spawn_point = spawn_point
 
         try:
             car_bp = world.get_blueprint_library().filter("vehicle")[0]
@@ -95,6 +99,26 @@ class CarlaDriver:
 
         return world
 
+    # 新增：重置车辆位置方法
+    def reset_vehicle_position(self) -> None:
+        """将车辆重置到初始生成点"""
+        if not self.car or not self.initial_spawn_point:
+            logger.warning("无法重置车辆位置：车辆未初始化或生成点未保存")
+            return
+
+        # 停止车辆并重置位置
+        self.car.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0, hand_brake=True))
+        self.car.set_transform(self.initial_spawn_point)
+        self.car.apply_control(carla.VehicleControl(hand_brake=False))
+
+        # 重置碰撞状态和GUI数据
+        self.collision_monitor.reset_collision_occurred()
+        update_vehicle_status("collision_occurred", False)
+        update_vehicle_status("collision_speed", 0.0)
+        update_vehicle_status("speed", 0.0)
+
+        logger.info(f"车辆已重置到初始生成点：{self.initial_spawn_point.location}")
+
     def print_operation_guide(self) -> None:
         """打印操作说明"""
         guide = """
@@ -103,6 +127,7 @@ class CarlaDriver:
 ↑：前进 | ↓：倒车 | ←：左转 | →：右转 
 空格键：急刹 | C：模拟碰撞 | ESC：退出
 W键：循环切换天气（晴天→雨天→雾天→夜间→晴天...）
+R键：重置车辆到初始生成点  # 新增：R键说明
 📊 实时监测：车速 | 天气 | 能见度 | 碰撞状态 | 红绿灯违规
 ========================================
         """
@@ -221,7 +246,11 @@ W键：循环切换天气（晴天→雨天→雾天→夜间→晴天...）
             elif not red_light_violation:
                 red_light_violation_flag = False
 
-            # 9. 退出检测
+            # 新增：9. 重置车辆位置（R键）
+            if debounce_check(keyboard.is_pressed("r"), self.r_key_triggered):
+                self.reset_vehicle_position()
+
+            # 10. 退出检测
             if keyboard.is_pressed("esc") and not self.exit_flag:
                 self.exit_flag = True
                 break
@@ -245,6 +274,7 @@ W键：循环切换天气（晴天→雨天→雾天→夜间→晴天...）
         finally:
             self.cleanup_resources()
             logger.info("程序正常退出")
+
 
 if __name__ == "__main__":
     driver = CarlaDriver()
