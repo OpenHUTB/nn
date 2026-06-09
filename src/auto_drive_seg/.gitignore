@@ -1,6 +1,9 @@
 # 预训练模型为二进制大文件，需自行从原始项目获取（见 README）
 models/
 
+# mkdocs 构建产物（mkdocs build 生成的静态站点）
+site/
+
 # 视频为二进制大文件，不入仓（测试视频请用原始项目 examples/ 下的 .mp4）
 *.mp4
 
@@ -13,6 +16,10 @@ models/
 !examples/result_benchmark.png
 !examples/result_heatmap.png
 !examples/result_frequency.png
+
+# 本地文档站使用的效果图（mkdocs 需要 docs_dir 下能找到这些文件）
+!docs/images/
+!docs/images/*.png
 
 # main.py 运行时生成的结果（示例效果图已单独保存在 examples/result_*.png）
 examples/sample_input_overlay.png

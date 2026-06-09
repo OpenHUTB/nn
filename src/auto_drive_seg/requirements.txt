@@ -8,3 +8,6 @@ opencv-python==4.6.0.66
 Pillow==9.3.0
 matplotlib==3.6.2
 natsort
+# 本地文档预览（mkdocs serve）依赖
+mkdocs>=1.5
+mkdocs-material>=9.0

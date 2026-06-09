@@ -1,0 +1,18 @@
+site_name: 自动驾驶车辆语义分割
+site_author: xiaomizhou-oss
+site_description: 基于 U-Net + Focal Loss 的 CARLA 街景 8 类语义分割模块文档
+docs_dir: docs
+
+nav:
+  - 项目完整文档: index.md  # 冒号后面必须有空格！
+
+theme: readthedocs
+
+markdown_extensions:
+  - codehilite:
+      linenums: true
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - tables
+  - admonition
