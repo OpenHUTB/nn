@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/auto_drive_system/auto_drive_system_README/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>基于 PPO 算法的 CARLA 自动驾驶系统 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u57fa\u4e8e PPO \u7b97\u6cd5\u7684 CARLA \u81ea\u52a8\u9a7e\u9a76\u7cfb\u7edf";
+        var mkdocs_page_input_path = "auto_drive_system/auto_drive_system_README.md";
+        var mkdocs_page_url = "/nn/auto_drive_system/auto_drive_system_README/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">基于 PPO 算法的 CARLA 自动驾驶系统</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/auto_drive_system/auto_drive_system_README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="ppo-carla">基于 PPO 算法的 CARLA 自动驾驶系统</h1>
+<h2 id="_1">项目简介</h2>
+<p>本项目基于 CARLA 0.9.15 仿真器，使用 PPO 强化学习算法训练自动驾驶智能体。智能体通过语义分割传感器感知环境，学习控制油门、刹车和方向盘，实现沿路径的自主行驶。本项目对原始 reward 函数进行了多项优化，使训练从无法收敛（ep_rew_mean ≈ 0）提升至 ep_rew_mean = 30.1。</p>
+<h2 id="_2">硬件与开发环境</h2>
+<ul>
+<li><strong>操作系统</strong>: Windows 10</li>
+<li><strong>显卡环境</strong>: RTX 4050 Laptop GPU (6GB)</li>
+<li><strong>仿真器版本</strong>: CARLA 0.9.15</li>
+<li><strong>Python 版本</strong>: 3.10</li>
+<li><strong>核心依赖</strong>: PyTorch, Stable-Baselines3, Gym, NumPy</li>
+<li><strong>Conda 环境</strong>: carla_rl</li>
+</ul>
+<h2 id="_3">安装步骤</h2>
+<pre><code class="language-bash"># 克隆仓库
+git clone https://github.com/YuHang-Zhou/nn.git
+cd nn
+
+# 安装依赖
+pip install -r src/auto_drive_system/requirements.txt
+</code></pre>
+<h2 id="_4">目录结构</h2>
+<pre><code>src/auto_drive_system/
+├── agent/              # 智能体相关代码
+│   └── reward.py       # 奖励函数定义
+├── carla_utils/        # CARLA 工具函数
+├── core_rl/            # RL 核心训练逻辑
+├── navigation/         # 导航模块
+├── tools/              # 辅助工具
+├── util/               # 通用工具函数
+├── utilities/          # 工具类
+├── config.py           # 配置文件（算法参数、奖励参数等）
+├── train.py            # 训练入口脚本
+├── carla_da_dynamic.py           # 动态数据增强
+├── carla_da_dynamic_with_camera.py  # 摄像头动态数据增强
+├── carla_da_static.py            # 静态数据增强
+├── utils.py            # 环境封装与工具函数
+└── requirements.txt    # 依赖列表
+</code></pre>
+<h2 id="_5">使用方法</h2>
+<h3 id="_6">训练</h3>
+<pre><code class="language-bash"># 启动 CARLA 仿真器
+./CarlaUE4.sh -RenderOffScreen
+
+# 在本地运行训练
+cd src/auto_drive_system
+python train.py --host &quot;localhost&quot;
+
+# 指定参数训练
+python train.py --host &quot;localhost&quot; --town Town01 --total_timesteps 1000000 --fps 20
+</code></pre>
+<h3 id="_7">训练参数</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--host</code></td>
+<td>CARLA 服务器 IP</td>
+<td>远程 IP</td>
+</tr>
+<tr>
+<td><code>--port</code></td>
+<td>CARLA 服务器端口</td>
+<td>2000</td>
+</tr>
+<tr>
+<td><code>--town</code></td>
+<td>训练地图</td>
+<td>Town01</td>
+</tr>
+<tr>
+<td><code>--total_timesteps</code></td>
+<td>总训练步数</td>
+<td>1000000</td>
+</tr>
+<tr>
+<td><code>--reload_model</code></td>
+<td>加载已有模型继续训练</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>--fps</code></td>
+<td>仿真帧率</td>
+<td>20</td>
+</tr>
+<tr>
+<td><code>--config</code></td>
+<td>配置文件路径</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>--num_checkpoints</code></td>
+<td>保存检查点数量</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>--no_render</code></td>
+<td>关闭渲染</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_8">配置说明</h3>
+<p>配置文件位于 <code>config.py</code>，主要参数：</p>
+<ul>
+<li><strong>algorithm</strong>: RL 算法选择（支持连续动作空间算法）</li>
+<li><strong>algorithm_params</strong>: 算法超参数（详见 Stable-Baselines3 文档）</li>
+<li><strong>action_smoothing</strong>: 是否启用动作平滑</li>
+<li><strong>reward_fn</strong>: 奖励函数选择（见 <code>agent/reward.py</code>）</li>
+<li><strong>reward_params</strong>: 奖励函数参数</li>
+<li><strong>obs_res</strong>: 观测分辨率（推荐 160×80）</li>
+</ul>
+<h2 id="_9">奖励函数优化</h2>
+<p>原始 reward 函数采用乘法组合（<code>speed × centering × angle</code>），存在以下问题：</p>
+<h3 id="_10">修复的问题</h3>
+<ol>
+<li><strong>角度跨 0°/360° 计算 bug</strong>: <code>wayp_angle=359, veh_angle=1</code> 时，<code>abs(359-1)=358</code>，导致角度因子错误归零。添加 <code>normalize_angle</code> 函数修复。</li>
+<li><strong>速度奖励跳变</strong>: 低速区间奖励从 -0.2 直接跳到正值，梯度信号不稳定。改为平滑线性插值。</li>
+<li><strong>低速计时器累积 bug</strong>: <code>low_speed_timer</code> 只加不减，应改为速度恢复时重置，实现"连续低速才终止"。</li>
+<li><strong>终止惩罚固定</strong>: 活 60 步和活 5 步终止惩罚相同（-1），改为随步数缩放。</li>
+</ol>
+<h3 id="_11">优化策略</h3>
+<ul>
+<li><strong>乘法改加权求和</strong>: 每个维度独立梯度信号，不再一个维度归零就全部归零</li>
+<li><strong>加入低速惩罚</strong>: 速度 &lt; 5 km/h 直接扣分，防止"不动"策略</li>
+<li><strong>居中因子二次衰减</strong>: 靠近中心时奖励更敏感，偏离时惩罚更猛</li>
+<li><strong>waypoint 前进奖励</strong>: 为 reward_fn5 增加"往前开"的明确信号</li>
+</ul>
+<h2 id="_12">训练结果</h2>
+<p>训练 100 万步后的关键指标：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>优化前</th>
+<th>优化后</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ep_rew_mean</td>
+<td>≈ 0</td>
+<td><strong>30.1</strong></td>
+</tr>
+<tr>
+<td>ep_len_mean</td>
+<td>极短</td>
+<td><strong>61.1</strong></td>
+</tr>
+<tr>
+<td>avg_center_dev</td>
+<td>-</td>
+<td><strong>0.0821</strong></td>
+</tr>
+<tr>
+<td>avg_speed</td>
+<td>0</td>
+<td><strong>1.91 km/h</strong></td>
+</tr>
+</tbody>
+</table>
+<!-- TensorBoard 训练曲线截图 -->
+<p><img alt="reward曲线" src="../image/train.gif" />
+<img alt="rollout曲线" src="../image/rollout.gif" />
+<img alt="自定义指标" src="../image/custom.gif" />
+<img alt="时间指标" src="../image/time.gif" /></p>
+<!-- 不管了，这里乱写 -->
+
+<h2 id="_13">运行效果</h2>
+<!-- 训练过程动图 -->
+<p><img alt="自动驾驶运行效果" src="../video/RL_SB3_carla.gif" /></p>
+<!-- 依旧乱写 -->
+
+<h2 id="_14">注意事项</h2>
+<ul>
+<li>本项目默认在双机模式下运行（一台跑 CARLA，一台跑 RL Agent），<code>--host</code> 参数默认为远程 IP。本地运行需设为 <code>localhost</code>。</li>
+<li>CARLA 仿真器建议使用 <code>-RenderOffScreen</code> 模式，减少 GPU 开销。</li>
+<li>训练过程中建议开启 TensorBoard 监控：<code>tensorboard --logdir=./rl_sb3_carla_log</code></li>
+</ul>
+<hr />
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
