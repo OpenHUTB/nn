@@ -1,8 +1,8 @@
+import carla
 import numpy as np
-import yaml
 import torch
 import torch.nn as nn
-import carla
+import yaml
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import models
 from typing import Dict, List, Any, Tuple
