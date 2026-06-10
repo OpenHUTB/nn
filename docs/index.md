@@ -209,11 +209,7 @@ title: 主页
 
 - [__机械臂自动抓取__](./robot_arm/README.md) - 基于Franka Panda的机械臂自动抓取仿真项目
 
-<<<<<<< HEAD
 - [__双机器人分区巡逻与动态避障仿真__](./muscle_humaniod/index.md) - 基于 MuJoCo 的双人形机器人分区巡逻与动态避障仿真系统
-=======
-
->>>>>>> ebacb9ab55185c039bacca159efd32b9ac410824
 
 
 
