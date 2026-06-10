@@ -1,6 +1,29 @@
 import carla
 import time
 import random
+import socket
+
+
+def test_connection(host="localhost", port=2000):
+    """测试Carla连接"""
+    # 先检查端口
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(2)
+    if sock.connect_ex((host, port)) != 0:
+        print(f"[X] 端口 {port} 未开放，请确认Carla服务器已启动")
+        sock.close()
+        return None
+    sock.close()
+
+    # 尝试连接
+    try:
+        client = carla.Client(host, port)
+        client.set_timeout(10.0)
+        world = client.get_world()
+        return client
+    except Exception as e:
+        print(f"[X] 连接失败: {e}")
+        return None
 
 
 def get_spawn_points(world):
@@ -280,10 +303,11 @@ def main():
     vehicles = []
 
     try:
-        # 连接到CARLA服务器
-        client = carla.Client("localhost", 2000)
-        client.set_timeout(10.0)  # 设置超时时间
-        print(f"✅ 成功连接到CARLA服务器")
+        # 测试连接
+        print("=== 连接诊断 ===")
+        client = test_connection()
+        if not client:
+            return
 
         # 获取世界
         world = client.get_world()

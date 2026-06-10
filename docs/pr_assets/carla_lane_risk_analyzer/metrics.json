@@ -1,0 +1,13 @@
+{
+  "source": "CARLA lane tracking log",
+  "frames": 22,
+  "max_risk": 0.9516,
+  "mean_risk": 0.482,
+  "high_risk_frames": 4,
+  "peak_frame": 17,
+  "generated_files": [
+    "carla_lane_offset_risk.png",
+    "carla_speed_density_risk.png",
+    "carla_lane_risk_scores.csv"
+  ]
+}
