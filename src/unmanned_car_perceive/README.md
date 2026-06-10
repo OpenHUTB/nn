@@ -28,7 +28,7 @@ NumPy（科学计算库）
 
 1\. 安装CARLA
 
-bash
+```bash
 
 \# 从官网下载CARLA 0.9.10或更高版本
 
@@ -36,7 +36,7 @@ bash
 
 2\. 设置Python环境
 
-bash
+```bash
 
 \# 创建虚拟环境（推荐）
 
@@ -54,7 +54,7 @@ pip install pygame numpy
 
 3\. 配置环境变量（可选）
 
-bash
+```bash
 
 \# 设置CARLA路径环境变量（Windows）
 
@@ -72,7 +72,7 @@ set CARLA\_ROOT=D:\\CARLA\_0.9.10
 
 
 
-bash
+```bash
 
 \# Windows: 双击CarlaUE4.exe
 
@@ -82,7 +82,7 @@ bash
 
 
 
-bash
+```bash
 
 python main.py
 
@@ -140,7 +140,7 @@ text
 
 点云数据处理
 
-python
+```python
 
 \# 激光雷达数据流处理
 
@@ -278,7 +278,7 @@ sync\_pygame.py（游戏引擎）
 
 添加新传感器
 
-python
+```python
 
 \# 在main.py的setup\_sensors()方法中添加
 
@@ -290,7 +290,7 @@ def setup\_new\_sensor(self):
 
 修改检测算法
 
-python
+```python
 
 \# 在obstacle\_detector.py中修改detect()方法
 
@@ -304,7 +304,7 @@ def detect(self, point\_cloud):
 
 扩展UI界面
 
-python
+```python
 
 \# 在drawer.py中添加新的显示方法
 
@@ -432,7 +432,7 @@ ModuleNotFoundError: No module named 'carla'
 
 添加新传感器
 
-python
+```python
 
 def setup\_radar(self):
 
@@ -450,7 +450,7 @@ def setup\_radar(self):
 
 自定义检测算法
 
-python
+```python
 
 class AdvancedObstacleDetector(ObstacleDetector):
 
@@ -464,7 +464,7 @@ class AdvancedObstacleDetector(ObstacleDetector):
 
 扩展 UI 功能
 
-python
+```python
 
 def display\_radar(self, radar\_data):
 
@@ -478,7 +478,7 @@ def display\_radar(self, radar\_data):
 
 集成规划控制模块
 
-python
+```python
 
 def control\_vehicle(self, obstacles):
 
@@ -500,7 +500,7 @@ def control\_vehicle(self, obstacles):
 
 测试脚本
 
-python
+```python
 
 \# performance\_test.py
 

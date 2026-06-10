@@ -59,6 +59,24 @@ WEATHER_PROFILES = {
         "fog_density": 50.0, "fog_distance": 3.0,
         "wetness": 80.0, "sun_altitude_angle": -90.0,
     },
+    "snow": {
+        "cloudiness": 90.0, "precipitation": 80.0,
+        "precipitation_deposits": 100.0, "wind_intensity": 60.0,
+        "fog_density": 60.0, "fog_distance": 4.0,
+        "wetness": 20.0, "sun_altitude_angle": 20.0,
+    },
+    "night_snow": {
+        "cloudiness": 100.0, "precipitation": 90.0,
+        "precipitation_deposits": 100.0, "wind_intensity": 70.0,
+        "fog_density": 70.0, "fog_distance": 2.0,
+        "wetness": 10.0, "sun_altitude_angle": -90.0,
+    },
+    "dust_storm": {
+        "cloudiness": 60.0, "precipitation": 0.0,
+        "precipitation_deposits": 50.0, "wind_intensity": 100.0,
+        "fog_density": 90.0, "fog_distance": 1.5,
+        "wetness": 0.0, "sun_altitude_angle": 50.0,
+    },
 }
 
 STEPS_PER_WEATHER = 200

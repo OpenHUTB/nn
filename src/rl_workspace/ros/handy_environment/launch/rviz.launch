@@ -1,0 +1,12 @@
+<launch>
+  <!-- Load rviz -->
+  <node
+    name="rviz"
+    pkg="rviz"
+    type="rviz"
+    args="-d $(find handy_environment)/rviz/camera.rviz"
+    required="true"
+  />
+
+  <include file="$(find finalarm_moveit_config)/launch/moveit_rviz.launch" />
+</launch>

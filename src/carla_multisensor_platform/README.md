@@ -70,7 +70,7 @@ carla==0.9.15
 torch>=1.7.0      # YOLOPv2 需要
 torchvision>=0.8.0
 
-##🚀 安装步骤
+## 🚀 安装步骤
 1. 安装 CARLA 模拟器
 从 CARLA 官方 GitHub 下载 CARLA 0.9.15
 
@@ -96,7 +96,7 @@ carla_egg = glob.glob('D:/CARLA/WindowsNoEditor/PythonAPI/carla/dist/carla-*.egg
 if carla_egg:
     sys.path.append(carla_egg[0])
 
-##🎮 使用方法
+## 🎮 使用方法
 启动仿真
 第1步：启动 CARLA 服务器
 
@@ -123,7 +123,7 @@ echo 正在启动 CARLA 仿真...
 python main.py
 pause
 
-##📷 传感器配置
+## 📷 传感器配置
 在 main.py 中修改 sensors_dict：
 
 python
@@ -150,7 +150,7 @@ SemanticSegmentationCamera	语义分割	禁用
 
 时间戳：帧 ID 和时间信息
 
-输出格式
+### 输出格式
 text
 dataset/
 └── session_YYYYMMDD_HHMMSS/
@@ -161,7 +161,7 @@ dataset/
     └── session_summary.json
 
 
-⌨️ 键盘控制
+## ⌨️ 键盘控制
 按键	        功能
 R	        开始/停止数据记录
 S	        显示录制状态
@@ -171,7 +171,7 @@ S / ↓  	刹车
 A / ←	左转
 D / →	右转
 空格	        手刹
-❓ 常见问题
+## ❓ 常见问题
 1. 运行报错 ModuleNotFoundError: No module named 'carla'
 原因：CARLA Python API 未正确安装
 
@@ -205,7 +205,7 @@ bash
 # 取消代理
 git config --global --unset http.proxy
 git config --global --unset https.proxy
-📝 许可证
+## 📝 许可证
 本项目仅供研究和教育用途。
 
 ## 🎬 运行效果
@@ -263,6 +263,7 @@ Data being recorded:
 ```bash
 chmod +x main.sh
 ./main.sh
+```
 
-🤝 贡献
+## 🤝 贡献
 欢迎提交 Issue 和 Pull Request。
