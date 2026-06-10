@@ -1,6 +1,4 @@
-# CARLA 模拟器中的多车辆跟踪系统
-# Multi Vehicle tracking in carla simulator
-#
+# CARLA 多车辆跟踪系统 (Multi-Vehicle Tracking in CARLA)
 本项目提供了一个在 CARLA 自动驾驶模拟器中实现多目标跟踪（Multi-Object Tracking, MOT）的完整解决方案，结合了 YOLO 目标检测算法和 DeepSORT 跟踪算法。
 
 **技术说明：**

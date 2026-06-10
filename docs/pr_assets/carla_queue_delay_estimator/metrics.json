@@ -1,0 +1,12 @@
+{
+  "source": "CARLA intersection queue log",
+  "records": 17,
+  "max_predicted_delay_s": 57.691,
+  "mean_predicted_delay_s": 33.483,
+  "extend_green_frames": 4,
+  "generated_files": [
+    "carla_queue_delay_curve.png",
+    "carla_signal_pressure.png",
+    "carla_queue_delay_scores.csv"
+  ]
+}

@@ -20,46 +20,51 @@ from datetime import datetime
 
 # 导入各个模块
 from config import AppConfig, SceneConfig, config_manager
-from image_processor import SmartImageProcessor, RoadDetector
-from lane_detector import LaneDetector
-from direction_analyzer import DirectionAnalyzer
-from visualizer import Visualizer
+from detection_service import DetectionService
 from video_processor import VideoProcessor
 from utils import PerformanceMonitor, Timer, safe_resize, calculate_fps
 from confidence_calibrator import ConfidenceCalibrator
 from quality_evaluator import QualityEvaluator
+from batch_processor import BatchProcessor
+from export_manager import ExportManager
+from performance_window import PerformanceWindow
 
 
 class LaneDetectionApp:
     """道路方向识别系统主应用程序 - 优化版本"""
-    
+
     def __init__(self, root):
         self.root = root
         self._setup_window()
-        
+
         # 初始化配置管理器
         self.config_manager = config_manager
         self.config = self.config_manager.config
-        
+
         # 注册配置变更回调
         self.config_manager.add_change_callback(self._on_config_changed, "main_app")
-        
+
         # 启动配置监控
         self.config_manager.start_watching(interval=2.0)
-        
+
         # 性能监控器
         self.performance_monitor = PerformanceMonitor(max_samples=100)
-        
+
         # 错误处理
         self.error_count = 0
         self.last_error_time = 0
         self.recovery_mode = False
         self.max_errors = self.config.max_error_count
         self.recovery_timeout = self.config.recovery_timeout
-        
-        # 初始化各个模块
-        self._initialize_modules()
-        
+
+        # 初始化检测服务（替换原来的多个模块初始化）
+        self.detection_service = DetectionService(self.config)
+        self.video_processor = VideoProcessor(self.config)
+        self.confidence_calibrator = ConfidenceCalibrator()
+        self.quality_evaluator = QualityEvaluator()
+        self.batch_processor = BatchProcessor(self.detection_service)
+        self.export_manager = ExportManager()
+
         # 状态变量
         self.current_image = None
         self.current_image_path = None
@@ -70,96 +75,83 @@ class LaneDetectionApp:
         # 导出相关状态
         self.last_detection_result = None
         self.result_image = None
-        self.export_history = []
-        
+
         # 视频相关变量
         self.video_file_path = None
         self.camera_mode = False
         self.camera_index = 0
-        
+
         # 性能统计
         self.processing_times = []
         self.frame_counter = 0
         self.last_fps_update = time.time()
         self.current_fps = 0
-        
+
         # 创建界面
         self._create_ui()
-        
-        # 创建性能监控窗口（隐藏）
-        self._create_performance_window()
-        
+
+        # 创建性能监控窗口管理器
+        self.perf_window_manager = PerformanceWindow(
+            self.root,
+            self.performance_monitor,
+            self.video_processor
+        )
+
         print("道路方向识别系统已启动（优化版本）")
         print(f"配置: {self.config.to_dict()}")
-    
-    def _initialize_modules(self):
-        """初始化各个模块"""
-        try:
-            self.image_processor = SmartImageProcessor(self.config)
-            self.road_detector = RoadDetector(self.config)
-            self.lane_detector = LaneDetector(self.config)
-            self.direction_analyzer = DirectionAnalyzer(self.config)
-            self.visualizer = Visualizer(self.config)
-            self.video_processor = VideoProcessor(self.config)
-            self.confidence_calibrator = ConfidenceCalibrator()
-            self.quality_evaluator = QualityEvaluator()
-            print("所有模块初始化完成")
-        except Exception as e:
-            print(f"模块初始化失败: {e}")
-            self._recover_from_error()
-    
+
     def _recover_from_error(self):
         """从错误中恢复"""
         if self.recovery_mode:
             return
-            
+
         self.recovery_mode = True
         print("进入恢复模式...")
-        
+
         try:
             # 延迟后重新初始化
             self.root.after(1000, self._perform_recovery)
         except Exception as e:
             print(f"恢复失败: {e}")
-    
+
     def _perform_recovery(self):
         """执行恢复操作"""
         try:
-            # 重新初始化模块
-            self._initialize_modules()
-            
+            # 重新初始化检测服务
+            self.detection_service = DetectionService(self.config)
+
             # 重置状态
             self.error_count = 0
             self.recovery_mode = False
-            
+
             # 更新状态显示
             self.status_var.set("系统已恢复")
             print("系统恢复完成")
-            
+
             # 如果是视频模式，尝试重新开始
             if self.is_video_mode and self.video_file_path:
                 self._open_video(self.video_file_path)
-                
+
         except Exception as e:
             print(f"恢复操作失败: {e}")
             # 如果恢复失败，等待更长时间后重试
             self.root.after(5000, self._perform_recovery)
-    
+
     def _on_config_changed(self, new_config):
         """配置变更回调"""
         print("检测到配置变更，重新初始化模块...")
         self.config = new_config
-        
-        # 重新初始化模块
-        self._initialize_modules()
-        
+
+        # 更新检测服务配置
+        self.detection_service.update_config(new_config)
+
         # 更新UI
         self._update_ui_from_config()
-        
+
         # 重新检测当前图像
         if self.current_image_path and not self.is_processing and not self.is_video_mode:
             self.root.after(500, self._redetect)
-    
+
     def _update_ui_from_config(self):
         """根据配置更新UI"""
         # 更新敏感度滑块
@@ -168,20 +160,20 @@ class LaneDetectionApp:
             sensitivity = (self.config.canny_threshold1 - 30) / 40.0
             sensitivity = max(0.0, min(1.0, sensitivity))
             self.sensitivity_var.set(sensitivity)
-    
+
     def _setup_window(self):
         """设置窗口"""
         self.root.title("道路方向识别系统 - 优化版本")
         self.root.geometry("1400x900")
         self.root.minsize(1200, 700)
-        
+
         # 设置窗口图标（如果有）
         try:
             if os.path.exists("icon.ico"):
                 self.root.iconbitmap("icon.ico")
         except:
             pass
-        
+
         # 设置窗口居中
         self.root.update_idletasks()
         width = self.root.winfo_width()
@@ -189,10 +181,10 @@ class LaneDetectionApp:
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f'{width}x{height}+{x}+{y}')
-        
+
         # 窗口关闭事件
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
-    
+
     def _create_ui(self):
         """创建用户界面"""
         # 主容器
@@ -219,12 +211,12 @@ class LaneDetectionApp:
 
         # 性能监控按钮
         self._create_performance_button(main_container)
-    
+
     def _create_title_bar(self, parent):
         """创建标题栏"""
         title_frame = ttk.Frame(parent)
         title_frame.pack(fill="x", pady=(0, 10))
-        
+
         # 标题
         title_label = ttk.Label(
             title_frame,
@@ -233,7 +225,7 @@ class LaneDetectionApp:
             foreground="#2c3e50"
         )
         title_label.pack(side="left")
-        
+
         # 模式指示器
         self.mode_label = ttk.Label(
             title_frame,
@@ -242,7 +234,7 @@ class LaneDetectionApp:
             foreground="#3498db"
         )
         self.mode_label.pack(side="right", padx=(0, 10))
-        
+
         # 配置状态指示器
         self.config_status_label = ttk.Label(
             title_frame,
@@ -573,11 +565,11 @@ class LaneDetectionApp:
     def _create_display_panel(self, parent):
         """创建显示面板"""
         display_frame = ttk.Frame(parent)
-        
+
         # 图像显示区域
         images_frame = ttk.Frame(display_frame)
         images_frame.pack(fill="both", expand=True)
-        
+
         # 原图显示
         original_frame = ttk.LabelFrame(
             images_frame,
@@ -586,7 +578,7 @@ class LaneDetectionApp:
             relief="groove"
         )
         original_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
-        
+
         self.original_canvas = tk.Canvas(
             original_frame,
             bg="#ecf0f1",
@@ -600,7 +592,7 @@ class LaneDetectionApp:
             font=("微软雅黑", 12),
             fill="#7f8c8d"
         )
-        
+
         # 结果图显示
         result_frame = ttk.LabelFrame(
             images_frame,
@@ -609,7 +601,7 @@ class LaneDetectionApp:
             relief="groove"
         )
         result_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
-        
+
         self.result_canvas = tk.Canvas(
             result_frame,
             bg="#ecf0f1",
@@ -623,14 +615,14 @@ class LaneDetectionApp:
             font=("微软雅黑", 12),
             fill="#7f8c8d"
         )
-        
+
         return display_frame
-    
+
     def _create_status_bar(self, parent):
         """创建状态栏"""
         status_frame = ttk.Frame(parent, relief="sunken", borderwidth=1)
         status_frame.pack(fill="x", pady=(10, 0))
-        
+
         # 进度条
         self.progress_bar = ttk.Progressbar(
             status_frame,
@@ -638,7 +630,7 @@ class LaneDetectionApp:
             length=200
         )
         self.progress_bar.pack(side="left", fill="x", expand=True, padx=(5, 10), pady=5)
-        
+
         # 状态文本
         self.status_var = tk.StringVar(value="就绪")
         status_label = ttk.Label(
@@ -647,7 +639,7 @@ class LaneDetectionApp:
             font=("微软雅黑", 9)
         )
         status_label.pack(side="right", padx=(0, 10), pady=5)
-        
+
         # 错误计数显示
         self.error_label = ttk.Label(
             status_frame,
@@ -656,7 +648,7 @@ class LaneDetectionApp:
             foreground="#e74c3c"
         )
         self.error_label.pack(side="right", padx=(0, 20), pady=5)
-    
+
     def _create_performance_button(self, parent):
         """创建性能监控按钮"""
         perf_button = ttk.Button(
@@ -666,224 +658,93 @@ class LaneDetectionApp:
             width=10
         )
         perf_button.pack(side="right", padx=(0, 10), pady=5)
-    
-    def _create_performance_window(self):
-        """创建性能监控窗口"""
-        self.perf_window = None
-        
+
     def _show_performance_window(self):
         """显示性能监控窗口"""
-        if self.perf_window is not None and self.perf_window.winfo_exists():
-            self.perf_window.deiconify()
-            self.perf_window.lift()
-            return
-            
-        self.perf_window = tk.Toplevel(self.root)
-        self.perf_window.title("性能监控")
-        self.perf_window.geometry("600x500")
-        self.perf_window.transient(self.root)
-        
-        # 创建选项卡
-        notebook = ttk.Notebook(self.perf_window)
-        notebook.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # 实时监控标签页
-        realtime_frame = ttk.Frame(notebook)
-        notebook.add(realtime_frame, text="实时监控")
-        
-        # 性能指标显示
-        self.perf_text = scrolledtext.ScrolledText(
-            realtime_frame,
-            wrap=tk.WORD,
-            font=("Consolas", 10),
-            height=20
-        )
-        self.perf_text.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # 配置标签页
-        config_frame = ttk.Frame(notebook)
-        notebook.add(config_frame, text="配置查看")
-        
-        self.config_text = scrolledtext.ScrolledText(
-            config_frame,
-            wrap=tk.WORD,
-            font=("Consolas", 9),
-            height=20
-        )
-        self.config_text.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # 更新配置显示
-        self._update_config_display()
-        
-        # 按钮框架
-        button_frame = ttk.Frame(self.perf_window)
-        button_frame.pack(fill="x", padx=10, pady=(0, 10))
-        
-        ttk.Button(
-            button_frame,
-            text="刷新",
-            command=self._update_performance_display
-        ).pack(side="left", padx=(0, 10))
-        
-        ttk.Button(
-            button_frame,
-            text="重置统计",
-            command=self._reset_performance_stats
-        ).pack(side="left", padx=(0, 10))
-        
-        ttk.Button(
-            button_frame,
-            text="保存配置",
-            command=self._save_current_config
-        ).pack(side="left", padx=(0, 10))
-        
-        ttk.Button(
-            button_frame,
-            text="关闭",
-            command=self.perf_window.destroy
-        ).pack(side="right")
-        
-        # 开始定时更新
-        self._start_performance_update()
-    
-    def _update_performance_display(self):
-        """更新性能显示"""
-        if self.perf_window is None or not self.perf_window.winfo_exists():
-            return
-            
-        summary = self.performance_monitor.get_summary()
-        
-        self.perf_text.delete(1.0, tk.END)
-        self.perf_text.insert(tk.END, "=== 性能监控数据 ===\n\n")
-        
-        for metric, stats in summary.items():
-            self.perf_text.insert(tk.END, f"{metric}:\n")
-            self.perf_text.insert(tk.END, f"  平均值: {stats['avg']:.4f}s\n")
-            self.perf_text.insert(tk.END, f"  最小值: {stats['min']:.4f}s\n")
-            self.perf_text.insert(tk.END, f"  最大值: {stats['max']:.4f}s\n")
-            self.perf_text.insert(tk.END, f"  标准差: {stats['std']:.4f}s\n")
-            self.perf_text.insert(tk.END, f"  95%分位: {stats['p95']:.4f}s\n")
-            self.perf_text.insert(tk.END, f"  样本数: {stats['count']}\n\n")
-        
-        # 添加视频处理信息
-        if self.is_video_mode:
-            video_info = self.video_processor.get_video_info()
-            self.perf_text.insert(tk.END, "=== 视频处理信息 ===\n\n")
-            for key, value in video_info.items():
-                if isinstance(value, float):
-                    self.perf_text.insert(tk.END, f"{key}: {value:.3f}\n")
-                else:
-                    self.perf_text.insert(tk.END, f"{key}: {value}\n")
-    
-    def _update_config_display(self):
-        """更新配置显示"""
-        if self.perf_window is None or not self.perf_window.winfo_exists():
-            return
-            
-        self.config_text.delete(1.0, tk.END)
         config_dict = self.config.to_dict()
-        
-        self.config_text.insert(tk.END, "=== 当前配置 ===\n\n")
-        for key, value in config_dict.items():
-            self.config_text.insert(tk.END, f"{key}: {value}\n")
-    
-    def _start_performance_update(self):
-        """开始性能数据更新"""
-        if self.perf_window is not None and self.perf_window.winfo_exists():
-            self._update_performance_display()
-            self.root.after(2000, self._start_performance_update)
-    
-    def _reset_performance_stats(self):
-        """重置性能统计"""
-        self.performance_monitor.reset()
-        self._update_performance_display()
-    
-    def _save_current_config(self):
-        """保存当前配置"""
-        if self.config_manager.save_current_config():
-            messagebox.showinfo("成功", "配置已保存")
-            self._update_config_display()
-    
+        self.perf_window_manager.show()
+        self.perf_window_manager.update_display(config_dict)
+
     def _on_advanced_option_change(self):
         """高级选项变更"""
         updates = {
             'enable_frame_buffer': self.enable_buffer_var.get(),
             'adaptive_skip_frames': self.adaptive_skip_var.get()
         }
-        
+
         self.config_manager.update_config(updates, save_to_file=True)
-    
+
     def _switch_to_image_mode(self):
         """切换到图像模式"""
         if self.is_video_mode:
             self._stop_video()
-        
+
         self.is_video_mode = False
         self.camera_mode = False
         self.mode_label.config(text="[图像模式]", foreground="#3498db")
-        
+
         # 显示图像控制，隐藏视频控制
         self.file_frame.pack(fill="x", pady=(0, 15))
         self.video_frame.pack_forget()
-        
+
         # 更新按钮状态
         self.select_image_btn.config(state="normal")
         self.redetect_btn.config(state="normal" if self.current_image_path else "disabled")
-        
+
         self.status_var.set("已切换到图像模式")
-    
+
     def _switch_to_video_mode(self):
         """切换到视频模式"""
         if self.is_video_mode and self.camera_mode:
             self._stop_video()
-        
+
         self.is_video_mode = True
         self.camera_mode = False
         self.mode_label.config(text="[视频模式]", foreground="#e74c3c")
-        
+
         # 隐藏图像控制，显示视频控制
         self.file_frame.pack_forget()
         self.video_frame.pack(fill="x", pady=(0, 15))
-        
+
         # 更新按钮状态
         self.select_video_btn.config(state="normal")
         self.play_btn.config(state="disabled")
         self.pause_btn.config(state="disabled")
         self.stop_btn.config(state="disabled")
         self.camera_test_btn.config(state="normal")
-        
+
         self.status_var.set("已切换到视频模式")
-    
+
     def _switch_to_camera_mode(self):
         """切换到摄像头模式"""
         try:
             if self.is_video_mode:
                 self._stop_video()
-            
+
             self.is_video_mode = True
             self.camera_mode = True
             self.mode_label.config(text="[摄像头模式]", foreground="#9b59b6")
-            
+
             # 隐藏图像控制，显示视频控制
             self.file_frame.pack_forget()
             self.video_frame.pack(fill="x", pady=(0, 15))
-            
+
             # 更新按钮状态
             self.select_video_btn.config(state="normal")
             self.play_btn.config(state="disabled")
             self.pause_btn.config(state="disabled")
             self.stop_btn.config(state="disabled")
             self.camera_test_btn.config(state="normal")
-            
+
             # 显示摄像头预览
             self._show_camera_preview()
-            
+
             self.status_var.set("已切换到摄像头模式")
-            
+
         except Exception as e:
             print(f"切换摄像头模式失败: {e}")
             self.status_var.set("切换摄像头模式失败")
-    
+
     def _show_camera_preview(self):
         """显示摄像头预览"""
         try:
@@ -892,17 +753,17 @@ class LaneDetectionApp:
                 self.camera_index = int(self.camera_index_var.get())
             except:
                 self.camera_index = self.config.camera_id
-            
+
             # 尝试打开摄像头
             self.status_var.set(f"正在打开摄像头 {self.camera_index}...")
             self.root.update()
-            
+
             if self.video_processor.open_camera(self.camera_index):
                 # 获取预览帧
                 ret, frame = self.video_processor.get_frame()
                 if ret:
                     self._display_image(frame, self.original_canvas, "摄像头预览")
-                    
+
                     # 在结果区域显示提示
                     self.result_canvas.delete("all")
                     self.result_canvas.create_text(
@@ -911,18 +772,18 @@ class LaneDetectionApp:
                         font=("微软雅黑", 12),
                         fill="#3498db"
                     )
-                    
+
                     self.play_btn.config(state="normal")
                     self.status_var.set(f"摄像头 {self.camera_index} 已就绪")
                 else:
                     self.status_var.set("无法获取摄像头画面")
             else:
                 self.status_var.set("无法打开摄像头")
-                
+
         except Exception as e:
             print(f"显示摄像头预览失败: {e}")
             self.status_var.set("摄像头预览失败")
-    
+
     def _test_camera(self):
         """测试摄像头功能"""
         try:
@@ -931,28 +792,28 @@ class LaneDetectionApp:
             test_window.title("摄像头测试")
             test_window.geometry("500x400")
             test_window.transient(self.root)
-            
+
             # 创建标签
             label = ttk.Label(test_window, text="正在测试摄像头...", font=("微软雅黑", 10))
             label.pack(pady=20)
-            
+
             # 创建文本显示区域
             result_text = tk.Text(test_window, height=15, width=50, font=("微软雅黑", 9))
             result_text.pack(pady=10, padx=20)
-            
+
             # 开始测试按钮
             def start_test():
                 result_text.delete(1.0, tk.END)
                 result_text.insert(tk.END, "=== 摄像头测试结果 ===\n\n")
-                
+
                 # 测试不同的摄像头索引
                 for i in range(4):  # 测试0-3号摄像头
                     result_text.insert(tk.END, f"测试摄像头 {i}:\n")
-                    
+
                     try:
                         # 尝试打开摄像头
                         cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
-                        
+
                         if cap.isOpened():
                             ret, frame = cap.read()
                             if ret:
@@ -960,7 +821,7 @@ class LaneDetectionApp:
                                 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                                 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                                 fps = cap.get(cv2.CAP_PROP_FPS)
-                                
+
                                 result_text.insert(tk.END, f"  ✓ 正常\n")
                                 result_text.insert(tk.END, f"     分辨率: {width}x{height}\n")
                                 result_text.insert(tk.END, f"     FPS: {fps:.1f}\n")
@@ -971,62 +832,62 @@ class LaneDetectionApp:
                             result_text.insert(tk.END, "  ✗ 无法打开\n")
                     except Exception as e:
                         result_text.insert(tk.END, f"  ✗ 错误: {str(e)}\n")
-                    
+
                     result_text.insert(tk.END, "\n")
-                
+
                 result_text.insert(tk.END, "=== 测试完成 ===\n")
                 result_text.see(1.0)  # 滚动到顶部
-            
+
             test_btn = ttk.Button(test_window, text="开始测试", command=start_test)
             test_btn.pack(pady=(0, 10))
-            
+
             # 关闭按钮
             close_btn = ttk.Button(test_window, text="关闭", command=test_window.destroy)
             close_btn.pack(pady=(0, 10))
-            
+
         except Exception as e:
             messagebox.showerror("测试错误", f"摄像头测试失败: {str(e)}")
-    
+
     def _select_image(self):
         """选择图片"""
         if self.is_processing:
             messagebox.showwarning("提示", "正在处理中，请稍候...")
             return
-        
+
         file_types = [
             ("图像文件", "*.jpg *.jpeg *.png *.bmp *.tiff"),
             ("所有文件", "*.*")
         ]
-        
+
         file_path = filedialog.askopenfilename(
             title="选择道路图片",
             filetypes=file_types
         )
-        
+
         if file_path:
             self.current_image_path = file_path
             self._load_image(file_path)
-    
+
     def _select_video(self):
         """选择视频文件"""
         if self.is_processing and self.is_video_mode:
             messagebox.showwarning("提示", "正在处理视频，请先停止当前处理")
             return
-        
+
         file_types = [
             ("视频文件", "*.mp4 *.avi *.mov *.mkv *.flv"),
             ("所有文件", "*.*")
         ]
-        
+
         file_path = filedialog.askopenfilename(
             title="选择道路视频",
             filetypes=file_types
         )
-        
+
         if file_path:
             self.video_file_path = file_path
             self._open_video(file_path)
-    
+
     def _open_video(self, file_path):
         """打开视频文件"""
         if self.video_processor.open_video_file(file_path):
@@ -1035,12 +896,12 @@ class LaneDetectionApp:
             self.pause_btn.config(state="disabled")
             self.stop_btn.config(state="disabled")
             self.status_var.set(f"视频已加载: {os.path.basename(file_path)}")
-            
+
             # 显示第一帧作为预览
             ret, frame = self.video_processor.get_frame()
             if ret:
                 self._display_image(frame, self.original_canvas, "视频预览")
-                
+
                 # 在结果区域显示提示
                 self.result_canvas.delete("all")
                 self.result_canvas.create_text(
@@ -1051,30 +912,30 @@ class LaneDetectionApp:
                 )
         else:
             messagebox.showerror("错误", "无法打开视频文件")
-    
+
     def _play_video(self):
         """播放视频/摄像头"""
         if self.is_processing and not self.is_video_mode:
             return
-        
+
         # 如果是摄像头模式但未打开，先尝试打开
         if self.camera_mode and (self.video_processor.video_capture is None or not self.video_processor.video_capture.isOpened()):
             self._show_camera_preview()
             if self.video_processor.video_capture is None or not self.video_processor.video_capture.isOpened():
                 messagebox.showwarning("警告", "请先打开摄像头")
                 return
-        
+
         # 更新界面状态
         self.status_var.set("正在启动处理...")
         self.root.update()
-        
+
         # 启动处理
         if self.video_processor.start_processing(self._process_video_frame):
             self.is_processing = True
             self.play_btn.config(state="disabled")
             self.pause_btn.config(state="normal")
             self.stop_btn.config(state="normal")
-            
+
             if self.camera_mode:
                 self.status_var.set("摄像头实时检测中...")
             else:
@@ -1082,7 +943,7 @@ class LaneDetectionApp:
         else:
             messagebox.showerror("错误", "无法开始处理")
             self.status_var.set("启动失败")
-    
+
     def _pause_video(self):
         """暂停视频"""
         if self.is_video_mode and self.video_processor.is_playing:
@@ -1090,7 +951,7 @@ class LaneDetectionApp:
             self.play_btn.config(state="normal")
             self.pause_btn.config(state="disabled")
             self.status_var.set("已暂停")
-    
+
     def _stop_video(self):
         """停止视频"""
         if self.is_video_mode:
@@ -1100,89 +961,63 @@ class LaneDetectionApp:
             self.pause_btn.config(state="disabled")
             self.stop_btn.config(state="disabled")
             self.status_var.set("已停止")
-            
+
             # 清空显示
             self._clear_canvas_display()
-    
+
     def _process_video_frame(self, frame, frame_info):
         """处理视频帧"""
         try:
-            with self.performance_monitor.start_timer("total_processing") as timer:
-                # 预处理帧
-                processed_frame, roi_info = self.image_processor.preprocess_frame(frame)
-                
-                # 道路检测
-                with self.performance_monitor.start_timer("road_detection"):
-                    road_info = self.road_detector.detect_road(
-                        processed_frame, 
-                        roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8))
-                    )
-                
-                # 车道线检测
-                with self.performance_monitor.start_timer("lane_detection"):
-                    # 1. 提取光照条件
-                    light_mode = roi_info.get('light_condition', 'day')
+            start_time = time.time()
 
-                    # 2. 获取 mask（安全获取）
-                    mask = roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8))
+            # 使用检测服务处理帧
+            result = self.detection_service.detect_frame(frame)
 
-                    # 3. 传入光照条件到检测器
-                    lane_info = self.lane_detector.detect(processed_frame, mask, light_mode)
+            if result is None:
+                raise ValueError("帧处理失败")
 
-                    # 可选：更新状态栏显示模式
-                    if light_mode == 'night':
-                        self.status_var.set(f"视频检测中 [夜间模式] | FPS: {self.current_fps:.1f}")
-                    elif light_mode == 'dusk':
-                        self.status_var.set(f"视频检测中 [黄昏模式] | FPS: {self.current_fps:.1f}")
-                    else:
-                        self.status_var.set(f"视频检测中 | FPS: {self.current_fps:.1f}")
+            processed_frame, detection_result = result
 
-                # 方向分析
-                with self.performance_monitor.start_timer("direction_analysis"):
-                    direction_info = self.direction_analyzer.analyze(road_info, lane_info)
-                
-                # 创建可视化
-                with self.performance_monitor.start_timer("visualization"):
-                    visualization = self.visualizer.create_visualization(
-                        processed_frame, road_info, lane_info, direction_info, 
-                        True, frame_info
-                    )
-            
-            processing_time = timer.stop()
-            
+            processing_time = time.time() - start_time
+            self.performance_monitor.record_metric("total_processing", processing_time)
+
             # 在主线程中更新UI
-            self.root.after(0, self._update_video_results, 
-                          processed_frame, visualization, direction_info, 
-                          lane_info, processing_time, frame_info)
-            
+            self.root.after(0, self._update_video_results,
+                            processed_frame,
+                            detection_result.get('visualization', processed_frame),
+                            detection_result['direction_info'],
+                            detection_result['lane_info'],
+                            processing_time,
+                            frame_info)
+
             # 更新错误计数
             self.error_count = 0
-            
+
         except Exception as e:
             print(f"视频帧处理失败: {e}")
             self.error_count += 1
             self._handle_error(e)
-    
+
     def _handle_error(self, error):
         """处理错误"""
         current_time = time.time()
-        
+
         # 更新错误显示
         self.root.after(0, lambda: self.error_label.config(text=f"错误: {self.error_count}"))
-        
+
         # 检查是否需要进入恢复模式
-        if (self.error_count >= self.max_errors and 
+        if (self.error_count >= self.max_errors and
             current_time - self.last_error_time < self.recovery_timeout):
-            
+
             self.last_error_time = current_time
-            
+
             # 自动恢复
             if self.config.auto_recovery:
                 print("错误次数过多，触发自动恢复...")
                 self._recover_from_error()
             else:
                 messagebox.showwarning("警告", "错误次数过多，建议重启应用程序")
-        
+
         self.last_error_time = current_time
 
     def _load_image(self, file_path):
@@ -1202,77 +1037,50 @@ class LaneDetectionApp:
             self._handle_error(e)
             messagebox.showerror("错误", f"加载图片失败: {str(e)}")
             self.status_var.set("加载失败")
-    
+
     def _process_image_with_recovery(self, file_path):
         """带恢复机制的图像处理"""
         try:
             self._process_image(file_path)
             self.error_count = 0
             self.recovery_mode = False
-            
+
         except Exception as e:
             self._handle_error(e)
             traceback.print_exc()
-            
+
     def _process_image(self, file_path):
         """处理图像"""
         # 标记为处理中
         self.is_processing = True
         self.root.after(0, self._update_processing_state, True)
-        
+
         try:
-            with self.performance_monitor.start_timer("total_processing") as timer:
-                # 1. 图像预处理
-                result = self.image_processor.load_and_preprocess(file_path)
-                if result is None:
-                    raise ValueError("无法处理图像")
-                
-                self.current_image, roi_info = result
-                
-                # 2. 道路检测
-                with self.performance_monitor.start_timer("road_detection"):
-                    road_info = self.road_detector.detect_road(self.current_image, roi_info['mask'])
-                
-                # 3. 车道线检测
-                with self.performance_monitor.start_timer("lane_detection"):
-                    # 1. 提取光照条件
-                    light_mode = roi_info.get('light_condition', 'day')
+            # 使用检测服务进行处理
+            result = self.detection_service.detect_image(file_path)
 
-                    # 2. 获取 mask（安全获取）
-                    mask = roi_info.get('mask', np.ones(self.current_image.shape[:2], dtype=np.uint8))
+            if result is None:
+                raise ValueError("无法处理图像")
 
-                    # 3. 传入光照条件到检测器
-                    lane_info = self.lane_detector.detect(self.current_image, mask, light_mode)
+            # 提取结果
+            self.current_image = result['image']
+            visualization = result['visualization']
+            direction_info = result['direction_info']
+            lane_info = result['lane_info']
+            processing_time = result['processing_time']
 
-                    # 可选：在界面上显示当前光照模式
-                    if light_mode == 'night':
-                        self.status_var.set("图像检测完成 [夜间模式]")
-                    elif light_mode == 'dusk':
-                        self.status_var.set("图像检测完成 [黄昏模式]")
-                    else:
-                        self.status_var.set("图像检测完成")
+            # 记录性能
+            self.performance_monitor.record_metric("total_processing", processing_time)
 
-                # 4. 方向分析
-                with self.performance_monitor.start_timer("direction_analysis"):
-                    direction_info = self.direction_analyzer.analyze(road_info, lane_info)
-                
-                # 5. 创建可视化
-                with self.performance_monitor.start_timer("visualization"):
-                    visualization = self.visualizer.create_visualization(
-                        self.current_image, road_info, lane_info, direction_info
-                    )
-            
-            processing_time = timer.stop()
-            
             # 在主线程中更新UI
-            self.root.after(0, self._update_results, 
-                          direction_info, lane_info, visualization, processing_time)
-            
+            self.root.after(0, self._update_results,
+                            direction_info, lane_info, visualization, processing_time)
+
             # 更新性能统计
             self.processing_times.append(processing_time)
             if len(self.processing_times) > 10:
                 self.processing_times.pop(0)
-            
+
             # 记录处理历史
             self.processing_history.append({
                 'file': file_path,
@@ -1280,15 +1088,15 @@ class LaneDetectionApp:
                 'direction': direction_info['direction'],
                 'confidence': direction_info['confidence']
             })
-            
+
         except Exception as e:
             print(f"处理失败: {e}")
             self.root.after(0, self._show_error, str(e))
-            
+
         finally:
             self.is_processing = False
             self.root.after(0, self._update_processing_state, False)
-    
+
     def _update_processing_state(self, is_processing):
         """更新处理状态"""
         if is_processing:
@@ -1299,7 +1107,7 @@ class LaneDetectionApp:
             self.progress_bar.stop()
             self.status_var.set("分析完成")
             self.redetect_btn.config(state="normal")
-    
+
     def _update_results(self, direction_info, lane_info, visualization, processing_time):
         """更新结果（图像模式）"""
         try:
@@ -1310,15 +1118,15 @@ class LaneDetectionApp:
             # 保存结果供导出使用
             self.result_image = visualization
             self.last_detection_result = direction_info
-            
+
             # 获取信息
             direction = direction_info['direction']
             confidence = direction_info['confidence']
             quality = lane_info.get('detection_quality', 0.0)
-            
+
             # 更新方向信息
             self.direction_label.config(text=f"方向: {direction}")
-            
+
             # 设置置信度文本和颜色
             if confidence > 0.7:
                 color = "#27ae60"  # 绿色
@@ -1329,16 +1137,16 @@ class LaneDetectionApp:
             else:
                 color = "#e74c3c"  # 红色
                 confidence_text = f"置信度: {confidence:.1%} (低)"
-            
+
             self.confidence_label.config(text=confidence_text, foreground=color)
-            
+
             # 设置检测质量
             self.quality_label.config(text=f"检测质量: {quality:.1%}")
-            
+
             # 设置处理时间
             avg_time = self.performance_monitor.get_statistics("total_processing_time")['avg']
             self.time_label.config(text=f"处理时间: {processing_time:.3f}s (平均: {avg_time:.3f}s)")
-            
+
             # 更新性能信息
             perf_stats = self.performance_monitor.get_summary()
             if perf_stats:
@@ -1354,13 +1162,13 @@ class LaneDetectionApp:
 
             # 更新状态
             self.status_var.set(f"分析完成 - {direction}")
-            
+
             print(f"处理完成: 方向={direction}, 置信度={confidence:.1%}, 耗时={processing_time:.3f}s")
-            
+
         except Exception as e:
             print(f"更新结果失败: {e}")
             self.status_var.set("更新结果失败")
-    
+
     def _update_video_results(self, original_frame, visualization, direction_info, lane_info, processing_time, frame_info):
         """更新视频结果"""
         try:
@@ -1371,15 +1179,15 @@ class LaneDetectionApp:
             # 保存结果供导出使用
             self.result_image = visualization
             self.last_detection_result = direction_info
-            
+
             # 获取信息
             direction = direction_info['direction']
             confidence = direction_info['confidence']
             quality = lane_info.get('detection_quality', 0.0)
-            
+
             # 更新方向信息
             self.direction_label.config(text=f"方向: {direction}")
-            
+
             # 设置置信度文本和颜色
             if confidence > 0.7:
                 color = "#27ae60"
@@ -1390,12 +1198,12 @@ class LaneDetectionApp:
             else:
                 color = "#e74c3c"
                 confidence_text = f"置信度: {confidence:.1%} (低)"
-            
+
             self.confidence_label.config(text=confidence_text, foreground=color)
-            
+
             # 设置检测质量
             self.quality_label.config(text=f"检测质量: {quality:.1%}")
-            
+
             # 计算FPS
             self.frame_counter += 1
             current_time = time.time()
@@ -1403,16 +1211,16 @@ class LaneDetectionApp:
                 self.current_fps = self.frame_counter / (current_time - self.last_fps_update)
                 self.last_fps_update = current_time
                 self.frame_counter = 0
-            
+
             # 获取视频信息
             video_info = self.video_processor.get_video_info()
             adaptive_skip = video_info.get('adaptive_frame_skip', 1)
             buffer_usage = video_info.get('buffer_usage', '0/5')
-            
+
             # 设置处理时间和FPS
             time_text = f"处理: {processing_time:.3f}s | FPS: {self.current_fps:.1f} | 跳帧: {adaptive_skip} | 缓冲: {buffer_usage}"
             self.time_label.config(text=time_text)
-            
+
             # 更新性能信息
             perf_stats = self.performance_monitor.get_summary()
             if perf_stats:
@@ -1420,71 +1228,71 @@ class LaneDetectionApp:
                 for module in ['road_detection_time', 'lane_detection_time', 'direction_analysis_time', 'visualization_time']:
                     if module in perf_stats:
                         module_times.append(f"{module.split('_')[0]}:{perf_stats[module]['avg']:.3f}s")
-                
+
                 if module_times:
                     self.performance_label.config(text=" | ".join(module_times))
 
             # 更新导出按钮状态
             self._update_export_buttons_state()
-            
+
             # 更新状态
             video_type = "摄像头" if self.camera_mode else "视频"
             status_text = f"{video_type}处理中 - {direction} | FPS: {self.current_fps:.1f}"
-            
+
             # 添加缓冲信息
             if hasattr(self.video_processor, 'frame_buffer'):
                 buffer_len = len(self.video_processor.frame_buffer)
                 max_len = self.video_processor.frame_buffer.maxlen
                 buffer_percent = (buffer_len / max_len) * 100
-                
+
                 if buffer_percent < 20:
                     status_text += f" | 缓冲低({buffer_percent:.0f}%)"
                 elif buffer_percent > 80:
                     status_text += f" | 缓冲高({buffer_percent:.0f}%)"
-            
+
             self.status_var.set(status_text)
-            
+
         except Exception as e:
             print(f"更新视频结果失败: {e}")
-    
+
     def _display_image(self, image, canvas, title):
         """在Canvas上显示图像"""
         try:
             canvas.delete("all")
-            
+
             if image is None:
                 canvas.create_text(300, 200, text=f"{title}加载失败", fill="red")
                 return
-            
+
             # 转换颜色空间
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(image_rgb)
-            
+
             # 获取Canvas尺寸
             canvas_width = canvas.winfo_width()
             canvas_height = canvas.winfo_height()
-            
+
             if canvas_width <= 1 or canvas_height <= 1:
                 canvas_width, canvas_height = 600, 400
-            
+
             # 计算缩放比例
             img_width, img_height = pil_image.size
             scale = min(canvas_width / img_width, canvas_height / img_height) * 0.95  # 留出边距
-            
+
             if scale < 1:
                 new_size = (int(img_width * scale), int(img_height * scale))
                 pil_image = pil_image.resize(new_size, Image.Resampling.LANCZOS)
-            
+
             # 转换为Tkinter格式
             photo = ImageTk.PhotoImage(pil_image)
-            
+
             # 居中显示
             x = (canvas_width - photo.width()) // 2
             y = (canvas_height - photo.height()) // 2
-            
+
             canvas.create_image(x, y, anchor="nw", image=photo)
             canvas.image = photo  # 保持引用
-            
+
             # 添加标题
             canvas.create_text(
                 canvas_width // 2, 15,
@@ -1492,23 +1300,23 @@ class LaneDetectionApp:
                 font=("微软雅黑", 10, "bold"),
                 fill="#2c3e50"
             )
-            
+
         except Exception as e:
             print(f"显示图像失败: {e}")
             canvas.create_text(150, 150, text="图像显示失败", fill="red")
-    
+
     def _clear_canvas_display(self):
         """清空画布显示"""
         self.original_canvas.delete("all")
         self.result_canvas.delete("all")
-        
+
         self.original_canvas.create_text(
             300, 200,
             text="请选择输入源",
             font=("微软雅黑", 12),
             fill="#7f8c8d"
         )
-        
+
         self.result_canvas.create_text(
             300, 200,
             text="检测结果将显示在这里",
@@ -1525,46 +1333,9 @@ class LaneDetectionApp:
 
     def _export_result_image(self):
         """导出带标注的结果图片"""
-        if self.result_image is None:
-            messagebox.showwarning("警告", "没有可导出的结果图片")
-            return
-
-        # 选择保存路径
-        default_name = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        file_path = filedialog.asksaveasfilename(
-            title="保存结果图片",
-            defaultextension=".png",
-            initialfile=default_name,
-            filetypes=[
-                ("PNG图片", "*.png"),
-                ("JPEG图片", "*.jpg *.jpeg"),
-                ("所有文件", "*.*")
-            ]
-        )
-
-        if not file_path:
-            return
-
-        try:
-            # 保存图片
-            success = cv2.imwrite(file_path, self.result_image)
-
-            if success:
-                # 记录导出历史
-                self.export_history.append({
-                    'type': 'image',
-                    'path': file_path,
-                    'time': datetime.now().isoformat()
-                })
-
-                messagebox.showinfo("成功", f"结果图片已保存到:\n{file_path}")
-                self.status_var.set(f"图片已导出: {os.path.basename(file_path)}")
-            else:
-                messagebox.showerror("错误", "保存图片失败")
-
-        except Exception as e:
-            messagebox.showerror("错误", f"导出图片时出错: {str(e)}")
-            print(f"导出图片失败: {e}")
+        success = self.export_manager.export_image(self.result_image, self.root)
+        if success:
+            self.status_var.set(f"图片已导出")
 
     def _update_export_buttons_state(self):
         """更新导出按钮状态"""
@@ -1577,349 +1348,56 @@ class LaneDetectionApp:
 
     def _export_json_report(self):
         """导出JSON格式的检测报告"""
-        if self.last_detection_result is None:
-            messagebox.showwarning("警告", "没有可导出的检测结果")
-            return
-
-        # 选择保存路径
-        default_name = f"detection_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        file_path = filedialog.asksaveasfilename(
-            title="保存JSON报告",
-            defaultextension=".json",
-            initialfile=default_name,
-            filetypes=[
-                ("JSON文件", "*.json"),
-                ("所有文件", "*.*")
-            ]
+        success = self.export_manager.export_json_report(
+            self.last_detection_result,
+            self.current_image,
+            self.current_image_path,
+            self.root
         )
-
-        if not file_path:
-            return
-
-        try:
-            # 构建完整的报告数据
-            report_data = {
-                'report_info': {
-                    'generated_at': datetime.now().isoformat(),
-                    'software_version': '1.0',
-                    'source_image': self.current_image_path
-                },
-                'detection_result': self.last_detection_result,
-                'image_info': {
-                    'width': int(self.current_image.shape[1]) if self.current_image is not None else None,
-                    'height': int(self.current_image.shape[0]) if self.current_image is not None else None,
-                    'channels': int(self.current_image.shape[2]) if self.current_image is not None and len(
-                        self.current_image.shape) > 2 else None
-                }
-            }
-
-            # 写入JSON文件
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(report_data, f, indent=2, ensure_ascii=False, default=str)
-
-            # 记录导出历史
-            self.export_history.append({
-                'type': 'json',
-                'path': file_path,
-                'time': datetime.now().isoformat()
-            })
-
-            messagebox.showinfo("成功", f"JSON报告已保存到:\n{file_path}")
-            self.status_var.set(f"JSON报告已导出: {os.path.basename(file_path)}")
-
-        except Exception as e:
-            messagebox.showerror("错误", f"导出JSON报告时出错: {str(e)}")
-            print(f"导出JSON失败: {e}")
+        if success:
+            self.status_var.set(f"JSON报告已导出")
 
     def _on_parameter_change(self, value):
         """参数变化回调"""
         sensitivity = self.sensitivity_var.get()
-        
+
         # 根据敏感度调整参数
         updates = {
             'canny_threshold1': int(30 + sensitivity * 40),
             'canny_threshold2': int(80 + sensitivity * 100),
             'hough_threshold': int(20 + (1 - sensitivity) * 30)
         }
-        
+
         # 更新配置
         self.config_manager.update_config(updates, save_to_file=True)
-        
+
         print(f"参数更新: 敏感度={sensitivity:.2f}, 更新={updates}")
-        
+
         # 如果已有图像，自动重新检测
         if self.current_image_path and not self.is_processing and not self.is_video_mode:
             self._redetect()
 
     def _export_csv_report(self):
         """导出CSV格式的检测报告"""
-        if self.last_detection_result is None:
-            messagebox.showwarning("警告", "没有可导出的检测结果")
-            return
-
-        # 选择保存路径
-        default_name = f"detection_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        file_path = filedialog.asksaveasfilename(
-            title="保存CSV报告",
-            defaultextension=".csv",
-            initialfile=default_name,
-            filetypes=[
-                ("CSV文件", "*.csv"),
-                ("所有文件", "*.*")
-            ]
+        success = self.export_manager.export_csv_report(
+            self.last_detection_result,
+            self.current_image,
+            self.current_image_path,
+            self.root
         )
+        if success:
+            self.status_var.set(f"CSV报告已导出")
 
-        if not file_path:
-            return
-
-        try:
-            # 准备CSV数据
-            result = self.last_detection_result
-
-            # 定义CSV表头和数据
-            headers = [
-                '字段', '值'
-            ]
-
-            rows = [
-                ['生成时间', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-                ['源图片', self.current_image_path or 'N/A'],
-                ['', ''],
-                ['检测结果', ''],
-                ['方向', result.get('direction', 'N/A')],
-                ['置信度', f"{result.get('confidence', 0):.2%}"],
-                ['推理说明', result.get('reasoning', 'N/A')],
-                ['', ''],
-                ['概率分布', ''],
-            ]
-
-            # 添加各方向的概率
-            probabilities = result.get('probabilities', {})
-            for direction, prob in probabilities.items():
-                rows.append([f'{direction}概率', f"{prob:.2%}"])
-
-            # 添加图像信息
-            rows.extend([
-                ['', ''],
-                ['图像信息', ''],
-            ])
-
-            if self.current_image is not None:
-                rows.extend([
-                    ['宽度', self.current_image.shape[1]],
-                    ['高度', self.current_image.shape[0]],
-                ])
-                if len(self.current_image.shape) > 2:
-                    rows.append(['通道数', self.current_image.shape[2]])
-
-            # 写入CSV文件
-            with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f)
-                writer.writerow(headers)
-                writer.writerows(rows)
-
-            # 记录导出历史
-            self.export_history.append({
-                'type': 'csv',
-                'path': file_path,
-                'time': datetime.now().isoformat()
-            })
-
-            messagebox.showinfo("成功", f"CSV报告已保存到:\n{file_path}")
-            self.status_var.set(f"CSV报告已导出: {os.path.basename(file_path)}")
-
-        except Exception as e:
-            messagebox.showerror("错误", f"导出CSV报告时出错: {str(e)}")
-            print(f"导出CSV失败: {e}")
 
     def _batch_export_folder(self):
         """批量导出文件夹中的所有图片"""
-        # 选择输入文件夹
-        input_folder = filedialog.askdirectory(
-            title="选择包含道路图片的文件夹"
-        )
+        self.batch_processor.process_folder(self.root)
 
-        if not input_folder:
-            return
-
-        # 选择输出文件夹
-        output_folder = filedialog.askdirectory(
-            title="选择导出结果的保存文件夹"
-        )
-
-        if not output_folder:
-            return
-
-        # 获取所有图片文件
-        image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
-        image_files = [
-            f for f in os.listdir(input_folder)
-            if f.lower().endswith(image_extensions)
-        ]
-
-        if not image_files:
-            messagebox.showwarning("警告", "所选文件夹中没有找到图片文件")
-            return
-
-        # 确认批量处理
-        confirm = messagebox.askyesno(
-            "确认批量处理",
-            f"将处理 {len(image_files)} 张图片\n\n是否继续？"
-        )
-
-        if not confirm:
-            return
-
-        # 创建进度窗口
-        progress_window = tk.Toplevel(self.root)
-        progress_window.title("批量处理中...")
-        progress_window.geometry("400x200")
-        progress_window.transient(self.root)
-        progress_window.grab_set()
-
-        # 进度信息标签
-        info_label = ttk.Label(
-            progress_window,
-            text=f"正在处理 0/{len(image_files)} 张图片...",
-            font=("微软雅黑", 10)
-        )
-        info_label.pack(pady=20)
-
-        # 进度条
-        progress_bar = ttk.Progressbar(
-            progress_window,
-            mode='determinate',
-            length=350
-        )
-        progress_bar.pack(pady=10)
-        progress_bar['maximum'] = len(image_files)
-
-        # 状态标签
-        status_label = ttk.Label(
-            progress_window,
-            text="",
-            font=("微软雅黑", 9),
-            foreground="#7f8c8d"
-        )
-        status_label.pack(pady=10)
-
-        # 在后台线程中处理
-        def batch_process():
-            success_count = 0
-            fail_count = 0
-            results = []
-
-            for i, image_file in enumerate(image_files):
-                try:
-                    # 更新进度
-                    progress_window.after(0, lambda idx=i + 1, total=len(image_files), name=image_file: (
-                        info_label.config(text=f"正在处理 {idx}/{total}: {name}"),
-                        progress_bar.step(1),
-                        status_label.config(text=f"当前: {name}")
-                    ))
-
-                    # 读取图片
-                    image_path = os.path.join(input_folder, image_file)
-                    image = cv2.imread(image_path)
-
-                    if image is None:
-                        fail_count += 1
-                        continue
-
-                    # 检测方向
-                    direction_result = self._detect_single_image(image)
-
-                    # 保存结果图片
-                    result_filename = f"result_{os.path.splitext(image_file)[0]}.png"
-                    result_path = os.path.join(output_folder, result_filename)
-                    cv2.imwrite(result_path, direction_result['result_image'])
-
-                    # 保存JSON报告
-                    json_filename = f"report_{os.path.splitext(image_file)[0]}.json"
-                    json_path = os.path.join(output_folder, json_filename)
-
-                    report_data = {
-                        'image_file': image_file,
-                        'generated_at': datetime.now().isoformat(),
-                        'direction': direction_result['direction'],
-                        'confidence': direction_result['confidence'],
-                        'reasoning': direction_result.get('reasoning', '')
-                    }
-
-                    with open(json_path, 'w', encoding='utf-8') as f:
-                        json.dump(report_data, f, indent=2, ensure_ascii=False)
-
-                    results.append({
-                        'file': image_file,
-                        'direction': direction_result['direction'],
-                        'confidence': direction_result['confidence']
-                    })
-
-                    success_count += 1
-
-                except Exception as e:
-                    print(f"处理 {image_file} 失败: {e}")
-                    fail_count += 1
-
-            # 处理完成
-            progress_window.after(0, lambda: (
-                info_label.config(text=f"处理完成！成功: {success_count}, 失败: {fail_count}"),
-                status_label.config(text=f"结果已保存到: {output_folder}"),
-                progress_window.after(2000, progress_window.destroy)
-            ))
-
-            # 保存汇总报告
-            summary_path = os.path.join(output_folder, "batch_summary.csv")
-            with open(summary_path, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=['file', 'direction', 'confidence'])
-                writer.writeheader()
-                writer.writerows(results)
-
-            progress_window.after(0, lambda: messagebox.showinfo(
-                "批量处理完成",
-                f"成功: {success_count}\n失败: {fail_count}\n\n汇总报告: {summary_path}"
-            ))
-
-        # 启动后台线程
-        thread = threading.Thread(target=batch_process, daemon=True)
-        thread.start()
-
-    def _detect_single_image(self, image):
-        """检测单张图片（用于批量处理）"""
-        try:
-            # 使用现有模块进行检测
-            road_features = self.road_detector.detect_road(image)
-            lane_info = self.lane_detector.detect_lanes(image)
-            direction_result = self.direction_analyzer.analyze(road_features, lane_info)
-
-            # 可视化
-            result_image = self.visualizer.draw_result(
-                image.copy(),
-                road_features,
-                lane_info,
-                direction_result
-            )
-
-            return {
-                'direction': direction_result['direction'],
-                'confidence': direction_result['confidence'],
-                'reasoning': direction_result.get('reasoning', ''),
-                'result_image': result_image
-            }
-
-        except Exception as e:
-            print(f"检测失败: {e}")
-            return {
-                'direction': '未知',
-                'confidence': 0.0,
-                'reasoning': f'检测失败: {str(e)}',
-                'result_image': image
-            }
 
     def _on_scene_change(self, event):
         """场景选择变化"""
         scene = self.scene_var.get()
-        
+
         if scene == "高速公路":
             new_config = SceneConfig.get_scene_config('highway')
         elif scene == "城市道路":
@@ -1928,48 +1406,48 @@ class LaneDetectionApp:
             new_config = SceneConfig.get_scene_config('rural')
         else:  # 自动
             return
-        
+
         # 更新配置管理器
         self.config_manager.update_config(new_config.to_dict(), save_to_file=True)
-        
+
         print(f"场景切换为: {scene}")
         self.status_var.set(f"场景已切换为: {scene}")
-        
+
         # 重新检测
         if self.current_image_path and not self.is_processing and not self.is_video_mode:
             self._redetect()
-    
+
     def _show_error(self, error_msg):
         """显示错误"""
         messagebox.showerror("错误", f"处理失败: {error_msg}")
         self.status_var.set("处理失败")
         self.error_count += 1
         self.error_label.config(text=f"错误: {self.error_count}")
-    
+
     def _on_closing(self):
         """窗口关闭事件"""
         try:
             # 停止配置监控
             if hasattr(self, 'config_manager'):
                 self.config_manager.stop_watching()
-            
+
             # 停止视频处理
             if self.is_video_mode:
                 self._stop_video()
-            
+
             # 释放摄像头资源
             if hasattr(self, 'video_processor') and self.video_processor:
                 print("正在释放摄像头资源...")
                 self.video_processor.release()
-            
+
             # 关闭性能监控窗口
-            if self.perf_window is not None and self.perf_window.winfo_exists():
-                self.perf_window.destroy()
-            
+            if hasattr(self, 'perf_window_manager'):
+                self.perf_window_manager.destroy()
+
             # 关闭窗口
             self.root.destroy()
             print("应用程序已关闭")
-            
+
         except Exception as e:
             print(f"关闭应用程序时出错: {e}")
             self.root.destroy()
@@ -1980,13 +1458,13 @@ def main():
     try:
         # 创建主窗口
         root = tk.Tk()
-        
+
         # 创建应用程序实例
         app = LaneDetectionApp(root)
-        
+
         # 运行主循环
         root.mainloop()
-        
+
     except Exception as e:
         print(f"应用程序启动失败: {e}")
         traceback.print_exc()

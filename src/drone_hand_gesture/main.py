@@ -229,6 +229,10 @@ class IntegratedDroneSimulation:
         self.data_log = []
         self.log_file = "flight_log.json"
 
+        # 飞行统计
+        self.flight_stats = FlightStatistics()
+        self.show_stats_panel = False  # V键切换统计面板
+
         print("无人机初始化完成，等待手势指令...")
 
         print("无人机仿真系统初始化完成 [OK]")
@@ -622,6 +626,13 @@ class IntegratedDroneSimulation:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
             y_offset += 15
         
+        # 显示统计面板切换提示
+        hint_text = "V: Stats Panel" if not self.show_stats_panel else "V: Controls Panel"
+        hint_color = (100, 100, 100) if not self.show_stats_panel else (0, 255, 255)
+        cv2.putText(enhanced_frame, hint_text,
+                    (width + 20, height - 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, hint_color, 1)
+
         # 显示帧率
         current_time = time.time()
         if hasattr(self, 'last_frame_time'):
@@ -638,7 +649,176 @@ class IntegratedDroneSimulation:
                     (width + 20, height - 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, mirror_color, 1)
 
+        # 显示录制/回放状态
+        if self.drone_controller.is_recording:
+            record_count = len(self.drone_controller.recorded_trajectory)
+            cv2.putText(enhanced_frame, f"REC: {record_count} pts",
+                        (width + 150, height - 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+        elif self.drone_controller.is_replaying:
+            replay_progress = self.drone_controller.replay_index
+            replay_total = len(self.drone_controller.replay_trajectory)
+            speed = self.drone_controller.replay_speed
+            cv2.putText(enhanced_frame, f"REPLAY: {replay_progress}/{replay_total} @{speed}x",
+                        (width + 150, height - 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+
+        # 显示航点信息
+        waypoint_count = len(self.drone_controller.waypoints)
+        if waypoint_count > 0:
+            cv2.putText(enhanced_frame, f"WAYPOINTS: {waypoint_count}",
+                        (width + 150, height - 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
         return enhanced_frame
+
+    def _draw_controls_panel(self, frame, x_start, y_start):
+        """绘制控制提示面板"""
+        y_offset = y_start
+        
+        cv2.putText(frame, "CONTROLS", 
+                    (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        y_offset += 25
+        
+        controls = [
+            "Q/ESC: Exit",
+            "C: Switch Camera",
+            "I: Mirror On/Off",
+            "P: Record Trajectory",
+            "O: Save Recording",
+            "J: Replay Trajectory",
+            "D: Debug Info",
+            "H: Help",
+            "F: Fullscreen",
+            "M: Toggle Mode",
+            "[ : Lower Sensitivity",
+            "] : Raise Sensitivity",
+            "= : Reset Sensitivity",
+            "W: Add Waypoint",
+            "X: Clear Waypoints",
+            "1-7: Quick Waypoint"
+        ]
+        
+        for control in controls:
+            cv2.putText(frame, control, 
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+            y_offset += 15
+        
+        return y_offset
+
+    def _draw_stats_panel(self, frame, x_start, y_start, frame_height):
+        """绘制飞行统计面板"""
+        y_offset = y_start
+        report = self.flight_stats.get_report()
+
+        # 标题
+        cv2.putText(frame, "FLIGHT STATISTICS", 
+                    (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
+        y_offset += 22
+
+        # 分隔线
+        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
+        y_offset += 8
+
+        stats_lines = [
+            (f"Flight: {self.flight_stats.format_time(report['total_flight_time'])}", (255, 255, 255)),
+            (f"Distance: {report['total_distance']:.2f} m", (150, 255, 150)),
+            (f"Max Alt: {report['max_altitude']:.2f} m", (150, 255, 150)),
+            (f"Max Dist: {report['max_distance_from_home']:.2f} m", (150, 255, 150)),
+            (f"Max Speed: {report['max_speed']:.2f} m/s", (255, 200, 100)),
+            (f"Avg Speed: {report['avg_speed']:.2f} m/s", (255, 200, 100)),
+            (f"Takeoffs: {report['takeoff_count']}", (200, 200, 255)),
+            (f"Landings: {report['landing_count']}", (200, 200, 255)),
+        ]
+
+        for text, color in stats_lines:
+            cv2.putText(frame, text,
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+            y_offset += 17
+
+        # 分隔线
+        y_offset += 3
+        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
+        y_offset += 8
+
+        # 电池信息
+        battery = report['battery']
+        cv2.putText(frame, "BATTERY",
+                    (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+        y_offset += 16
+
+        bat_color = (0, 255, 0) if battery['current'] > 30 else (0, 255, 255) if battery['current'] > 10 else (0, 0, 255)
+        cv2.putText(frame, f"  Level: {battery['current']:.1f}%", (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, bat_color, 1)
+        y_offset += 14
+        cv2.putText(frame, f"  Drain: {battery['drain_per_minute']:.2f} %/min", (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1)
+        y_offset += 14
+        if battery['remaining_time'] > 0:
+            cv2.putText(frame, f"  Est. Remain: {self.flight_stats.format_time(battery['remaining_time'] * 60)}",
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 255), 1)
+            y_offset += 14
+
+        # 分隔线
+        y_offset += 2
+        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
+        y_offset += 8
+
+        # 手势频率
+        cv2.putText(frame, f"GESTURES ({report['total_gestures']})",
+                    (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+        y_offset += 16
+
+        top_gestures = report['top_gestures'][:5]
+        if top_gestures:
+            max_count = max(c for _, c in top_gestures)
+            for gesture_name, count in top_gestures:
+                # 手势名称缩写
+                short_name = gesture_name.replace('_', ' ').title()[:14]
+                bar_width = int((count / max_count) * 100) if max_count > 0 else 0
+                cv2.putText(frame, f"  {short_name}", (x_start + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
+                # 小进度条
+                bar_x = x_start + 150
+                cv2.rectangle(frame, (bar_x, y_offset - 8), (bar_x + 100, y_offset), (60, 60, 60), -1)
+                cv2.rectangle(frame, (bar_x, y_offset - 8), (bar_x + bar_width, y_offset), (0, 180, 0), -1)
+                cv2.putText(frame, str(count), (bar_x + 105, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (150, 150, 150), 1)
+                y_offset += 14
+        else:
+            cv2.putText(frame, "  No gestures yet", (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
+            y_offset += 14
+
+        # 命令频率（如果空间够的话）
+        if y_offset < frame_height - 50:
+            y_offset += 4
+            cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
+            y_offset += 8
+
+            cv2.putText(frame, f"COMMANDS ({report['total_commands']})",
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+            y_offset += 16
+
+            top_commands = report['top_commands'][:4]
+            if top_commands:
+                for cmd_name, count in top_commands:
+                    short_name = cmd_name.replace('_', ' ').title()[:14]
+                    cv2.putText(frame, f"  {short_name}: {count}", (x_start + 20, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.35, (180, 180, 200), 1)
+                    y_offset += 14
+            else:
+                cv2.putText(frame, "  No commands yet", (x_start + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
+                y_offset += 14
 
     def _show_help(self):
         """显示帮助信息"""
@@ -689,6 +869,14 @@ class IntegratedDroneSimulation:
         print("  Q/ESC - 退出")
         print("  C - 切换摄像头")
         print("  I - 切换镜像模式")
+        print("  P - 开始录制轨迹")
+        print("  O - 停止录制并保存")
+        print("  J - 加载并回放轨迹")
+        print("  +/- - 调整回放速度")
+        print("  W - 添加航点标记")
+        print("  X - 清除所有航点")
+        print("  1-7 - 快速添加航点（起飞/左转/右转/上升/下降/悬停/降落）")
+        print("  V - 切换飞行统计面板")
         print("  D - 显示调试信息")
         print("  H - 显示帮助")
         print("  F - 切换全屏")
@@ -990,6 +1178,9 @@ class IntegratedDroneSimulation:
         print("           按 'T' 键手动起飞")
         print("           按 'L' 键手动降落")
         print("           按 'H' 键悬停")
+        print("           按 'P' 键开始录制轨迹")
+        print("           按 'O' 键停止录制并保存")
+        print("           按 'J' 键加载并回放轨迹")
 
         # 按键防抖记录
         self._last_key_press = {}
@@ -1062,6 +1253,68 @@ class IntegratedDroneSimulation:
                     self.drone_controller.send_command("stop")
                     self._last_key_press['s'] = current_time
 
+            # ========== 轨迹录制/回放控制 ==========
+            # 检查录制键 P
+            if keys[pygame.K_p]:
+                if ('p' not in self._last_key_press or
+                        current_time - self._last_key_press['p'] > 1.0):
+                    if not self.drone_controller.is_replaying:
+                        self.drone_controller.start_recording()
+                    self._last_key_press['p'] = current_time
+
+            # 检查停止录制键 O
+            if keys[pygame.K_o]:
+                if ('o' not in self._last_key_press or
+                        current_time - self._last_key_press['o'] > 1.0):
+                    if self.drone_controller.is_recording:
+                        self.drone_controller.stop_recording()
+                        self.drone_controller.save_trajectory_to_file()
+                    self._last_key_press['o'] = current_time
+
+            # 检查回放键 J
+            if keys[pygame.K_j]:
+                if ('j' not in self._last_key_press or
+                        current_time - self._last_key_press['j'] > 1.0):
+                    if not self.drone_controller.is_recording:
+                        saved_files = self.drone_controller.list_saved_trajectories()
+                        if saved_files:
+                            print("\n已保存的轨迹文件：")
+                            for i, f in enumerate(saved_files[:5]):
+                                print(f"  {i + 1}. {f}")
+                            print(f"\n最新轨迹: {saved_files[0]}")
+                            # 自动加载最新的轨迹并回放
+                            loaded = self.drone_controller.load_trajectory_from_file(saved_files[0])
+                            if loaded:
+                                self.drone_controller.start_replay(speed=1.0)
+                        else:
+                            print("[INFO] 没有找到已保存的轨迹文件")
+                            print("   请先录制轨迹（按P开始录制，按O停止并保存）")
+                    self._last_key_press['j'] = current_time
+
+            # 检查回放速度调整
+            if self.drone_controller.is_replaying:
+                if keys[pygame.K_EQUALS] or keys[pygame.K_PLUS]:
+                    if ('=' not in self._last_key_press or
+                            current_time - self._last_key_press['='] > 0.3):
+                        self.drone_controller.replay_speed = min(5.0, self.drone_controller.replay_speed + 0.5)
+                        print(f"[INFO] 回放速度: {self.drone_controller.replay_speed}x")
+                        self._last_key_press['='] = current_time
+                if keys[pygame.K_MINUS]:
+                    if ('-' not in self._last_key_press or
+                            current_time - self._last_key_press['-'] > 0.3):
+                        self.drone_controller.replay_speed = max(0.1, self.drone_controller.replay_speed - 0.5)
+                        print(f"[INFO] 回放速度: {self.drone_controller.replay_speed}x")
+                        self._last_key_press['-'] = current_time
+
+            # 检查统计面板切换键 V
+            if keys[pygame.K_v]:
+                if ('v' not in self._last_key_press or
+                        current_time - self._last_key_press['v'] > 0.5):
+                    self.show_stats_panel = not self.show_stats_panel
+                    status = "开启" if self.show_stats_panel else "关闭"
+                    print(f"[INFO] 飞行统计面板: {status}")
+                    self._last_key_press['v'] = current_time
+
             if not self.viewer.handle_events():
                 self.running = False
                 break
@@ -1070,20 +1323,41 @@ class IntegratedDroneSimulation:
                 break
 
             drone_state = self.drone_controller.get_state()
-            self.drone_controller.update_physics(dt)
+
+            # 更新飞行统计
+            self.flight_stats.update(
+                drone_state=drone_state,
+                current_gesture=self.current_gesture,
+                current_command=getattr(self, 'current_command', None),
+                dt=dt
+            )
+
+            # 处理轨迹回放
+            if self.drone_controller.is_replaying:
+                replay_result = self.drone_controller.update_replay()
+                if replay_result:
+                    position, mode = replay_result
+                    self.drone_controller.state['position'] = position
+                    self.drone_controller.state['mode'] = mode
+                elif replay_result is None and not self.drone_controller.is_replaying:
+                    # 回放结束，停止更新物理
+                    self.drone_controller.update_physics(dt)
+            else:
+                self.drone_controller.update_physics(dt)
 
             if self.physics_engine and self.drone_controller.state['armed']:
                 control_input = self._get_control_input_from_state(drone_state)
                 physics_state = self.physics_engine.update(dt, control_input)
 
             trajectory = self.drone_controller.get_trajectory()
+            waypoints = self.drone_controller.get_waypoints_for_display()
 
             drone_state_with_gesture = drone_state.copy()
             if self.current_gesture:
                 drone_state_with_gesture['current_gesture'] = self.current_gesture
                 drone_state_with_gesture['gesture_confidence'] = self.gesture_confidence
 
-            self.viewer.render(drone_state_with_gesture, trajectory)
+            self.viewer.render(drone_state_with_gesture, trajectory, waypoints)
 
             # 控制帧率，避免CPU占用过高
             elapsed = time.time() - start_time
@@ -1219,6 +1493,11 @@ class IntegratedDroneSimulation:
         print("    ↑↓←→ - 旋转视角")
         print("    +/- - 缩放视角")
         print("    空格 - 重置视角")
+        print("  轨迹录制回放:")
+        print("    P - 开始录制轨迹")
+        print("    O - 停止录制并保存")
+        print("    J - 加载并回放轨迹")
+        print("    +/- - 调整回放速度")
         print("=" * 60)
         print("提示:")
         print("  1. 无人机初始在地面，等待手势指令")
@@ -1268,6 +1547,10 @@ class IntegratedDroneSimulation:
 
             # 保存日志
             self._save_log()
+
+            # 打印飞行统计报告
+            self.flight_stats.finalize()
+            self.flight_stats.print_report()
 
             print("无人机仿真系统已安全关闭 [OK]")
 

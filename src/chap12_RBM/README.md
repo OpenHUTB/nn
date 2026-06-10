@@ -1,3 +1,5 @@
+# 受限玻尔兹曼机
+
 ## Engineering Update (2026-04-26)
 
 This PR adds a lightweight engineering improvement for `visualize_results.py` without changing the RBM core algorithm:
@@ -14,7 +16,7 @@ python visualize_results.py --create-demo-data --no-show --output outputs/rbm_re
 
 Generated output:
 - `outputs/rbm_results.png`
-# 受限玻尔兹曼机
+
 
 
 

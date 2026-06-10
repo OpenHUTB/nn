@@ -10,7 +10,7 @@ from std_msgs.msg import Float32MultiArray, Float32, Bool
 from uitb import Simulator
 
 
-class RCCarNode(object):
+class RCCarNode:
     def __init__(self, simulator_folder, rate_hz=30.0):
         rospy.loginfo("RCCarNode init, simulator_folder: %s", simulator_folder)
 

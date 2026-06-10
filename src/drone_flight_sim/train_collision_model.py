@@ -137,26 +137,32 @@ def load_data():
         image_paths, labels, test_size=0.2, random_state=42, stratify=labels
     )
 
-    # 过采样：复制危险样本使其数量与安全样本接近
+    # 过采样：复制危险样本使两类数量相等（更好的平衡）
     safe_idx = np.where(y_train == 0)[0]
     danger_idx = np.where(y_train == 1)[0]
 
-    if len(danger_idx) > 0:
-        # 过采样到安全样本数量的 1/3
-        target_danger = max(len(danger_idx) * 4, 20)  # 至少复制到20个
-        oversample_times = target_danger // len(danger_idx)
-
-        X_danger_oversampled = np.repeat(X_train[danger_idx], oversample_times)
-        y_danger_oversampled = np.repeat(y_train[danger_idx], oversample_times)
-
+    if len(danger_idx) > 0 and len(danger_idx) < len(safe_idx):
+        # 计算需要复制多少次才能让危险样本数量等于安全样本
+        oversample_times = len(safe_idx) // len(danger_idx)
+        remainder = len(safe_idx) % len(danger_idx)
+        
+        # 复制整数倍
+        X_danger_oversampled = np.repeat(X_train[danger_idx], oversample_times, axis=0)
+        y_danger_oversampled = np.repeat(y_train[danger_idx], oversample_times, axis=0)
+        
+        # 如果有余数，随机抽取剩余数量
+        if remainder > 0:
+            random_indices = np.random.choice(danger_idx, remainder, replace=False)
+            X_danger_remainder = X_train[random_indices]
+            y_danger_remainder = y_train[random_indices]
+            X_danger_oversampled = np.concatenate([X_danger_oversampled, X_danger_remainder])
+            y_danger_oversampled = np.concatenate([y_danger_oversampled, y_danger_remainder])
+        
+        # 合并：保留全部安全样本 + 过采样后的危险样本
         X_train = np.concatenate([X_train[safe_idx], X_danger_oversampled])
         y_train = np.concatenate([y_train[safe_idx], y_danger_oversampled])
-
+        
         print(f"   过采样后训练集: {len(X_train)} (安全: {len(safe_idx)}, 危险: {len(X_danger_oversampled)})")
-
-    print(f"   训练集: {len(X_train)}, 测试集: {len(X_test)}")
-
-    return X_train, X_test, y_train, y_test
 
 
 def train_model():
@@ -166,16 +172,26 @@ def train_model():
     if X_train is None:
         return
 
-    # 数据变换
-    transform = transforms.Compose([
+    # 训练数据增强
+    train_transform = transforms.Compose([
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
+        transforms.RandomRotation(15),           # ±15度旋转
+        transforms.RandomAffine(0, translate=(0.1, 0.1)),  # 平移10%
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5], std=[0.5])  # 归一化
+        transforms.Normalize(mean=[0.5], std=[0.5])
     ])
 
+    # 测试数据不变（仅resize和归一化）
+    test_transform = transforms.Compose([
+        transforms.Resize((IMG_SIZE, IMG_SIZE)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5], std=[0.5])
+    ])
+
+
     # 创建数据集
-    train_dataset = CollisionDataset(X_train, y_train, transform)
-    test_dataset = CollisionDataset(X_test, y_test, transform)
+    train_dataset = CollisionDataset(X_train, y_train, train_transform)  # 用增强
+    test_dataset = CollisionDataset(X_test, y_test, test_transform)      # 用原始
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)

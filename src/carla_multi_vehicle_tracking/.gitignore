@@ -1,0 +1,8 @@
+__pycache__
+output
+jsons
+video outputs
+yolov8x.pt
+pymot
+best_n.pt
+best_s.pt
