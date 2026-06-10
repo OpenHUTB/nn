@@ -204,6 +204,9 @@ title: 主页
 
 - [__机械臂自动抓取__](./robot_arm/README.md) - 基于Franka Panda的机械臂自动抓取仿真项目
 
+- [__PilotNet自动驾驶系统__](./pilotnet/index.md) - 基于NVIDIA PilotNet架构的端到端自动驾驶学习系统
+
+
 
 
 
