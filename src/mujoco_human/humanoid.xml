@@ -1,0 +1,78 @@
+<mujoco model="humanoid">
+  <compiler angle="radian"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1"/>
+  </visual>
+
+  <default>
+    <geom condim="3" friction="1 0.1 0.1"/>
+    <joint damping="0.1"/>
+  </default>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" diffuse="1 1 1" specular="0.1 0.1 0.1"/>
+    <geom name="floor" type="plane" size="10 10 0.1" rgba="0.9 0.9 0.9 1"/>
+
+    <!-- 躯干 -->
+    <body name="torso" pos="0 0 1.25">
+      <joint name="root" type="free"/>
+      <geom type="capsule" size="0.15 0.25" fromto="0 0 -0.25 0 0 0.25" rgba="0.2 0.6 1.0 1"/>
+
+      <!-- 头 -->
+      <body name="head" pos="0 0 0.3">
+        <joint type="ball"/>
+        <geom type="sphere" size="0.15" rgba="1.0 0.8 0.6 1"/>
+      </body>
+
+      <!-- 左臂 -->
+      <body name="left_shoulder" pos="0.2 0 0.15">
+        <joint type="ball"/>
+        <geom type="capsule" size="0.08 0.25" fromto="0 0 0 0 0 -0.25" rgba="0.8 0.4 0.4 1"/>
+        <body name="left_elbow" pos="0 0 -0.25">
+          <joint axis="0 1 0" range="-2.79 0"/>
+          <geom type="capsule" size="0.07 0.25" fromto="0 0 0 0 0 -0.25" rgba="0.8 0.4 0.4 1"/>
+        </body>
+      </body>
+
+      <!-- 右臂 -->
+      <body name="right_shoulder" pos="-0.2 0 0.15">
+        <joint type="ball"/>
+        <geom type="capsule" size="0.08 0.25" fromto="0 0 0 0 0 -0.25" rgba="0.4 0.4 0.8 1"/>
+        <body name="right_elbow" pos="0 0 -0.25">
+          <joint axis="0 1 0" range="-2.79 0"/>
+          <geom type="capsule" size="0.07 0.25" fromto="0 0 0 0 0 -0.25" rgba="0.4 0.4 0.8 1"/>
+        </body>
+      </body>
+
+      <!-- 左腿 -->
+      <body name="left_hip" pos="0.1 0 -0.25">
+        <joint type="ball"/>
+        <geom type="capsule" size="0.1 0.3" fromto="0 0 0 0 0 -0.3" rgba="0.8 0.6 0.4 1"/>
+        <body name="left_knee" pos="0 0 -0.3">
+          <joint axis="0 1 0" range="-2.79 0"/>
+          <geom type="capsule" size="0.09 0.3" fromto="0 0 0 0 0 -0.3" rgba="0.8 0.6 0.4 1"/>
+          <body name="left_ankle" pos="0 0 -0.3">
+            <joint axis="1 0 0" range="-0.52 0.52"/>
+            <geom type="box" size="0.15 0.1 0.05" pos="0 0 -0.05" rgba="0.6 0.6 0.6 1"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 右腿 -->
+      <body name="right_hip" pos="-0.1 0 -0.25">
+        <joint type="ball"/>
+        <geom type="capsule" size="0.1 0.3" fromto="0 0 0 0 0 -0.3" rgba="0.6 0.4 0.8 1"/>
+        <body name="right_knee" pos="0 0 -0.3">
+          <joint axis="0 1 0" range="-2.79 0"/>
+          <geom type="capsule" size="0.09 0.3" fromto="0 0 0 0 0 -0.3" rgba="0.6 0.4 0.8 1"/>
+          <body name="right_ankle" pos="0 0 -0.3">
+            <joint axis="1 0 0" range="-0.52 0.52"/>
+            <geom type="box" size="0.15 0.1 0.05" pos="0 0 -0.05" rgba="0.6 0.6 0.6 1"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

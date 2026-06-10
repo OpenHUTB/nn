@@ -1,0 +1,11 @@
+{
+  "source": "AirSim multirotor IMU and GPS telemetry log",
+  "records": 12,
+  "max_gps_drift_m": 3.9433,
+  "relocalize_frames": 4,
+  "generated_files": [
+    "airsim_runtime_trajectory_drift.png",
+    "airsim_imu_health_curve.png",
+    "airsim_imu_drift_scores.csv"
+  ]
+}

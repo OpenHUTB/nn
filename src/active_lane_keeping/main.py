@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import os
 import warnings
+import yaml
 
 from itertools import count
 from os.path import join
@@ -14,12 +15,26 @@ from agent import Agent
 from recorder import Recorder
 from world import World
 
-def log_parameters(id:str, logger:logging.Logger, parameters: Iterable[float],
+
+def load_config(config_path: str) -> dict:
+    """Load configuration from a YAML file.
+
+    Args:
+        config_path (str): Path to the YAML configuration file.
+
+    Returns:
+        dict: Configuration dictionary.
+    """
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+
+def log_parameters(run_id:str, logger:logging.Logger, parameters: Iterable[float],
     delta_parameters: Iterable[float], error:float, steps:int) -> None:
     """Log one set of Parameters
 
     Args:
-        id (str): An unique identifier used to identify the run.
+        run_id (str): An unique identifier used to identify the run.
         logger (logging.Logger): Logger that writes logs.
         parameters (Iterable[float]): Parameters of the controller.
         delta_parameters (Iterable[float]): Delta parameters for adaption of the
@@ -27,25 +42,26 @@ def log_parameters(id:str, logger:logging.Logger, parameters: Iterable[float],
         error (float): Summed error received by the environment.
         steps (int): Number of steps taken within the run.
     """
-    logger.info((f'id: {id} | parameters: {parameters} | delta_parameters: '
+    logger.info((f'id: {run_id} | parameters: {parameters} | delta_parameters: '
         f'{delta_parameters} | error: {error:.5f} | steps: {steps:5d}'))
 
-def run(id:str, path:str, world:World, agent:Agent, steps:int = 100,
-    save:bool=False) -> tuple[float, int]:
+
+def run(run_id:str, path:str, world:World, agent:Agent, steps:int = 1000,
+    save:bool=True) -> tuple[float, int]:
     """One Epsisode inside the World
 
     Performs one run inside the world until the maximum steps is reached or a
     collision was detected.
 
     Args:
-        id (str): An unique identifier used to identify the run.
+        run_id (str): An unique identifier used to identify the run.
         path (str): Path where all files for a run will be stored.
         world (World): Environment for the simulation.
         agent (Agent): Agent to decide on actions.
         steps (int, optional): Number of maximum amount of steps to take until
-            termination. Defaults to 100.
+            termination. Defaults to 1000.
         save (bool, optional): Whether to create a video of the run. Defaults to
-            False.
+            True.
 
     Returns:
         tuple[float, int]:
@@ -56,7 +72,7 @@ def run(id:str, path:str, world:World, agent:Agent, steps:int = 100,
 
     if save:
         recorder = Recorder(folder=path)
-        recorder.init_new_video(id=id)
+        recorder.init_new_video(id=run_id)
 
     for i in range(steps):
         steer, throttle = agent.get_actions(detection_surface_area, error)
@@ -72,11 +88,12 @@ def run(id:str, path:str, world:World, agent:Agent, steps:int = 100,
             agent.show_error()
             break
 
-    agent.save_error_fig(path, id)
+    agent.save_error_fig(path, run_id)
     if save:
         recorder.close_recording()
 
     return sum(agent.errors), i
+
 
 def check_supported_controller(name:str) -> str:
     """Check supported controller
@@ -96,14 +113,15 @@ def check_supported_controller(name:str) -> str:
         return 'pid'
     return name
 
-def get_logger(id:str, path:str, debug:bool=False) -> logging.Logger:
+
+def get_logger(run_id:str, path:str, debug:bool=False) -> logging.Logger:
     """Retrieve logger
 
-    The returned logger 'pacman_rl' writes to a file inside the 'logs' folder
-    and streams the logs to the console.
+    The returned logger 'active_lane_keeping_assistant' writes to a file inside
+    the 'logs' folder and streams the logs to the console.
 
     Args:
-        id (str): An unique identifier used to identify the log file.
+        run_id (str): An unique identifier used to identify the log file.
         path (str): Path where all files for a run will be stored.
         debug (bool, optional): Whether to use the debug mode for logging. If
             False, only infos will be logged. Defaults to False.
@@ -119,7 +137,7 @@ def get_logger(id:str, path:str, debug:bool=False) -> logging.Logger:
     formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
     logger = logging.getLogger('active_lane_keeping_assistant')
     logger.setLevel(level=level)
-    fh = logging.FileHandler(join(path, f'alka_{id}.log'), mode='a')
+    fh = logging.FileHandler(join(path, f'alka_{run_id}.log'), mode='a')
     sh = logging.StreamHandler()
     sh.setFormatter(formatter)
     fh.setFormatter(formatter)
@@ -128,51 +146,53 @@ def get_logger(id:str, path:str, debug:bool=False) -> logging.Logger:
 
     return logger
 
-def twiddle(id:str, path:str, tolerance:float=0.2, controller:str='pid',
-    steps:int=100, debug:bool=False) -> None:
+
+def twiddle(run_id:str, path:str, config: dict, tolerance:float=0.2,
+            controller:str='pid', steps:int=1000, debug:bool=False) -> None:
     """Twiddle-Algorithm
 
     Perform the twiddle algorithm to receive near optimal parameters for the
     PID-controller.
 
     Args:
-        id (str): An unique identifier used to identify the run.
+        run_id (str): An unique identifier used to identify the run.
         path (str): Path where all files for a run will be stored.
+        config (dict): Configuration dictionary.
         tolerance (float, optional): Value that must be undershot for the
             algorithm to be terminated. Defaults to 0.2.
         controller (str, optional): Identifies the controller to be used for the
             run. Defaults to 'pid'.
         steps (int, optional): Number of maximum amount of steps to take until
-            termination. Defaults to 100.
+            termination. Defaults to 1000.
         debug (bool, optional): Whether to use the debug mode for logging.
             Defaults to False.
     """
-    logger = get_logger(id=id, path=path, debug=debug)
+    logger = get_logger(run_id=run_id, path=path, debug=debug)
     controller = check_supported_controller(name=controller)
 
-    logger.info(f'twiddle: {id}')
+    logger.info(f'twiddle: {run_id}')
     logger.info((f'tolerance: {tolerance} | controller: {controller} | steps: '
         f'{steps}'))
 
     parameters = np.zeros(3)
     delta_parameters = np.ones(3)
-    
-    world = World()
+
+    world = World.from_config(config)
     agent = Agent(controller=controller, tau_p=parameters[0],
         tau_i=parameters[1], tau_d=parameters[2])
 
-    best_err, steps_taken = run(id, path, world, agent, steps, save=False)
+    best_err, steps_taken = run(run_id, path, world, agent, steps, save=False)
     best_parameters = parameters
-    best_id = id
+    best_id = run_id
 
-    log_parameters(id, logger, parameters, delta_parameters, best_err,
+    log_parameters(run_id, logger, parameters, delta_parameters, best_err,
         steps_taken)
 
     for t in count():
         if (sum(delta_parameters) < tolerance):
             break
         for i in range(len(parameters)):
-            new_id = f'{id}_{t}_{i}_a'
+            new_id = f'{run_id}_{t}_{i}_a'
             world.id = new_id
             parameters[i] += delta_parameters[i]
 
@@ -190,7 +210,7 @@ def twiddle(id:str, path:str, tolerance:float=0.2, controller:str='pid',
                 delta_parameters[i] *= 1.1
             else:
                 logger.debug(f'Trying opposite direction for parameter {i}.')
-                new_id = f'{id}_{t}_{i}_a'
+                new_id = f'{run_id}_{t}_{i}_a'
                 world.id = new_id
                 parameters[i] -= 2*delta_parameters[i]
 
@@ -213,35 +233,47 @@ def twiddle(id:str, path:str, tolerance:float=0.2, controller:str='pid',
                         f'Decreasing step size.'))
                     parameters[i] += delta_parameters[i]
                     delta_parameters[i] *= 0.9
-    
+
     logger.info((f'best run - id: {best_id} | parameters: {best_parameters} | '
         f'error: {best_err:.5f}'))
 
-def no_adapt(id:str, path:str, steps:int=100, controller:str='simple') -> None:
+
+def no_adapt(run_id:str, path:str, config: dict, steps:int=1000,
+             controller:str=None) -> None:
     """Run without adaption
 
     Run the environment without the adaption of the parameters from the
     controller.
 
     Args:
-        id (str): Unique identifier for the run.
+        run_id (str): Unique identifier for the run.
         path (str): Path where all files for a run will be stored.
+        config (dict): Configuration dictionary.
         steps (int, optional): Number of steps to take within the environment.
-            Defaults to 100.
+            Defaults to 1000.
         controller (str, optional): Identifies the controller to be used for the
-            run. Defaults to 'simple'.
+            run. If None, uses default from config. Defaults to None.
     """
     world = None
     try:
-        world = World()
-        agent = Agent(controller=controller)
-        run(id=id, path=path, world=world, agent=agent, steps=steps, save=True)
+        world = World.from_config(config)
+
+        ctrl = config.get('controller', {})
+        ctrl_name = controller if controller else ctrl.get('default_controller', 'pid')
+
+        agent = Agent.from_config(config)
+        if controller:
+            agent.controller_name = controller
+            agent._select_controller_method(controller)
+
+        save = config.get('run', {}).get('save_video', True)
+        run(run_id=run_id, path=path, world=world, agent=agent, steps=steps, save=save)
     finally:
         if world is not None:
             world.close()
 
 
-def make_path(folder:str, id:str) -> str:
+def make_path(folder:str, run_id:str) -> str:
     """Create folder
 
     Checks if a folder for the id already exists and creates the folder if
@@ -250,30 +282,31 @@ def make_path(folder:str, id:str) -> str:
     Args:
         folder (str): Name of the folder where the folder for the run will be
             located.
-        id (str): Unique identifier for the run. This will be used to identify
+        run_id (str): Unique identifier for the run. This will be used to identify
             the specific folder for this run.
 
     Returns:
         str: Path including the id of the run.
     """
-    path = join(os.getcwd(), folder, id)
+    path = join(os.getcwd(), folder, run_id)
 
     if not os.path.exists(path):
         os.makedirs(path)
     else:
         warnings.warn('Path already exists. Files may be overwritten.')
-    
+
     return path
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='Active Lane Keeping System',
-        description='')
+        description='An autonomous lane keeping assistant using computer vision and PID control.')
     parser.add_argument('-id', '--identifier', type=str, help=('Unique '
         'identifier used to identify the run.'), dest='id', required=True)
-    parser.add_argument('-c', '--controller', default='pid', type=str,
+    parser.add_argument('-c', '--controller', default=None, type=str,
         choices=['simple', 'p', 'pd', 'pid'], help=('The method used to '
-        'control the car.'), dest='controller')
-    parser.add_argument('-s', '--steps', default=100, type=int, help=('The '
+        'control the car. If not specified, uses default from config.'), dest='controller')
+    parser.add_argument('-s', '--steps', type=int, help=('The '
         'number of steps that the agent controls the car. This does not '
         'include the inital setup driving to the fourth lane.'), dest='steps')
     parser.add_argument('-a', '--adapt', action='store_true',
@@ -285,13 +318,21 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--debug', action='store_true',
         help=('Whether to use debug mode for logging. This takes effect only '
         'if adapt is set to true.'), dest='debug')
+    parser.add_argument('-cfg', '--config', default='config.yaml', type=str,
+        help=('Path to the configuration file. Defaults to \'config.yaml\'.'),
+        dest='config')
     args = parser.parse_args()
 
-    path = make_path(folder='assets', id=args.id)
+    config = load_config(args.config)
+
+    run_steps = args.steps if args.steps else config.get('run', {}).get('default_steps', 1000)
+
+    path = make_path(folder='assets', run_id=args.id)
 
     if args.adapt:
-        twiddle(id=args.id, path=path, tolerance=args.tolerance,
-            controller=args.controller, steps=args.steps, debug=args.debug)        
+        twiddle(run_id=args.id, path=path, config=config, tolerance=args.tolerance,
+            controller=args.controller if args.controller else 'pid',
+            steps=run_steps, debug=args.debug)
     else:
-        no_adapt(id=args.id, path=path, steps=args.steps,
+        no_adapt(run_id=args.id, path=path, config=config, steps=run_steps,
             controller=args.controller)

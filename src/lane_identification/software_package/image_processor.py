@@ -134,33 +134,35 @@ class SmartImageProcessor:
         """估计图像噪声水平"""
         laplacian = cv2.Laplacian(image, cv2.CV_64F)
         return float(np.std(laplacian))
-    
+
     def _calculate_roi(self, image_shape: Tuple[int, ...]) -> Dict[str, Any]:
         """计算ROI区域"""
         height, width = image_shape[:2]
-        
+
         # 动态ROI计算
         roi_top = int(height * 0.35)
         roi_bottom = int(height * 0.92)
         roi_width = int(width * 0.85)
-        
+
         vertices = np.array([[
             ((width - roi_width) // 2, roi_bottom),
             ((width - roi_width) // 2 + int(roi_width * 0.3), roi_top),
             ((width - roi_width) // 2 + int(roi_width * 0.7), roi_top),
             ((width + roi_width) // 2, roi_bottom)
         ]], dtype=np.int32)
-        
+
         # 创建掩码
         mask = np.zeros(image_shape[:2], dtype=np.uint8)
         cv2.fillPoly(mask, vertices, 255)
-        
+
         return {
             'vertices': vertices,
             'mask': mask,
-            'bounds': (roi_top, roi_bottom, roi_width)
+            'bounds': (roi_top, roi_bottom, roi_width),
+            'image_width': width,
+            'image_height': height
         }
-    
+
     def _update_cache(self, key: str, value: Any):
         """更新缓存"""
         if len(self._cache) >= self.config.cache_size:
