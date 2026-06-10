@@ -130,35 +130,13 @@ class IntegratedDroneSimulation:
             self.gesture_detector = GestureDetector()
 
         print("正在初始化无人机控制器...")
-        # 检查是否启用多无人机模式
-        self.multi_drone_enabled = self.config.get('multi_drone_enabled', False)
-        self.num_drones = self.config.get('num_drones', 2)
-
-        if self.multi_drone_enabled:
-            print(f"[OK] 启用多无人机模式: {self.num_drones} 架无人机")
-            self.multi_drone_controller = MultiDroneController(
-                num_drones=self.num_drones,
-                config=None,
-                simulation_mode=True
-            )
-            self.formation = DroneFormation(self.multi_drone_controller)
-            # 默认使用 dual 控制模式
-            self.multi_drone_controller.set_control_mode("dual")
-            self.drone_controller = self.multi_drone_controller.get_drone(0)  # 保持兼容性
-        else:
-            self.multi_drone_controller = None
-            self.formation = None
-            self.drone_controller = DroneController(simulation_mode=True)
+        self.drone_controller = DroneController(simulation_mode=True)
 
         print("正在初始化3D仿真显示...")
         self.viewer = Drone3DViewer(
             width=self.config.get('window_width', 1024),
             height=self.config.get('window_height', 768)
         )
-
-        # 设置多无人机渲染模式
-        if self.multi_drone_enabled:
-            self.viewer.set_multi_drone_mode(True)
 
         # 初始化物理引擎（可选）
         if HAS_PHYSICS_ENGINE:
@@ -666,154 +644,6 @@ class IntegratedDroneSimulation:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
         return enhanced_frame
-
-    def _draw_controls_panel(self, frame, x_start, y_start):
-        """绘制控制提示面板"""
-        y_offset = y_start
-        
-        cv2.putText(frame, "CONTROLS", 
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        y_offset += 25
-        
-        controls = [
-            "Q/ESC: Exit",
-            "C: Switch Camera",
-            "I: Mirror On/Off",
-            "P: Record Trajectory",
-            "O: Save Recording",
-            "J: Replay Trajectory",
-            "D: Debug Info",
-            "H: Help",
-            "F: Fullscreen",
-            "M: Toggle Mode",
-            "[ : Lower Sensitivity",
-            "] : Raise Sensitivity",
-            "= : Reset Sensitivity",
-            "W: Add Waypoint",
-            "X: Clear Waypoints",
-            "1-7: Quick Waypoint"
-        ]
-        
-        for control in controls:
-            cv2.putText(frame, control, 
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
-            y_offset += 15
-        
-        return y_offset
-
-    def _draw_stats_panel(self, frame, x_start, y_start, frame_height):
-        """绘制飞行统计面板"""
-        y_offset = y_start
-        report = self.flight_stats.get_report()
-
-        # 标题
-        cv2.putText(frame, "FLIGHT STATISTICS", 
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
-        y_offset += 22
-
-        # 分隔线
-        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-        y_offset += 8
-
-        stats_lines = [
-            (f"Flight: {self.flight_stats.format_time(report['total_flight_time'])}", (255, 255, 255)),
-            (f"Distance: {report['total_distance']:.2f} m", (150, 255, 150)),
-            (f"Max Alt: {report['max_altitude']:.2f} m", (150, 255, 150)),
-            (f"Max Dist: {report['max_distance_from_home']:.2f} m", (150, 255, 150)),
-            (f"Max Speed: {report['max_speed']:.2f} m/s", (255, 200, 100)),
-            (f"Avg Speed: {report['avg_speed']:.2f} m/s", (255, 200, 100)),
-            (f"Takeoffs: {report['takeoff_count']}", (200, 200, 255)),
-            (f"Landings: {report['landing_count']}", (200, 200, 255)),
-        ]
-
-        for text, color in stats_lines:
-            cv2.putText(frame, text,
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
-            y_offset += 17
-
-        # 分隔线
-        y_offset += 3
-        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-        y_offset += 8
-
-        # 电池信息
-        battery = report['battery']
-        cv2.putText(frame, "BATTERY",
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-        y_offset += 16
-
-        bat_color = (0, 255, 0) if battery['current'] > 30 else (0, 255, 255) if battery['current'] > 10 else (0, 0, 255)
-        cv2.putText(frame, f"  Level: {battery['current']:.1f}%", (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, bat_color, 1)
-        y_offset += 14
-        cv2.putText(frame, f"  Drain: {battery['drain_per_minute']:.2f} %/min", (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1)
-        y_offset += 14
-        if battery['remaining_time'] > 0:
-            cv2.putText(frame, f"  Est. Remain: {self.flight_stats.format_time(battery['remaining_time'] * 60)}",
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 255), 1)
-            y_offset += 14
-
-        # 分隔线
-        y_offset += 2
-        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-        y_offset += 8
-
-        # 手势频率
-        cv2.putText(frame, f"GESTURES ({report['total_gestures']})",
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-        y_offset += 16
-
-        top_gestures = report['top_gestures'][:5]
-        if top_gestures:
-            max_count = max(c for _, c in top_gestures)
-            for gesture_name, count in top_gestures:
-                # 手势名称缩写
-                short_name = gesture_name.replace('_', ' ').title()[:14]
-                bar_width = int((count / max_count) * 100) if max_count > 0 else 0
-                cv2.putText(frame, f"  {short_name}", (x_start + 20, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
-                # 小进度条
-                bar_x = x_start + 150
-                cv2.rectangle(frame, (bar_x, y_offset - 8), (bar_x + 100, y_offset), (60, 60, 60), -1)
-                cv2.rectangle(frame, (bar_x, y_offset - 8), (bar_x + bar_width, y_offset), (0, 180, 0), -1)
-                cv2.putText(frame, str(count), (bar_x + 105, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (150, 150, 150), 1)
-                y_offset += 14
-        else:
-            cv2.putText(frame, "  No gestures yet", (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
-            y_offset += 14
-
-        # 命令频率（如果空间够的话）
-        if y_offset < frame_height - 50:
-            y_offset += 4
-            cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-            y_offset += 8
-
-            cv2.putText(frame, f"COMMANDS ({report['total_commands']})",
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-            y_offset += 16
-
-            top_commands = report['top_commands'][:4]
-            if top_commands:
-                for cmd_name, count in top_commands:
-                    short_name = cmd_name.replace('_', ' ').title()[:14]
-                    cv2.putText(frame, f"  {short_name}: {count}", (x_start + 20, y_offset),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.35, (180, 180, 200), 1)
-                    y_offset += 14
-            else:
-                cv2.putText(frame, "  No commands yet", (x_start + 20, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
-                y_offset += 14
 
     def _draw_controls_panel(self, frame, x_start, y_start):
         """绘制控制提示面板"""
