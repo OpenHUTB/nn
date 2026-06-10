@@ -18,8 +18,11 @@ class SimpleController:
         self.world = world
         self.vehicle = vehicle
         self.map = world.get_map()
-        # self.target_speed = 30.0  # km/h，原速度限制
-        self.target_speed = 50.0  # km/h，增加最高速度限制
+        # 速度限制相关
+        self.max_speed = 50.0  # km/h，最大速度限制
+        self.min_speed = 10.0  # km/h，最小速度限制
+        self.target_speed = 50.0  # km/h，当前目标速度
+        self.speed_step = 5.0  # km/h，速度调整步长
         self.waypoint_distance = 5.0
         self.last_waypoint = None
         # self.reverse_mode = False  # 倒车模式标志（未使用）
@@ -94,6 +97,26 @@ class SimpleController:
             print("进入倒车模式")
         else:
             print("退出倒车模式，恢复前进")
+
+    def increase_speed_limit(self):
+        """增加速度限制"""
+        if self.target_speed < self.max_speed:
+            self.target_speed = min(self.target_speed + self.speed_step, self.max_speed)
+            print(f"速度限制增加到: {self.target_speed:.0f} km/h")
+        else:
+            print(f"已达到最大速度限制: {self.max_speed:.0f} km/h")
+
+    def decrease_speed_limit(self):
+        """减少速度限制"""
+        if self.target_speed > self.min_speed:
+            self.target_speed = max(self.target_speed - self.speed_step, self.min_speed)
+            print(f"速度限制降低到: {self.target_speed:.0f} km/h")
+        else:
+            print(f"已达到最小速度限制: {self.min_speed:.0f} km/h")
+
+    def get_speed_limit(self):
+        """获取当前速度限制"""
+        return self.target_speed
 
 
 class WeatherManager:
@@ -584,6 +607,8 @@ class SimpleDrivingSystem:
         print("  x - 切换倒车/前进模式（速度为0时生效）")
         print("  v - 切换视角（第一人称/第三人称/鸟瞰图）")
         print("  w - 切换天气（晴天/多云/雨天/暴风雨/雪天/雾天/夜晚）")
+        print("  + - 增加速度限制")
+        print("  - - 减少速度限制")
         print("\n感知与避障系统已启用:")
         print("  - LiDAR检测范围: 50米")
         print("  - 警告距离: 15米")
@@ -663,6 +688,12 @@ class SimpleDrivingSystem:
                                     (20, 280), cv2.FONT_HERSHEY_SIMPLEX,
                                     0.8, (255, 165, 0), 2)  # 橙色显示
                     
+                    # 显示速度限制
+                    speed_limit = self.controller.get_speed_limit()
+                    cv2.putText(display_img, f"Speed Limit: {speed_limit:.0f} km/h",
+                                (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (255, 255, 0), 2)  # 青色显示
+                    
                     # 显示LiDAR距离和警告
                     if self.lidar_manager:
                         min_dist = self.lidar_manager.get_min_distance()
@@ -670,15 +701,15 @@ class SimpleDrivingSystem:
                         
                         if warning_level == 'danger':
                             cv2.putText(display_img, f"⚠️ OBSTACLE! {min_dist:.1f}m",
-                                        (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                        (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
                                         0.8, (0, 0, 255), 2)  # 红色警告
                         elif warning_level == 'warning':
                             cv2.putText(display_img, f"⚠️ Warning: {min_dist:.1f}m",
-                                        (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                        (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
                                         0.8, (0, 255, 255), 2)  # 黄色警告
                         else:
                             cv2.putText(display_img, f"Distance: {min_dist:.1f}m",
-                                        (20, 320), cv2.FONT_HERSHEY_SIMPLEX,
+                                        (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
                                         0.8, (0, 255, 0), 2)  # 绿色安全
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
@@ -713,6 +744,12 @@ class SimpleDrivingSystem:
                     # 切换天气模式
                     if self.weather_manager:
                         self.weather_manager.cycle_weather()
+                elif key == ord('+') or key == ord('='):
+                    # 增加速度限制
+                    self.controller.increase_speed_limit()
+                elif key == ord('-') or key == ord('_'):
+                    # 减少速度限制
+                    self.controller.decrease_speed_limit()
 
                 frame_count += 1
 

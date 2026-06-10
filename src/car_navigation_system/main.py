@@ -151,6 +151,7 @@ class SimpleDrivingSystem:
         self.current_vehicle_index = 0  # 当前车辆品牌索引
         self.spawn_point = None  # 存储车辆出生点
         self.show_hud = False  # HUD显示标志
+        self.show_ar_navigation = False  # AR导航显示标志
 
     def draw_hud(self, display_img, speed, throttle, steer, frame_count):
         """绘制HUD仪表盘
@@ -270,6 +271,118 @@ class SimpleDrivingSystem:
             
         except Exception as e:
             print(f"绘制HUD时出错: {e}")
+            return display_img
+
+    def draw_ar_navigation(self, display_img):
+        """绘制AR导航箭头
+        在画面上叠加导航箭头，指示前进方向
+        """
+        try:
+            if not self.show_ar_navigation:
+                return display_img
+
+            if not self.vehicle:
+                return display_img
+
+            vehicle_transform = self.vehicle.get_transform()
+            vehicle_location = vehicle_transform.location
+            vehicle_yaw = vehicle_transform.rotation.yaw
+
+            map = self.world.get_map()
+            current_waypoint = map.get_waypoint(vehicle_location, project_to_road=True)
+
+            if not current_waypoint:
+                return display_img
+
+            next_waypoints = current_waypoint.next(10.0)
+            if not next_waypoints:
+                return display_img
+
+            next_waypoint = next_waypoints[0]
+            next_location = next_waypoint.transform.location
+
+            dx = next_location.x - vehicle_location.x
+            dy = next_location.y - vehicle_location.y
+            target_yaw = math.degrees(math.atan2(dy, dx))
+
+            relative_yaw = (target_yaw - vehicle_yaw + 360) % 360
+            if relative_yaw > 180:
+                relative_yaw -= 360
+
+            img_height, img_width = display_img.shape[:2]
+            center_x = img_width // 2
+            center_y = img_height - 150
+
+            if abs(relative_yaw) < 15:
+                arrow_color = (0, 255, 0)
+            elif abs(relative_yaw) < 45:
+                arrow_color = (0, 255, 255)
+            else:
+                arrow_color = (0, 165, 255)
+
+            arrow_length = 80
+            arrow_width = 30
+
+            offset_x = int(relative_yaw * 3)
+            arrow_center_x = center_x + offset_x
+            arrow_center_y = center_y
+
+            arrow_tip = (arrow_center_x, arrow_center_y - arrow_length // 2)
+            arrow_left = (arrow_center_x - arrow_width // 2, arrow_center_y + arrow_length // 2)
+            arrow_right = (arrow_center_x + arrow_width // 2, arrow_center_y + arrow_length // 2)
+
+            pts = np.array([[arrow_tip, arrow_left, arrow_right]], dtype=np.int32)
+
+            overlay = display_img.copy()
+            cv2.fillPoly(overlay, pts, arrow_color)
+            cv2.addWeighted(overlay, 0.6, display_img, 0.4, 0, display_img)
+
+            cv2.polylines(display_img, pts, True, (255, 255, 255), 2)
+
+            direction_text = ""
+            if abs(relative_yaw) < 15:
+                direction_text = "STRAIGHT"
+            elif relative_yaw < -15:
+                direction_text = f"LEFT {abs(int(relative_yaw))}°"
+            else:
+                direction_text = f"RIGHT {int(relative_yaw)}°"
+
+            text_size = cv2.getTextSize(direction_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            text_x = arrow_center_x - text_size[0] // 2
+            text_y = arrow_center_y + arrow_length // 2 + 30
+
+            cv2.rectangle(display_img,
+                         (text_x - 10, text_y - text_size[1] - 10),
+                         (text_x + text_size[0] + 10, text_y + 10),
+                         (0, 0, 0), -1)
+            cv2.rectangle(display_img,
+                         (text_x - 10, text_y - text_size[1] - 10),
+                         (text_x + text_size[0] + 10, text_y + 10),
+                         (100, 100, 100), 2)
+
+            cv2.putText(display_img, direction_text,
+                       (text_x, text_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            distance = math.sqrt(dx**2 + dy**2)
+            distance_text = f"{distance:.1f}m"
+
+            dist_size = cv2.getTextSize(distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+            dist_x = arrow_center_x - dist_size[0] // 2
+            dist_y = arrow_tip[1] - 20
+
+            cv2.rectangle(display_img,
+                         (dist_x - 5, dist_y - dist_size[1] - 5),
+                         (dist_x + dist_size[0] + 5, dist_y + 5),
+                         (0, 0, 0), -1)
+            cv2.putText(display_img, distance_text,
+                       (dist_x, dist_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+            return display_img
+
+        except Exception as e:
+            print(f"绘制AR导航时出错: {e}")
             return display_img
 
     def connect(self):
@@ -901,8 +1014,14 @@ class SimpleDrivingSystem:
         print("  l - 切换夜晚模式（自动打开/关闭近光灯）")
         print("  d - 切换导航轨迹显示")
         print("  y - 切换HUD仪表盘显示")
+        print("  i - 切换AR导航显示（画面叠加导航箭头）")
         print("  p - 保存当前画面截图")
         print("\n开始自动驾驶...\n")
+
+        # 创建显示窗口
+        cv2.namedWindow('Autonomous Driving - Simple Version', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('Autonomous Driving - Simple Version', 640, 480)
+        cv2.moveWindow('Autonomous Driving - Simple Version', 100, 100)
 
         frame_count = 0
         running = True
@@ -1008,7 +1127,14 @@ class SimpleDrivingSystem:
                     if self.show_hud:
                         display_img = self.draw_hud(display_img, speed, throttle, steer, frame_count)
 
+                    # 显示AR导航箭头
+                    if self.show_ar_navigation:
+                        display_img = self.draw_ar_navigation(display_img)
+
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
+                    # 确保窗口置顶显示
+                    cv2.setWindowProperty('Autonomous Driving - Simple Version', cv2.WND_PROP_TOPMOST, 1)
+                    cv2.setWindowProperty('Autonomous Driving - Simple Version', cv2.WND_PROP_TOPMOST, 0)
 
                 # 处理按键
                 key = cv2.waitKey(1) & 0xFF
@@ -1074,6 +1200,13 @@ class SimpleDrivingSystem:
                         print("HUD仪表盘已开启")
                     else:
                         print("HUD仪表盘已关闭")
+                elif key == ord('i') or key == ord('I'):
+                    # 切换AR导航显示（支持大小写）
+                    self.show_ar_navigation = not self.show_ar_navigation
+                    if self.show_ar_navigation:
+                        print("AR导航已开启")
+                    else:
+                        print("AR导航已关闭")
 
                 frame_count += 1
 

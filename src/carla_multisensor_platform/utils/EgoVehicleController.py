@@ -30,9 +30,21 @@ class EgoVehicleController:
         更新车辆运动状态（带碰撞避免）
         
         Args:
-            ego_vehicle: 主车辆对象
-            control: 控制对象
-            obstacle_distance: 前方障碍物距离（米），None表示无检测
+          ego_vehicle: CARLA主车辆对象
+          control: carla.VehicleControl 控制对象
+          obstacle_distance: 前方障碍物距离（米），None表示无检测
+            - 使用示例：
+              # 从传感器获取距离
+              distance = lidar_sensor.get_distance()
+              controller.update_ego_vehicle(vehicle, control, distance)
+            - 阈值说明：
+              < 3.0m: 紧急刹车
+              3.0-6.0m: 减速慢行  
+              6.0-10.0m: 轻微减速
+              > 10.0m: 正常巡航或手动控制
+    
+        Returns:
+          None (直接应用控制到车辆)
         """
         # 获取当前速度和位置
         transform = ego_vehicle.get_transform()
@@ -97,6 +109,40 @@ class EgoVehicleController:
 
 
 class KeyboardController:
+    def get_obstacle_distance_from_sensors(ego_vehicle):
+      """
+        从车辆传感器获取最近障碍物距离（示例实现）
+    
+        使用方式：
+          # 在主循环中调用
+          distance = get_obstacle_distance_from_sensors(ego_vehicle)
+          controller.update_ego_vehicle(ego_vehicle, control, distance)
+    
+        Args:
+          ego_vehicle: CARLA车辆对象
+         
+        Returns:
+          float: 最近障碍物的距离（米），如果没有检测到障碍物则返回None
+      """
+      try:
+        # 方法1：使用碰撞传感器（需要已添加）
+        # collision_sensor = ego_vehicle.get_sensor_by_type(carla.SensorType.COLLISION)
+        
+        # 方法2：使用雷达/LiDAR（示例）
+        # for sensor in ego_vehicle.get_sensors():
+        #     if sensor.type_id.startswith('sensor.lidar'):
+        #         points = sensor.get_point_cloud()
+        #         if points:
+        #             min_distance = min(p.distance for p in points)
+        #             return min_distance
+        
+        # 方法3：简易模拟（用于测试，实际使用时删除）
+        import random
+        return random.choice([None, 2.5, 5.0, 8.0, 15.0])
+        
+      except Exception as e:
+        print(f"传感器读取失败: {e}")
+        return None
     def __init__(self):
         self.controller = carla.VehicleControl()
         self.is_reverse = False
