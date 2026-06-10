@@ -1,25 +1,26 @@
 import os
+from pathlib import Path
 import DQN_model as DQN
 
 # Load the saved model
-save_dir = 'training\saved_models'  # Match DQN_model.py
 model_file = 'DQN.pt'  # Specify the exact file
+model_path = Path(__file__).resolve().parents[1] / 'training' / 'saved_models' / model_file
 driver = DQN.Agent(
     state_space_shape=(4, 84, 84),  # Adjust to your state shape
     action_n=5,  # Match the saved model's action_n
-    load_state=True,
-    load_model=model_file
+    load_state=model_path.exists(),
+    load_model=model_file if model_path.exists() else None
 )
 
 # Evaluate
 def evaluate_agent(agent, num_episodes=5, render=True):
     import gymnasium as gym
-    from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation
-    env = gym.make("CarRacing-v3", continuous=False, render_mode="human" if render else "rgb_array")
+    from gymnasium.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
+    env = gym.make("CarRacing-v2", continuous=False, render_mode="human" if render else "rgb_array")
     env = DQN.SkipFrame(env, skip=4)
-    env = GrayscaleObservation(env)
+    env = GrayScaleObservation(env)
     env = ResizeObservation(env, (84, 84))
-    env = FrameStackObservation(env, stack_size=4)
+    env = FrameStack(env, num_stack=4)
     agent.epsilon = 0
     seeds_list = [i for i in range(num_episodes)]
     scores = []
@@ -37,5 +38,5 @@ def evaluate_agent(agent, num_episodes=5, render=True):
     env.close()
     return sum(scores) / len(scores)
 
-avg_score = evaluate_agent(driver, num_episodes=5, render=True)
+avg_score = evaluate_agent(driver, num_episodes=5, render=False)
 print(f"Average evaluation score: {avg_score:.1f}")

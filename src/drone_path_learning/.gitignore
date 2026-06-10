@@ -1,30 +1,12 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Virtual environments
-.venv/
-venv/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Training artifacts (Stable-Baselines3 / TensorBoard)
-data/logs/
-data/checkpoints/
-data/best_model/
-data/results/
-**/events.out.tfevents.*
-
-# IDE/editor files
+logs/
+wandb/
+gym_env/gym_env.egg-info/
+gym_env/gym_env/envs/lgmd/
+logs_save/
+logs_new/
+img_save/
+scripts/lgmd/
 .vscode/
-.idea/
+
+*.pyc
+gym_env/gym_env/envs/airsim_env
