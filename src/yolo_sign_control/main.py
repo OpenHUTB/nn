@@ -9,6 +9,8 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 # 控制台仪表盘（不依赖Pygame显示）
 from console_dashboard import render_dashboard, enable_ansi_support
+# 数据记录器
+from data_logger import DataLogger
 
 # ==============================================================================
 # -- find carla module ---------------------------------------------------------
@@ -218,8 +220,52 @@ def get_nearest_obstacle(signs, image_height):
     return nearest_sign
 
 # ==============================================================================
-# -- Camera Image Processing ---------------------------------------------------
+# -- 速度平滑控制器 --------------------------------------------------------------
 # ==============================================================================
+
+class SpeedController:
+    """速度平滑控制器 - 渐进式加减速，模拟真实驾驶"""
+
+    def __init__(self, ramp_rate=0.04):
+        self.current_throttle = 0.0
+        self.current_brake = 0.0
+        self.ramp_rate = ramp_rate  # 每帧最大变化量
+
+    def update(self, target_throttle, target_brake):
+        """
+        平滑过渡到目标值
+        返回 (平滑后的油门, 平滑后的刹车)
+        """
+        # 油门平滑（渐进式增加/减少）
+        if self.current_throttle < target_throttle:
+            self.current_throttle = min(
+                target_throttle,
+                self.current_throttle + self.ramp_rate
+            )
+        elif self.current_throttle > target_throttle:
+            self.current_throttle = max(
+                target_throttle,
+                self.current_throttle - self.ramp_rate * 1.5  # 收油比加油快一点
+            )
+
+        # 刹车平滑（渐进式踩/松）
+        if self.current_brake < target_brake:
+            self.current_brake = min(
+                target_brake,
+                self.current_brake + self.ramp_rate * 0.8  # 刹车建立稍慢
+            )
+        elif self.current_brake > target_brake:
+            self.current_brake = max(
+                target_brake,
+                self.current_brake - self.ramp_rate * 1.2  # 松刹车稍快
+            )
+
+        return self.current_throttle, self.current_brake
+
+    def reset(self):
+        """重置控制器状态"""
+        self.current_throttle = 0.0
+        self.current_brake = 0.0
 
 def parse_image_to_surface_and_array(image):
     """
@@ -278,24 +324,29 @@ def get_steering_angle(vehicle_transform, waypoint_transform):
         angle *= -1
     return angle
 
-# Control based on traffic signs with collision avoidance
-def control_vehicle_based_on_sign(vehicle, detected_signs, simulation_time, image_height=600):
+# Control based on traffic signs with collision avoidance and smooth control
+def control_vehicle_based_on_sign(vehicle, detected_signs, simulation_time, image_height=600, speed_controller=None):
     velocity = vehicle.get_velocity()
     current_speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6
 
-    # 初始化返回值：是否需要碰撞预警显示
+    # 初始化返回值
     collision_warning = None
+    is_emergency = False
     braking_force = 0.0
-    throttle_value = 0.5  # 默认油门
+    throttle_value = 0.6  # 巡航油门
 
     # Traffic light control
     try:
         traffic_light_state = vehicle.get_traffic_light_state()
         if traffic_light_state == carla.TrafficLightState.Red:
-            vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+            if speed_controller:
+                smooth_t, smooth_b = speed_controller.update(0.0, 1.0)
+                vehicle.apply_control(carla.VehicleControl(throttle=smooth_t, brake=smooth_b))
+            else:
+                vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
             return True, "RED LIGHT"
     except Exception:
-        pass  # 获取交通灯状态失败时跳过
+        pass
 
     # --- 碰撞预警：检测前方障碍物（车辆/行人） ---
     nearest = get_nearest_obstacle(detected_signs, image_height)
@@ -304,32 +355,39 @@ def control_vehicle_based_on_sign(vehicle, detected_signs, simulation_time, imag
 
         # 根据距离分级响应
         if distance < 8.0:
-            # 紧急制动 - 距离太近
+            # 紧急制动 - 距离太近（直接刹死，安全第一）
             braking_force = 1.0
             throttle_value = 0.0
+            is_emergency = True
             collision_warning = f"EMERGENCY BRAKE! {label} at {distance:.1f}m"
         elif distance < 15.0:
             # 强减速
             braking_force = min(0.8, 1.0 - distance / 15.0)
-            throttle_value = 0.1
+            throttle_value = 0.0
             collision_warning = f"WARNING! {label} at {distance:.1f}m"
         elif distance < 25.0:
             # 轻微减速
             braking_force = 0.2
-            throttle_value = max(0.2, 0.5 - (25.0 - distance) / 50.0)
+            throttle_value = 0.1
             collision_warning = f"Caution: {label} at {distance:.1f}m"
         elif distance < 40.0:
-            # 提前预警，不制动
+            # 提前预警，收油滑行
+            throttle_value = max(0.1, 0.4 - (40.0 - distance) / 100.0)
             collision_warning = f"{label} ahead at {distance:.1f}m"
 
     # --- 交通标志检测控制 ---
     for sign, conf, _ in detected_signs:
         if "stop" in sign.lower() and conf > 0.5:
-            # 停车标志 - 完全制动（不再使用time.sleep，避免阻塞主线程导致崩溃）
+            # 停车标志 - 完全制动
             throttle_value = 0.0
             braking_force = 1.0
+            is_emergency = True
             collision_warning = f"STOP SIGN! ({conf:.0%})"
-            vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+            if speed_controller:
+                smooth_t, smooth_b = speed_controller.update(0.0, 1.0)
+                vehicle.apply_control(carla.VehicleControl(throttle=smooth_t, brake=smooth_b, steer=vehicle.get_control().steer))
+            else:
+                vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
             return True, collision_warning
 
         elif "speed limit" in sign.lower():
@@ -337,23 +395,37 @@ def control_vehicle_based_on_sign(vehicle, detected_signs, simulation_time, imag
             if digits:
                 speed_limit = digits[0]
                 if current_speed > speed_limit:
-                    # 超速了，需要减速
-                    braking_force = max(braking_force, 0.3)
-                    throttle_value = min(throttle_value, 0.1)
+                    # 超速了，松油门+轻刹车
+                    braking_force = max(braking_force, 0.15)
+                    throttle_value = min(throttle_value, 0.05)
                     collision_warning = f"Speed limit: {speed_limit} km/h"
+                elif current_speed < speed_limit - 5:
+                    # 低于限速，缓慢加速
+                    throttle_value = max(throttle_value, 0.4)
 
-    # 应用控制（考虑所有因素后的综合结果）
-    if braking_force > 0:
+    # 通过平滑控制器应用非紧急控制
+    if speed_controller:
+        if is_emergency and distance < 8.0:
+            # 紧急情况直接刹死
+            vehicle.apply_control(carla.VehicleControl(
+                throttle=0.0, brake=1.0, steer=vehicle.get_control().steer
+            ))
+        else:
+            smooth_throttle, smooth_brake = speed_controller.update(throttle_value, braking_force)
+            vehicle.apply_control(carla.VehicleControl(
+                throttle=smooth_throttle,
+                brake=smooth_brake,
+                steer=vehicle.get_control().steer
+            ))
+    elif braking_force > 0 or is_emergency:
+        # 没有控制器时直接应用（旧逻辑）
         vehicle.apply_control(carla.VehicleControl(
             throttle=throttle_value,
             brake=braking_force,
             steer=vehicle.get_control().steer
         ))
-    else:
-        # 正常行驶，保持之前设置的油门
-        pass  # 主循环中的默认控制会处理
 
-    return False, collision_warning
+    return is_emergency, collision_warning
 
 # Spawn traffic signs
 def spawn_dynamic_elements(world, blueprint_library):
@@ -381,6 +453,61 @@ def spawn_dynamic_elements(world, blueprint_library):
             signs.append(actor)
     return signs
 
+# ==============================================================================
+# -- 仿真统计报告 ----------------------------------------------------------------
+# ==============================================================================
+
+class SimulationStats:
+    """仿真统计 - 收集运行数据并在结束时打印报告"""
+
+    def __init__(self):
+        self.frame_count = 0
+        self.total_detections = 0
+        self.warning_count = 0
+        self.emergency_count = 0
+        self.max_speed = 0.0
+        self.speed_sum = 0.0
+        self.speed_samples = 0
+
+    def record_frame(self, signs, is_emergency, warning_text):
+        self.frame_count += 1
+        self.total_detections += len(signs)
+        if is_emergency:
+            self.emergency_count += 1
+        if warning_text:
+            self.warning_count += 1
+
+    def update_speed(self, speed):
+        self.speed_sum += speed
+        self.speed_samples += 1
+        if speed > self.max_speed:
+            self.max_speed = round(speed, 1)
+
+    def print_report(self, elapsed, total_cars_spawned):
+        """打印仿真统计报告"""
+        avg_speed = self.speed_sum / self.speed_samples if self.speed_samples > 0 else 0
+        duration_min = elapsed / 60
+        fps = self.frame_count / elapsed if elapsed > 0 else 0
+
+        print()
+        print("=" * 55)
+        print("   📊  SIMULATION REPORT")
+        print("=" * 55)
+        print(f"   Duration:           {int(duration_min):02d}:{int(elapsed % 60):02d} min")
+        print(f"   Frames processed:   {self.frame_count} ({fps:.1f} FPS)")
+        print(f"   ─────────────────────────────────────────")
+        print(f"   Max speed:          {self.max_speed:.1f} km/h")
+        print(f"   Avg speed:          {avg_speed:.1f} km/h")
+        print(f"   ─────────────────────────────────────────")
+        print(f"   Total detections:   {self.total_detections}")
+        print(f"   Warnings:           {self.warning_count}")
+        print(f"   Emergencies:        {self.emergency_count}")
+        print(f"   Detection rate:     {self.total_detections / elapsed:.1f} obj/s")
+        print(f"   ─────────────────────────────────────────")
+        print(f"   NPC vehicles:       {total_cars_spawned}")
+        print("=" * 55)
+        print()
+
 # Main function
 def main():
     actor_list = []
@@ -388,6 +515,15 @@ def main():
 
     # 启用控制台 ANSI 支持（Windows 终端）
     enable_ansi_support()
+
+    # 初始化数据记录器
+    logger = DataLogger()
+
+    # 初始化速度平滑控制器（渐进式加减速）
+    speed_ctrl = SpeedController(ramp_rate=0.04)
+
+    # 仿真统计
+    stats = SimulationStats()
 
     try:
         # 确保pygame已初始化
@@ -412,6 +548,7 @@ def main():
         actor_list.append(vehicle)
 
         # Spawn NPC traffic
+        npc_count = 0
         for _ in range(10):
             traffic_bp = random.choice(blueprint_library.filter('vehicle.*'))
             traffic_spawn = random.choice(map.get_spawn_points())
@@ -419,6 +556,7 @@ def main():
             if npc:
                 npc.set_autopilot(True)
                 actor_list.append(npc)
+                npc_count += 1
 
         # Camera
         camera_bp = blueprint_library.find("sensor.camera.rgb")
@@ -485,10 +623,16 @@ def main():
             angle = get_steering_angle(trans, next_wp.transform)
             steer = max(-1.0, min(1.0, angle * 2.0))
 
+            # 默认控制：巡航状态
             control = carla.VehicleControl()
-            control.throttle = 0.5
             control.steer = steer
-            control.brake = 0.0
+
+            # 通过速度控制器平滑输出油门/刹车
+            target_throttle = 0.6  # 巡航目标油门
+            target_brake = 0.0
+            smooth_t, smooth_b = speed_ctrl.update(target_throttle, target_brake)
+            control.throttle = smooth_t
+            control.brake = smooth_b
             vehicle.apply_control(control)
 
             # Speed & time
@@ -499,6 +643,7 @@ def main():
             speed = math.sqrt(vel.x**2 + vel.y**2 + vel.z**2) * 3.6
             if speed > max_speed:
                 max_speed = round(speed, 1)
+            stats.update_speed(speed)
 
             # Display and detection
             if camera_surface[0] is not None and camera_array[0] is not None:
@@ -511,9 +656,15 @@ def main():
                     # YOLO 检测（使用副本）
                     signs = detect_traffic_signs(array_copy)
 
-                    # 碰撞预警 + 车辆控制
+                    # 更新统计
+                    stats.record_frame(signs, is_emergency if 'is_emergency' in dir() else False,
+                                       warning_text if 'warning_text' in dir() else None)
+
+                    # 碰撞预警 + 车辆控制（使用速度平滑控制器）
                     is_emergency, warning_text = control_vehicle_based_on_sign(
-                        vehicle, signs, elapsed, image_height=600
+                        vehicle, signs, elapsed,
+                        image_height=600,
+                        speed_controller=speed_ctrl
                     )
                     if is_emergency:
                         # 紧急情况下跳过默认控制
@@ -526,6 +677,23 @@ def main():
 
                     # 找出最近障碍物用于显示
                     nearest_obs = get_nearest_obstacle(signs, 600)
+
+                    # 记录数据到 CSV
+                    try:
+                        logger.record(
+                            elapsed=elapsed,
+                            speed=speed,
+                            throttle=speed_ctrl.current_throttle,
+                            brake=speed_ctrl.current_brake,
+                            steer=control.steer,
+                            signs=signs,
+                            warning_text=warning_text if 'warning_text' in dir() else None,
+                            is_emergency=is_emergency if 'is_emergency' in dir() else False,
+                            traffic_light_state=vehicle.get_traffic_light_state(),
+                            nearest_obs=nearest_obs,
+                        )
+                    except Exception:
+                        pass
 
                     # 双缓冲显示以减少画面撕裂
                     display.fill((0, 0, 0))  # 先清除屏幕
@@ -597,9 +765,9 @@ def main():
                         signs=signs,
                         warning_text=warning_text if 'warning_text' in dir() else None,
                         is_emergency=is_emergency if 'is_emergency' in dir() else False,
-                        throttle=control.throttle if 'control' in dir() else 0,
-                        brake=control.brake if 'control' in dir() else 0,
-                        steer=control.steer if 'control' in dir() else 0,
+                        throttle=speed_ctrl.current_throttle,
+                        brake=speed_ctrl.current_brake,
+                        steer=control.steer,
                         traffic_light_state=vehicle.get_traffic_light_state(),
                         nearest_obs=nearest_obs if 'nearest_obs' in dir() else None,
                     )
@@ -623,6 +791,18 @@ def main():
                 pass
         try:
             pygame.quit()
+        except Exception:
+            pass
+
+        # 输出数据记录报告
+        try:
+            logger.close_and_report()
+        except Exception:
+            pass
+
+        # 输出仿真统计报告
+        try:
+            stats.print_report(elapsed, npc_count + 1)  # +1 for ego vehicle
         except Exception:
             pass
 

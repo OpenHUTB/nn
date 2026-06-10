@@ -118,6 +118,9 @@ screenshots/
 !docs/carla_CAM/
 !docs/carla_CAM/images/
 !docs/carla_CAM/images/*.png
+!docs/lane_detection/
+!docs/lane_detection/images/
+!docs/lane_detection/images/*.jpg
 !docs/dqn_*.png
 !docs/rain_sensor_fusion/
 !docs/rain_sensor_fusion/image/

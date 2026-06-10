@@ -1,7 +1,6 @@
 import torch
 import carla
 import numpy as np
-from PIL import Image
 from itertools import count
 import torchvision.transforms as T
 from PIL.Image import Resampling
@@ -35,7 +34,7 @@ def process_state(state):
 
 
 target_net = DQN(HEIGHT, WIDTH, len(ACTIONS), channel=channels).to(device)
-#target_net.load_state_dict(torch.load(model_path))
+# target_net.load_state_dict(torch.load(model_path))
 target_net.eval()
 
 client = carla.Client('localhost', 2000)

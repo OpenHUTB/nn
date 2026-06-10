@@ -544,12 +544,6 @@ class GraspRobot(MujocoPhyEnv):
         obs, reward, done, info = self.step(action)
         return obs, reward, done, info
 
-    def step_test(self, action, fail_count=0):
-        obs, reward, done, info = self.step(action)
-        completed = self.grasped_num == _grasp_target_num
-        info["completion"] = "Success" if completed else "InProgress"
-        return obs, reward, done, info
-
     def step(self, action):
         """
         执行一次完整抓取尝试。

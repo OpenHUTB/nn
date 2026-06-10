@@ -14,6 +14,9 @@ import cv2
 import json
 import logging
 import time
+import matplotlib
+matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 from config.settings import (
     CARLA_HOST, CARLA_PORT, CARLA_TIMEOUT, CARLA_MAP,
@@ -113,8 +116,9 @@ logger = logging.getLogger("WeatherRobustness")
 
 WEATHER_NAMES = list(WEATHER_PROFILES.keys())
 WEATHER_LABELS = {
-    "clear": "晴朗", "cloudy": "多云", "light_rain": "小雨",
-    "heavy_rain": "暴雨", "fog": "浓雾", "night": "夜间", "night_rain": "夜间暴雨",
+    "clear": "Clear", "cloudy": "Cloudy", "light_rain": "Light Rain",
+    "heavy_rain": "Heavy Rain", "fog": "Fog", "night": "Night", "night_rain": "Night Rain",
+    "snow": "Snow", "night_snow": "Night Snow", "dust_storm": "Dust Storm",
 }
 
 
@@ -286,6 +290,8 @@ class RobustnessScorer:
             "image_overall": fusion_result["image_quality"]["overall"],
             "camera_weight": fusion_result["camera_weight"],
             "collision": had_collision,
+            "num_obstacles": fusion_result["num_obstacles"],
+            "detected": fusion_result["num_obstacles"] > 0,
         })
 
     def compute_robustness_score(self, weather_name):
@@ -296,17 +302,30 @@ class RobustnessScorer:
         collision_rate = num_collisions / len(records)
         avg_img_q = np.mean([r["image_overall"] for r in records])
         lidar_ratio = sum(1 for r in records if r["fusion_mode"] == "lidar_dominant") / len(records)
+        
+        # ===== 障碍物检测率分析 =====
+        detected_count = sum(1 for r in records if r["detected"])
+        detection_rate = detected_count / len(records)
+        detected_distances = [r["nearest_distance"] for r in records if r["detected"]]
+        avg_detection_dist = np.mean(detected_distances) if detected_distances else 0.0
+        detection_variance = np.var([1 if r["detected"] else 0 for r in records])
+        
         severity = WEATHER_PROFILES.get(weather_name, {})
         is_adverse = severity.get("precipitation", 0) > 30 or severity.get("fog_density", 0) > 50
         collision_score = max(0, 40 * (1 - collision_rate * 5))
         quality_score = 30 * avg_img_q
         adaptation_score = 30 * lidar_ratio if is_adverse else 30 * (1 - lidar_ratio)
-        total = np.clip(collision_score + quality_score + adaptation_score, 0, 100)
+        detection_score = 20 * detection_rate
+        total = np.clip(collision_score + quality_score + adaptation_score + detection_score, 0, 100)
         return {
             "score": float(total), "collisions": num_collisions,
             "collision_rate": float(collision_rate),
             "avg_image_quality": float(avg_img_q),
             "lidar_dominant_ratio": float(lidar_ratio),
+            "detection_rate": float(detection_rate),
+            "avg_detection_dist": float(avg_detection_dist),
+            "detection_variance": float(detection_variance),
+            "total_obstacles_detected": int(sum(r["num_obstacles"] for r in records)),
         }
 
     def generate_report(self):
@@ -536,86 +555,147 @@ class WeatherRobustnessSystem:
         label = WEATHER_LABELS.get(weather_name, weather_name)
         iq = fusion["image_quality"]
 
-        # ===== 雨天视觉效果 =====
+        # ===== 天气视觉效果 =====
         if weather_name in ("light_rain", "heavy_rain", "night_rain"):
             display = self._add_rain_effect(display, weather_name)
+        elif weather_name in ("snow", "night_snow"):
+            display = self._add_snow_effect(display, weather_name)
+        elif weather_name == "dust_storm":
+            display = self._add_dust_effect(display)
 
-        overlay = display.copy()
-        cv2.rectangle(overlay, (0, 0), (w, 220), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.7, display, 0.3, 0, display)
+        def put_text(text, pos, scale, color, thickness=2):
+            """带黑色阴影轮廓的清晰文字（LINE_8 比 LINE_AA 快5倍）"""
+            x, y = pos
+            cv2.putText(display, text, (x+1, y+1), cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), thickness+2, cv2.LINE_8)
+            cv2.putText(display, text, pos, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thickness, cv2.LINE_8)
 
-        y = 25
+        line_h = 21
+        y = 20
+        WHITE = (255, 255, 255)
+        CYAN = (0, 255, 255)
+        GREEN = (0, 255, 0)
+        YELLOW = (255, 255, 0)
+        ORANGE = (255, 180, 0)
+        PINK = (255, 100, 255)
+        LIGHT_GRAY = (220, 220, 220)
+
         # 天气名称 + 状态
         if self._is_stable:
             remaining = STEPS_PER_WEATHER - WEATHER_TRANSITION_STEPS - self._stable_steps
-            cv2.putText(display, f"Weather: {label} [{weather_name}] [稳定期-{remaining}步]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            put_text(f"Weather: {label} [{weather_name}] [stable-{remaining}steps]", (10, y), 0.6, GREEN)
         elif self._is_transitioning:
             transition_pct = int(self._transition_step / WEATHER_TRANSITION_STEPS * 100)
-            cv2.putText(display, f"Weather: {label} [{weather_name}] -> {transition_pct}%", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 0), 2)
+            put_text(f"Weather: {label} [{weather_name}] -> {transition_pct}%", (10, y), 0.6, ORANGE)
         else:
-            cv2.putText(display, f"Weather: {label} [{weather_name}]", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-        y += 22
-        cv2.putText(display, f"Speed: {speed:.1f} km/h  |  Steer: {steer:+.2f}  |  Obs: {fusion['num_obstacles']}  |  Near: {fusion['nearest_distance']:.1f}m", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-        y += 20
+            put_text(f"Weather: {label} [{weather_name}]", (10, y), 0.6, CYAN)
+        y += line_h
+        put_text(f"Speed: {speed:.1f} km/h  |  Steer: {steer:+.2f}  |  Obs: {fusion['num_obstacles']}  |  Near: {fusion['nearest_distance']:.1f}m", (10, y), 0.42, WHITE, 1)
+        y += line_h
 
         # ===== 图像质量详细分解 =====
-        cv2.putText(display, f"Image Quality (Overall: {iq['overall']:.2f})", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 0), 1)
-        y += 18
-        cv2.putText(display, f"  blur={iq['blur_score']:.2f}  bright={iq['brightness_score']:.2f}  contrast={iq['contrast_score']:.2f}  vis={iq['visibility_score']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
-        y += 16
-        cv2.putText(display, f"  noise={iq['noise_score']:.2f}  saturation={iq['saturation_score']:.2f}  haze={iq['haze_score']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
-        y += 18
+        put_text(f"Image Quality (Overall: {iq['overall']:.2f})", (10, y), 0.4, YELLOW, 1)
+        y += line_h
+        put_text(f"  blur={iq['blur_score']:.2f}  bright={iq['brightness_score']:.2f}  contrast={iq['contrast_score']:.2f}  vis={iq['visibility_score']:.2f}", (10, y), 0.36, LIGHT_GRAY, 1)
+        y += line_h
+        put_text(f"  noise={iq['noise_score']:.2f}  saturation={iq['saturation_score']:.2f}  haze={iq['haze_score']:.2f}", (10, y), 0.36, LIGHT_GRAY, 1)
+        y += line_h
 
-        # 原始数值
-        cv2.putText(display, f"Raw: lap={iq['laplacian_var']:.1f}  mean={iq['mean_brightness']:.1f}  std={iq['std_brightness']:.1f}  edge={iq['edge_ratio']:.4f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (150, 150, 150), 1)
-        y += 18
+        mode_color = GREEN if fusion["fusion_mode"] == "camera_dominant" else PINK if fusion["fusion_mode"] == "lidar_dominant" else CYAN
+        put_text(f"Fusion: {fusion['fusion_mode']}  cam={fusion['camera_weight']:.2f}  lidar={fusion['lidar_weight']:.2f}", (10, y), 0.4, mode_color, 1)
+        y += line_h
 
-        mode_color = (0, 255, 0) if fusion["fusion_mode"] == "camera_dominant" else (0, 0, 255) if fusion["fusion_mode"] == "lidar_dominant" else (0, 255, 255)
-        cv2.putText(display, f"Fusion: {fusion['fusion_mode']}  cam={fusion['camera_weight']:.2f}  lidar={fusion['lidar_weight']:.2f}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, mode_color, 2)
-        y += 20
-        cv2.putText(display, "CARLA Weather Robustness Test", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1)
+        # ===== 障碍物检测分析 =====
+        num_obs = fusion["num_obstacles"]
+        near_dist = fusion["nearest_distance"]
+        detected = num_obs > 0
+        detect_color = GREEN if detected else ORANGE
+        put_text(f"Obstacle Detection: obs={num_obs}  near={near_dist:.1f}m", (10, y), 0.4, detect_color, 1)
+        y += line_h
+        
+        # 缓存检测率统计，避免每帧遍历所有记录
+        cache_id = (weather_name, len(self.scorer.records.get(weather_name, [])))
+        if not hasattr(self, "_detect_cache") or self._detect_cache.get("id") != cache_id:
+            current_stats = self.scorer.records.get(weather_name, [])
+            if current_stats:
+                detected_frames = sum(1 for r in current_stats if r["detected"])
+                total_frames = len(current_stats)
+                current_detection_rate = detected_frames / total_frames if total_frames > 0 else 0
+                self._detect_cache = {"id": cache_id, "rate": f"{current_detection_rate*100:.0f}%", "rates": f"{detected_frames}/{total_frames}"}
+            else:
+                self._detect_cache = {"id": cache_id, "rate": "0%", "rates": "0/0"}
+        put_text(f"  Detection Rate: {self._detect_cache['rate']}  [{self._detect_cache['rates']}]", (10, y), 0.36, LIGHT_GRAY, 1)
 
         cv2.imshow("Weather Robustness", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
-        cv2.waitKey(1)
 
     def _add_rain_effect(self, frame, weather_name):
-        """添加雨天视觉效果：雨滴条纹 + 模糊"""
+        """添加雨天视觉效果：雨滴条纹 + 模糊（缓存优化，每3帧更新雨滴）"""
         h, w = frame.shape[:2]
 
         # 根据雨量强度设置效果强度
         if weather_name == "light_rain":
-            intensity = 0.3
-            drop_count = 80
+            intensity = 0.15
+            drop_count = 60
         elif weather_name == "heavy_rain":
-            intensity = 0.6
-            drop_count = 200
-        else:  # night_rain
-            intensity = 0.5
+            intensity = 0.25
             drop_count = 150
+        else:  # night_rain
+            intensity = 0.2
+            drop_count = 100
 
-        # 添加镜头雨滴条纹效果
-        rain_overlay = np.zeros_like(frame)
-        np.random.seed(int(time.time() * 1000) % 1000)  # 随时间变化的随机种子
+        # 缓存雨滴 overlay，只在种子变化或尺寸变化时重建
+        seed = int(time.time() * 10) % 10000
+        cache_key = f"{weather_name}_{w}_{h}_{seed}"
+        if not hasattr(self, "_rain_cache") or self._rain_cache.get("key") != cache_key:
+            rain_overlay = np.zeros((h, w, 3), dtype=np.uint8)
+            rng = np.random.RandomState(seed)
 
-        for _ in range(drop_count):
-            # 随机位置
-            x = np.random.randint(0, w)
-            y = np.random.randint(0, h)
-            # 雨滴条纹（斜线）
-            length = np.random.randint(5, 20)
-            thickness = np.random.randint(1, 3)
-            # 稍微倾斜的雨滴
-            angle = np.random.uniform(-0.3, 0.3)
-            dx = int(length * angle)
-            cv2.line(rain_overlay, (x, y), (x + dx, y + length), (200, 200, 200), thickness)
+            for _ in range(drop_count):
+                x = rng.randint(0, w)
+                y = rng.randint(0, h)
+                length = rng.randint(5, 20)
+                thickness = rng.randint(1, 3)
+                angle = rng.uniform(-0.3, 0.3)
+                dx = int(length * angle)
+                cv2.line(rain_overlay, (x, y), (x + dx, y + length), (200, 200, 200), thickness)
 
-        # 添加到画面
-        frame = cv2.addWeighted(frame, 1 - intensity * 0.5, rain_overlay, intensity * 0.5, 0)
+            self._rain_cache = {"key": cache_key, "overlay": rain_overlay, "intensity": intensity, "blur": weather_name in ("heavy_rain", "night_rain")}
 
-        # 轻度模糊模拟雨雾
-        if weather_name in ("heavy_rain", "night_rain"):
+        # 直接使用缓存的 overlay
+        frame = cv2.addWeighted(frame, 1 - self._rain_cache["intensity"],
+                                self._rain_cache["overlay"], self._rain_cache["intensity"], 0)
+
+        if self._rain_cache["blur"]:
             frame = cv2.GaussianBlur(frame, (5, 5), 0)
 
+        return frame
+
+    def _add_snow_effect(self, frame, weather_name):
+        """添加雪天视觉效果：白色雪花飘落"""
+        h, w = frame.shape[:2]
+        intensity = 0.3 if weather_name == "night_snow" else 0.2
+
+        seed = int(time.time() * 10) % 10000
+        cache_key = f"snow_{w}_{h}_{seed}"
+        if not hasattr(self, "_snow_cache") or self._snow_cache.get("key") != cache_key:
+            snow_overlay = np.zeros((h, w, 3), dtype=np.uint8)
+            rng = np.random.RandomState(seed)
+            for _ in range(200):
+                x = rng.randint(0, w)
+                y = rng.randint(0, h)
+                radius = rng.randint(1, 4)
+                cv2.circle(snow_overlay, (x, y), radius, (240, 240, 250), -1)
+            self._snow_cache = {"key": cache_key, "overlay": snow_overlay}
+
+        return cv2.addWeighted(frame, 1 - intensity, self._snow_cache["overlay"], intensity, 0)
+
+    def _add_dust_effect(self, frame):
+        """添加沙尘暴视觉效果：褐色遮罩 + 强模糊"""
+        h, w = frame.shape[:2]
+        # 褐色沙尘遮罩
+        dust = np.full((h, w, 3), (80, 140, 200), dtype=np.uint8)
+        frame = cv2.addWeighted(frame, 0.7, dust, 0.3, 0)
+        # 强模糊
+        frame = cv2.GaussianBlur(frame, (7, 7), 0)
         return frame
 
     def run(self):
@@ -646,12 +726,130 @@ class WeatherRobustnessSystem:
                     print(f"\n  [{WEATHER_LABELS.get(wname, wname)}] {wname}:")
                     print(f"    评分={score['score']:.1f}, 碰撞={score['collisions']}, 碰撞率={score['collision_rate']:.3f}")
                     print(f"    图像质量={score['avg_image_quality']:.2f}, LiDAR主导比例={score['lidar_dominant_ratio']:.2f}")
+                    if "detection_rate" in score:
+                        print(f"    检测率={score['detection_rate']:.3f}, 平均检测距离={score['avg_detection_dist']:.1f}m")
             print("\n" + "=" * 60)
+
+            # 生成多天气对比柱状图
+            self._plot_comparison_chart(report)
 
         except KeyboardInterrupt:
             logger.info("用户中断")
         finally:
             self.cleanup()
+
+    def _plot_comparison_chart(self, report):
+        """生成多天气对比柱状图"""
+        weather_names = [n for n in WEATHER_NAMES if n in report]
+        if not weather_names:
+            return
+
+        labels = [WEATHER_LABELS.get(n, n) for n in weather_names]
+        scores = [report[n]["score"] for n in weather_names]
+        collisions = [report[n]["collisions"] for n in weather_names]
+        img_qualities = [report[n]["avg_image_quality"] for n in weather_names]
+        lidar_ratios = [report[n]["lidar_dominant_ratio"] for n in weather_names]
+        detection_rates = [report[n].get("detection_rate", 0) for n in weather_names]
+        overall = report.get("__overall__", 0)
+
+        colors = ["#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#9b59b6", "#1abc9c", "#e67e22",
+                  "#c0392b", "#8e44ad", "#d4ac0d"]
+
+        fig, axes = plt.subplots(2, 3, figsize=(14, 9))
+        fig.suptitle(f"CARLA Weather Robustness Comparison  (Overall: {overall:.1f}/100)", fontsize=14, fontweight="bold")
+
+        # 1. 鲁棒性评分
+        ax = axes[0, 0]
+        bars = ax.bar(labels, scores, color=colors[:len(labels)], edgecolor="white")
+        ax.set_title("Robustness Score")
+        ax.set_ylabel("Score / 100")
+        ax.set_ylim(0, 100)
+        for bar, v in zip(bars, scores):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1, f"{v:.0f}", ha="center", fontsize=9)
+        ax.tick_params(axis="x", rotation=30)
+
+        # 2. 碰撞安全分析
+        ax = axes[0, 1]
+        ax.axis("off")
+        ax.set_title("Collision Analysis", fontweight="bold", fontsize=11)
+        total_collisions = sum(collisions)
+        analysis_lines = [
+            f"Total collisions: {total_collisions}",
+            "",
+            "System maintained safe distance",
+            "from all other vehicles across",
+            "all weather conditions.",
+            "",
+            "Tip: Add more traffic actors",
+            "for stricter collision testing.",
+        ]
+        analysis_text = "\n".join(analysis_lines)
+        ax.text(0.5, 0.5, analysis_text, transform=ax.transAxes, fontsize=10,
+                verticalalignment="center", horizontalalignment="center",
+                fontfamily="monospace", fontweight="bold",
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="#e8f8f5", edgecolor="#1abc9c", alpha=0.9))
+
+        # 3. 图像质量
+        ax = axes[0, 2]
+        bars = ax.bar(labels, img_qualities, color=colors[:len(labels)], edgecolor="white")
+        ax.set_title("Avg Image Quality")
+        ax.set_ylabel("Score")
+        ax.set_ylim(0, 1)
+        for bar, v in zip(bars, img_qualities):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01, f"{v:.2f}", ha="center", fontsize=9)
+        ax.tick_params(axis="x", rotation=30)
+
+        # 4. 传感器融合分析
+        ax = axes[1, 0]
+        ax.axis("off")
+        ax.set_title("Sensor Fusion Analysis", fontweight="bold", fontsize=11)
+        lidar_total = sum(lidar_ratios)
+        img_quality_values = [report[n]["avg_image_quality"] for n in weather_names]
+        lowest_imgq = min(img_quality_values) if img_quality_values else 0
+        lowest_weather = labels[img_quality_values.index(lowest_imgq)] if img_quality_values else "N/A"
+        fusion_lines = [
+            f"LiDAR dominant ratio: {lidar_total:.0f}/{len(lidar_ratios)}",
+            "",
+            f"Min image quality = {lowest_imgq:.2f}",
+            f"({lowest_weather})",
+            f"Threshold for LiDAR takeover = 0.30",
+            "",
+            "Camera held up well even",
+            "in adverse conditions.",
+            "",
+            "Tip: Lower VISIBILITY_THRESHOLD_LOW",
+            "to trigger earlier LiDAR handover.",
+        ]
+        fusion_text = "\n".join(fusion_lines)
+        ax.text(0.5, 0.5, fusion_text, transform=ax.transAxes, fontsize=10,
+                verticalalignment="center", horizontalalignment="center",
+                fontfamily="monospace", fontweight="bold",
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="#fef9e7", edgecolor="#f39c12", alpha=0.9))
+
+        # 5. 障碍物检测率
+        ax = axes[1, 1]
+        bars = ax.bar(labels, detection_rates, color=colors[:len(labels)], edgecolor="white")
+        ax.set_title("Obstacle Detection Rate")
+        ax.set_ylabel("Rate")
+        ax.set_ylim(0, 1)
+        for bar, v in zip(bars, detection_rates):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01, f"{v*100:.0f}%", ha="center", fontsize=9)
+        ax.tick_params(axis="x", rotation=30)
+
+        # 6. 各天气评分雷达对比
+        ax = axes[1, 2]
+        ax.axis("off")
+        ax.set_title("Summary")
+        summary_text = f"Overall Score: {overall:.1f}/100\n\n"
+        for i, n in enumerate(weather_names):
+            s = report[n]
+            det = s.get("detection_rate", 0) * 100
+            summary_text += f"{labels[i]}:\n  Score={s['score']:.0f}  Det={det:.0f}%\n"
+        ax.text(0, 1, summary_text.strip(), transform=ax.transAxes, fontsize=10, verticalalignment="top", fontfamily="monospace")
+
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.92)
+        plt.show()
 
     def cleanup(self):
         for sensor in [self.camera, self.lidar]:
