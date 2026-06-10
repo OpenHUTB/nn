@@ -97,7 +97,8 @@ class EvaluateThread(QtCore.QThread):
 
         obs = self.env.reset()
         episode_num = 0
-        reward_sum = np.array([0.0])
+        current_episode_reward = 0.0
+        episode_rewards = []
         episode_successes = []
         episode_crashes = []
         traj_list_all = []
@@ -123,7 +124,7 @@ class EvaluateThread(QtCore.QThread):
             obs_list.append(obs)
 
             obs = new_obs
-            reward_sum[-1] += reward
+            current_episode_reward += reward
 
             if done:
                 episode_num += 1
@@ -132,12 +133,13 @@ class EvaluateThread(QtCore.QThread):
                 logger.info(
                     "Episode %d | reward=%.4f | success=%s",
                     episode_num,
-                    reward_sum[-1],
+                    current_episode_reward,
                     maybe_is_success,
                 )
+                episode_rewards.append(current_episode_reward)
                 episode_successes.append(float(maybe_is_success))
                 episode_crashes.append(float(maybe_is_crash))
-                reward_sum = np.append(reward_sum, 0.0)
+                current_episode_reward = 0.0
                 obs = self.env.reset()
                 if info.get("is_success"):
                     traj_list.append(1)
@@ -169,7 +171,7 @@ class EvaluateThread(QtCore.QThread):
         np.save(os.path.join(eval_folder, "state_eval"), np.array(state_list_all, dtype=object))
         np.save(os.path.join(eval_folder, "obs_eval"), np.array(obs_list_all, dtype=object))
 
-        avg_reward = reward_sum[: self.eval_ep_num].mean()
+        avg_reward = np.mean(episode_rewards)
         success_rate = np.mean(episode_successes)
         crash_rate = np.mean(episode_crashes)
         avg_success_steps = np.mean(step_num_list) if step_num_list else float("nan")

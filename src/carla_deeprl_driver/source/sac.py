@@ -1,10 +1,11 @@
+import carla
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import source.utility as util
 from torch.distributions import Normal
-import carla
 from typing import Tuple
+
+import source.utility as util
 
 config = util.get_env_settings("./config.yaml")
 device = util.device

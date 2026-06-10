@@ -1,0 +1,9 @@
+<launch>
+    <arg
+    name="model"
+    default="$(find handy_description)/urdf/handy_description.urdf.xacro"
+  />
+    <include file="$(find finalarm_description)/launch/display.launch">
+        <arg name="model" value="$(arg model)" />
+    </include>
+</launch>

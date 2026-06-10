@@ -6,84 +6,143 @@ import carla
 import logging
 
 class EgoVehicleController:
-"""
-    主车辆控制器
-    
-    功能：
-        - 初始化车辆控制参数
-        - 更新车辆速度控制（目标速度 30 km/h）
-        - 简单的车道保持（基于航点跟随）
-    
-    属性：
-        controller (carla.VehicleControl): CARLA 车辆控制对象
-    """
     def __init__(self) -> None:
         self.controller = None
-  
-    def setup_ego_vehicle(self, ego_vehicle):  
-    """
-        配置主车辆初始控制参数
-        
-        Args:
-            ego_vehicle (carla.Vehicle): 主车辆对象
-            
-        Returns:
-            carla.VehicleControl: 配置好的控制对象
-        """
-        """Configure ego vehicle for automatic movement"""
-        # Set up basic control parameters
+        self.cruise_speed = 30.0  # 巡航速度 km/h
+        self.cruise_enabled = False
+    
+    def toggle_cruise(self):
+        """切换定速巡航"""
+        self.cruise_enabled = not self.cruise_enabled
+        status = "开启" if self.cruise_enabled else "关闭"
+        print(f"定速巡航 {status}")
+    
+    def setup_ego_vehicle(self, ego_vehicle):
+        """配置主车辆初始控制参数"""
         self.controller = carla.VehicleControl()
-        self.controller.throttle = 0.5  # 50% throttle
-        self.controller.steer = 0.0     # No steering initially
+        self.controller.throttle = 0.5
+        self.controller.steer = 0.0
         ego_vehicle.apply_control(self.controller)
         return self.controller
 
-    def update_ego_vehicle(self, ego_vehicle, control):
+    def update_ego_vehicle(self, ego_vehicle, control, obstacle_distance=None):
         """
         更新车辆运动状态（带碰撞避免）
         
         Args:
-            ego_vehicle (carla.Vehicle): 主车辆对象
-            control (carla.VehicleControl): 控制对象（会被修改）
-        
-        控制逻辑：
-            1. 速度控制：低于 30 km/h 时加速，高于时减速
-            2. 车道跟随：计算与下一航点的角度差，调整转向
+          ego_vehicle: CARLA主车辆对象
+          control: carla.VehicleControl 控制对象
+          obstacle_distance: 前方障碍物距离（米），None表示无检测
+            - 使用示例：
+              # 从传感器获取距离
+              distance = lidar_sensor.get_distance()
+              controller.update_ego_vehicle(vehicle, control, distance)
+            - 阈值说明：
+              < 3.0m: 紧急刹车
+              3.0-6.0m: 减速慢行  
+              6.0-10.0m: 轻微减速
+              > 10.0m: 正常巡航或手动控制
+    
+        Returns:
+          None (直接应用控制到车辆)
         """
-        """Update ego vehicle movement with collision avoidance"""
-        # Get current transform and velocity
+        # 获取当前速度和位置
         transform = ego_vehicle.get_transform()
         velocity = ego_vehicle.get_velocity()
-        speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6  # Convert to km/h
+        speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6
 
-        # Basic speed control
-        if speed < 30.0:  # Target speed of 30 km/h
-            control.throttle = 0.5
-            control.brake = 0.0
+        # ========== 自动避障逻辑 ==========
+        if obstacle_distance is not None:
+            if obstacle_distance < 3.0:
+                # 紧急刹车
+                control.throttle = 0.0
+                control.brake = 1.0
+                print(f"⚠️ 紧急刹车！距离障碍物 {obstacle_distance:.1f} 米")
+                ego_vehicle.apply_control(control)
+                return
+            elif obstacle_distance < 6.0:
+                # 减速慢行
+                control.throttle = 0.2
+                control.brake = 0.3
+                print(f"⚠️ 减速慢行，距离障碍物 {obstacle_distance:.1f} 米")
+                ego_vehicle.apply_control(control)
+                return
+            elif obstacle_distance < 10.0:
+                # 轻微减速
+                control.throttle = 0.35
+                control.brake = 0.1
+                print(f"⚠️ 注意前方，距离障碍物 {obstacle_distance:.1f} 米")
+                ego_vehicle.apply_control(control)
+                return
+
+        # ========== 定速巡航模式 ==========
+        if self.cruise_enabled:
+            speed_error = self.cruise_speed - speed
+            if speed_error > 0:
+                control.throttle = min(0.5, 0.1 + speed_error / 100)
+                control.brake = 0.0
+            else:
+                control.throttle = 0.0
+                control.brake = min(0.5, abs(speed_error) / 100)
         else:
-            control.throttle = 0.0
-            control.brake = 0.1
+            # ========== 原有速度控制 ==========
+            if speed < 30.0:
+                control.throttle = 0.5
+                control.brake = 0.0
+            else:
+                control.throttle = 0.0
+                control.brake = 0.1
 
-        # Simple lane following
+        # ========== 车道保持逻辑 ==========
         waypoint = ego_vehicle.get_world().get_map().get_waypoint(transform.location)
         if waypoint:
-            # Get the next waypoint
             next_waypoint = waypoint.next(5.0)[0]
             if next_waypoint:
-                # Calculate angle to next waypoint
                 next_location = next_waypoint.transform.location
                 angle = math.atan2(next_location.y - transform.location.y,
                                 next_location.x - transform.location.x)
                 angle = math.degrees(angle) - transform.rotation.yaw
-                angle = (angle + 180) % 360 - 180  # Normalize angle to [-180, 180]
-
-                # Apply steering based on angle
+                angle = (angle + 180) % 360 - 180
                 control.steer = max(-0.5, min(0.5, angle / 90.0))
 
-        # Apply the control
         ego_vehicle.apply_control(control)
 
+
 class KeyboardController:
+    def get_obstacle_distance_from_sensors(ego_vehicle):
+      """
+        从车辆传感器获取最近障碍物距离（示例实现）
+    
+        使用方式：
+          # 在主循环中调用
+          distance = get_obstacle_distance_from_sensors(ego_vehicle)
+          controller.update_ego_vehicle(ego_vehicle, control, distance)
+    
+        Args:
+          ego_vehicle: CARLA车辆对象
+         
+        Returns:
+          float: 最近障碍物的距离（米），如果没有检测到障碍物则返回None
+      """
+      try:
+        # 方法1：使用碰撞传感器（需要已添加）
+        # collision_sensor = ego_vehicle.get_sensor_by_type(carla.SensorType.COLLISION)
+        
+        # 方法2：使用雷达/LiDAR（示例）
+        # for sensor in ego_vehicle.get_sensors():
+        #     if sensor.type_id.startswith('sensor.lidar'):
+        #         points = sensor.get_point_cloud()
+        #         if points:
+        #             min_distance = min(p.distance for p in points)
+        #             return min_distance
+        
+        # 方法3：简易模拟（用于测试，实际使用时删除）
+        import random
+        return random.choice([None, 2.5, 5.0, 8.0, 15.0])
+        
+      except Exception as e:
+        print(f"传感器读取失败: {e}")
+        return None
     def __init__(self):
         self.controller = carla.VehicleControl()
         self.is_reverse = False
@@ -127,7 +186,6 @@ class KeyboardController:
                 self.update(keys)
                 self.ego_vehicle.apply_control(self.controller)
 
-                # Draw key status visually on pygame display
                 self.draw_keyboard_state(self.screen, keys)
                 pygame.display.flip()
 
@@ -149,17 +207,14 @@ class KeyboardController:
             print('Keyboard controller mode exited.')
             
     def draw_keyboard_state(self, screen, keys):
-        # Colors
         WHITE = (255, 255, 255)
         GREEN = (0, 255, 0)
         GRAY = (180, 180, 180)
         BLACK = (0, 0, 0)
 
         font = pygame.font.SysFont(None, 30)
-
         screen.fill(BLACK)
 
-        # Key positions
         key_map = {
             "UP": (160, 50),
             "LEFT": (100, 100),

@@ -1,0 +1,40 @@
+# Active Lane Keeping Assistant Configuration
+
+# CARLA Connection Settings
+connection:
+  server_ip: "127.0.0.1"
+  port: 2000
+  timeout: 10.0  # 增加超时时间，避免地图加载超时
+
+# Simulation Settings
+simulation:
+  map: "Town05"  # 地图名称
+  time_difference: 0.01  # 每步时间间隔
+
+# Camera Settings
+camera:
+  image_height: 480
+  image_width: 640
+  fov: 110
+  x_offset: 2.5  # 摄像头相对车辆的位置
+  z_offset: 0.7
+
+# Controller Settings (PID Parameters)
+controller:
+  default_controller: "pid"  # simple, p, pd, pid
+  tau_p: 0.65              # 比例参数
+  tau_i: 0.00000002        # 积分参数
+  tau_d: 0.034             # 微分参数
+  throttle: 0.3            # 油门值
+  surface_lower_threshold: 20000000.0  # 检测面积下限
+  surface_upper_threshold: 30000000.0  # 检测面积上限
+
+# Run Settings
+run:
+  default_steps: 1000      # 默认运行步数
+  save_video: true         # 是否保存视频
+
+# Debug Settings
+debug:
+  show_error_plot: true    # 显示误差曲线图
+  save_error_image: true   # 保存误差图片
