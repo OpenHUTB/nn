@@ -38,7 +38,7 @@ except (ImportError, AttributeError) as e:
 
 from drone_controller import DroneController
 from simulation_3d import Drone3DViewer
-from flight_statistics import FlightStatistics
+from multi_drone_controller import MultiDroneController, DroneFormation
 
 # 注意：physics_engine.py 是可选的，如果没有可以先注释掉
 try:
@@ -130,13 +130,35 @@ class IntegratedDroneSimulation:
             self.gesture_detector = GestureDetector()
 
         print("正在初始化无人机控制器...")
-        self.drone_controller = DroneController(simulation_mode=True)
+        # 检查是否启用多无人机模式
+        self.multi_drone_enabled = self.config.get('multi_drone_enabled', False)
+        self.num_drones = self.config.get('num_drones', 2)
+
+        if self.multi_drone_enabled:
+            print(f"[OK] 启用多无人机模式: {self.num_drones} 架无人机")
+            self.multi_drone_controller = MultiDroneController(
+                num_drones=self.num_drones,
+                config=None,
+                simulation_mode=True
+            )
+            self.formation = DroneFormation(self.multi_drone_controller)
+            # 默认使用 dual 控制模式
+            self.multi_drone_controller.set_control_mode("dual")
+            self.drone_controller = self.multi_drone_controller.get_drone(0)  # 保持兼容性
+        else:
+            self.multi_drone_controller = None
+            self.formation = None
+            self.drone_controller = DroneController(simulation_mode=True)
 
         print("正在初始化3D仿真显示...")
         self.viewer = Drone3DViewer(
             width=self.config.get('window_width', 1024),
             height=self.config.get('window_height', 768)
         )
+
+        # 设置多无人机渲染模式
+        if self.multi_drone_enabled:
+            self.viewer.set_multi_drone_mode(True)
 
         # 初始化物理引擎（可选）
         if HAS_PHYSICS_ENGINE:
@@ -350,17 +372,12 @@ class IntegratedDroneSimulation:
                 self._show_help()
             elif key == ord('f'):  # 切换全屏
                 self._toggle_fullscreen()
-            elif key == ord('i'):  # 切换镜像模式
-                self.mirror_mode = not self.mirror_mode
-                mode_text = "开启" if self.mirror_mode else "关闭"
-                print(f"[INFO] 摄像头镜像模式: {mode_text}")
-            elif key == ord('w'):  # 添加航点标记
-                self._add_waypoint()
-            elif key == ord('x'):  # 清除航点
-                self._clear_waypoints()
-            elif key >= ord('1') and key <= ord('7'):  # 数字键快速添加航点
-                label_index = key - ord('1')
-                self.drone_controller.add_waypoint_by_index(label_index)
+            elif key == ord('['):  # 降低灵敏度
+                self._adjust_sensitivity(-1)
+            elif key == ord(']'):  # 提高灵敏度
+                self._adjust_sensitivity(1)
+            elif key == ord('='):  # 重置灵敏度为默认值
+                self._reset_sensitivity()
 
         print("手势识别线程结束")
 
@@ -387,15 +404,6 @@ class IntegratedDroneSimulation:
         """重置灵敏度为默认值（中）"""
         self.gesture_detector.set_sensitivity(2)
         print("[灵敏度] 已重置为默认灵敏度: MEDIUM")
-
-    def _add_waypoint(self):
-        """添加航点标记"""
-        waypoint = self.drone_controller.add_waypoint(f"航点{len(self.drone_controller.waypoints)}")
-        print(f"[航点] 位置: ({waypoint.position[0]:.1f}, {waypoint.position[1]:.1f}, {waypoint.position[2]:.1f})")
-
-    def _clear_waypoints(self):
-        """清除所有航点"""
-        self.drone_controller.clear_waypoints()
 
     def _enhance_interface(self, frame, gesture, confidence):
         """增强界面显示（支持双手控制模式）"""
@@ -593,11 +601,30 @@ class IntegratedDroneSimulation:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 255, 150), 1)
         y_offset += 30
         
-        # 显示统计面板或控制提示（V键切换）
-        if self.show_stats_panel:
-            self._draw_stats_panel(enhanced_frame, width, y_offset, height)
-        else:
-            y_offset = self._draw_controls_panel(enhanced_frame, width, y_offset)
+        # 显示控制提示
+        cv2.putText(enhanced_frame, "CONTROLS", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        y_offset += 25
+        
+        controls = [
+            "Q/ESC: Exit",
+            "C: Switch Camera",
+            "I: Mirror On/Off",
+            "D: Debug Info",
+            "H: Help",
+            "F: Fullscreen",
+            "M: Toggle Mode",
+            "[ : Lower Sensitivity",
+            "] : Raise Sensitivity",
+            "= : Reset Sensitivity"
+        ]
+        
+        for control in controls:
+            cv2.putText(enhanced_frame, control, 
+                        (width + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+            y_offset += 15
         
         # 显示统计面板切换提示
         hint_text = "V: Stats Panel" if not self.show_stats_panel else "V: Controls Panel"
@@ -1478,11 +1505,6 @@ class IntegratedDroneSimulation:
         print("  3. 左手在屏幕左侧控制方向，右手在右侧控制高度")
         print("  4. 按 'm' 键可切换回单手控制模式")
         print("  5. 按 '[' 或 ']' 键调节手势识别灵敏度")
-        print("  6. 按 'w' 键在当前位置添加航点标记")
-        print("  7. 按 '1-7' 数字键快速添加带标签的航点")
-        print("  8. 航点会与轨迹一起保存，方便航线回放")
-        print("  9. 按 'v' 键切换飞行统计面板（实时数据）")
-        print("  10. 退出时自动打印完整飞行统计报告")
         print("=" * 60)
         print("系统启动中...")
 

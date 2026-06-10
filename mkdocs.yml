@@ -50,7 +50,7 @@ nav:
 - CarRacing DQN/DoubleDQN：训练改进与可视化对比: 'car_racing_dqn_improvements.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 - 自动驾驶车辆语义分割: 'auto_drive_seg/README.md'
-
+- 双足人形机器人SAC步态仿真: 'mujoco_running\running.md'
 
 # - mdx_math 用于行内公式显示
 markdown_extensions:
