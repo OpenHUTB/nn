@@ -206,6 +206,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/mujoco_hci_sim/</loc>
+         <lastmod>2026-06-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/mujoco_man/mujoco_manrun/</loc>
          <lastmod>2026-06-10</lastmod>
          <changefreq>daily</changefreq>
