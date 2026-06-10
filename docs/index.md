@@ -80,6 +80,8 @@ title: 主页
 
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
 
+[__交通检测__](./carla_traffic_light/carla_traffic_light.md) - carla_traffic_light 模块背景、改进内容、运行方式与效果总结。
+
 ## 规划 <span id="planning"></span>
 
 [__导航__](#navigation)
