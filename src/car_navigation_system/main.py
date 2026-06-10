@@ -1,4 +1,4 @@
-﻿# --------------------------
+# --------------------------
 # 简化修复版：确保车辆正确生成
 # --------------------------
 
@@ -129,6 +129,11 @@ class SimpleDrivingSystem:
         ]  # 车辆颜色列表
         self.current_color_index = 0  # 当前颜色索引
         self.screenshot_dir = 'screenshots'  # 截图保存目录
+        self.show_trajectory = False  # 轨迹显示标志
+        self.trajectory_points = deque(maxlen=500)  # 轨迹点集合
+        self.map_img = None  # 存储地图图像
+        self.map_width = 800  # 地图图像宽度
+        self.map_height = 800  # 地图图像高度
         
         # 车辆品牌列表（经过验证可用的蓝图）
         self.vehicle_models = [
@@ -145,6 +150,240 @@ class SimpleDrivingSystem:
         ]
         self.current_vehicle_index = 0  # 当前车辆品牌索引
         self.spawn_point = None  # 存储车辆出生点
+        self.show_hud = False  # HUD显示标志
+        self.show_ar_navigation = False  # AR导航显示标志
+
+    def draw_hud(self, display_img, speed, throttle, steer, frame_count):
+        """绘制HUD仪表盘
+        在画面右上角绘制仪表盘，包含速度表、油门、方向盘等信息
+        """
+        try:
+            # 创建HUD背景（半透明黑色）
+            hud_height = 300
+            hud_width = 280
+            hud_bg = np.zeros((hud_height, hud_width, 4), dtype=np.uint8)
+            
+            # 绘制HUD背景
+            cv2.rectangle(hud_bg, (0, 0), (hud_width, hud_height), (40, 40, 40, 200), -1)
+            cv2.rectangle(hud_bg, (0, 0), (hud_width, hud_height), (100, 100, 100), 2)
+            
+            # 绘制速度表（圆形仪表盘）
+            center_x, center_y = hud_width // 2, 100
+            radius = 70
+            
+            # 外圈
+            cv2.circle(hud_bg, (center_x, center_y), radius, (80, 80, 80), 2)
+            
+            # 绘制速度刻度（0-200 km/h）
+            for i in range(0, 201, 20):
+                angle = np.radians(135 - (i / 200) * 270)  # 从135度到405度（270度范围）
+                x1 = int(center_x + (radius - 10) * np.cos(angle))
+                y1 = int(center_y - (radius - 10) * np.sin(angle))
+                x2 = int(center_x + radius * np.cos(angle))
+                y2 = int(center_y - radius * np.sin(angle))
+                
+                # 重要刻度（0, 40, 80, 120, 160, 200）
+                if i % 40 == 0:
+                    cv2.line(hud_bg, (x1, y1), (x2, y2), (255, 255, 255), 2)
+                    # 添加数字
+                    text_x = int(center_x + (radius - 25) * np.cos(angle))
+                    text_y = int(center_y - (radius - 25) * np.sin(angle))
+                    cv2.putText(hud_bg, str(i), (text_x - 10, text_y + 5), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                else:
+                    cv2.line(hud_bg, (x1, y1), (x2, y2), (80, 80, 80), 1)
+            
+            # 绘制速度指针
+            speed_angle = np.radians(135 - (min(speed, 200) / 200) * 270)
+            needle_x = int(center_x + (radius - 20) * np.cos(speed_angle))
+            needle_y = int(center_y - (radius - 20) * np.sin(speed_angle))
+            cv2.line(hud_bg, (center_x, center_y), (needle_x, needle_y), (0, 255, 0), 3)
+            cv2.circle(hud_bg, (center_x, center_y), 8, (255, 255, 255), -1)
+            
+            # 显示速度数字（大字体）
+            cv2.putText(hud_bg, f"{int(speed)}", (center_x - 35, center_y + 55), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
+            cv2.putText(hud_bg, "km/h", (center_x - 15, center_y + 75), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            
+            # 绘制油门进度条
+            throttle_bar_width = 100
+            throttle_bar_height = 15
+            throttle_x = 20
+            throttle_y = hud_height - 80
+            
+            # 标签
+            cv2.putText(hud_bg, "THROTTLE", (throttle_x, throttle_y - 5), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            
+            # 背景条
+            cv2.rectangle(hud_bg, (throttle_x, throttle_y), 
+                         (throttle_x + throttle_bar_width, throttle_y + throttle_bar_height), 
+                         (80, 80, 80), -1)
+            
+            # 油门条（绿色渐变表示力度）
+            throttle_width = int(throttle_bar_width * min(throttle, 1.0))
+            if throttle_width > 0:
+                cv2.rectangle(hud_bg, (throttle_x, throttle_y), 
+                             (throttle_x + throttle_width, throttle_y + throttle_bar_height), 
+                             (0, 200, 0), -1)
+            
+            # 绘制刹车进度条
+            brake_x = hud_width - throttle_bar_width - 20
+            
+            # 标签
+            cv2.putText(hud_bg, "BRAKE", (brake_x, throttle_y - 5), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            
+            # 背景条
+            cv2.rectangle(hud_bg, (brake_x, throttle_y), 
+                         (brake_x + throttle_bar_width, throttle_y + throttle_bar_height), 
+                         (80, 80, 80), -1)
+            
+            # 方向盘指示器
+            steer_y = hud_height - 40
+            cv2.putText(hud_bg, f"STEER: {steer:.2f}", (20, steer_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            
+            # 左右转向指示
+            if abs(steer) > 0.1:
+                direction = "LEFT" if steer < 0 else "RIGHT"
+                color = (0, 255, 255) if abs(steer) > 0.5 else (255, 255, 0)
+                cv2.putText(hud_bg, direction, (hud_width - 80, steer_y), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            
+            # 帧率信息
+            cv2.putText(hud_bg, f"FPS: {frame_count % 60 + 1}", (20, steer_y + 25), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+            
+            # 将HUD叠加到显示图像上（右上角）
+            # 获取图像尺寸
+            img_height, img_width = display_img.shape[:2]
+            
+            # 创建ROI（右上角区域）
+            roi = display_img[0:hud_height, img_width - hud_width:img_width]
+            
+            # 混合HUD和原图
+            alpha = 0.9  # HUD透明度
+            cv2.addWeighted(hud_bg[:, :, :3], alpha, roi, 1 - alpha, 0, roi)
+            
+            return display_img
+            
+        except Exception as e:
+            print(f"绘制HUD时出错: {e}")
+            return display_img
+
+    def draw_ar_navigation(self, display_img):
+        """绘制AR导航箭头
+        在画面上叠加导航箭头，指示前进方向
+        """
+        try:
+            if not self.show_ar_navigation:
+                return display_img
+
+            if not self.vehicle:
+                return display_img
+
+            vehicle_transform = self.vehicle.get_transform()
+            vehicle_location = vehicle_transform.location
+            vehicle_yaw = vehicle_transform.rotation.yaw
+
+            map = self.world.get_map()
+            current_waypoint = map.get_waypoint(vehicle_location, project_to_road=True)
+
+            if not current_waypoint:
+                return display_img
+
+            next_waypoints = current_waypoint.next(10.0)
+            if not next_waypoints:
+                return display_img
+
+            next_waypoint = next_waypoints[0]
+            next_location = next_waypoint.transform.location
+
+            dx = next_location.x - vehicle_location.x
+            dy = next_location.y - vehicle_location.y
+            target_yaw = math.degrees(math.atan2(dy, dx))
+
+            relative_yaw = (target_yaw - vehicle_yaw + 360) % 360
+            if relative_yaw > 180:
+                relative_yaw -= 360
+
+            img_height, img_width = display_img.shape[:2]
+            center_x = img_width // 2
+            center_y = img_height - 150
+
+            if abs(relative_yaw) < 15:
+                arrow_color = (0, 255, 0)
+            elif abs(relative_yaw) < 45:
+                arrow_color = (0, 255, 255)
+            else:
+                arrow_color = (0, 165, 255)
+
+            arrow_length = 80
+            arrow_width = 30
+
+            offset_x = int(relative_yaw * 3)
+            arrow_center_x = center_x + offset_x
+            arrow_center_y = center_y
+
+            arrow_tip = (arrow_center_x, arrow_center_y - arrow_length // 2)
+            arrow_left = (arrow_center_x - arrow_width // 2, arrow_center_y + arrow_length // 2)
+            arrow_right = (arrow_center_x + arrow_width // 2, arrow_center_y + arrow_length // 2)
+
+            pts = np.array([[arrow_tip, arrow_left, arrow_right]], dtype=np.int32)
+
+            overlay = display_img.copy()
+            cv2.fillPoly(overlay, pts, arrow_color)
+            cv2.addWeighted(overlay, 0.6, display_img, 0.4, 0, display_img)
+
+            cv2.polylines(display_img, pts, True, (255, 255, 255), 2)
+
+            direction_text = ""
+            if abs(relative_yaw) < 15:
+                direction_text = "STRAIGHT"
+            elif relative_yaw < -15:
+                direction_text = f"LEFT {abs(int(relative_yaw))}°"
+            else:
+                direction_text = f"RIGHT {int(relative_yaw)}°"
+
+            text_size = cv2.getTextSize(direction_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            text_x = arrow_center_x - text_size[0] // 2
+            text_y = arrow_center_y + arrow_length // 2 + 30
+
+            cv2.rectangle(display_img,
+                         (text_x - 10, text_y - text_size[1] - 10),
+                         (text_x + text_size[0] + 10, text_y + 10),
+                         (0, 0, 0), -1)
+            cv2.rectangle(display_img,
+                         (text_x - 10, text_y - text_size[1] - 10),
+                         (text_x + text_size[0] + 10, text_y + 10),
+                         (100, 100, 100), 2)
+
+            cv2.putText(display_img, direction_text,
+                       (text_x, text_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            distance = math.sqrt(dx**2 + dy**2)
+            distance_text = f"{distance:.1f}m"
+
+            dist_size = cv2.getTextSize(distance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+            dist_x = arrow_center_x - dist_size[0] // 2
+            dist_y = arrow_tip[1] - 20
+
+            cv2.rectangle(display_img,
+                         (dist_x - 5, dist_y - dist_size[1] - 5),
+                         (dist_x + dist_size[0] + 5, dist_y + 5),
+                         (0, 0, 0), -1)
+            cv2.putText(display_img, distance_text,
+                       (dist_x, dist_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+            return display_img
+
+        except Exception as e:
+            print(f"绘制AR导航时出错: {e}")
+            return display_img
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -586,6 +825,96 @@ class SimpleDrivingSystem:
             if not self.vehicle:
                 self.spawn_vehicle()
 
+    def generate_topology_map(self):
+        """生成道路拓扑地图图像"""
+        try:
+            # 创建黑色背景
+            self.map_img = np.zeros((self.map_width, self.map_height, 3), dtype=np.uint8)
+
+            # 获取地图拓扑
+            map = self.world.get_map()
+            topology = map.get_topology()
+
+            # 计算道路节点的范围
+            all_x = []
+            all_y = []
+            for waypoint in map.generate_waypoints(2.0):
+                all_x.append(waypoint.transform.location.x)
+                all_y.append(waypoint.transform.location.y)
+
+            if not all_x or not all_y:
+                print("无法获取道路拓扑信息")
+                return
+
+            min_x, max_x = min(all_x), max(all_x)
+            min_y, max_y = min(all_y), max(all_y)
+
+            # 坐标缩放比例
+            scale_x = (self.map_width - 100) / (max_x - min_x) if max_x != min_x else 1
+            scale_y = (self.map_height - 100) / (max_y - min_y) if max_y != min_y else 1
+            self.map_scale = min(scale_x, scale_y) * 0.8
+            self.map_offset_x = min_x
+            self.map_offset_y = min_y
+
+            # 绘制道路
+            for waypoint in map.generate_waypoints(2.0):
+                wp_x = int((waypoint.transform.location.x - self.map_offset_x) * self.map_scale + 50)
+                wp_y = int((waypoint.transform.location.y - self.map_offset_y) * self.map_scale + 50)
+
+                # 绘制道路点（灰色）
+                cv2.circle(self.map_img, (wp_x, wp_y), 1, (80, 80, 80), -1)
+
+            print("道路拓扑地图生成成功")
+        except Exception as e:
+            print(f"生成拓扑地图时出错: {e}")
+
+    def world_to_map(self, location):
+        """将世界坐标转换为地图图像坐标"""
+        try:
+            x = int((location.x - self.map_offset_x) * self.map_scale + 50)
+            y = int((location.y - self.map_offset_y) * self.map_scale + 50)
+            return (x, y)
+        except:
+            return (400, 400)
+
+    def toggle_night_mode(self):
+        """切换夜晚模式并自动打开/关闭近光灯"""
+        try:
+            # 检查是否已有夜晚模式标志
+            if not hasattr(self, 'is_night_mode'):
+                self.is_night_mode = False
+            
+            self.is_night_mode = not self.is_night_mode
+            
+            if self.is_night_mode:
+                # 切换到夜晚模式
+                night_weather = carla.WeatherParameters(
+                    cloudiness=80.0,
+                    precipitation=0.0,
+                    sun_altitude_angle=-30.0,  # 负角度表示夜晚
+                    fog_density=30.0,
+                    fog_distance=50.0
+                )
+                self.world.set_weather(night_weather)
+                
+                # 打开近光灯
+                if self.vehicle:
+                    self.vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.LowBeam))
+                
+                print("已切换到夜晚模式，近光灯已打开")
+            else:
+                # 切换回白天模式（使用当前天气）
+                self.set_weather(self.current_weather)
+                
+                # 关闭近光灯
+                if self.vehicle:
+                    self.vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.NONE))
+                
+                print("已切换到白天模式，近光灯已关闭")
+                
+        except Exception as e:
+            print(f"切换夜晚模式时出错: {e}")
+
     def take_screenshot(self, image):
         """保存当前画面截图"""
         try:
@@ -681,9 +1010,18 @@ class SimpleDrivingSystem:
         print("  m - 切换地图（Town01/Town02/Town03等）")
         print("  w - 切换天气（晴天/雨天/多云/湿滑）")
         print("  c - 切换车辆颜色")
-        print("  b - 切换车辆品牌（Tesla/Ford/Mustang等）")
+        print("  u - 切换车辆款式（Tesla/Chevrolet/Ford等）")
+        print("  l - 切换夜晚模式（自动打开/关闭近光灯）")
+        print("  d - 切换导航轨迹显示")
+        print("  y - 切换HUD仪表盘显示")
+        print("  i - 切换AR导航显示（画面叠加导航箭头）")
         print("  p - 保存当前画面截图")
         print("\n开始自动驾驶...\n")
+
+        # 创建显示窗口
+        cv2.namedWindow('Autonomous Driving - Simple Version', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('Autonomous Driving - Simple Version', 640, 480)
+        cv2.moveWindow('Autonomous Driving - Simple Version', 100, 100)
 
         frame_count = 0
         running = True
@@ -755,7 +1093,48 @@ class SimpleDrivingSystem:
                                 (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (0, 128, 255), 2)  # 橙色显示
 
+                    # 显示轨迹导航（新功能）
+                    if self.show_trajectory:
+                        # 更新轨迹点
+                        location = self.vehicle.get_location()
+                        self.trajectory_points.append((location.x, location.y))
+
+                        # 如果地图图像不存在，生成它
+                        if self.map_img is None:
+                            self.generate_topology_map()
+
+                        # 绘制轨迹地图
+                        if self.map_img is not None:
+                            map_display = self.map_img.copy()
+
+                            # 绘制轨迹点
+                            if len(self.trajectory_points) > 1:
+                                for i in range(1, len(self.trajectory_points)):
+                                    prev_point = self.world_to_map(carla.Location(x=self.trajectory_points[i-1][0], y=self.trajectory_points[i-1][1]))
+                                    curr_point = self.world_to_map(carla.Location(x=self.trajectory_points[i][0], y=self.trajectory_points[i][1]))
+                                    cv2.line(map_display, prev_point, curr_point, (0, 255, 0), 2)
+
+                            # 绘制当前车辆位置（红色圆点）
+                            vehicle_pos = self.world_to_map(location)
+                            cv2.circle(map_display, vehicle_pos, 8, (0, 0, 255), -1)
+                            cv2.circle(map_display, vehicle_pos, 12, (0, 0, 255), 2)
+
+                            # 调整地图大小并显示在角落
+                            map_resized = cv2.resize(map_display, (200, 200))
+                            display_img[-220:-20, -220:-20] = map_resized
+
+                    # 显示HUD仪表盘
+                    if self.show_hud:
+                        display_img = self.draw_hud(display_img, speed, throttle, steer, frame_count)
+
+                    # 显示AR导航箭头
+                    if self.show_ar_navigation:
+                        display_img = self.draw_ar_navigation(display_img)
+
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
+                    # 确保窗口置顶显示
+                    cv2.setWindowProperty('Autonomous Driving - Simple Version', cv2.WND_PROP_TOPMOST, 1)
+                    cv2.setWindowProperty('Autonomous Driving - Simple Version', cv2.WND_PROP_TOPMOST, 0)
 
                 # 处理按键
                 key = cv2.waitKey(1) & 0xFF
@@ -801,6 +1180,33 @@ class SimpleDrivingSystem:
                         self.take_screenshot(self.camera_image)
                     else:
                         print("当前没有图像可保存")
+                elif key == ord('l') or key == ord('L'):
+                    # 切换夜晚模式（支持大小写）
+                    self.toggle_night_mode()
+                elif key == ord('u') or key == ord('U'):
+                    # 切换车辆款式（支持大小写）
+                    self.switch_vehicle()
+                elif key == ord('d') or key == ord('D'):
+                    # 切换轨迹显示（支持大小写）
+                    self.show_trajectory = not self.show_trajectory
+                    if self.show_trajectory:
+                        print("轨迹显示已开启")
+                    else:
+                        print("轨迹显示已关闭")
+                elif key == ord('y') or key == ord('Y'):
+                    # 切换HUD仪表盘显示（支持大小写）
+                    self.show_hud = not self.show_hud
+                    if self.show_hud:
+                        print("HUD仪表盘已开启")
+                    else:
+                        print("HUD仪表盘已关闭")
+                elif key == ord('i') or key == ord('I'):
+                    # 切换AR导航显示（支持大小写）
+                    self.show_ar_navigation = not self.show_ar_navigation
+                    if self.show_ar_navigation:
+                        print("AR导航已开启")
+                    else:
+                        print("AR导航已关闭")
 
                 frame_count += 1
 

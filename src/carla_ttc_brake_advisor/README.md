@@ -11,6 +11,17 @@
 - 生成 TTC 时序图和目标位置风险热力散点图。
 - 将运行效果图输出到 `docs/pr_assets/carla_ttc_brake_advisor`。
 
+## 环境要求
+
+- Python 3.7+
+- NumPy
+- pandas
+- matplotlib
+
+## 数据字段说明
+
+目标跟踪日志包含车辆、行人和自行车的相对位置、相对速度和目标类别，用于计算 TTC 和碰撞风险。
+
 ## 运行
 
 ```bash

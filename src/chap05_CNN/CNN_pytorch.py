@@ -1,335 +1,311 @@
-#!/usr/bin/env python
-# coding: utf-8
-# =============================================================================
-# 基于 PyTorch 的 CNN 实现 —— MNIST 手写数字识别（优化版）
-#
-# 功能特点：
-#   1. 自动选择 CUDA / Apple MPS / CPU
-#   2. 固定随机种子，提高可复现性
-#   3. MNIST 标准均值方差归一化
-#   4. 训练集数据增强：随机旋转、平移、缩放
-#   5. 使用训练集 / 验证集 / 测试集三部分，更规范
-#   6. 三段式 CNN：Conv + BN + ReLU + Pool + Dropout
-#   7. Kaiming 初始化
-#   8. AdamW + CosineAnnealingLR
-#   9. CrossEntropyLoss + Label Smoothing
-#  10. CUDA 下自动使用 AMP 混合精度训练
-#  11. 梯度裁剪，提升训练稳定性
-#  12. 根据验证集准确率自动保存最佳模型
-#  13. 支持加载最佳模型并在测试集上最终评估
-# =============================================================================
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+优化版 PyTorch CNN —— MNIST 手写数字识别
 
-import os
-import time
+优化点:
+  - 配置集中化，训练/评估函数去全局依赖，便于复用和调参
+  - 更稳健的 CUDA / MPS / CPU 设备选择
+  - DataLoader 参数按 num_workers 自动适配，避免 Windows / num_workers=0 报错
+  - 训练集增强、验证/测试集标准预处理，固定划分随机种子
+  - 更轻量的 CNN Head: AdaptiveAvgPool2d + Linear，减少参数量
+  - AdamW + CosineAnnealingLR + Label Smoothing + 梯度裁剪
+  - CUDA AMP 自动混合精度，兼容不同 PyTorch 版本
+  - 早停、最佳 checkpoint 保存、最终测试
+  - 单张 Tensor / 图片文件推理接口
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
 import random
-from pathlib import Path
+import time
 from contextlib import nullcontext
-from typing import Tuple, Dict, Any, Optional
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
+from PIL import Image
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
 
 # =============================================================================
-# 配置区
+# 配置
 # =============================================================================
+@dataclass
 class Config:
-    # 路径配置
-    DATA_DIR = "./mnist"
-    SAVE_DIR = "./checkpoints"
-    CKPT_NAME = "best_cnn_mnist.pth"
+    # 路径
+    data_dir: str = "./mnist"
+    save_dir: str = "./checkpoints"
+    ckpt_name: str = "best_cnn_mnist.pth"
 
-    # 训练超参数
-    EPOCHS = 15
-    BATCH_SIZE = 128
-    TEST_BATCH_SIZE = 512
-    LEARNING_RATE = 1e-3
-    WEIGHT_DECAY = 5e-4
-    DROPOUT = 0.3
-    LABEL_SMOOTHING = 0.1
-    GRAD_CLIP_NORM = 5.0
+    # 训练
+    epochs: int = 15
+    batch_size: int = 128
+    test_batch_size: int = 512
+    lr: float = 1e-3
+    weight_decay: float = 5e-4
+    label_smoothing: float = 0.1
+    grad_clip: Optional[float] = 5.0
 
-    # 验证集比例
-    VAL_RATIO = 0.1
+    # 模型
+    num_classes: int = 10
+    channels: Tuple[int, int, int] = (32, 64, 128)
+    dropout: float = 0.25
 
-    # DataLoader 配置
-    # Windows + PyCharm 下 NUM_WORKERS=0 最稳定
-    # 如果运行稳定，可以改成 2 或 4
-    NUM_WORKERS = 0
+    # 验证 / 早停
+    val_ratio: float = 0.1
+    early_stop_patience: Optional[int] = 5
 
-    # 随机种子
-    SEED = 42
+    # DataLoader
+    # Windows 建议 0；Linux/macOS 可设 2/4/8
+    num_workers: int = 0
 
-    # 日志打印间隔
-    LOG_INTERVAL = 100
+    # 其他
+    seed: int = 42
+    log_interval: int = 100
+    test_best_after_train: bool = True
+    deterministic: bool = False
+    compile_model: bool = False
 
-    # 是否在训练结束后加载最佳模型并重新测试
-    TEST_BEST_AFTER_TRAIN = True
-
-    # MNIST 官方统计均值和标准差
-    MNIST_MEAN = (0.1307,)
-    MNIST_STD = (0.3081,)
-
-
-cfg = Config()
+    # MNIST 训练集统计量
+    mean: Tuple[float, ...] = (0.1307,)
+    std: Tuple[float, ...] = (0.3081,)
 
 
 # =============================================================================
-# 工具函数
+# 工具
 # =============================================================================
 def get_device() -> torch.device:
-    """自动选择训练设备。"""
+    """自动选择训练设备: CUDA > MPS > CPU。"""
     if torch.cuda.is_available():
         return torch.device("cuda")
 
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    mps_backend = getattr(torch.backends, "mps", None)
+    if mps_backend is not None and mps_backend.is_available():
         return torch.device("mps")
 
     return torch.device("cpu")
 
 
-DEVICE = get_device()
-
-
-def set_seed(seed: int = 42) -> None:
-    """固定随机种子，尽可能保证实验可复现。"""
+def set_seed(seed: int, deterministic: bool = False) -> None:
+    """固定随机种子。deterministic=True 会牺牲部分速度以提高可复现性。"""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
 
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
 
-        # 更强调可复现性
+    if deterministic:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
-
-def ensure_dir(path: str) -> None:
-    """确保目录存在。"""
-    Path(path).mkdir(parents=True, exist_ok=True)
-
-
-def get_checkpoint_path() -> str:
-    """获取最佳模型保存路径。"""
-    ensure_dir(cfg.SAVE_DIR)
-    return os.path.join(cfg.SAVE_DIR, cfg.CKPT_NAME)
-
-
-def create_grad_scaler(device: torch.device) -> Optional[Any]:
-    """创建 AMP GradScaler，兼容新版和旧版 PyTorch。"""
-    if device.type != "cuda":
-        return None
-
-    if hasattr(torch, "amp") and hasattr(torch.amp, "GradScaler"):
         try:
-            return torch.amp.GradScaler("cuda", enabled=True)
-        except TypeError:
-            return torch.amp.GradScaler(enabled=True)
+            torch.use_deterministic_algorithms(True)
+        except Exception:
+            pass
+    else:
+        torch.backends.cudnn.benchmark = torch.cuda.is_available()
 
-    return torch.cuda.amp.GradScaler(enabled=True)
+
+def seed_worker(worker_id: int) -> None:
+    """DataLoader 多进程 worker 的随机种子初始化。"""
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
+def make_checkpoint_path(cfg: Config) -> Path:
+    path = Path(cfg.save_dir) / cfg.ckpt_name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def count_parameters(model: nn.Module) -> int:
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 def autocast_context(device: torch.device):
-    """创建 AMP autocast 上下文，兼容新版和旧版 PyTorch。"""
+    """只在 CUDA 上启用 AMP；MPS/CPU 使用普通精度。"""
     if device.type != "cuda":
         return nullcontext()
 
-    if hasattr(torch, "amp") and hasattr(torch.amp, "autocast"):
+    try:
         return torch.amp.autocast(device_type="cuda", enabled=True)
+    except TypeError:
+        return torch.cuda.amp.autocast(enabled=True)
 
-    return torch.cuda.amp.autocast(enabled=True)
+
+def make_grad_scaler(device: torch.device):
+    enabled = device.type == "cuda"
+    try:
+        return torch.amp.GradScaler("cuda", enabled=enabled)
+    except (TypeError, AttributeError):
+        return torch.cuda.amp.GradScaler(enabled=enabled)
 
 
 # =============================================================================
-# 数据加载
+# 数据
 # =============================================================================
-def build_transforms() -> Tuple[transforms.Compose, transforms.Compose]:
-    """构建训练集和测试集的数据预处理流程。"""
-
-    train_transform = transforms.Compose([
+def build_transforms(cfg: Config):
+    train_tf = transforms.Compose([
         transforms.RandomAffine(
             degrees=10,
-            translate=(0.1, 0.1),
+            translate=(0.10, 0.10),
             scale=(0.95, 1.05),
+            shear=5,
         ),
         transforms.ToTensor(),
-        transforms.Normalize(cfg.MNIST_MEAN, cfg.MNIST_STD),
+        transforms.Normalize(cfg.mean, cfg.std),
     ])
 
-    eval_transform = transforms.Compose([
+    eval_tf = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(cfg.MNIST_MEAN, cfg.MNIST_STD),
+        transforms.Normalize(cfg.mean, cfg.std),
     ])
 
-    return train_transform, eval_transform
+    return train_tf, eval_tf
 
 
-def build_dataloaders() -> Tuple[DataLoader, DataLoader, DataLoader]:
-    """
-    构建 MNIST 训练集、验证集和测试集 DataLoader。
+def build_dataloaders(
+    cfg: Config,
+    device: torch.device,
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    """构建 MNIST 训练 / 验证 / 测试 DataLoader。"""
+    if not 0.0 < cfg.val_ratio < 1.0:
+        raise ValueError(f"val_ratio 必须在 (0, 1) 内，当前为: {cfg.val_ratio}")
 
-    说明：
-        train_loader 使用数据增强；
-        val_loader 不使用数据增强；
-        test_loader 不使用数据增强。
-    """
+    train_tf, eval_tf = build_transforms(cfg)
 
-    train_transform, eval_transform = build_transforms()
-
-    # 用于训练的数据集，带数据增强
-    full_train_aug = torchvision.datasets.MNIST(
-        root=cfg.DATA_DIR,
+    # 同一份训练数据使用两套 transform:
+    # 训练子集带增强；验证子集不带增强，避免验证指标被随机扰动。
+    train_full = torchvision.datasets.MNIST(
+        root=cfg.data_dir,
         train=True,
-        transform=train_transform,
         download=True,
+        transform=train_tf,
     )
-
-    # 用于验证的数据集，不带数据增强
-    full_train_eval = torchvision.datasets.MNIST(
-        root=cfg.DATA_DIR,
+    val_full = torchvision.datasets.MNIST(
+        root=cfg.data_dir,
         train=True,
-        transform=eval_transform,
         download=True,
+        transform=eval_tf,
     )
-
     test_set = torchvision.datasets.MNIST(
-        root=cfg.DATA_DIR,
+        root=cfg.data_dir,
         train=False,
-        transform=eval_transform,
         download=True,
+        transform=eval_tf,
     )
 
-    total_size = len(full_train_aug)
-    val_size = int(total_size * cfg.VAL_RATIO)
-    train_size = total_size - val_size
+    n_total = len(train_full)
+    n_val = max(1, int(n_total * cfg.val_ratio))
 
-    generator = torch.Generator().manual_seed(cfg.SEED)
-    indices = torch.randperm(total_size, generator=generator).tolist()
+    split_gen = torch.Generator().manual_seed(cfg.seed)
+    indices = torch.randperm(n_total, generator=split_gen).tolist()
 
-    val_indices = indices[:val_size]
-    train_indices = indices[val_size:]
+    val_indices = indices[:n_val]
+    train_indices = indices[n_val:]
 
-    train_set = Subset(full_train_aug, train_indices)
-    val_set = Subset(full_train_eval, val_indices)
+    train_set = Subset(train_full, train_indices)
+    val_set = Subset(val_full, val_indices)
 
-    pin_memory = DEVICE.type == "cuda"
-    persistent_workers = cfg.NUM_WORKERS > 0
+    loader_gen = torch.Generator().manual_seed(cfg.seed)
+
+    common: dict[str, Any] = {
+        "num_workers": cfg.num_workers,
+        "pin_memory": device.type == "cuda",
+        "worker_init_fn": seed_worker if cfg.num_workers > 0 else None,
+        "generator": loader_gen,
+    }
+
+    if cfg.num_workers > 0:
+        common["persistent_workers"] = True
+        common["prefetch_factor"] = 2
 
     train_loader = DataLoader(
         train_set,
-        batch_size=cfg.BATCH_SIZE,
+        batch_size=cfg.batch_size,
         shuffle=True,
-        num_workers=cfg.NUM_WORKERS,
-        pin_memory=pin_memory,
         drop_last=False,
-        persistent_workers=persistent_workers,
+        **common,
     )
-
     val_loader = DataLoader(
         val_set,
-        batch_size=cfg.TEST_BATCH_SIZE,
+        batch_size=cfg.test_batch_size,
         shuffle=False,
-        num_workers=cfg.NUM_WORKERS,
-        pin_memory=pin_memory,
         drop_last=False,
-        persistent_workers=persistent_workers,
+        **common,
     )
-
     test_loader = DataLoader(
         test_set,
-        batch_size=cfg.TEST_BATCH_SIZE,
+        batch_size=cfg.test_batch_size,
         shuffle=False,
-        num_workers=cfg.NUM_WORKERS,
-        pin_memory=pin_memory,
         drop_last=False,
-        persistent_workers=persistent_workers,
+        **common,
     )
 
-    print(f"训练集样本数: {train_size}")
-    print(f"验证集样本数: {val_size}")
-    print(f"测试集样本数: {len(test_set)}")
-
+    print(f"训练 / 验证 / 测试 样本数: {len(train_set)} / {len(val_set)} / {len(test_set)}")
     return train_loader, val_loader, test_loader
 
 
 # =============================================================================
-# 模型定义
+# 模型
 # =============================================================================
-class ConvBlock(nn.Module):
-    """Conv2d + BatchNorm2d + ReLU 的基础模块。"""
+def conv_block(in_ch: int, out_ch: int, dropout2d: float = 0.0) -> nn.Sequential:
+    layers: list[nn.Module] = [
+        nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
+        nn.BatchNorm2d(out_ch),
+        nn.ReLU(inplace=True),
+        nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1, bias=False),
+        nn.BatchNorm2d(out_ch),
+        nn.ReLU(inplace=True),
+        nn.MaxPool2d(kernel_size=2),
+    ]
 
-    def __init__(self, in_channels: int, out_channels: int):
-        super().__init__()
+    if dropout2d > 0:
+        layers.append(nn.Dropout2d(dropout2d))
 
-        self.block = nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                bias=False,
-            ),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.block(x)
+    return nn.Sequential(*layers)
 
 
 class CNN(nn.Module):
-    """
-    MNIST CNN 分类模型。
+    """MNIST CNN 分类模型。输入 [B, 1, 28, 28]，输出 [B, num_classes]。"""
 
-    输入:
-        [batch_size, 1, 28, 28]
-
-    输出:
-        [batch_size, 10]
-    """
-
-    def __init__(self, num_classes: int = 10, dropout: float = 0.3):
+    def __init__(
+        self,
+        num_classes: int = 10,
+        channels: Tuple[int, int, int] = (32, 64, 128),
+        dropout: float = 0.25,
+    ) -> None:
         super().__init__()
 
+        c1, c2, c3 = channels
+        dropout2d = dropout * 0.5
+
         self.features = nn.Sequential(
-            # 1 x 28 x 28 -> 32 x 14 x 14
-            ConvBlock(1, 32),
-            ConvBlock(32, 32),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Dropout2d(dropout * 0.5),
-
-            # 32 x 14 x 14 -> 64 x 7 x 7
-            ConvBlock(32, 64),
-            ConvBlock(64, 64),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Dropout2d(dropout * 0.5),
-
-            # 64 x 7 x 7 -> 128 x 3 x 3
-            ConvBlock(64, 128),
-            ConvBlock(128, 128),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Dropout2d(dropout * 0.5),
+            conv_block(1, c1, dropout2d),
+            conv_block(c1, c2, dropout2d),
+            conv_block(c2, c3, dropout2d),
         )
 
+        # 相比固定 Flatten(128*3*3)，AdaptiveAvgPool2d 更轻量，也不依赖中间特征图尺寸。
         self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(128 * 3 * 3, 256),
-            nn.ReLU(inplace=True),
             nn.Dropout(dropout),
-            nn.Linear(256, num_classes),
+            nn.Linear(c3, num_classes),
         )
 
         self._init_weights()
 
     def _init_weights(self) -> None:
-        """初始化模型参数。"""
         for module in self.modules():
             if isinstance(module, nn.Conv2d):
                 nn.init.kaiming_normal_(
@@ -337,383 +313,418 @@ class CNN(nn.Module):
                     mode="fan_out",
                     nonlinearity="relu",
                 )
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
-
             elif isinstance(module, nn.Linear):
                 nn.init.kaiming_normal_(
                     module.weight,
-                    nonlinearity="relu",
+                    nonlinearity="linear",
                 )
                 nn.init.zeros_(module.bias)
-
             elif isinstance(module, nn.BatchNorm2d):
                 nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
-        x = self.classifier(x)
-        return x
+        return self.classifier(x)
 
 
 # =============================================================================
-# 训练与评估
+# 训练 / 评估
 # =============================================================================
+def accuracy_from_logits(logits: torch.Tensor, labels: torch.Tensor) -> int:
+    return (logits.argmax(dim=1) == labels).sum().item()
+
+
 @torch.no_grad()
 def evaluate(
     model: nn.Module,
-    data_loader: DataLoader,
+    loader: DataLoader,
     loss_fn: nn.Module,
+    device: torch.device,
 ) -> Tuple[float, float]:
-    """在验证集或测试集上评估模型。"""
-
     model.eval()
 
     total_loss = 0.0
     total_correct = 0
     total_samples = 0
 
-    for images, labels in data_loader:
-        images = images.to(DEVICE, non_blocking=True)
-        labels = labels.to(DEVICE, non_blocking=True)
+    for images, labels in loader:
+        images = images.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
 
         logits = model(images)
         loss = loss_fn(logits, labels)
 
         batch_size = images.size(0)
         total_loss += loss.item() * batch_size
-        total_correct += (logits.argmax(dim=1) == labels).sum().item()
+        total_correct += accuracy_from_logits(logits, labels)
         total_samples += batch_size
 
-    avg_loss = total_loss / total_samples
-    accuracy = total_correct / total_samples
-
-    return avg_loss, accuracy
+    return total_loss / total_samples, total_correct / total_samples
 
 
 def train_one_epoch(
     model: nn.Module,
-    train_loader: DataLoader,
+    loader: DataLoader,
     loss_fn: nn.Module,
     optimizer: torch.optim.Optimizer,
-    scheduler: Any,
-    scaler: Optional[Any],
+    scheduler: torch.optim.lr_scheduler.LRScheduler,
+    scaler,
+    cfg: Config,
+    device: torch.device,
     epoch: int,
 ) -> Tuple[float, float]:
-    """训练一个 epoch。"""
-
     model.train()
 
     total_loss = 0.0
     total_correct = 0
     total_samples = 0
 
-    use_amp = DEVICE.type == "cuda"
-
-    for step, (images, labels) in enumerate(train_loader, start=1):
-        images = images.to(DEVICE, non_blocking=True)
-        labels = labels.to(DEVICE, non_blocking=True)
+    for step, (images, labels) in enumerate(loader, start=1):
+        images = images.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
 
         optimizer.zero_grad(set_to_none=True)
 
-        if use_amp:
-            with autocast_context(DEVICE):
-                logits = model(images)
-                loss = loss_fn(logits, labels)
-
-            scaler.scale(loss).backward()
-
-            if cfg.GRAD_CLIP_NORM is not None:
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(),
-                    max_norm=cfg.GRAD_CLIP_NORM,
-                )
-
-            scaler.step(optimizer)
-            scaler.update()
-
-        else:
+        with autocast_context(device):
             logits = model(images)
             loss = loss_fn(logits, labels)
 
-            loss.backward()
+        scaler.scale(loss).backward()
 
-            if cfg.GRAD_CLIP_NORM is not None:
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(),
-                    max_norm=cfg.GRAD_CLIP_NORM,
-                )
+        if cfg.grad_clip is not None:
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
 
-            optimizer.step()
-
+        scaler.step(optimizer)
+        scaler.update()
         scheduler.step()
 
         batch_size = images.size(0)
         total_loss += loss.item() * batch_size
-        total_correct += (logits.argmax(dim=1) == labels).sum().item()
+        total_correct += accuracy_from_logits(logits.detach(), labels)
         total_samples += batch_size
 
-        if step % cfg.LOG_INTERVAL == 0 or step == len(train_loader):
-            current_lr = optimizer.param_groups[0]["lr"]
-            train_loss = total_loss / total_samples
-            train_acc = total_correct / total_samples
-
+        if step % cfg.log_interval == 0 or step == len(loader):
+            lr = optimizer.param_groups[0]["lr"]
             print(
-                f"Epoch [{epoch:02d}/{cfg.EPOCHS}] "
-                f"Step [{step:04d}/{len(train_loader)}] "
-                f"Loss: {train_loss:.4f} "
-                f"Acc: {train_acc * 100:.2f}% "
-                f"LR: {current_lr:.2e}"
+                f"  Epoch {epoch:02d} [{step:04d}/{len(loader)}] "
+                f"loss={total_loss / total_samples:.4f} "
+                f"acc={total_correct / total_samples * 100:.2f}% "
+                f"lr={lr:.2e}"
             )
 
-    avg_loss = total_loss / total_samples
-    accuracy = total_correct / total_samples
-
-    return avg_loss, accuracy
+    return total_loss / total_samples, total_correct / total_samples
 
 
 def save_checkpoint(
+    path: Path,
     model: nn.Module,
-    optimizer: torch.optim.Optimizer,
-    scheduler: Any,
     epoch: int,
+    val_loss: float,
     val_acc: float,
-    path: str,
+    cfg: Config,
 ) -> None:
-    """保存模型检查点。"""
-
     checkpoint = {
         "epoch": epoch,
+        "val_loss": val_loss,
         "val_acc": val_acc,
         "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "scheduler_state_dict": scheduler.state_dict(),
-        "config": {
-            "epochs": cfg.EPOCHS,
-            "batch_size": cfg.BATCH_SIZE,
-            "test_batch_size": cfg.TEST_BATCH_SIZE,
-            "learning_rate": cfg.LEARNING_RATE,
-            "weight_decay": cfg.WEIGHT_DECAY,
-            "dropout": cfg.DROPOUT,
-            "label_smoothing": cfg.LABEL_SMOOTHING,
-            "grad_clip_norm": cfg.GRAD_CLIP_NORM,
-            "val_ratio": cfg.VAL_RATIO,
-            "seed": cfg.SEED,
-        },
+        "config": asdict(cfg),
     }
-
     torch.save(checkpoint, path)
 
 
 def load_checkpoint(
+    path: str | Path,
     model: nn.Module,
-    path: str,
-    map_location: torch.device,
-) -> Dict[str, Any]:
-    """加载模型检查点。"""
+    device: torch.device,
+) -> dict[str, Any]:
+    path = Path(path)
 
-    checkpoint = torch.load(path, map_location=map_location)
+    try:
+        checkpoint = torch.load(path, map_location=device, weights_only=False)
+    except TypeError:
+        checkpoint = torch.load(path, map_location=device)
+
     model.load_state_dict(checkpoint["model_state_dict"])
     return checkpoint
+
+
+def maybe_compile_model(
+    model: nn.Module,
+    cfg: Config,
+    device: torch.device,
+) -> nn.Module:
+    if not cfg.compile_model:
+        return model
+
+    if device.type != "cuda":
+        print("compile_model=True 但当前不是 CUDA 设备，已跳过 torch.compile。")
+        return model
+
+    if not hasattr(torch, "compile"):
+        print("当前 PyTorch 版本不支持 torch.compile，已跳过。")
+        return model
+
+    print("启用 torch.compile。首次 epoch 可能较慢。")
+    return torch.compile(model)
 
 
 def train(
     model: nn.Module,
     train_loader: DataLoader,
     val_loader: DataLoader,
+    cfg: Config,
+    device: torch.device,
 ) -> float:
-    """完整训练流程。"""
-
     optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=cfg.LEARNING_RATE,
-        weight_decay=cfg.WEIGHT_DECAY,
+        lr=cfg.lr,
+        weight_decay=cfg.weight_decay,
     )
 
+    total_steps = max(1, cfg.epochs * len(train_loader))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
-        T_max=cfg.EPOCHS * len(train_loader),
+        T_max=total_steps,
+        eta_min=cfg.lr * 0.01,
     )
 
-    loss_fn = nn.CrossEntropyLoss(
-        label_smoothing=cfg.LABEL_SMOOTHING,
-    )
+    train_loss_fn = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
+    eval_loss_fn = nn.CrossEntropyLoss()
 
-    scaler = create_grad_scaler(DEVICE)
-    ckpt_path = get_checkpoint_path()
+    scaler = make_grad_scaler(device)
+    ckpt_path = make_checkpoint_path(cfg)
 
-    print("=" * 80)
-    print("训练配置")
-    print("=" * 80)
-    print(f"设备              : {DEVICE}")
-    print(f"训练样本数        : {len(train_loader.dataset)}")
-    print(f"验证样本数        : {len(val_loader.dataset)}")
-    print(f"Epochs            : {cfg.EPOCHS}")
-    print(f"Batch Size        : {cfg.BATCH_SIZE}")
-    print(f"Learning Rate     : {cfg.LEARNING_RATE}")
-    print(f"Weight Decay      : {cfg.WEIGHT_DECAY}")
-    print(f"Dropout           : {cfg.DROPOUT}")
-    print(f"Label Smoothing   : {cfg.LABEL_SMOOTHING}")
-    print(f"Grad Clip Norm    : {cfg.GRAD_CLIP_NORM}")
-    print(f"AMP               : {DEVICE.type == 'cuda'}")
-    print(f"Checkpoint Path   : {ckpt_path}")
-    print("=" * 80)
+    print("=" * 72)
+    print(f"设备: {device} | AMP: {device.type == 'cuda'} | Epochs: {cfg.epochs}")
+    print(f"Batch: {cfg.batch_size} | LR: {cfg.lr} | WD: {cfg.weight_decay}")
+    print(f"Dropout: {cfg.dropout} | Label smoothing: {cfg.label_smoothing}")
+    print(f"Checkpoint: {ckpt_path}")
+    print("=" * 72)
 
-    best_val_acc = 0.0
+    best_val_acc = -1.0
+    best_val_loss = float("inf")
+    no_improve = 0
 
-    for epoch in range(1, cfg.EPOCHS + 1):
-        start_time = time.time()
+    for epoch in range(1, cfg.epochs + 1):
+        start = time.perf_counter()
 
         train_loss, train_acc = train_one_epoch(
             model=model,
-            train_loader=train_loader,
-            loss_fn=loss_fn,
+            loader=train_loader,
+            loss_fn=train_loss_fn,
             optimizer=optimizer,
             scheduler=scheduler,
             scaler=scaler,
+            cfg=cfg,
+            device=device,
             epoch=epoch,
         )
+        val_loss, val_acc = evaluate(model, val_loader, eval_loss_fn, device)
 
-        val_loss, val_acc = evaluate(
-            model=model,
-            data_loader=val_loader,
-            loss_fn=loss_fn,
+        elapsed = time.perf_counter() - start
+
+        is_better = (
+            val_acc > best_val_acc
+            or (abs(val_acc - best_val_acc) < 1e-12 and val_loss < best_val_loss)
         )
 
-        elapsed = time.time() - start_time
-
-        print("-" * 80)
-        print(
-            f"Epoch [{epoch:02d}/{cfg.EPOCHS}] 完成 "
-            f"| 用时: {elapsed:.1f}s "
-            f"| Train Loss: {train_loss:.4f} "
-            f"| Train Acc: {train_acc * 100:.2f}% "
-            f"| Val Loss: {val_loss:.4f} "
-            f"| Val Acc: {val_acc * 100:.2f}%"
+        msg = (
+            f"[Epoch {epoch:02d}] {elapsed:.1f}s | "
+            f"train: loss={train_loss:.4f} acc={train_acc * 100:.2f}% | "
+            f"val: loss={val_loss:.4f} acc={val_acc * 100:.2f}%"
         )
 
-        if val_acc > best_val_acc:
+        if is_better:
             best_val_acc = val_acc
-
+            best_val_loss = val_loss
+            no_improve = 0
             save_checkpoint(
-                model=model,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                epoch=epoch,
-                val_acc=val_acc,
                 path=ckpt_path,
+                model=model,
+                epoch=epoch,
+                val_loss=val_loss,
+                val_acc=val_acc,
+                cfg=cfg,
             )
+            msg += "  [BEST -> saved]"
+        else:
+            no_improve += 1
+            msg += f"  [no-improve: {no_improve}]"
 
-            print(f"发现新的最佳模型，验证集准确率: {best_val_acc * 100:.2f}%")
-            print(f"模型已保存到: {ckpt_path}")
+        print(msg)
 
-        print("-" * 80)
+        if cfg.early_stop_patience is not None and no_improve >= cfg.early_stop_patience:
+            print(f"早停: 验证集连续 {cfg.early_stop_patience} 轮未提升。")
+            break
 
-    print("=" * 80)
-    print(f"训练完成，最佳验证集准确率: {best_val_acc * 100:.2f}%")
-    print("=" * 80)
+    print("=" * 72)
+    print(f"训练完成，最佳验证准确率: {best_val_acc * 100:.2f}%")
+    print("=" * 72)
 
     return best_val_acc
 
 
 # =============================================================================
-# 单张图片推理函数
+# 推理
 # =============================================================================
 @torch.no_grad()
-def predict_single_image(
+def predict_single_tensor(
     model: nn.Module,
     image: torch.Tensor,
-) -> int:
+    device: torch.device,
+) -> Tuple[int, float]:
     """
-    对单张 MNIST 图片进行预测。
+    对单张 MNIST Tensor 预测。
 
     参数:
-        model: 训练好的模型
-        image: shape 为 [1, 28, 28] 或 [1, 1, 28, 28] 的 Tensor
-
-    返回:
-        预测类别，范围 0-9
+        image: shape 为 [1, 28, 28] 或 [1, 1, 28, 28]，
+               且已完成 ToTensor + Normalize。
     """
-
     model.eval()
 
     if image.dim() == 3:
         image = image.unsqueeze(0)
 
-    if image.dim() != 4:
+    if image.dim() != 4 or image.size(1) != 1:
         raise ValueError(
-            f"输入图片维度应为 [1, 28, 28] 或 [1, 1, 28, 28]，当前为 {tuple(image.shape)}"
+            "输入维度应为 [1, 28, 28] 或 [1, 1, 28, 28]，"
+            f"当前为: {tuple(image.shape)}"
         )
 
-    image = image.to(DEVICE, non_blocking=True)
+    image = image.to(device, non_blocking=True)
     logits = model(image)
-    pred = logits.argmax(dim=1).item()
+    probs = torch.softmax(logits, dim=1)
+    confidence, prediction = probs.max(dim=1)
 
-    return pred
+    return prediction.item(), confidence.item()
+
+
+@torch.no_grad()
+def predict_image_file(
+    model: nn.Module,
+    image_path: str | Path,
+    cfg: Config,
+    device: torch.device,
+) -> Tuple[int, float]:
+    """
+    对图片文件预测。图片会被转成灰度图并 resize 到 28x28。
+    适合推理外部手写数字图片；MNIST 原始样本可直接用 predict_single_tensor。
+    """
+    _, eval_tf = build_transforms(cfg)
+    image = Image.open(image_path).convert("L").resize((28, 28))
+    tensor = eval_tf(image)
+    return predict_single_tensor(model, tensor, device)
 
 
 # =============================================================================
-# 主函数
+# CLI / 主流程
 # =============================================================================
-def main() -> None:
-    set_seed(cfg.SEED)
+def parse_args() -> Config:
+    parser = argparse.ArgumentParser(description="优化版 PyTorch CNN MNIST 训练脚本")
 
-    train_loader, val_loader, test_loader = build_dataloaders()
+    parser.add_argument("--data-dir", type=str, default=Config.data_dir)
+    parser.add_argument("--save-dir", type=str, default=Config.save_dir)
+    parser.add_argument("--ckpt-name", type=str, default=Config.ckpt_name)
 
-    model = CNN(
-        num_classes=10,
-        dropout=cfg.DROPOUT,
-    ).to(DEVICE)
+    parser.add_argument("--epochs", type=int, default=Config.epochs)
+    parser.add_argument("--batch-size", type=int, default=Config.batch_size)
+    parser.add_argument("--test-batch-size", type=int, default=Config.test_batch_size)
+    parser.add_argument("--lr", type=float, default=Config.lr)
+    parser.add_argument("--weight-decay", type=float, default=Config.weight_decay)
+    parser.add_argument("--dropout", type=float, default=Config.dropout)
+    parser.add_argument("--label-smoothing", type=float, default=Config.label_smoothing)
+    parser.add_argument("--grad-clip", type=float, default=Config.grad_clip)
 
-    print("模型结构：")
-    print(model)
+    parser.add_argument("--val-ratio", type=float, default=Config.val_ratio)
+    parser.add_argument("--early-stop-patience", type=int, default=Config.early_stop_patience)
+    parser.add_argument("--num-workers", type=int, default=Config.num_workers)
+    parser.add_argument("--seed", type=int, default=Config.seed)
+    parser.add_argument("--log-interval", type=int, default=Config.log_interval)
 
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument("--compile-model", action="store_true")
+    parser.add_argument("--no-test", action="store_true")
 
-    print(f"总参数量      : {total_params / 1e6:.3f} M")
-    print(f"可训练参数量  : {trainable_params / 1e6:.3f} M")
+    args = parser.parse_args()
 
-    train(
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
+    return Config(
+        data_dir=args.data_dir,
+        save_dir=args.save_dir,
+        ckpt_name=args.ckpt_name,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        test_batch_size=args.test_batch_size,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        dropout=args.dropout,
+        label_smoothing=args.label_smoothing,
+        grad_clip=args.grad_clip,
+        val_ratio=args.val_ratio,
+        early_stop_patience=args.early_stop_patience,
+        num_workers=args.num_workers,
+        seed=args.seed,
+        log_interval=args.log_interval,
+        deterministic=args.deterministic,
+        compile_model=args.compile_model,
+        test_best_after_train=not args.no_test,
     )
 
-    if cfg.TEST_BEST_AFTER_TRAIN:
-        ckpt_path = get_checkpoint_path()
 
-        if os.path.exists(ckpt_path):
-            print("正在加载最佳模型进行最终测试...")
+def main() -> None:
+    cfg = parse_args()
+    device = get_device()
 
-            checkpoint = load_checkpoint(
+    set_seed(cfg.seed, deterministic=cfg.deterministic)
+
+    if device.type == "cuda":
+        try:
+            torch.set_float32_matmul_precision("high")
+        except Exception:
+            pass
+
+    print("当前配置:")
+    print(json.dumps(asdict(cfg), ensure_ascii=False, indent=2))
+
+    train_loader, val_loader, test_loader = build_dataloaders(cfg, device)
+
+    model = CNN(
+        num_classes=cfg.num_classes,
+        channels=cfg.channels,
+        dropout=cfg.dropout,
+    ).to(device)
+
+    model = maybe_compile_model(model, cfg, device)
+
+    print(f"可训练参数量: {count_parameters(model) / 1e6:.3f}M")
+
+    train(model, train_loader, val_loader, cfg, device)
+
+    if cfg.test_best_after_train:
+        ckpt_path = make_checkpoint_path(cfg)
+
+        if ckpt_path.exists():
+            checkpoint = load_checkpoint(ckpt_path, model, device)
+            test_loss, test_acc = evaluate(
                 model=model,
-                path=ckpt_path,
-                map_location=DEVICE,
+                loader=test_loader,
+                loss_fn=nn.CrossEntropyLoss(),
+                device=device,
             )
 
-            loss_fn = nn.CrossEntropyLoss(
-                label_smoothing=cfg.LABEL_SMOOTHING,
-            )
-
-            final_loss, final_acc = evaluate(
-                model=model,
-                data_loader=test_loader,
-                loss_fn=loss_fn,
-            )
-
-            print("=" * 80)
-            print(f"最佳模型来自 Epoch: {checkpoint['epoch']}")
-            print(f"保存时验证集准确率: {checkpoint['val_acc'] * 100:.2f}%")
-            print(f"最终测试 Loss     : {final_loss:.4f}")
-            print(f"最终测试 Acc      : {final_acc * 100:.2f}%")
-            print("=" * 80)
+            print("=" * 72)
+            print(f"测试集结果，基于 Epoch {checkpoint['epoch']} 的最佳模型:")
+            print(f"  loss = {test_loss:.4f}")
+            print(f"  acc  = {test_acc * 100:.2f}%")
+            print("=" * 72)
         else:
             print("未找到最佳模型文件，跳过最终测试。")
 
 
 if __name__ == "__main__":
-    # Windows 下使用 DataLoader 多进程时，必须放在 main 入口中执行
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n训练已被用户手动中断。")

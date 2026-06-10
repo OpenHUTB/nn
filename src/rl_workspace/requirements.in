@@ -1,0 +1,6 @@
+-e file:./agent
+-r ros/state_controller/requirements.in
+-r ros/img2vec/requirements.in
+
+# dev tools
+pip-tools

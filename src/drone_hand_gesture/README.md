@@ -82,7 +82,6 @@ python main_deep_learning.py --model_path dataset/models/gesture_deep_cnn.pth --
 **控制方式**：
 - **手势控制**：张开手掌（起飞）、食指向上（上升）、握拳（降落）等
 - **键盘控制**：空格（起飞/降落）、T（起飞）、L（降落）、H（悬停）、Q/ESC（退出）
-
 ## 深度学习功能
 
 
