@@ -136,8 +136,6 @@
 <li><a href="#调参经验">调参经验</a></li>
 <li><a href="#常见问题">常见问题</a></li>
 <li><a href="#未来工作">未来工作</a></li>
-<li><a href="#媒体文件说明">媒体文件说明</a></li>
-<li><a href="#注意事项">注意事项</a></li>
 <li><a href="#致谢">致谢</a></li>
 <li><a href="#参考文献">参考文献</a></li>
 </ul>
@@ -1644,110 +1642,27 @@ else:
 <li><strong>安全约束强化</strong>：使用 Constrained RL (CPO) 或 Safety Layer，将安全约束显式建模</li>
 <li><strong>真实场景迁移</strong>：在仿真器训练好的模型迁移到真实车辆，研究 Sim-to-Real Gap</li>
 </ol>
-<h2 id="_48">媒体文件说明</h2>
-<p>README 中引用了以下图片和视频文件，需放置在仓库的对应目录下：</p>
-<h3 id="_49">架构图与对比图（已包含）</h3>
-<table>
-<thead>
-<tr>
-<th>文件路径</th>
-<th>说明</th>
-<th>来源</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>image/system_architecture.jpg</code></td>
-<td>系统架构图</td>
-<td>项目自带</td>
-</tr>
-<tr>
-<td><code>image/reward_comparison.jpg</code></td>
-<td>乘法 vs 加权求和奖励对比图</td>
-<td>项目自带</td>
-</tr>
-<tr>
-<td><code>image/training_pipeline.jpg</code></td>
-<td>训练流程图</td>
-<td>项目自带</td>
-</tr>
-</tbody>
-</table>
-<h3 id="_50">训练曲线截图（需手动导出）</h3>
-<table>
-<thead>
-<tr>
-<th>文件路径</th>
-<th>说明</th>
-<th>导出方式</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>image/train.gif</code></td>
-<td>reward 训练曲线</td>
-<td>TensorBoard 截图/录屏</td>
-</tr>
-<tr>
-<td><code>image/rollout.gif</code></td>
-<td>rollout 指标曲线</td>
-<td>TensorBoard 截图/录屏</td>
-</tr>
-<tr>
-<td><code>image/custom.gif</code></td>
-<td>自定义指标曲线（avg_speed、avg_center_dev 等）</td>
-<td>TensorBoard 截图/录屏</td>
-</tr>
-<tr>
-<td><code>image/time.gif</code></td>
-<td>时间相关指标曲线</td>
-<td>TensorBoard 截图/录屏</td>
-</tr>
-</tbody>
-</table>
-<p>导出方法：打开 TensorBoard（<code>tensorboard --logdir=./tensorboard</code>），在对应面板截图或录屏，保存为 GIF 放入 <code>image/</code> 目录。</p>
-<h3 id="_51">运行效果视频（需手动录制）</h3>
-<table>
-<thead>
-<tr>
-<th>文件路径</th>
-<th>说明</th>
-<th>录制方式</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>video/RL_SB3_carla.gif</code></td>
-<td>自动驾驶运行效果动图</td>
-<td>运行 <code>evaluate.py</code> 时录屏</td>
-</tr>
-</tbody>
-</table>
-<p>录制方法：运行 <code>python evaluate.py</code>，使用屏幕录制工具（如 LICEcap、ScreenToGif）录制 Pygame 窗口，保存为 GIF 放入 <code>video/</code> 目录。</p>
-<blockquote>
-<p><strong>提示</strong>：如果暂时没有 GIF 文件，也可以使用 PNG 截图代替，将 README 中的对应路径后缀从 <code>.gif</code> 改为 <code>.png</code> 即可。</p>
-</blockquote>
-<h2 id="_52">注意事项</h2>
-<h3 id="_53">运行环境</h3>
+<h2 id="_48">注意事项</h2>
+<h3 id="_49">运行环境</h3>
 <ul>
 <li><strong>双机模式</strong>：本项目默认在双机模式下运行（一台跑 CARLA，一台跑 RL Agent），<code>--host</code> 参数默认为远程 IP。本地运行需设为 <code>localhost</code></li>
 <li><strong>GPU 显存</strong>：CARLA 仿真器会占用大量 GPU 显存（约 4GB），建议使用 <code>-RenderOffScreen</code> 模式减少开销，或将仿真器和训练分布在不同 GPU 上</li>
 <li><strong>网络延迟</strong>：如果是双机模式，确保两台机器在同一内网，延迟过高会导致训练不稳定</li>
 <li><strong>同步模式</strong>：环境使用 CARLA 同步模式（<code>synchronous_mode=True</code>），每步调用 <code>world.tick()</code> 推进仿真。确保 CARLA 服务器端也设置了同步模式</li>
 </ul>
-<h3 id="_54">训练监控</h3>
+<h3 id="_50">训练监控</h3>
 <ul>
 <li><strong>TensorBoard 监控</strong>：训练过程中建议开启 TensorBoard 跟踪训练指标，及时发现异常</li>
 <li><strong>检查点保存</strong>：默认保存 10 个检查点，均匀分布在整个训练过程中。可以根据 <code>--num_checkpoints</code> 调整</li>
 <li><strong>日志输出</strong>：训练日志会输出到 stdout 和 tensorboard 目录下的 CSV 文件，便于后续分析</li>
 </ul>
-<h3 id="_55">模型加载</h3>
+<h3 id="_51">模型加载</h3>
 <ul>
 <li><strong>路径匹配</strong>：<code>evaluate.py</code> 和 <code>test.py</code> 中的模型路径需根据实际训练输出修改</li>
 <li><strong>环境一致性</strong>：加载模型时的环境配置（obs_sensor、obs_res、action_smoothing 等）必须与训练时一致，否则会导致维度不匹配</li>
 <li><strong>确定性推理</strong>：<code>evaluate.py</code> 中使用 <code>deterministic=True</code> 确保输出稳定，用于演示和评估；<code>deterministic=False</code> 用于观察策略的探索行为</li>
 </ul>
-<h2 id="_56">致谢</h2>
+<h2 id="_52">致谢</h2>
 <ul>
 <li><a href="https://carla.org/">CARLA Simulator</a> — 开源自动驾驶仿真平台</li>
 <li><a href="https://stable-baselines3.readthedocs.io/">Stable-Baselines3</a> — 强化学习算法库</li>
@@ -1755,7 +1670,7 @@ else:
 <li><a href="https://spinningup.openai.com/">OpenAI Spinning Up</a> — 强化学习入门教程</li>
 <li><a href="https://github.com/DLR-RM/rl-baselines3-zoo">RL-Baselines3-Zoo</a> — RL 训练最佳实践</li>
 </ul>
-<h2 id="_57">参考文献</h2>
+<h2 id="_53">参考文献</h2>
 <ol>
 <li>Schulman, J., Wolski, F., Dhariwal, P., Radford, A., &amp; Klimov, O. (2017). Proximal Policy Optimization Algorithms. arXiv:1707.06347.</li>
 <li>Dosovitskiy, A., Ros, G., Codevilla, F., Lopez, A., &amp; Koltun, V. (2017). CARLA: An Open Urban Driving Simulator. arXiv:1711.03938.</li>
