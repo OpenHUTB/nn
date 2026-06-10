@@ -118,6 +118,7 @@ WEATHER_NAMES = list(WEATHER_PROFILES.keys())
 WEATHER_LABELS = {
     "clear": "Clear", "cloudy": "Cloudy", "light_rain": "Light Rain",
     "heavy_rain": "Heavy Rain", "fog": "Fog", "night": "Night", "night_rain": "Night Rain",
+    "snow": "Snow", "night_snow": "Night Snow", "dust_storm": "Dust Storm",
 }
 
 
@@ -554,9 +555,13 @@ class WeatherRobustnessSystem:
         label = WEATHER_LABELS.get(weather_name, weather_name)
         iq = fusion["image_quality"]
 
-        # ===== 雨天视觉效果 =====
+        # ===== 天气视觉效果 =====
         if weather_name in ("light_rain", "heavy_rain", "night_rain"):
             display = self._add_rain_effect(display, weather_name)
+        elif weather_name in ("snow", "night_snow"):
+            display = self._add_snow_effect(display, weather_name)
+        elif weather_name == "dust_storm":
+            display = self._add_dust_effect(display)
 
         def put_text(text, pos, scale, color, thickness=2):
             """带黑色阴影轮廓的清晰文字（LINE_8 比 LINE_AA 快5倍）"""
@@ -664,6 +669,35 @@ class WeatherRobustnessSystem:
 
         return frame
 
+    def _add_snow_effect(self, frame, weather_name):
+        """添加雪天视觉效果：白色雪花飘落"""
+        h, w = frame.shape[:2]
+        intensity = 0.3 if weather_name == "night_snow" else 0.2
+
+        seed = int(time.time() * 10) % 10000
+        cache_key = f"snow_{w}_{h}_{seed}"
+        if not hasattr(self, "_snow_cache") or self._snow_cache.get("key") != cache_key:
+            snow_overlay = np.zeros((h, w, 3), dtype=np.uint8)
+            rng = np.random.RandomState(seed)
+            for _ in range(200):
+                x = rng.randint(0, w)
+                y = rng.randint(0, h)
+                radius = rng.randint(1, 4)
+                cv2.circle(snow_overlay, (x, y), radius, (240, 240, 250), -1)
+            self._snow_cache = {"key": cache_key, "overlay": snow_overlay}
+
+        return cv2.addWeighted(frame, 1 - intensity, self._snow_cache["overlay"], intensity, 0)
+
+    def _add_dust_effect(self, frame):
+        """添加沙尘暴视觉效果：褐色遮罩 + 强模糊"""
+        h, w = frame.shape[:2]
+        # 褐色沙尘遮罩
+        dust = np.full((h, w, 3), (80, 140, 200), dtype=np.uint8)
+        frame = cv2.addWeighted(frame, 0.7, dust, 0.3, 0)
+        # 强模糊
+        frame = cv2.GaussianBlur(frame, (7, 7), 0)
+        return frame
+
     def run(self):
         try:
             self.connect()
@@ -718,7 +752,8 @@ class WeatherRobustnessSystem:
         detection_rates = [report[n].get("detection_rate", 0) for n in weather_names]
         overall = report.get("__overall__", 0)
 
-        colors = ["#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#9b59b6", "#1abc9c", "#e67e22"]
+        colors = ["#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#9b59b6", "#1abc9c", "#e67e22",
+                  "#c0392b", "#8e44ad", "#d4ac0d"]
 
         fig, axes = plt.subplots(2, 3, figsize=(14, 9))
         fig.suptitle(f"CARLA Weather Robustness Comparison  (Overall: {overall:.1f}/100)", fontsize=14, fontweight="bold")

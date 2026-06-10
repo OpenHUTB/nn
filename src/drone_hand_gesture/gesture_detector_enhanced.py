@@ -35,12 +35,12 @@ class EnhancedGestureDetector:
                 
                 self.hands = self.mp_hands.Hands(
                     static_image_mode=False,
-                    max_num_hands=1,
+                    max_num_hands=2,  # 支持双手
                     min_detection_confidence=0.5,
                     min_tracking_confidence=0.5
                 )
                 self.mode = "mediapipe"
-                print("[INFO] 使用 MediaPipe 手势检测模式")
+                print("[INFO] 使用 MediaPipe 手势检测模式 + 滑动手势支持")
             except Exception as e:
                 print(f"[WARNING] MediaPipe 初始化失败: {e}")
                 self.mode = "opencv"
@@ -308,6 +308,147 @@ class EnhancedGestureDetector:
     def _classify_by_rules(self, hand_landmarks):
         """规则分类"""
         return "open_palm", 0.5
+
+        left_commands = {
+            "victory": "forward",
+            "thumb_up": "backward",
+            "pointing_up": "left",
+            "pointing_down": "right",
+        }
+
+        right_commands = {
+            "pointing_up": "up",
+            "pointing_down": "down",
+            "ok_sign": "hover",
+        }
+
+        both_commands = {
+            "open_palm": "takeoff",
+            "closed_fist": "land",
+            "thumb_down": "stop",
+        }
+
+        if left_hand_data:
+            gesture = left_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(left_hand_data, gesture)
+            result['left_gesture'] = gesture
+
+            if gesture in self.swipe_commands:
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
+            elif gesture in left_commands:
+                result['direction_command'] = left_commands[gesture]
+                result['direction_intensity'] = intensity
+            elif gesture in both_commands:
+                result['special_command'] = both_commands[gesture]
+
+        if right_hand_data:
+            gesture = right_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(right_hand_data, gesture)
+            result['right_gesture'] = gesture
+
+            if gesture in self.swipe_commands:
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
+            elif gesture in right_commands:
+                result['altitude_command'] = right_commands[gesture]
+                result['altitude_intensity'] = intensity
+            elif gesture in both_commands:
+                result['special_command'] = both_commands[gesture]
+
+        return result
+
+    # ============ 滑动手势检测方法 ============
+    
+    def _get_palm_center(self, hand_landmarks):
+        """获取手掌中心位置"""
+        if not hand_landmarks:
+            return None
+        palm_landmark = hand_landmarks.landmark[9]
+        return {
+            'x': palm_landmark.x,
+            'y': palm_landmark.y,
+            'z': palm_landmark.z if hasattr(palm_landmark, 'z') else 0
+        }
+    
+    def _detect_swipe_gesture(self, hand_key, frame_width, frame_height, current_time):
+        """检测滑动手势"""
+        if current_time - self.last_swipe_time < self.swipe_cooldown:
+            return None
+        
+        history = self.palm_history.get(hand_key, [])
+        if len(history) < 3:
+            return None
+        
+        recent_points = history[-3:]
+        start_point = recent_points[0]['position']
+        end_point = recent_points[-1]['position']
+        
+        delta_x = end_point[0] - start_point[0]
+        delta_y = end_point[1] - start_point[1]
+        
+        time_delta = recent_points[-1]['timestamp'] - recent_points[0]['timestamp']
+        if time_delta <= 0:
+            return None
+        
+        velocity_x = abs(delta_x) / time_delta
+        velocity_y = abs(delta_y) / time_delta
+        
+        direction = None
+        gesture_name = None
+        
+        if abs(delta_x) > self.swipe_threshold and velocity_x > self.swipe_min_velocity:
+            if delta_x > 0:
+                direction = "swipe_right"
+                gesture_name = "swipe_right"
+            else:
+                direction = "swipe_left"
+                gesture_name = "swipe_left"
+            intensity = min(abs(delta_x) * 2, 1.0)
+            confidence = min(velocity_x / 2.0, 1.0)
+            
+        elif abs(delta_y) > self.swipe_threshold and velocity_y > self.swipe_min_velocity:
+            if delta_y < 0:
+                direction = "swipe_up"
+                gesture_name = "swipe_up"
+            else:
+                direction = "swipe_down"
+                gesture_name = "swipe_down"
+            intensity = min(abs(delta_y) * 2, 1.0)
+            confidence = min(velocity_y / 2.0, 1.0)
+        
+        if direction:
+            self.last_swipe_time = current_time
+            self.palm_history[hand_key] = []
+            
+            return {
+                'direction': direction,
+                'intensity': intensity,
+                'gesture_name': gesture_name,
+                'confidence': confidence,
+            }
+        
+        return None
+    
+    def get_swipe_command(self, swipe_gesture):
+        """获取滑动手势对应的控制指令"""
+        return self.swipe_commands.get(swipe_gesture, "none")
+    
+    def get_current_swipe(self):
+        """获取当前检测到的滑动手势"""
+        return (self.current_swipe, self.swipe_intensity)
+    
+    def get_dual_hand_commands(self, left_hand_data, right_hand_data):
+        """获取双手控制命令（支持滑动手势）"""
+        result = {
+            'direction_command': None,
+            'direction_intensity': 0.5,
+            'altitude_command': None,
+            'altitude_intensity': 0.5,
+            'special_command': None,
+            'left_gesture': None,
+            'right_gesture': None
+        }
 
         left_commands = {
             "victory": "forward",

@@ -453,6 +453,61 @@ def spawn_dynamic_elements(world, blueprint_library):
             signs.append(actor)
     return signs
 
+# ==============================================================================
+# -- 仿真统计报告 ----------------------------------------------------------------
+# ==============================================================================
+
+class SimulationStats:
+    """仿真统计 - 收集运行数据并在结束时打印报告"""
+
+    def __init__(self):
+        self.frame_count = 0
+        self.total_detections = 0
+        self.warning_count = 0
+        self.emergency_count = 0
+        self.max_speed = 0.0
+        self.speed_sum = 0.0
+        self.speed_samples = 0
+
+    def record_frame(self, signs, is_emergency, warning_text):
+        self.frame_count += 1
+        self.total_detections += len(signs)
+        if is_emergency:
+            self.emergency_count += 1
+        if warning_text:
+            self.warning_count += 1
+
+    def update_speed(self, speed):
+        self.speed_sum += speed
+        self.speed_samples += 1
+        if speed > self.max_speed:
+            self.max_speed = round(speed, 1)
+
+    def print_report(self, elapsed, total_cars_spawned):
+        """打印仿真统计报告"""
+        avg_speed = self.speed_sum / self.speed_samples if self.speed_samples > 0 else 0
+        duration_min = elapsed / 60
+        fps = self.frame_count / elapsed if elapsed > 0 else 0
+
+        print()
+        print("=" * 55)
+        print("   📊  SIMULATION REPORT")
+        print("=" * 55)
+        print(f"   Duration:           {int(duration_min):02d}:{int(elapsed % 60):02d} min")
+        print(f"   Frames processed:   {self.frame_count} ({fps:.1f} FPS)")
+        print(f"   ─────────────────────────────────────────")
+        print(f"   Max speed:          {self.max_speed:.1f} km/h")
+        print(f"   Avg speed:          {avg_speed:.1f} km/h")
+        print(f"   ─────────────────────────────────────────")
+        print(f"   Total detections:   {self.total_detections}")
+        print(f"   Warnings:           {self.warning_count}")
+        print(f"   Emergencies:        {self.emergency_count}")
+        print(f"   Detection rate:     {self.total_detections / elapsed:.1f} obj/s")
+        print(f"   ─────────────────────────────────────────")
+        print(f"   NPC vehicles:       {total_cars_spawned}")
+        print("=" * 55)
+        print()
+
 # Main function
 def main():
     actor_list = []
@@ -466,6 +521,9 @@ def main():
 
     # 初始化速度平滑控制器（渐进式加减速）
     speed_ctrl = SpeedController(ramp_rate=0.04)
+
+    # 仿真统计
+    stats = SimulationStats()
 
     try:
         # 确保pygame已初始化
@@ -490,6 +548,7 @@ def main():
         actor_list.append(vehicle)
 
         # Spawn NPC traffic
+        npc_count = 0
         for _ in range(10):
             traffic_bp = random.choice(blueprint_library.filter('vehicle.*'))
             traffic_spawn = random.choice(map.get_spawn_points())
@@ -497,6 +556,7 @@ def main():
             if npc:
                 npc.set_autopilot(True)
                 actor_list.append(npc)
+                npc_count += 1
 
         # Camera
         camera_bp = blueprint_library.find("sensor.camera.rgb")
@@ -583,6 +643,7 @@ def main():
             speed = math.sqrt(vel.x**2 + vel.y**2 + vel.z**2) * 3.6
             if speed > max_speed:
                 max_speed = round(speed, 1)
+            stats.update_speed(speed)
 
             # Display and detection
             if camera_surface[0] is not None and camera_array[0] is not None:
@@ -594,6 +655,10 @@ def main():
 
                     # YOLO 检测（使用副本）
                     signs = detect_traffic_signs(array_copy)
+
+                    # 更新统计
+                    stats.record_frame(signs, is_emergency if 'is_emergency' in dir() else False,
+                                       warning_text if 'warning_text' in dir() else None)
 
                     # 碰撞预警 + 车辆控制（使用速度平滑控制器）
                     is_emergency, warning_text = control_vehicle_based_on_sign(
@@ -732,6 +797,12 @@ def main():
         # 输出数据记录报告
         try:
             logger.close_and_report()
+        except Exception:
+            pass
+
+        # 输出仿真统计报告
+        try:
+            stats.print_report(elapsed, npc_count + 1)  # +1 for ego vehicle
         except Exception:
             pass
 

@@ -56,6 +56,7 @@ class VisionSystem:
             results = self.yolo_model(img_bgr, conf=0.6, verbose=False)
             current_seen_classes = set()
             min_distance = float('inf') 
+            detected_side = None
             
             roi_left = 200
             roi_right = 440
@@ -77,8 +78,7 @@ class VisionSystem:
                     if cls_name in ["car", "person"]:
                         real_height = 1.7 if cls_name == "person" else 1.5
                         distance = (self.focal_length * real_height) / max(1.0, box_height)
-                        
-                        # (AEB 会用到这个最小距离，哪怕在40米外也要持续算)
+                    
                         if distance < min_distance:
                             if self.smoothed_distance == float('inf'):
                                 self.smoothed_distance = distance
@@ -86,8 +86,8 @@ class VisionSystem:
                                 self.smoothed_distance = (0.3 * distance) + (0.7 * self.smoothed_distance)
                                 
                             min_distance = self.smoothed_distance
+                            detected_side = "left" if box_center_x < 320 else "right"
                             
-                        # 🌟 核心拦截逻辑：只有距离小于 40 米时，才将其计入“雷达监控名单”
                         if distance <= radar_max_range:
                             current_seen_classes.add(cls_name)
             
@@ -119,9 +119,9 @@ class VisionSystem:
             cv2.imshow("CARLA YOLOv8 Vision", annotated_frame)
             cv2.waitKey(1)
             
-            return annotated_frame, min_distance
+            return annotated_frame, min_distance, detected_side
             
-        return None, float('inf')
+        return None, float('inf'), None
 
     def destroy(self):
         if self.camera_sensor:
@@ -129,4 +129,4 @@ class VisionSystem:
             self.camera_sensor.destroy()
         cv2.destroyAllWindows() 
         cv2.waitKey(1)
-        print("🧹 [视觉模块] 摄像头已卸载，窗口已关闭。")
+        print("🧹 [视觉模块] 摄像头已卸载，窗口已关闭。")   

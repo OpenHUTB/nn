@@ -78,6 +78,8 @@ title: 主页
 
 [__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) -  基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
 
+[__人形机器人SAC强化学习步态优化__](./mujoco_running/running.md) - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真
+
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
 
 ## 规划 <span id="planning"></span>
@@ -220,7 +222,8 @@ title: 主页
 
 ## 控制  <span id="control"></span>
 
-
+[PID](#pid)
+[__CARLA IMU 数据采集平台__](./carla_imu/carla_imu.md) — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档
 
 [PID](#pid)
 

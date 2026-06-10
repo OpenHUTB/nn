@@ -16,6 +16,10 @@ def main():
     print("===================================")
     choice = input("请输入选项 (1 或 2，默认按回车选 1): ").strip()
     target_type_name = "行人" if choice == '2' else "车辆"
+    print("  [1] 障碍物靠左生成")
+    print("  [2] 障碍物靠右生成")
+    side_choice = input("请选择障碍物位置 (1 或 2，默认按回车选 1): ").strip()
+    spawn_side = "right" if side_choice == '2' else "left"
     print(f"\n⏳ 正在连接 CARLA 服务器并准备生成 {target_type_name}...\n")
 
     client = carla.Client('localhost', 2000)
@@ -51,12 +55,19 @@ def main():
         
         for sp in spawn_points:
             wp = world.get_map().get_waypoint(sp.location)
-            # 必须当前不是路口
             if not wp.is_junction:
-                # 探寻前方 60 米处的路点
-                fwd_wps = wp.next(60.0)
+                target_wp = wp
+                if spawn_side == "left":
+                    while target_wp.get_left_lane() and target_wp.get_left_lane().lane_type == carla.LaneType.Driving:
+                        target_wp = target_wp.get_left_lane()
+                else:
+                    while target_wp.get_right_lane() and target_wp.get_right_lane().lane_type == carla.LaneType.Driving:
+                        target_wp = target_wp.get_right_lane()
+
+                fwd_wps = target_wp.next(60.0)
                 if fwd_wps and not fwd_wps[0].is_junction:
-                    ego_spawn_point = sp
+                    ego_spawn_point = target_wp.transform
+                    ego_spawn_point.location.z += 0.5
                     target_waypoint = fwd_wps[0]
                     break
                     
@@ -76,7 +87,7 @@ def main():
             # 3. 生成靶标 (使用地图路网获取的精确前方航点)
             target_transform = target_waypoint.transform
             target_transform.location.z += 0.5  # 稍微抬高防止卡地里
-            
+
             if choice == '2':
                 target_bp = bp_lib.filter('walker.pedestrian.*')[0]
             else:
@@ -113,6 +124,7 @@ def main():
             control = carla.VehicleControl()
             steer_cache, is_reverse, target_speed_kmh = 0.0, False, 0.0  
             Kp, Ki, error_sum = 0.15, 0.02, 0.0 
+            saved_target_speed = None
 
             prev_key_w = False
             prev_key_s = False
@@ -178,34 +190,27 @@ def main():
                 
                 if vision_system:
                     # 1. 视觉感知：获取最近障碍物距离
-                    _, min_dist = vision_system.process_and_render()
+                    _, min_dist, obstacle_side = vision_system.process_and_render()
                     
                     safe_dist = min_dist if min_dist != float('inf') else 100.0
-                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh)
+                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh, obstacle_side)
                     
                     if not is_reverse and planner_steer is not None:
                         control.steer = planner_steer
                         
-                    # 3. 纵向决策 (AES 减速 vs AEB 急刹)
+                    if lane_planner.is_changing_lane and not is_reverse and not control.hand_brake:
+                        if saved_target_speed is None:
+                            saved_target_speed = target_speed_kmh
+                            
+                        target_speed_kmh = 15.0
+                        control.brake = 0.0
+                    else:
+                        if saved_target_speed is not None:
+                            target_speed_kmh = saved_target_speed
+                            saved_target_speed = None
                     if min_dist != float('inf'):
                         # 计算当前车速下的安全制动距离 (公式：v²/2a + 反应距离)
-                        braking_dist = (speed_m_s ** 2) / (2 * 6.0) + 3.0 
-                        
-                        if lane_planner.is_changing_lane and not is_reverse:
-                            # 【变道优先级高】：如果正在变道，我们选择“减速绕过”而不是“原地停死”
-                            # 这样可以防止车子切到一半停在马路中间
-                            target_speed_kmh = 15.0  
-                            control.brake = 0.0     # 变道时禁制 AEB 介入
-                            
-                        elif min_dist <= braking_dist and current_speed_kmh > 2.0 and not is_reverse:
-                            # 【制动保底】：如果没有在变道（比如旁边没路），则触发 AEB 紧急制动
-                            vision_aeb_active = True
-                            if not was_aeb_active:
-                                print(f"\033[91m⚠️ 路径受阻且无法变道，触发 AEB 紧急刹车！\033[0m")
-                            target_speed_kmh = 0.0   
-                            control.throttle = 0.0
-                            control.brake = 1.0      
-                            control.hand_brake = True
+                        braking_dist = (speed_m_s ** 2) / (2 * 6.0) + 3.0
                 
                 was_aeb_active = vision_aeb_active
                 # ==========================================
