@@ -206,6 +206,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/mujoco_running/running/</loc>
+         <lastmod>2026-06-10</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/ppo_carla_driving/</loc>
          <lastmod>2026-06-10</lastmod>
          <changefreq>daily</changefreq>
