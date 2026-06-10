@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/muscle_humaniod/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>双机器人分区巡逻与动态避障仿真系统（MuJoCo） - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u53cc\u673a\u5668\u4eba\u5206\u533a\u5de1\u903b\u4e0e\u52a8\u6001\u907f\u969c\u4eff\u771f\u7cfb\u7edf\uff08MuJoCo\uff09";
+        var mkdocs_page_input_path = "muscle_humaniod/index.md";
+        var mkdocs_page_url = "/nn/muscle_humaniod/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">双机器人分区巡逻与动态避障仿真系统（MuJoCo）</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/muscle_humaniod/index.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="mujoco">双机器人分区巡逻与动态避障仿真系统（MuJoCo）</h1>
+<h2 id="1">1.项目概述</h2>
+<h3 id="11">1.1 项目简介</h3>
+<p>本项目面向双人形机器人协同作业仿真需求，基于 MuJoCo 物理仿真引擎实现<strong>分区自主巡逻、高空动态障碍物规避、机器人相互防撞、周期性肢体摆动</strong>一体化功能。系统采用<strong>点位巡航+距离判定避障+正弦节律肢体动作</strong>轻量化控制架构，无需复杂智能算法即可完成多机器人协同行为演示，具备纯本地运行、逻辑清晰、参数易调、可二次扩展等特点。</p>
+<p>项目在<strong>关节地址映射、运动边界限幅、双层避障逻辑、动态障碍物生成、拟人肢体动作</strong>等工程问题上完成落地实现，最终构建一套<strong>可运行、可复现、可拓展路径规划与集群算法</strong>的多机器人仿真基线系统。</p>
+<h3 id="12">1.2 项目整体流程</h3>
+<p>该系统形成完整的机器人行为闭环：
+模型加载与初始化 → 巡逻点位与参数配置 → 动态障碍物生成 → 分区行进控制 → 双层避障判定 → 肢体动作输出 → 仿真步进与状态反馈</p>
+<h3 id="13">1.3 项目组成</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>核心变量/逻辑</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型加载模块</td>
+<td>模型、数据实例 + 关节 <code>qposadr</code> 地址映射</td>
+<td>加载机器人模型，绑定所有受控关节索引</td>
+</tr>
+<tr>
+<td>参数配置模块</td>
+<td>运动速度、距离阈值、时间间隔、动作幅度常量</td>
+<td>统一管理仿真与控制全局参数</td>
+</tr>
+<tr>
+<td>巡逻点位模块</td>
+<td><code>patrol1</code>、<code>patrol2</code>、点位索引 <code>idx1/idx2</code></td>
+<td>划分左右区域，定义循环巡航路径</td>
+</tr>
+<tr>
+<td>障碍物模块</td>
+<td>定时随机生成球体/立方体</td>
+<td>模拟高空动态干扰障碍物</td>
+</tr>
+<tr>
+<td>巡逻控制模块</td>
+<td>方向计算、坐标更新、边界限幅</td>
+<td>控制机器人沿预设点位自主移动</td>
+</tr>
+<tr>
+<td>避障检测模块</td>
+<td>欧式距离判定逻辑</td>
+<td>实现障碍物避让、机器人互防撞</td>
+</tr>
+<tr>
+<td>肢体动作模块</td>
+<td>正弦周期振荡信号</td>
+<td>生成手臂、髋关节拟人摆动动作</td>
+</tr>
+<tr>
+<td>仿真主循环</td>
+<td><code>mj_step</code> + 可视化同步</td>
+<td>物理求解、画面渲染与闭环运行</td>
+</tr>
+</tbody>
+</table>
+<p>本项目的核心价值在于：<strong>搭建轻量化多机器人行为仿真框架，为集群巡逻、避障、路径规划等算法提供测试平台</strong>。</p>
+<h3 id="14">1.4 核心技术特点</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">特点</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>分区协同巡逻</strong></td>
+<td style="text-align: left;">双机器人划分独立区域，沿矩形点位循环巡航，区域互不干涉</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>双层避障机制</strong></td>
+<td style="text-align: left;">同时检测高空障碍物与邻机间距，双重安全防护</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>节律肢体运动</strong></td>
+<td style="text-align: left;">基于正弦函数生成周期摆动，还原人形行走姿态</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>动态环境模拟</strong></td>
+<td style="text-align: left;">定时随机生成高空球体、立方体，构建动态干扰场景</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>运动边界约束</strong></td>
+<td style="text-align: left;">坐标限幅防止机器人越界，提升系统稳定性</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>纯轻量化架构</strong></td>
+<td style="text-align: left;">无复杂控制算法，逻辑简单、运行高效、调试便捷</td>
+</tr>
+</tbody>
+</table>
+<h3 id="15">1.5 运行环境与使用方式</h3>
+<h4 id="_1">环境准备</h4>
+<pre><code class="language-bash">pip install mujoco numpy
+</code></pre>
+<h4 id="_2">运行演示（推荐入口）</h4>
+<pre><code class="language-bash">python main.py
+</code></pre>
+<h4 id="_3">文件目录说明</h4>
+<pre><code>./
+├── main.py          # 仿真主程序
+└── humanoid.xml     # MuJoCo 人形机器人模型文件（同目录放置）
+</code></pre>
+<h3 id="16">1.6 项目核心目标</h3>
+<ul>
+<li><strong>可运行性</strong>：Windows / Linux 跨平台直接运行，无需额外依赖。</li>
+<li><strong>分区巡逻</strong>：两台机器人在各自区域内稳定完成循环点位巡航。</li>
+<li><strong>双重避障</strong>：实现动态障碍物避让与机器人之间相互防碰撞。</li>
+<li><strong>拟人动作</strong>：常态下肢体周期性摆动，危险状态下动作自适应收敛。</li>
+<li><strong>可扩展性</strong>：保留完整框架接口，支持后续接入路径规划、集群控制、传感器仿真等功能。</li>
+</ul>
+<h2 id="2">2. 项目背景与问题定义</h2>
+<h3 id="21">2.1 背景</h3>
+<p>多移动机器人分区巡逻是集群机器人领域典型应用场景，在安防巡检、区域作业等场景具备实际价值。人形机器人兼具移动底盘与多自由度肢体，除位置移动外，还需要搭配自然肢体动作提升仿真真实性。</p>
+<p>MuJoCo 凭借高精度刚体动力学、接触仿真、简洁 Python 接口，成为机器人行为仿真主流平台。传统简易仿真脚本普遍存在<strong>关节索引混乱、机器人越界、相互碰撞、姿态僵硬、动态环境缺失</strong>等问题。本项目基于 MuJoCo 搭建标准化仿真框架，采用<strong>点位巡航+距离避障+关节精准映射</strong>方案，构建稳定可用的多机器人巡逻仿真基线。</p>
+<h3 id="22">2.2 现存痛点</h3>
+<ul>
+<li>多机器人联合控制时，关节索引采用固定切片易出现错位；</li>
+<li>无边界约束，机器人运动范围失控、跑出仿真区域；</li>
+<li>缺少避障逻辑，机器人易与障碍物、同伴发生碰撞；</li>
+<li>仅实现点位移动，肢体姿态僵硬，缺乏拟人行走效果；</li>
+<li>环境静态化，无动态障碍物，仿真场景真实性不足。</li>
+</ul>
+<p>基于这些问题，本项目使用 MuJoCo 物理仿真平台，采用<strong>定点巡逻+距离避障+周期肢体动作</strong>组合方案，逐步优化系统稳定性与仿真效果。</p>
+<h3 id="23">2.3 项目建设目标</h3>
+<ul>
+<li><strong>分区巡航</strong>：两台人形机器人在左右独立区域完成稳定循环巡逻。</li>
+<li><strong>动态避障</strong>：对随机出现的高空障碍物进行主动避让。</li>
+<li><strong>集群防撞</strong>：机器人之间保持安全距离，杜绝相互碰撞。</li>
+<li><strong>拟人运动</strong>：实现手臂、髋关节周期性摆动，模拟自然行走姿态。</li>
+<li><strong>工程稳定性</strong>：增加运动限幅、姿态固定、危险动作收敛等机制。</li>
+<li><strong>功能拓展性</strong>：框架模块化设计，便于后续算法迭代与功能新增。</li>
+</ul>
+<h2 id="3">3. 核心技术栈与理论基础</h2>
+<p>本项目技术栈分为仿真层、控制层、算法层、可视化层四部分。</p>
+<h3 id="31">3.1 核心技术栈</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">技术类别</th>
+<th style="text-align: left;">具体选型</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">物理仿真引擎</td>
+<td style="text-align: left;">MuJoCo 2.3+</td>
+<td style="text-align: left;">刚体动力学求解、接触计算、状态更新</td>
+</tr>
+<tr>
+<td style="text-align: left;">数值计算</td>
+<td style="text-align: left;">NumPy</td>
+<td style="text-align: left;">欧式距离、符号判断、数值限幅、三角函数运算</td>
+</tr>
+<tr>
+<td style="text-align: left;">基础工具库</td>
+<td style="text-align: left;">Python 3.8+ / random / time / os</td>
+<td style="text-align: left;">路径读取、随机障碍物生成、计时控制</td>
+</tr>
+<tr>
+<td style="text-align: left;">开发语言</td>
+<td style="text-align: left;">Python 3.8+</td>
+<td style="text-align: left;">逻辑开发、快速调试、跨平台运行</td>
+</tr>
+<tr>
+<td style="text-align: left;">机器人模型</td>
+<td style="text-align: left;">自定义 XML 人形模型</td>
+<td style="text-align: left;">含平移底盘、双臂、双腿多自由度结构</td>
+</tr>
+</tbody>
+</table>
+<p>上表概括了本项目最核心的开发与运行基础。围绕这些技术，项目进一步形成了 <strong>"模型-控制-仿真"</strong> 三段式工程闭环。</p>
+<h3 id="32-mujoco">3.2 仿真层：MuJoCo</h3>
+<p>MuJoCo（Multi-Joint Dynamics with Contact）是面向机器人控制的物理仿真引擎，支持：
+- 刚体动力学与接触力建模
+- 关节姿态、速度实时读写
+- Python API 全流程控制
+- 内置可视化 Viewer 实时渲染</p>
+<p>在本项目中，MuJoCo 主要承担三个作用：
+- 加载双人形机器人 XML 模型，解析关节、刚体、几何对象；
+- 提供机器人坐标、关节姿态、刚体位置等状态反馈；
+- 执行关节位置指令，完成物理步进与画面刷新。</p>
+<p>相关代码位置：
+- 模型与数据加载：<code>main()</code> 函数模型初始化段
+- 关节地址绑定：<code>main()</code> 内各关节 <code>qposadr</code> 获取代码
+- 物理步进：<code>mujoco.mj_step(model, data)</code>
+- 可视化渲染：<code>viewer.launch_passive</code> 与 <code>v.sync()</code></p>
+<h3 id="33">3.3 控制层：关节映射与运动约束</h3>
+<p>本项目通过<strong>关节名称寻址</strong>获取 <code>qpos</code> 数组偏移地址，彻底避免固定切片带来的索引错位问题。</p>
+<pre><code class="language-python">r1_slide_x = model.joint(&quot;r1_slide_x&quot;).qposadr.item()
+r1_slide_y = model.joint(&quot;r1_slide_y&quot;).qposadr.item()
+r1_arm_l = model.joint(&quot;r1_j_larm&quot;).qposadr.item()
+r1_arm_r = model.joint(&quot;r1_j_rarm&quot;).qposadr.item()
+r1_hip_l = model.joint(&quot;r1_left_hip&quot;).qposadr.item()
+r1_hip_r = model.joint(&quot;r1_right_hip&quot;).qposadr.item()
+r1_knee_l = model.joint(&quot;r1_left_knee&quot;).qposadr.item()
+r1_knee_r = model.joint(&quot;r1_right_knee&quot;).qposadr.item()
+</code></pre>
+<p>同时采用 <code>np.clip</code> 对机器人平面坐标做硬约束，限制运动范围：</p>
+<pre><code class="language-python">r1_x = np.clip(r1_x,-MOVE_LIMIT,MOVE_LIMIT)
+r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
+</code></pre>
+<h3 id="34">3.4 控制算法与运动学基础</h3>
+<p>本项目采用 <strong>点位巡航+距离避障+正弦周期肢体动作</strong> 分层控制架构，整体分为三层：
+<strong>高层路径规划 → 中层避障决策 → 底层关节执行</strong>，形成完整控制闭环。</p>
+<h4 id="341">3.4.1 分区点位巡航逻辑</h4>
+<p>为两台机器人划分独立矩形巡逻路径，通过点位索引循环切换目标位置：</p>
+<pre><code class="language-python"># R1 左侧巡逻区域点位
+patrol1 = [[-0.75, -0.3], [-0.3, -0.3], [-0.3, 0.3], [-0.75, 0.3]]
+# R2 右侧巡逻区域点位
+patrol2 = [[0.3, -0.3], [0.75, -0.3], [0.75, 0.3], [0.3, 0.3]]
+</code></pre>
+<p>控制逻辑：根据当前点位与机器人坐标差值，使用 <code>np.sign</code> 获取行进方向，叠加固定步长实现连续移动；到达点位阈值后自动切换下一个巡航点。</p>
+<h4 id="342">3.4.2 欧式距离避障模型</h4>
+<p>系统两套避障逻辑均基于二维欧式距离判定，距离公式：
+<script type="math/tex; mode=display">
+d = \sqrt{(x_2-x_1)^2 + (y_2-y_1)^2}
+</script>
+</p>
+<ol>
+<li>
+<p><strong>高空障碍物避障</strong>
+遍历仿真环境中高空刚体坐标，当障碍物与机器人距离小于检测阈值，立即反向调整行进方向，脱离危险区域。</p>
+</li>
+<li>
+<p><strong>机器人互避障</strong>
+计算两台机器人平面间距，当小于安全距离时，停止原巡逻方向，沿轴向偏移拉开间距，防止碰撞。</p>
+</li>
+</ol>
+<h4 id="343">3.4.3 正弦节律肢体摆动</h4>
+<p>采用正弦函数生成连续周期信号，模拟人形机器人行走时手臂、髋关节自然摆动：
+<script type="math/tex; mode=display">
+s = \sin(swing\_t \cdot swing\_k)
+</script>
+- <code>swing_t</code>：仿真步长累计计数
+- <code>swing_k</code>：摆动频率系数
+- <code>arm_amp</code> / <code>leg_amp</code>：肢体摆动幅度</p>
+<p>正常状态下左右肢体反向摆动；检测到危险时，肢体姿态快速收敛，模拟警惕状态。</p>
+<h4 id="344">3.4.4 动态障碍物生成机制</h4>
+<p>基于系统时间戳定时刷新障碍物，实现动态环境效果：
+- 设定球体、立方体各自刷新时间间隔；
+- 到达间隔后随机生成 XY 坐标，固定高度放置高空障碍物；
+- 重置障碍物速度，保证初始静止状态。</p>
+<h3 id="35">3.5 工程化机制</h3>
+<h4 id="_4">初始姿态固化</h4>
+<p>仿真启动时统一复位机器人坐标、腿部姿态与全身速度，保证初始状态稳定直立：</p>
+<pre><code class="language-python">data.qpos[r1_slide_x] = r1_x
+data.qpos[r1_slide_y] = r1_y
+data.qpos[r1_knee_l] = STAND_KNEE
+data.qpos[r1_knee_r] = STAND_KNEE
+data.qvel[:] = 0
+</code></pre>
+<h4 id="_5">危险姿态自适应收敛</h4>
+<p>机器人检测到障碍物或同伴靠近时，肢体摆动幅度衰减，动作趋于稳健：</p>
+<pre><code class="language-python">if not danger1:
+    data.qpos[r1_arm_l]=arm_amp*s;data.qpos[r1_arm_r]=-arm_amp*s
+    data.qpos[r1_hip_l]=leg_amp*s;data.qpos[r1_hip_r]=-leg_amp*s
+else:
+    data.qpos[r1_arm_l:r1_arm_r+1]*=0.92
+    data.qpos[r1_hip_l:r1_hip_r+1]*=0.92
+</code></pre>
+<h3 id="36">3.6 核心参数说明</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>数值</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>STAND_KNEE</td>
+<td>0.0</td>
+<td>膝盖直立角度，保持稳定站姿</td>
+</tr>
+<tr>
+<td>MOVE_LIMIT</td>
+<td>0.85</td>
+<td>机器人平面最大运动边界</td>
+</tr>
+<tr>
+<td>MOVE_SPEED</td>
+<td>0.0001</td>
+<td>正常巡逻行进步长</td>
+</tr>
+<tr>
+<td>DANGER_Z</td>
+<td>0.35</td>
+<td>高空障碍物高度判定阈值</td>
+</tr>
+<tr>
+<td>DETECT_RANGE</td>
+<td>0.7</td>
+<td>障碍物有效检测距离</td>
+</tr>
+<tr>
+<td>ROBOT_SAFE_DIST</td>
+<td>0.42</td>
+<td>机器人之间最小安全间距</td>
+</tr>
+<tr>
+<td>ESCAPE_SPEED</td>
+<td>0.00035</td>
+<td>相互避让移动速度</td>
+</tr>
+<tr>
+<td>BALL_INTERVAL</td>
+<td>3.5</td>
+<td>球形障碍物刷新周期(秒)</td>
+</tr>
+<tr>
+<td>CUBE_INTERVAL</td>
+<td>4.2</td>
+<td>立方体障碍物刷新周期(秒)</td>
+</tr>
+<tr>
+<td>arm_amp / leg_amp</td>
+<td>0.45 / 0.11</td>
+<td>手臂、髋关节摆动幅度</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4">4. 系统整体架构</h2>
+<p>图 1 双机器人巡逻控制整体架构图
+<img alt="robot_arch" src="goujia.png" /></p>
+<p>本系统控制闭环包含<strong>模型加载层、参数配置层、动态环境层、巡逻决策层、避障逻辑层、肢体执行层、MuJoCo 仿真反馈层</strong>七大模块，形成完整的路径决策-避障-动作执行-仿真反馈闭环。</p>
+<h2 id="5">5 系统优化</h2>
+<h3 id="51">5.1 优化一：关节名称寻址，消除索引错位</h3>
+<p>原始方案使用固定下标切片读取关节状态，模型修改后极易控制错乱。本项目改用<strong>关节名称+qposadr</strong>寻址：</p>
+<pre><code class="language-python">joint_addr = model.joint(&quot;joint_name&quot;).qposadr.item()
+</code></pre>
+<p>优化作用：
+- 关节地址与模型强绑定，修改 XML 模型无需改动索引代码；
+- 彻底解决关节控制错位、动作发散问题。</p>
+<h3 id="52">5.2 优化二：运动边界硬限幅，防止区域越界</h3>
+<p>增加坐标限幅逻辑，约束机器人活动范围：</p>
+<pre><code class="language-python">r1_x = np.clip(r1_x,-MOVE_LIMIT,MOVE_LIMIT)
+r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
+</code></pre>
+<p>优化作用：
+- 限制机器人在指定区域内活动；
+- 避免跑出仿真可视范围，提升场景完整性。</p>
+<h3 id="53">5.3 优化三：分区路径解耦，实现独立巡航</h3>
+<p>将两台机器人巡逻路径划分为左右互不重叠区域，点位数组独立配置。
+优化作用：
+- 天然减少机器人相遇概率；
+- 巡逻逻辑互不干扰，运行更稳定。</p>
+<h3 id="54">5.4 优化四：双层避障逻辑，提升运行鲁棒性</h3>
+<p>同时增加<strong>高空障碍物避障</strong>与<strong>机器人互防撞</strong>两套逻辑，分层判定危险。
+优化作用：
+- 应对动态环境干扰与集群内部碰撞两类风险；
+- 多场景下均可稳定运行。</p>
+<h3 id="55">5.5 优化五：肢体动作状态自适应</h3>
+<p>区分正常巡逻与危险状态，危险时自动衰减摆动幅度。
+优化作用：
+- 行为逻辑更拟人；
+- 危险状态下肢体姿态更稳定，减少抖动。</p>
+<h3 id="56">5.6 优化六：定时动态障碍物，丰富仿真场景</h3>
+<p>基于时间戳定时随机生成球体、立方体障碍物。
+优化作用：
+- 构建动态非结构化环境；
+- 提升仿真场景真实性与算法测试价值。</p>
+<h3 id="57">5.7 优化七：初始姿态统一复位</h3>
+<p>仿真启动时清零速度、固定膝盖角度、初始化坐标。
+优化作用：
+- 保证每次启动初始状态一致，可复现性强；
+- 避免开局姿态异常、倾倒问题。</p>
+<h2 id="6">6. 核心技术难点与解决历程</h2>
+<h3 id="61">6.1 关节索引错位导致动作异常</h3>
+<ul>
+<li><strong>问题本质</strong>：MuJoCo 关节在 <code>qpos</code> 数组中排布由 XML 模型决定，固定切片下标不具备通用性。</li>
+<li><strong>解决方案</strong>：通过 <code>model.joint(name).qposadr</code> 获取每个关节独立偏移地址，按名称寻址控制。</li>
+</ul>
+<h3 id="62">6.2 机器人运动越界问题</h3>
+<ul>
+<li><strong>问题本质</strong>：持续累加位移后，坐标不受约束，机器人跑出仿真区域。</li>
+<li><strong>解决方案</strong>：使用 <code>np.clip</code> 对 XY 坐标做上下限约束，划定有效活动区域。</li>
+</ul>
+<h3 id="63">6.3 机器人与障碍物、同伴频繁碰撞</h3>
+<ul>
+<li><strong>问题本质</strong>：无距离检测逻辑，机器人按固定路径行进，无法感知周边危险。</li>
+<li><strong>解决方案</strong>：引入欧式距离判定，设置多级阈值，触发后反向修正行进方向。</li>
+</ul>
+<h3 id="64">6.4 肢体姿态僵硬，仿真效果差</h3>
+<ul>
+<li><strong>问题本质</strong>：仅控制底盘移动，四肢无动作，拟人度低。</li>
+<li><strong>解决方案</strong>：引入正弦周期信号驱动手臂、髋关节做往复摆动，危险状态下自适应收敛。</li>
+</ul>
+<h2 id="7">7. 系统运行效果</h2>
+<h3 id="71">7.1 运行环境配置</h3>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>系统</td>
+<td>Windows 11 / Ubuntu 20.04</td>
+</tr>
+<tr>
+<td>仿真</td>
+<td>MuJoCo 2.3+</td>
+</tr>
+<tr>
+<td>依赖</td>
+<td>Python3.8、NumPy、random、time</td>
+</tr>
+</tbody>
+</table>
+<h3 id="72">7.2 交互与运行说明</h3>
+<ul>
+<li>程序启动后自动加载模型，两台机器人分别在左右区域开始循环巡逻；</li>
+<li>系统定时在高空随机生成球体、立方体障碍物；</li>
+<li>机器人检测到障碍物或同伴距离过近时自动避让；</li>
+<li>常态下手臂与髋关节持续周期性摆动；</li>
+<li>检测到危险时肢体摆动幅度减小，姿态趋于稳定；</li>
+<li>关闭可视化窗口即可终止程序。</li>
+</ul>
+<h3 id="73">7.3 运行结果图片</h3>
+<p>图 2 双机器人分区巡逻常态效果
+<img alt="巡逻效果" src="fenqu.png" /></p>
+<p>图 3 机器人动态避障运行效果
+<img alt="避障效果" src="dongtaibizhang.png" /></p>
+<h2 id="8">8. 现存不足与后续优化方向</h2>
+<h3 id="81">8.1 现存不足</h3>
+<ul>
+<li><strong>巡逻策略简单</strong>：仅支持固定点位巡航，不支持动态路径规划、目标点变更；</li>
+<li><strong>避障策略单一</strong>：仅支持反向避让，无绕行、减速、原地等待等复杂行为；</li>
+<li><strong>动作参数固定</strong>：肢体摆动频率、幅度全程不变，无法随运动状态自适应调整；</li>
+<li><strong>无状态机管理</strong>：巡逻、避障、停止等行为逻辑耦合，不利于功能拆分；</li>
+<li><strong>无虚拟传感器</strong>：基于全局坐标判定环境，未模拟激光、视觉等真实机载传感器。</li>
+</ul>
+<h3 id="82">8.2 后续优化方向</h3>
+<ul>
+<li><strong>引入智能路径规划</strong>：接入 A*、Dijkstra 算法，实现任意目标点自主路径规划。</li>
+<li><strong>丰富避障策略库</strong>：区分静态/动态障碍物，实现绕行、减速、悬停多级避障逻辑。</li>
+<li><strong>步态算法融合</strong>：参考 CPG 振荡器思路，替换纯正弦摆动，实现可控仿生步态。</li>
+<li><strong>增加有限状态机</strong>：划分巡逻、避障、暂停、紧急停止状态，解耦业务逻辑。</li>
+<li><strong>虚拟传感器仿真</strong>：添加激光雷达、深度相机模型，基于局部感知完成避障，贴近实体机器人。</li>
+<li><strong>集群协同拓展</strong>：增加队形控制、任务分配，拓展至多机器人集群编队作业场景。</li>
+</ul>
+<h2 id="9">9. 总结</h2>
+<p>本项目基于 MuJoCo 仿真引擎，搭建了双人形机器人分区巡逻与动态避障完整仿真系统。项目采用<strong>点位巡航+距离避障+周期肢体动作</strong>轻量化架构，解决了关节索引错位、机器人越界、相互碰撞、姿态僵硬等工程问题，实现分区自主巡逻、动态障碍避让、集群防碰撞、拟人肢体运动等核心功能。</p>
+<p>系统模块化程度高、参数配置清晰、跨平台运行稳定，既可作为多机器人基础行为仿真教学案例，也可在此框架上拓展路径规划、仿生步态、集群控制、传感器仿真等高级功能，为后续机器人算法研究与实体部署提供可靠的仿真测试基线。</p>
+<p>项目代码位置：<code>main.py</code>
+模型文件位置：<code>humanoid.xml</code></p>
+<h2 id="_6">参考文献</h2>
+<p>[1] Todorov E, Erez T, Tassa Y. MuJoCo: A physics engine for model-based control[C]//2012 IEEE/RSJ International Conference on Intelligent Robots and Systems. IEEE, 2012: 5026-5033.
+[2] 王浩, 张磊. 多移动机器人分区巡逻与避障算法研究[J]. 机械设计与制造, 2020.
+[3] 刘成举。基于自学习 CPG 的仿人机器人自适应行走控制 [J]. 自动化学报，2021, 47 (8): 1652-1661.</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
