@@ -82,14 +82,14 @@ title: 主页
 
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
 
-## 规划 <span id="planning"></span>
+## 规划
 
-[__导航__](#navigation)
+- [**导航**](autonomous_navigation/) - 基于神经网络的自动驾驶路径规划与导航
 
-## 控制  <span id="control"></span>
+## 控制
 
-[PID](#pid)
-title: 主页
+- [**PID控制**](auto_drive_ss/) - 基于PID的自动驾驶速度与方向控制
+- [**CARLA IMU 数据采集平台**](carla_imu/carla_imu/) - CARLA惯性测量单元数据采集与可视化驾驶平台
 
 
 
