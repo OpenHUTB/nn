@@ -14,13 +14,14 @@
 - opencv-python>=4.5.0
 - pynput>=1.8
 - msgpack-rpc-python>=0.4.1
+- torch
 
 ## 项目结构
 ```
 drone_flight_sim/
 ├── main.py                      # 主程序入口（支持两种飞行模式）
 ├── drone_controller.py          # 无人机核心控制模块
-├── collision_handler.py         # 碰撞检测与处理模块
+├── collision_handler.py         # 碰撞检测与处理模块(简单神经网络)
 ├── flight_path.py               # 航点规划模块
 ├── keyboard_control.py          # 键盘控制模块
 ├── collision_data_collector.py  # 手动碰撞数据采集模块
@@ -114,6 +115,7 @@ drone_flight_sim/
 | R | 一键返航 |
 | L | 执行降落 |
 | ESC | 紧急停止并退出 |
+| O | 一键环绕（飞矩形轨迹） |
 
 **特点**：
 - 持续按键时无人机持续移动
@@ -203,6 +205,9 @@ waypoints = FlightPath.square_path(size=15, height=-3)
 
 # 使用矩形路径
 waypoints = FlightPath.rectangle_path(width=20, length=10, altitude=-3)
+
+#使用三角形路径
+waypoints = FlightPath.triangle_path(size=15, height=-5)
 
 # 使用自定义路径
 waypoints = [(5, 0, -3), (5, -5, -3), (0, -5, -3), (0, 0, -3)]
@@ -337,6 +342,53 @@ collision_20260430_221730_9.1_-10.1,1,danger,0.14,6190.47,9.1,-10.1
 ```
 
 **下一步计划：**
-- 训练碰撞预测模型
+- ~~训练碰撞预测模型~~ ✅ 已完成
 - 实时推理与避障控制
 - 强化学习智能体训练
+
+---
+
+## 机器学习碰撞预测模型
+
+### 模型训练
+
+使用 CNN 对深度图像进行二分类（安全 vs 危险碰撞风险）：
+
+```bash
+python train_collision_model.py
+```
+
+### 模型评估
+
+```bash
+python train_collision_model.py --eval
+```
+
+### 模型文件
+
+训练好的模型保存在：`collision_model.pth`
+
+### 模型架构
+
+```
+输入: 深度图像 (64x64 灰度)
+    ↓
+Conv2D(1→16) + BN + ReLU + MaxPool
+    ↓
+Conv2D(16→32) + BN + ReLU + MaxPool
+    ↓
+Conv2D(32→64) + BN + ReLU + MaxPool
+    ↓
+Conv2D(64→128) + BN + ReLU + MaxPool
+    ↓
+Flatten → Dense(256) → Dropout → Dense(64) → Dense(1)
+    ↓
+输出: 碰撞风险概率 [0~1]
+```
+
+### 训练数据
+
+- 数据集：`collision_dataset/`
+- 样本数：301（安全: 278, 危险: 23）
+- 数据增强：过采样平衡类别
+- 测试准确率：91.80%

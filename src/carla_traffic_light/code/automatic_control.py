@@ -7,8 +7,16 @@
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
 """Example of automatic vehicle control from client side."""
-
+# -*- coding: utf-8 -*-
 from __future__ import print_function
+
+import sys
+import os
+
+# 添加 CARLA PythonAPI 路径
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'CARLA_0.9.15', 'WindowsNoEditor', 'PythonAPI', 'carla'))
 
 import argparse
 import collections
@@ -16,10 +24,8 @@ import datetime
 import glob
 import logging
 import math
-import os
 import random
 import re
-import sys
 import weakref
 
 try:
@@ -59,7 +65,7 @@ import carla
 from carla import ColorConverter as cc
 
 from agents.navigation.behavior_agent import BehaviorAgent  # pylint: disable=import-error
-from agents.navigation.roaming_agent import RoamingAgent  # pylint: disable=import-error
+#from agents.navigation.roaming_agent import RoamingAgent  # pylint: disable=import-error
 from agents.navigation.basic_agent import BasicAgent  # pylint: disable=import-error
 
 
@@ -200,6 +206,13 @@ class World(object):
 
 class KeyboardControl(object):
     def __init__(self, world):
+        self.world = world
+        self.autopilot_enabled = True   # 自动驾驶开启状态
+        # 手动驾驶按键状态
+        self.throttle = 0.0
+        self.brake = 0.0
+        self.steer = 0.0
+        self.reverse = False
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self):
@@ -209,7 +222,268 @@ class KeyboardControl(object):
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+                elif event.key == pygame.K_c:
+                    # 切换摄像头视角
+                    self.world.camera_manager.toggle_camera()
+                    self.world.hud.notification("Camera angle changed", seconds=1.0)
+                elif event.key == pygame.K_h:
+                    # 显示帮助
+                    self.world.hud.help.toggle()
+                elif event.key == pygame.K_n:
+                    # 切换下一种天气
+                    self.world.next_weather(reverse=False)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
+                elif event.key == pygame.K_m:
+                    # 切换上一种天气
+                    self.world.next_weather(reverse=True)
+                    self.world.hud.notification("Weather changed", seconds=1.0)
+                elif event.key == pygame.K_g:
+                    # 生成随机行人
+                    self.spawn_random_pedestrian()
+                    self.world.hud.notification("Pedestrian spawned", seconds=1.0)
+                elif event.key == pygame.K_t:
+                    # 生成交通车辆
+                    self.spawn_traffic_vehicles(5)  # 生成5辆车
+                elif event.key == pygame.K_y:
+                    self.clear_traffic_vehicles_batch()
+                elif event.key == pygame.K_f:
+                    # 切换自动驾驶开关
+                    self.autopilot_enabled = not self.autopilot_enabled
+                    status = "ON" if self.autopilot_enabled else "OFF"
+                    self.world.hud.notification(f"Autopilot {status}", seconds=1.0)
+                    print(f"Autopilot {status}")
+                # 手动驾驶：释放按键时归零
+                elif event.key == pygame.K_UP or event.key == pygame.K_w:
+                    self.throttle = 0.0
+                elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                    self.brake = 0.0
+                elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                    self.steer = 0.0
+                elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                    self.steer = 0.0
 
+            elif event.type == pygame.KEYDOWN:
+                # 仅在自动驾驶关闭时响应手动驾驶按键
+                if not self.autopilot_enabled:
+                    if event.key == pygame.K_UP or event.key == pygame.K_w:
+                        self.throttle = 0.8
+                        self.brake = 0.0
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.brake = 0.8
+                        self.throttle = 0.0
+                    elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                        self.steer = -0.6
+                    elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                        self.steer = 0.6
+
+        return False
+    def spawn_random_pedestrian(self):
+        """在车辆附近的人行道上生成一个随机行人"""
+        world = self.world.world
+        player_transform = self.world.player.get_transform()
+        player_location = player_transform.location
+
+        # 获取地图和车辆所在路点
+        carla_map = world.get_map()
+        vehicle_waypoint = carla_map.get_waypoint(player_location, project_to_road=True,
+                                                  lane_type=carla.LaneType.Driving)
+
+        # 搜索附近人行道（半径 20 米，角度范围 -45° 到 +45° 前方）
+        sidewalk_waypoint = None
+        search_radius = 20.0
+        angles = [-45, 0, 45]  # 搜索角度（度）
+
+        for angle in angles:
+            # 计算方向向量（相对于车辆朝向）
+            yaw_rad = math.radians(player_transform.rotation.yaw + angle)
+            direction = carla.Vector3D(x=math.cos(yaw_rad), y=math.sin(yaw_rad), z=0.0)
+            # 按固定步长向外搜索，使用整数步长
+            for dist in range(2, int(search_radius), 3):  # 从 2 米开始，步长 3 米
+                check_location = player_location + direction * dist
+                # 获取该位置附近的路点（优先人行道）
+                waypoint = carla_map.get_waypoint(check_location, project_to_road=True, lane_type=carla.LaneType.Any)
+                if waypoint and waypoint.lane_type == carla.LaneType.Sidewalk:
+                    sidewalk_waypoint = waypoint
+                    break
+            if sidewalk_waypoint:
+                break
+
+        if sidewalk_waypoint is None:
+            # 没找到人行道，降级到在车辆前方 5-10 米路面生成
+            self.world.hud.notification("No sidewalk found, spawning on road", seconds=2.0)
+            spawn_offset = carla.Location(
+                x=random.uniform(5.0, 10.0),
+                y=random.uniform(-2.0, 2.0),
+                z=0.0
+            )
+            spawn_location = player_transform.transform(spawn_offset)
+        else:
+            spawn_location = sidewalk_waypoint.transform.location
+            # 微调 Z 轴避免卡地
+            spawn_location.z += 0.5
+
+        # 获取行人蓝图
+        blueprint_library = world.get_blueprint_library()
+        pedestrian_bps = blueprint_library.filter('walker.pedestrian.*')
+        if not pedestrian_bps:
+            self.world.hud.notification("No pedestrian blueprints found", seconds=2.0)
+            return
+
+        pedestrian_bp = random.choice(pedestrian_bps)
+
+        # 随机旋转
+        rotation = carla.Rotation(yaw=random.uniform(0, 360))
+        transform = carla.Transform(spawn_location, rotation)
+
+        pedestrian = world.try_spawn_actor(pedestrian_bp, transform)
+        if pedestrian is None:
+            self.world.hud.notification("Failed to spawn pedestrian", seconds=2.0)
+            return
+
+        # 给行人设置行走控制
+        walker_control = carla.WalkerControl()
+        walker_control.speed = random.uniform(0.8, 2.0)
+        direction_angle = random.uniform(-180, 180)
+        walker_control.direction = carla.Vector3D(
+            x=math.cos(math.radians(direction_angle)),
+            y=math.sin(math.radians(direction_angle)),
+            z=0.0
+        )
+        pedestrian.apply_control(walker_control)
+
+        # 存储以便清理
+        if not hasattr(self, 'spawned_pedestrians'):
+            self.spawned_pedestrians = []
+        self.spawned_pedestrians.append(pedestrian)
+
+        self.world.hud.notification(f"Pedestrian on sidewalk: {pedestrian.type_id.split('.')[-1]}", seconds=1.5)
+
+    def spawn_traffic_vehicles(self, num_vehicles=10):
+        """生成多辆 NPC 车辆，模拟真实交通"""
+        world = self.world.world
+        blueprint_library = world.get_blueprint_library()
+
+        # 获取所有车辆蓝图
+        vehicle_bps = blueprint_library.filter('vehicle.*')
+
+        # 过滤掉一些特殊车辆（可选）
+        vehicle_bps = [bp for bp in vehicle_bps if
+                       'ambulance' not in bp.id and 'police' not in bp.id and 'fire' not in bp.id]
+
+        if not vehicle_bps:
+            self.world.hud.notification("No vehicle blueprints found", seconds=2.0)
+            return
+
+        # 获取所有生成点
+        spawn_points = world.get_map().get_spawn_points()
+        if not spawn_points:
+            self.world.hud.notification("No spawn points available", seconds=2.0)
+            return
+
+        # 随机打乱生成点
+        random.shuffle(spawn_points)
+
+        # 初始化存储列表
+        if not hasattr(self, 'traffic_vehicles'):
+            self.traffic_vehicles = []
+
+        spawned_count = 0
+        # 生成指定数量的车辆
+        for i, spawn_point in enumerate(spawn_points):
+            if spawned_count >= num_vehicles:
+                break
+
+            # 随机选择一辆车
+            vehicle_bp = random.choice(vehicle_bps)
+            # 设置颜色（如果有）
+            if vehicle_bp.has_attribute('color'):
+                color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
+                vehicle_bp.set_attribute('color', color)
+
+            # 生成车辆
+            vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+            if vehicle:
+                self.traffic_vehicles.append(vehicle)
+                spawned_count += 1
+
+        self.world.hud.notification(f"Spawned {spawned_count} traffic vehicles", seconds=3.0)
+
+        # 可选：让这些车辆开始自动驾驶
+        self._set_vehicles_autopilot(True)
+
+    def _set_vehicles_autopilot(self, enabled=True):
+        """设置所有交通车辆的自动驾驶状态"""
+        if not hasattr(self, 'traffic_vehicles'):
+            return
+        for vehicle in self.traffic_vehicles:
+            if vehicle is not None:
+                vehicle.set_autopilot(enabled)
+
+    def clear_traffic_vehicles_batch(self):
+        """使用 CARLA 批量命令安全清除所有交通车辆"""
+        if not hasattr(self, 'traffic_vehicles') or not self.traffic_vehicles:
+            self.world.hud.notification("No traffic vehicles to clear", seconds=1.0)
+            return
+
+        print(f"批量清除 {len(self.traffic_vehicles)} 辆车")
+
+        # 检查 client 是否存在
+        if not hasattr(self, 'client') or self.client is None:
+            print("错误：client 未设置，无法批量销毁")
+            return
+
+        # 收集所有有效车辆的 ID
+        vehicle_ids = []
+        for v in self.traffic_vehicles:
+            if v is not None and v.is_alive:
+                vehicle_ids.append(v.id)
+
+        if vehicle_ids:
+            try:
+                # 创建销毁命令列表
+                commands = [carla.command.DestroyActor(vid) for vid in vehicle_ids]
+                # 执行批量命令
+                response = self.client.apply_batch_sync(commands, True)
+                destroyed = sum(1 for r in response if not r.has_error())
+                print(f"批量销毁完成，成功 {destroyed} 辆")
+                self.world.hud.notification(f"Cleared {destroyed} vehicles", seconds=2.0)
+            except Exception as e:
+                print(f"批量销毁异常: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("没有有效的车辆需要清除")
+
+        # 清空列表
+        self.traffic_vehicles = []
+
+    def clear_traffic_vehicles(self):
+        """清除所有生成的交通车辆（超稳健版，绝不崩溃）"""
+        if not hasattr(self, 'traffic_vehicles') or not self.traffic_vehicles:
+            self.world.hud.notification("No traffic vehicles to clear", seconds=1.0)
+            return
+
+        print(f"开始清除 {len(self.traffic_vehicles)} 辆车")
+        destroyed = 0
+        # 复制一份，避免迭代中修改原列表
+        to_destroy = list(self.traffic_vehicles)
+        for vehicle in to_destroy:
+            if vehicle is None:
+                continue
+            try:
+                # 先检查是否还存活
+                if not vehicle.is_alive:
+                    print(f"  ⚠️ 车辆已失效: {vehicle.type_id}")
+                    continue
+                vehicle.destroy()
+                destroyed += 1
+                print(f"  ✓ 销毁成功: {vehicle.type_id}")
+            except Exception as e:
+                print(f"  ✗ 销毁时异常 ({vehicle.type_id}): {e}")
+                # 注意：这里不打印 traceback 以避免信息过多
+        self.traffic_vehicles = []
+        self.world.hud.notification(f"Cleared {destroyed} vehicles", seconds=2.0)
+        print(f"清除完成，实际销毁 {destroyed} 辆")
     @staticmethod
     def _is_quit_shortcut(key):
         """Shortcut for quitting"""
@@ -241,6 +515,8 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
+        self.total_distance = 0.0
+        self.last_location = None
 
     def on_world_tick(self, timestamp):
         """Gets informations from the world at every tick"""
@@ -251,6 +527,14 @@ class HUD(object):
 
     def tick(self, world, clock):
         """HUD method for every tick"""
+        # 计算行驶里程
+        current_location = world.player.get_location()
+        if self.last_location is not None:
+            # 计算移动距离（米）
+            delta = current_location.distance(self.last_location)
+            self.total_distance += delta
+        self.last_location = current_location
+
         self._notifications.tick(world, clock)
         if not self._show_info:
             return
@@ -280,6 +564,7 @@ class HUD(object):
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % transform.location.z,
+            'Odometer: % 10.2f km' % (self.total_distance / 1000.0),
             '']
         if isinstance(control, carla.VehicleControl):
             self._info_text += [
@@ -411,9 +696,31 @@ class HelpText(object):
 
     def __init__(self, font, width, height):
         """Constructor method"""
-        lines = __doc__.split('\n')
+        lines = [
+            "=== CARLA Help ===",
+            "",
+            "C        - Switch Camera View",
+            "H        - Show/Hide Help",
+            "N        - Next Weather",
+            "M        - Previous Weather",
+            "G        - Spawn Random Pedestrian",
+            "T        - Spawn Traffic Vehicles (5 cars)",
+            "Y        - Clear All Traffic Vehicles",
+            "F        - Toggle Autopilot (ON/OFF)",
+            "Manual mode (Autopilot OFF):",
+            "  Arrow/WASD - Drive",
+            "Ctrl+Q   - Quit",
+            "ESC      - Quit",
+            "",
+            "--agent Basic      - Basic Mode",
+            "--agent Behavior   - Behavior Mode (Traffic Light)",
+            "--loop             - Loop Mode",
+            "--behavior normal  - Driving Style (normal/cautious/aggressive)",
+            "",
+            "Traffic Light: Behavior Agent mode only",
+        ]
         self.font = font
-        self.dim = (680, len(lines) * 22 + 12)
+        self.dim = (900, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
         self.seconds_left = 0
         self.surface = pygame.Surface(self.dim)
@@ -686,27 +993,26 @@ def game_loop(args):
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
+        controller.client = client
 
         if args.agent == "Roaming":
             agent = RoamingAgent(world.player)
         elif args.agent == "Basic":
             agent = BasicAgent(world.player)
             spawn_point = world.map.get_spawn_points()[0]
-            agent.set_destination((spawn_point.location.x,
-                                   spawn_point.location.y,
-                                   spawn_point.location.z))
+            agent.set_destination(spawn_point.location)
         else:
             agent = BehaviorAgent(world.player, behavior=args.behavior)
 
             spawn_points = world.map.get_spawn_points()
             random.shuffle(spawn_points)
 
-            if spawn_points[0].location != agent.vehicle.get_location():
+            if spawn_points[0].location != world.player.get_location():
                 destination = spawn_points[0].location
             else:
                 destination = spawn_points[1].location
 
-            agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
+            agent.set_destination(world.player.get_location(), destination)
 
         clock = pygame.time.Clock()
 
@@ -729,35 +1035,57 @@ def game_loop(args):
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
-                control = agent.run_step()
-                control.manual_gear_shift = False
-                world.player.apply_control(control)
+                if controller.autopilot_enabled:
+                    control = agent.run_step()
+                    control.manual_gear_shift = False
+                    world.player.apply_control(control)
+                else:
+                    # 手动模式：使用键盘控制
+                    control = carla.VehicleControl()
+                    control.throttle = controller.throttle
+                    control.brake = controller.brake
+                    control.steer = controller.steer
+                    control.reverse = controller.reverse
+                    world.player.apply_control(control)
             else:
-                agent.update_information()
+                #agent.update_information()
 
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
 
                 # Set new destination when target has been reached
-                if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
-                    agent.reroute(spawn_points)
-                    tot_target_reached += 1
-                    world.hud.notification("The target has been reached " +
-                                           str(tot_target_reached) + " times.", seconds=4.0)
+                #if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
+                #    agent.reroute(spawn_points)
+                #    tot_target_reached += 1
+                #    world.hud.notification("The target has been reached " +
+                #                           str(tot_target_reached) + " times.", seconds=4.0)
 
-                elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
-                    print("Target reached, mission accomplished...")
-                    break
+                #elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
+                #    print("Target reached, mission accomplished...")
+                #    break
 
                 speed_limit = world.player.get_speed_limit()
                 agent.get_local_planner().set_speed(speed_limit)
 
                 control = agent.run_step()
+                print(f"Throttle: {control.throttle}, Steer: {control.steer}, Brake: {control.brake}")  # 添加这行
                 world.player.apply_control(control)
 
+
     finally:
+
         if world is not None:
+
+            # 清理生成的交通车辆
+
+            if hasattr(controller, 'traffic_vehicles'):
+
+                for vehicle in controller.traffic_vehicles:
+
+                    if vehicle is not None:
+                        vehicle.destroy()
+
             world.destroy()
 
         pygame.quit()

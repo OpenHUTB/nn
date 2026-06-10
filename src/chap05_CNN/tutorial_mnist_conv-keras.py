@@ -108,44 +108,21 @@ class MyConvModel(keras.Model):
 
     @tf.function
     def call(self, x):
-    """
-    前向传播函数（定义模型的数据流向）。
-    Args:
-        x: 输入数据张量，形状通常为 [batch_size, height, width, channels]
-    Returns:
-        probs: 输出概率分布张量，形状为 [batch_size, num_classes]，
-               每个样本的各类别概率之和为1
-    """
-    # 第一层卷积操作：使用3x3卷积核提取局部特征
-    # 输入形状：[N,H,W,C] -> 输出形状：[N,H,W,conv1_filters]
-    h1 = self.l1_conv(x)  # l1_conv 是第一个卷积层实例
-    
-    # 第一层最大池化：2x2窗口下采样，减少空间维度
-    # 输出形状变为输入的一半（如[N,128,128,32]->[N,64,64,32]）
-    h1_pool = self.pool(h1)  # pool 是 MaxPooling2D 层实例
-    
-    # 第二层卷积操作：在更高层次提取特征
-    # 使用更多卷积核捕获更复杂的模式
-    h2 = self.l2_conv(h1_pool)
-    h2_pool = self.pool(h2)  # 只保留一次池化操作
-    
-    # 展平操作：将多维特征图转换为一维特征向量
-    # 例如 [N,7,7,64] -> [N,3136]
-    flat_h = self.flat(h2_pool)  # flat 是 Flatten 层实例
-    
-    # 第一个全连接层：进行高级特征组合和非线性变换
-    # 通常使用ReLU等激活函数引入非线性
-    dense1 = self.dense1(flat_h)  # dense1 是第一个Dense层
-    
-    # 输出层：生成各分类的原始得分（logits）
-    # 不使用激活函数，保持线性输出
-    logits = self.dense2(dense1)  # dense2 是输出层
-    
-    # 应用softmax将logits转换为概率分布
-    # axis=-1 表示在最后一个维度（类别维度）进行归一化
-    probs = tf.nn.softmax(logits, axis=-1)
-    
-    return logits
+        """
+        前向传播函数（定义模型的数据流向）。
+        Args:
+            x: 输入数据张量，形状通常为 [batch_size, height, width, channels]
+        Returns:
+            logits: 输出张量，形状为 [batch_size, num_classes]
+        """
+        h1 = self.l1_conv(x)
+        h1_pool = self.pool(h1)
+        h2 = self.l2_conv(h1_pool)
+        h2_pool = self.pool(h2)
+        flat_h = self.flat(h2_pool)
+        dense1 = self.dense1(flat_h)
+        logits = self.dense2(dense1)
+        return logits
 # 创建一个神经网络模型的实例
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法

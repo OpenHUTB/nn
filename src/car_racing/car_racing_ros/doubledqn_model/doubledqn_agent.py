@@ -139,14 +139,21 @@ class DoubleDQNAgent(BaseAgent):
         4. 应用软更新到目标网络
         """
         self.n_updates += 1
-        states, actions, rewards, new_states, terminateds = self.get_samples(batch_size)
+        states, actions, rewards, new_states, dones = self.get_samples(batch_size)
+        target_q_clip = self.hyperparameters.get("target_q_clip", None)
+        try:
+            target_q_clip_f = None if target_q_clip is None else float(target_q_clip)
+        except (TypeError, ValueError):
+            target_q_clip_f = None
 
         if self.use_amp:
             from torch.cuda.amp import autocast
             with torch.no_grad(), autocast():
                 next_actions = self.policy_net(new_states).argmax(1, keepdim=True)
                 next_q = self.frozen_net(new_states).gather(1, next_actions)
-                target_q = rewards.unsqueeze(1) + (1 - terminateds.float().unsqueeze(1)) * self.gamma * next_q
+                target_q = rewards.unsqueeze(1) + (1 - dones.float().unsqueeze(1)) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
 
             self.optimizer.zero_grad(set_to_none=True)
             with autocast():
@@ -162,7 +169,9 @@ class DoubleDQNAgent(BaseAgent):
             with torch.no_grad():
                 next_actions = self.policy_net(new_states).argmax(1, keepdim=True)
                 next_q = self.frozen_net(new_states).gather(1, next_actions)
-                target_q = rewards.unsqueeze(1) + (1 - terminateds.float().unsqueeze(1)) * self.gamma * next_q
+                target_q = rewards.unsqueeze(1) + (1 - dones.float().unsqueeze(1)) * self.gamma * next_q
+                if target_q_clip_f is not None and target_q_clip_f > 0:
+                    target_q = target_q.clamp(-target_q_clip_f, target_q_clip_f)
             loss = self.loss_fn(current_q, target_q)
             self.optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -181,7 +190,8 @@ class DoubleDQNAgent(BaseAgent):
         # 软更新公式: Q_target = τ * Q_policy + (1 - τ) * Q_target
         # 其中 τ 是很小的值 (如 0.005)
         # 这比硬更新 (每N步完全复制) 更平滑稳定
-        if self.n_updates % self.update_target_every == 0:
+        update_every = int(self.update_target_every) if self.update_target_every is not None else 1
+        if update_every <= 1 or (self.act_taken % update_every) == 0:
             for target_param, policy_param in zip(
                 self.frozen_net.parameters(), self.policy_net.parameters()
             ):

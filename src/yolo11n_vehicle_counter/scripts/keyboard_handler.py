@@ -1,21 +1,24 @@
 import cv2 as cv
 import os
 
-# 全局变量用于置信度阈值调整
-_confidence_threshold = 0.15  # 默认值
+# 编辑模式状态（全局变量）
+edit_mode = False
 
-def get_confidence_threshold():
-    """获取当前置信度阈值"""
-    return _confidence_threshold
+def toggle_edit_mode():
+    """切换编辑模式"""
+    global edit_mode
+    edit_mode = not edit_mode
+    status = "开启" if edit_mode else "关闭"
+    print(f"📝 编辑模式已{status}")
+    return edit_mode
 
-def set_confidence_threshold(value):
-    """设置置信度阈值"""
-    global _confidence_threshold
-    _confidence_threshold = max(0.01, min(1.0, value))  # 限制在0.01-1.0之间
+def is_edit_mode():
+    """检查是否处于编辑模式"""
+    return edit_mode
 
 def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
     """处理键盘事件
-    
+
     Args:
         key: 按下的键
         frame: 当前帧
@@ -23,11 +26,16 @@ def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
         cap: 视频捕获对象
         out: 视频输出对象
         window_name: 窗口名称
-    
+
     Returns:
-        bool: 是否继续运行
+        tuple: (是否继续运行, 是否需要更新显示)
     """
-    if key == ord('p'):  # 按'p'键暂停
+    need_update = False
+
+    if key == ord('d'):  # 按'd'键切换编辑模式
+        toggle_edit_mode()
+        need_update = True
+    elif key == ord('p'):  # 按'p'键暂停
         # 进入暂停状态
         paused = True
         while paused:
@@ -50,7 +58,7 @@ def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
                 cap.release()
                 out.release()
                 cv.destroyAllWindows()
-                return False
+                return False, False
     elif key == ord('s'):  # 按's'键保存当前帧截图
         # 创建截图目录（如果不存在）
         screenshot_dir = "screenshots"
@@ -61,14 +69,6 @@ def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
         cv.imwrite(screenshot_path, frame)
         print(f"✅ 截图已保存: {screenshot_path}")
     elif key == ord('q'):  # 按'q'键退出程序
-        return False
-    elif key == ord('c') or key == ord('C'):
-        # 按C键增加阈值
-        set_confidence_threshold(_confidence_threshold + 0.05)
-        print(f"置信度阈值: {_confidence_threshold:.2f}")
-    elif key == ord('d') or key == ord('D'):
-        # 按D键减少阈值
-        set_confidence_threshold(_confidence_threshold - 0.05)
-        print(f"置信度阈值: {_confidence_threshold:.2f}")
-    
-    return True
+        return False, False
+
+    return True, need_update

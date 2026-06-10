@@ -1,0 +1,8 @@
+# YOLO dataset config
+path: ./final_dataset
+train: images
+val: images
+nc: 2
+names:
+  0: stop_sign
+  1: traffic_light

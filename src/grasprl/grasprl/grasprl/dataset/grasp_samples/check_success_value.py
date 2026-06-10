@@ -1,36 +1,37 @@
 import os
 import numpy as np
 
-#改成相对路径 
 data_path = os.path.dirname(os.path.abspath(__file__))
-success_num = 0
-total_num = 0
-error_files = []
 
-label_files = [f for f in os.listdir(data_path) if f.startswith("label_") and f.endswith(".npy")]
+success = 0
+fail = 0
+forces = []
+sforces = []
+fforces = []
 
-print("===== 各Label的grasp_success值 =====")
-for f in label_files:
-    total_num += 1
+
+files = [f for f in os.listdir(data_path) if f.endswith(".npy")]
+
+for f in files:
+    p = os.path.join(data_path, f)
     try:
-        label = np.load(os.path.join(data_path, f), allow_pickle=True).item()
-        val = label.get("grasp_success", -1)
-        print(f"{f} → {val}")
-        if val == 1:
-            success_num += 1
+        d = np.load(p, allow_pickle=True)
+        if isinstance(d, np.ndarray):
+            d = d.item()
+        s = d.get("grasp_success", 0)
+        force = d.get("grasp_force", 50)
+        forces.append(force)
+        if s == 1:
+            success += 1
+            sforces.append(force)
+        else:
+            fail += 1
+            fforces.append(force)
     except:
-        error_files.append(f)
-        print(f"{f} → 读取失败")
+        continue
 
-print("\n===== 统计结果 =====")
-print(f"总数量：{total_num}")
-print(f"成功数：{success_num}")
-print(f"失败数：{total_num - success_num - len(error_files)}")
-print(f"读取失败：{len(error_files)}")
-if total_num > 0:
-    print(f"成功率：{success_num/total_num*100:.2f}%")
-
-if error_files:
-    print("\n===== 失败文件 =====")
-    for f in error_files:
-        print(f"- {f}")
+print("抓取成功", success)
+print("抓取失败", fail)
+print("平均力", np.mean(forces) if forces else 0)
+print("成功平均力", np.mean(sforces) if sforces else 0)
+print("失败平均力", np.mean(fforces) if fforces else 0)
