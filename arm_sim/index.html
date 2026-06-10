@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/arm_sim/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>生物模型交互与ROS 2集成项目 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u751f\u7269\u6a21\u578b\u4ea4\u4e92\u4e0eROS 2\u96c6\u6210\u9879\u76ee";
+        var mkdocs_page_input_path = "arm_sim.md";
+        var mkdocs_page_url = "/nn/arm_sim/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">生物模型交互与ROS 2集成项目</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/arm_sim.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="ros-2">生物模型交互与ROS 2集成项目</h1>
+<h2 id="_1">项目概述</h2>
+<p>本项目融合了基于MuJoCo的人体上肢物理仿真与ROS 2机器人操作系统，实现了兼具高精度手势交互与分布式通信能力的综合仿真系统。项目核心包含两大功能模块：
+1. <strong>食指指向追踪</strong>（<code>mobl_arms_index_pointing</code>）：通过MediaPipe手部追踪驱动食指指向指定目标（如小球）的仿真功能
+- <strong>功能演示</strong>：
+<img alt="ezgif-72b271013158aed5" src="https://github.com/user-attachments/assets/937c5994-4cfe-42ae-8f77-2eb0ebb1b41a" /></p>
+<ol>
+<li><strong>面板选择反应</strong>（<code>mobl_arms_index_choice_reaction</code>）：新增的多目标面板交互模块，支持食指对虚拟面板进行选择与反应测试</li>
+<li><strong>功能演示</strong>：
+<img alt="ezgif-283f8d513dd75e78" src="https://github.com/user-attachments/assets/6edd413e-8566-4b36-a8c0-fd6650ceee10" /></li>
+</ol>
+<h2 id="_2">主要特点</h2>
+<h3 id="_3">通用特点</h3>
+<ul>
+<li><strong>高精度骨骼模型</strong>：包含上肢完整骨骼结构，细化手部掌骨、指骨（近节/中节/远节）的几何与物理参数</li>
+<li><strong>增强型肌肉驱动</strong>：基于FDPI、EDM等食指相关肌肉群的肌腱路径定义，提升动作真实性</li>
+<li><strong>实时手势映射</strong>：集成MediaPipe手部追踪，将真实手势实时映射到虚拟模型</li>
+<li><strong>ROS 2分布式通信</strong>：通过ROS 2节点实现关节数据发布、感知数据处理与外部系统交互</li>
+<li><strong>模块化设计</strong>：保持与<a href="https://github.com/User-in-the-Box/user-in-the-box">User-in-the-Box</a>原项目的兼容性</li>
+</ul>
+<h3 id="mobl_arms_index_pointing">食指指向模块（<code>mobl_arms_index_pointing</code>）</h3>
+<ul>
+<li><strong>目标追踪功能</strong>：支持配置单一目标坐标（如小球），实现食指自动指向指定位置</li>
+<li><strong>动态轨迹规划</strong>：根据目标位置实时计算手指运动轨迹，确保平滑自然的指向动作</li>
+</ul>
+<h3 id="mobl_arms_index_choice_reaction">面板选择反应模块（<code>mobl_arms_index_choice_reaction</code>）</h3>
+<ul>
+<li><strong>多目标交互面板</strong>：虚拟面板上可配置多个选择目标，支持自定义布局与样式</li>
+<li><strong>反应时间记录</strong>：精确记录从面板目标出现到食指选择的反应时长，用于交互性能分析</li>
+<li><strong>选择有效性判定</strong>：自动检测食指与目标区域的接触状态，判断选择有效性</li>
+<li><strong>动态目标生成</strong>：支持随机/序列生成面板目标，模拟复杂选择任务</li>
+<li><strong>任务逻辑闭环</strong>：通过task.py实现奖励机制、超时判断、任务重置的完整逻辑闭环</li>
+<li><strong>友好状态提示</strong>：终端实时输出任务进度、奖励数值、碰撞状态，便于调试与分析</li>
+</ul>
+<h2 id="_4">目录结构</h2>
+<pre><code>HCL_interaction_task/
+├── mobl_arms_index_pointing/       # 食指指向追踪模块
+│   ├── config.yaml                 # 指向仿真参数配置
+│   ├── simulation.xml              # 指向功能模型定义
+│   ├── evaluator.py                # 指向模块程序入口
+│   ├── simulator.py                # 指向仿真核心逻辑
+│   ├── assets/                     # 指向模块模型资源（网格/纹理）
+│   └── mujoco_ros_demo/            # 指向模块ROS 2功能包
+├── mobl_arms_index_choice_reaction/ # 面板选择反应模块
+│   ├── config.yaml                 # 面板交互参数配置
+│   ├── simulation.xml              # 面板功能模型定义
+│   ├── main.py                     # 面板模块程序入口
+│   ├── simulator.py                # 面板仿真核心逻辑
+│   ├── task.py                     # 面板任务逻辑核心
+│   └── assets/                     # 面板模块模型资源（含面板纹理）
+├── README.md                       # 项目说明文档
+└── requirements.txt                # 项目依赖清单
+</code></pre>
+<h2 id="_5">模型结构</h2>
+<h3 id="mobl_arms_index_pointingsimulationxml">食指指向模型（<code>mobl_arms_index_pointing/simulation.xml</code>）</h3>
+<ul>
+<li>核心组件：上肢骨骼结构、肌肉肌腱系统、目标标记点（小球）</li>
+<li>关键定义：手指关节活动范围、肌肉附着点、目标位置约束</li>
+</ul>
+<h3 id="mobl_arms_index_choice_reactionsimulationxml">面板选择模型（<code>mobl_arms_index_choice_reaction/simulation.xml</code>）</h3>
+<ul>
+<li>核心组件：继承基础上肢模型，新增交互面板几何体、多目标区域标记</li>
+<li>关键定义：面板碰撞属性、目标区域触发条件、手指接触检测参数</li>
+</ul>
+<h2 id="_6">核心模块说明</h2>
+<h3 id="mobl_arms_index_choice_reactiontaskpy">面板任务逻辑核心（<code>mobl_arms_index_choice_reaction/task.py</code>）</h3>
+<h4 id="1">1. 模块作用</h4>
+<p>作为面板选择反应模块的「大脑」，负责串联仿真流程与交互逻辑，实现从任务初始化到结果判定的完整闭环，无需侵入修改仿真核心代码，保持模块解耦性。</p>
+<h4 id="2">2. 核心功能</h4>
+<table>
+<thead>
+<tr>
+<th>功能项</th>
+<th>详细描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>任务初始化/重置</td>
+<td>支持任务参数加载与状态重置，实现多轮任务自动循环运行</td>
+</tr>
+<tr>
+<td>指尖-目标碰撞检测</td>
+<td>精准识别食指远节（<code>hand_2distph</code>）与面板目标（<code>button-x</code>）的接触状态</td>
+</tr>
+<tr>
+<td>奖励机制设计</td>
+<td>正确选择目标奖励（默认10.0）、超时失败扣分（默认-5.0）、动作成本惩罚（可选）</td>
+</tr>
+<tr>
+<td>超时判断</td>
+<td>基于配置的超时步数/时间，自动判定任务失败并触发重置</td>
+</tr>
+<tr>
+<td>实时状态反馈</td>
+<td>每50步输出任务进度、剩余步数、当前奖励，便于实时监控仿真过程</td>
+</tr>
+<tr>
+<td>兼容无执行器模型</td>
+<td>对无肌肉/执行器驱动的模型提供友好提示，不影响任务核心逻辑运行</td>
+</tr>
+</tbody>
+</table>
+<h4 id="3">3. 关键类与方法</h4>
+<ul>
+<li><strong><code>ChoicePanelTask</code> 类</strong>：任务逻辑封装核心，关联仿真器实例与配置参数</li>
+<li><code>__init__</code>：初始化任务参数（目标按钮、奖励值、超时步数）</li>
+<li><code>reset()</code>：重置任务状态，用于多轮任务循环</li>
+<li><code>update()</code>：每步仿真调用，更新任务状态（碰撞检测、奖励计算、超时判断）</li>
+<li><code>_check_button_contact()</code>：内部核心方法，实现指尖与目标的碰撞检测</li>
+</ul>
+<h4 id="4">4. 配置依赖</h4>
+<p>任务参数完全读取自<code>config.yaml</code>，支持灵活配置，无需修改代码：</p>
+<pre><code class="language-yaml"># 任务相关配置（已整合到config.yaml）
+target_button: 0        # 目标按钮ID（0-3对应红/绿/蓝/黄）
+button_reward: 10.0     # 正确选择奖励值
+effort_cost: 0.01       # 动作成本惩罚系数（有执行器时生效）
+timeout: 600            # 任务超时步数（对应仿真时长）
+</code></pre>
+<h2 id="_7">系统要求</h2>
+<ul>
+<li>Ubuntu 22.04 LTS (ROS 2 Humble)</li>
+<li>Python 3.8+（推荐3.10.18）</li>
+<li>MuJoCo 2.3.0+（测试版本3.3.7）</li>
+<li>依赖库：OpenCV、MediaPipe、NumPy、PyYAML</li>
+<li>环境管理：Conda 环境管理器</li>
+<li>额外依赖（C++）：libglfw3-dev、libyaml-cpp-dev、libeigen3-dev</li>
+</ul>
+<h2 id="_8">安装步骤</h2>
+<h3 id="1_1">1. 克隆仓库（如适用）</h3>
+<pre><code class="language-bash">git clone https://github.com/lbxlb/nn.git
+cd HCL_interaction_task
+</code></pre>
+<h3 id="2_1">2. 环境配置</h3>
+<pre><code class="language-bash"># 创建并激活conda环境
+conda create -n mjoco_ros python=3.10
+conda activate mjoco_ros
+
+# 安装依赖
+pip install -r requirements.txt
+# 或手动安装
+pip install mujoco mediapipe numpy opencv-python pyyaml
+
+# 安装ROS 2相关依赖（如使用ROS功能）
+sudo apt install ros-humble-ros-base
+</code></pre>
+<h3 id="3_1">3. 模型资源准备</h3>
+<ol>
+<li>
+<p>下载完整模型文件集（含精细STL模型和纹理）：
+   <a href="链接: https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e 提取码: rq8e">完整模型文件集网盘链接</a></p>
+</li>
+<li>
+<p>解压资源文件到对应模块的assets目录：</p>
+</li>
+<li>指向模块：<code>mobl_arms_index_pointing/assets/</code></li>
+<li>面板模块：<code>mobl_arms_index_choice_reaction/assets/</code></li>
+</ol>
+<h2 id="_9">配置说明</h2>
+<h3 id="mobl_arms_index_pointingconfigyaml">食指指向模块配置（<code>mobl_arms_index_pointing/config.yaml</code>）</h3>
+<pre><code class="language-yaml">dt: 0.05                # 仿真步长
+render_mode: &quot;human&quot;    # 渲染模式（&quot;human&quot;/&quot;offscreen&quot;）
+resolution: [1280, 960] # 窗口分辨率
+target_pos: [0.4, 0, 0.7] # 目标小球坐标
+</code></pre>
+<h3 id="mobl_arms_index_choice_reactionconfigyaml">面板选择模块配置（<code>mobl_arms_index_choice_reaction/config.yaml</code>）</h3>
+<pre><code class="language-yaml">dt: 0.05                # 仿真步长
+render_mode: &quot;human&quot;    # 渲染模式
+resolution: [1280, 960] # 窗口分辨率
+panel_pos: [0.5, 0, 0.6] # 面板位置
+target_count: 3         # 面板目标数量
+target_size: 0.05       # 目标区域大小
+reaction_timeout: 5.0   # 反应超时时间（秒）
+# 任务逻辑配置（新增）
+target_button: 0        # 目标按钮ID（0-3）
+button_reward: 10.0     # 正确选择奖励值
+effort_cost: 0.01       # 动作成本惩罚系数
+timeout: 600            # 任务超时步数
+</code></pre>
+<h3 id="ros-2_1">ROS 2功能包结构</h3>
+<pre><code>mujoco_ros_demo/
+├── config/
+│   ├── assets/           # 3D模型文件(STL格式)
+│   ├── humanoid.xml      # 机器人模型配置文件
+│   └── config.yaml       # 仿真参数配置文件（C++版本）
+├── launch/
+│   └── main.launch.py    # ROS2启动文件（支持Python/C++节点）
+├── mujoco_ros_demo/      # Python节点目录
+│   ├── __init__.py
+│   ├── mujoco_publisher.py   # Python版：发布关节角度数据的节点
+│   └── data_subscriber.py    # Python版：订阅并处理数据的节点
+├── mujoco_demo_cpp/      # C++节点目录（新增）
+│   ├── simulator.cpp/.hpp    # C++版：MuJoCo仿真核心逻辑
+│   ├── mujoco_publisher.cpp  # C++版：发布关节角度数据的节点
+│   ├── data_subscriber.cpp   # C++版：订阅并处理数据的节点
+│   ├── data_acquire.cpp      # C++版：感知数据采集节点
+│   └── perception_node.cpp   # C++版：感知数据处理节点
+├── CMakeLists.txt        # C++编译配置文件（新增）
+├── package.xml           # ROS2包配置文件（更新依赖）
+├── setup.py              # Python包安装配置
+</code></pre>
+<h2 id="_10">节点说明</h2>
+<ol>
+<li><strong>MujocoPublisher</strong> (mujoco_publisher.py/mujoco_publisher.cpp)</li>
+<li>功能：加载MuJoCo模型并发布关节角度数据</li>
+<li>发布主题：/joint_angles (std_msgs/Float64MultiArray)</li>
+<li>
+<p>参数：model_path - 机器人模型文件路径</p>
+</li>
+<li>
+<p><strong>DataSubscriber</strong> (data_subscriber.py/data_subscriber.cpp)</p>
+</li>
+<li>功能：订阅关节角度数据并计算平均值</li>
+<li>订阅主题：/joint_angles (std_msgs/Float64MultiArray)</li>
+<li>
+<p>输出：终端打印关节角度及平均值</p>
+</li>
+<li>
+<p><strong>DataAcquire</strong> (data_acquire.py)</p>
+</li>
+<li>功能：采集外部传感器或设备数据（如手势追踪原始数据）</li>
+<li>发布主题：/raw_sensor_data (自定义消息类型)</li>
+<li>支持：MediaPipe原始数据、外部传感器输入等
+<img alt="ezgif-59ef5d64b961194d" src="https://github.com/user-attachments/assets/8baece71-eefd-40f8-8197-a92a7c6f9d02" /></li>
+<li><strong>PerceptionNode</strong> (perception_node.py)</li>
+<li>功能：处理感知数据，实现手势识别与解析</li>
+<li>订阅主题：/raw_sensor_data</li>
+<li>
+<p>发布主题：/processed_gesture (包含解析后的手势指令)
+<img alt="ezgif-40d1cc7854d18dd9" src="https://github.com/user-attachments/assets/3510e8f7-bf61-466b-9bae-2a55a86406e0" /></p>
+</li>
+<li>
+<p><strong>Main</strong> (main.launch.py)</p>
+</li>
+<li>功能：启动ROS 2系统并连接各个节点</li>
+<li>启动节点：MujocoPublisher、DataSubscriber
+<img alt="ezgif-7dec2645d82e4788" src="https://github.com/user-attachments/assets/97475b38-4876-409b-b52d-ce0e535c520b" /></li>
+</ol>
+<h2 id="_11">使用方法</h2>
+<h3 id="1_2">1. 基础仿真运行</h3>
+<pre><code class="language-bash">python evaluator.py --config config.yaml --model simulation.xml
+</code></pre>
+<h3 id="2-ros-2">2. ROS 2系统运行</h3>
+<pre><code class="language-bash"># 构建项目
+colcon build
+source install/setup.bash
+
+# 启动ROS 2节点(python)
+ros2 launch mujoco_ros_demo main.launch.py
+
+# 运行数据采集节点(C++)
+ros2 run mujoco_ros_demo data_acquire_cpp
+</code></pre>
+<h3 id="3_2">3. 查看运行状态</h3>
+<ul>
+<li>查看节点信息：<code>ros2 node list</code></li>
+<li>查看话题信息：<code>ros2 topic list</code></li>
+<li>可视化工具：<code>rqt</code></li>
+</ul>
+<h2 id="_12">项目来源/参考</h2>
+<ul>
+<li><a href="https://github.com/deepmind/mujoco">MuJoCo</a> - 高性能物理引擎</li>
+<li><a href="https://github.com/ros2">ROS 2</a> - 机器人操作系统</li>
+<li><a href="https://github.com/User-in-the-Box/user-in-the-box">User-in-the-Box</a> - 基础模型参考</li>
+</ul>
+<h2 id="_13">许可证</h2>
+<p>本项目基于Apache-2.0许可证发布。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
