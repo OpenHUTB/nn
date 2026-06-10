@@ -51,6 +51,7 @@ nav:
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
 - 自动驾驶车辆语义分割: 'auto_drive_seg/README.md'
 - 双足人形机器人SAC步态仿真: 'mujoco_running\running.md'
+- 人形机器人项目: mujoco_hci_sim/README.md
 
 # - mdx_math 用于行内公式显示
 markdown_extensions:
