@@ -43,6 +43,14 @@
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">首页</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#_2">入门 </a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_3">感知 </a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_4">规划 </a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_5">控制  </a>
+    </li>
     </ul>
                 </li>
               </ul>
@@ -94,7 +102,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="head">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</h1>
+                <p>=======</p>
 <h1 id="_1"><a href="https://github.com/OpenHUTB/nn">神经网络</a></h1>
 <p>欢迎使用神经网络文档，该页面包含所有内容的索引。</p>
 <ul>
@@ -102,11 +110,11 @@
 <li><a href="#perception"><strong>感知</strong></a></li>
 <li><a href="#planning"><strong>规划</strong></a></li>
 <li><a href="#control"><strong>控制</strong></a></li>
+<li><a href="#other"><strong>其他</strong></a></li>
 </ul>
 <hr />
 <h2 id="_2">入门 <span id="primary"></span></h2>
-<p><a href="carla_traffic_sign_recognition/carla_traffic_sign_recognition/"><strong>11</strong></a> — 入门热身示例<br />
-<a href="warmup/"><strong>热身</strong></a> — 入门热身示例</p>
+<p><a href="warmup/"><strong>热身</strong></a> — 入门热身示例</p>
 <p><a href="linear_regression/"><strong>线性回归</strong></a></p>
 <p><a href="linear_regression_improved/"><strong>线性回归改进</strong></a></p>
 <p><a href="linear_regression_fix/"><strong>线性回归修复</strong></a> - 修复偏置未更新bug</p>
@@ -124,209 +132,31 @@
 <p><a href="chap11_gaussian_mixture/"><strong>高斯混合改进</strong></a></p>
 <p><a href="RBM/"><strong>受限玻尔兹曼机</strong></a></p>
 <p><a href="RL/"><strong>强化学习</strong></a></p>
-<p><a href="ant_robot/%E6%9C%BA%E5%99%A8%E4%BA%BA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/">机器人仿真(MuJoCo)</a></p>
-<p><a href="arm_sim/"><strong>机械臂仿真系统</strong></a> - 基于MuJoCo的机械臂仿真与功能优化</p>
 <hr />
 <h2 id="_3">感知 <span id="perception"></span></h2>
 <p><a href="lane_detection/"><strong>车道线检测</strong></a> - 基于 OpenCV 的 Carla 场景车道线检测（分步实现）</p>
 <p><a href="carla_CAM/"><strong>carla_CAM</strong></a> - 使用类激活映射测试卷积神经网络</p>
 <p><a href="auto_drive_seg/"><strong>自动驾驶车辆语义分割</strong></a> - 基于 U-Net + Focal Loss 的 CARLA 街景 8 类语义分割（含数据增强、速度基准、概率热力图、类别频率分析）</p>
 <p><a href="edge_intelligence_V2X/"><strong>V2X路侧智能感知</strong></a> - 基于YOLOv8n的V2X路侧智能感知系统优化与实现</p>
-<p><a href="test/object_detection/"><strong>目标检测</strong></a> - 目标检测与危险评估
-<a href="image_object_detection/image_object_detection/"><strong>图像目标检测</strong></a> - 多功能图像目标检测系统
-<a href="#tracking"><strong>跟踪</strong></a> 
-<a href="./test.md"><strong>路径追踪</strong></a></p>
-<p><a href="traffic_sign_detection/"><strong>交通标识检测</strong></a> - 目标检测</p>
-<p><a href="td3_carracing/"><strong>td3_carracing</strong></a> - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统</p>
-<p><a href="UVA_flight_control_system/"><strong>无人机飞行控制</strong></a> - 基于AirSim的无人机飞行控制系统</p>
-<p><a href="humanoid_balance/Humanoid_Balance/"><strong>人形机器人平衡控制</strong></a> - 基于强化学习的人形机器人平衡控制仿真</p>
-<p><a href="improve/project/"><strong>工程规范优化</strong></a> - 多场景仿真与控制优化项目</p>
-<p><a href="mujoco_man/mujoco_manrun/"><strong>人形机器人站立行走</strong></a> -  基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）</p>
-<p><a href="mujoco_running/running/"><strong>人形机器人SAC强化学习步态优化</strong></a> - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真</p>
-<p><a href="setup_tool/report/"><strong>setup_tool模块汇报文档</strong></a> - setup_tool 模块背景、改进内容、运行方式与效果总结</p>
-<p><a href="mujoco_hci_sim/"><strong>人形机器人自主行走</strong></a> - 基于PPO强化学习的Humanoid人形机器人自主行走仿真</p>
-<h2 id="_4">规划 <span id="planning"></span></h2>
-<p><a href="#navigation"><strong>导航</strong></a></p>
-<p><a href="carla_yolo_planner/"><strong>Carla YOLO规划器</strong></a> - Carla环境结合YOLO的自动驾驶路径规划方案</p>
-<h2 id="_5">控制  <span id="control"></span></h2>
-<p><a href="#pid">PID</a>
-title: 主页</p>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<p>ebacb9ab55185c039bacca159efd32b9ac410824</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-<h1 id="_6"><a href="https://github.com/OpenHUTB/nn">神经网络</a></h1>
-<p>欢迎使用神经网络文档，该页面包含所有内容的索引。</p>
-<h2 id="_7">目录</h2>
-<ul>
-<li>
-<p><a href="#primary">入门</a> - 基础算法与模型示例</p>
-</li>
-<li>
-<p><a href="#perception">感知</a> - 计算机视觉与感知系统</p>
-</li>
-<li>
-<p><a href="#planning">规划</a> - 路径规划与决策</p>
-</li>
-<li>
-<p><a href="#control">控制</a> - 控制算法与仿真</p>
-</li>
-</ul>
-<hr />
-<h2 id="_8">入门 <span id="primary"></span></h2>
-<ul>
-<li>
-<p><a href="warmup/"><strong>热身</strong></a> - 入门热身示例</p>
-</li>
-<li>
-<p><a href="linear_regression/"><strong>线性回归</strong></a> - 基础线性回归模型</p>
-</li>
-<li>
-<p><a href="linear_regression_improved/"><strong>线性回归改进</strong></a> - 线性回归优化版本</p>
-</li>
-<li>
-<p><a href="linear_regression_fix/"><strong>线性回归修复</strong></a> - 修复偏置未更新bug</p>
-</li>
-<li>
-<p><a href="softmax_regression/"><strong>softmax回归</strong></a> - 多分类softmax回归</p>
-</li>
-<li>
-<p><a href="softmax_regression_improved/"><strong>线性回归和softmax回归改进</strong></a> - 回归算法改进</p>
-</li>
-<li>
-<p><a href="svm/"><strong>支持向量机</strong></a> - SVM分类算法</p>
-</li>
-<li>
-<p><a href="svm_improved/"><strong>支持向量机改进</strong></a> - SVM优化版本</p>
-</li>
-<li>
-<p><a href="simple_nn/"><strong>简单神经网络</strong></a> - 基础神经网络</p>
-</li>
-<li>
-<p><a href="CNN/"><strong>卷积神经网络</strong></a> - CNN基础实现</p>
-</li>
-<li>
-<p><a href="cnn_keras_sequential_improved/"><strong>卷积神经网络改进</strong></a> - CNN优化版本</p>
-</li>
-<li>
-<p><a href="RNN/"><strong>循环神经网络</strong></a> - RNN基础实现</p>
-</li>
-<li>
-<p><a href="poem_generation_rnn_improved/"><strong>循环神经网络改进</strong></a> - RNN优化版本</p>
-</li>
-<li>
-<p><a href="attention/"><strong>注意力机制</strong></a> - 注意力机制原理与实现</p>
-</li>
-<li>
-<p><a href="gaussian_mixture/"><strong>高斯混合</strong></a> - 高斯混合模型</p>
-</li>
-<li>
-<p><a href="chap11_gaussian_mixture/"><strong>高斯混合改进</strong></a> - 高斯混合优化</p>
-</li>
-<li>
-<p><a href="RBM/"><strong>受限玻尔兹曼机</strong></a> - RBM基础实现</p>
-</li>
-<li>
-<p><a href="RL/"><strong>强化学习</strong></a> - 强化学习基础</p>
-</li>
-<li>
-<p><a href="ant_robot/%E6%9C%BA%E5%99%A8%E4%BA%BA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/"><strong>机器人仿真</strong></a> - MuJoCo机器人仿真</p>
-</li>
-<li><a href="arm_sim/"><strong>机械臂仿真系统</strong></a> - 基于MuJoCo的机械臂仿真与功能优化 </li>
-</ul>
-<p><a href="rain_sensor_fusion\DEMO_REPORT.md"><strong>基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化</strong></a></p>
-<hr />
-<h2 id="_9">感知 <span id="perception"></span></h2>
-<ul>
-<li>
-<p><a href="carla_CAM/"><strong>carla_CAM</strong></a> - 使用类激活映射测试卷积神经网络</p>
-</li>
-<li>
-<p><a href="carla_traffic_sign_recognition/carla_traffic_sign_recognition/"><strong>交通标识识别</strong></a> — 交通标识识别</p>
-</li>
-<li>
-<p><a href="edge_intelligence_V2X/"><strong>V2X路侧智能感知</strong></a> - 基于YOLOv8n的V2X路侧智能感知系统优化与实现</p>
-</li>
-<li>
-<p><a href="carla_auto_vision_navigator/"><strong>Carla多模态异常检测</strong></a> - 基于多模态融合的Carla非结构化场景异常检测自动驾驶</p>
-</li>
-<li>
 <p><a href="test/object_detection/"><strong>目标检测</strong></a> - 目标检测与危险评估</p>
-</li>
-<li>
 <p><a href="image_object_detection/image_object_detection/"><strong>图像目标检测</strong></a> - 多功能图像目标检测系统</p>
-</li>
-<li>
-<p><strong>跟踪</strong> - 目标跟踪</p>
-</li>
-<li>
-<p><a href="./test.md"><strong>路径追踪</strong></a> - 路径追踪测试</p>
-</li>
-<li>
-<p><a href="traffic_sign_detection/"><strong>交通标识检测</strong></a> - 交通标识目标检测</p>
-</li>
-<li>
-<p><a href="td3_carracing/"><strong>td3_carracing</strong></a> - 基于 TD3 + CNN 的强化学习自动驾驶系统</p>
-</li>
-<li>
+<p><a href="./test.md"><strong>路径追踪</strong></a></p>
+<p><a href="traffic_sign_detection/"><strong>交通标识检测</strong></a> - 目标检测</p>
+<h2 id="_4">规划 <span id="planning"></span></h2>
+<p><a href="carla_yolo_planner/"><strong>Carla YOLO规划器</strong></a> - Carla环境结合YOLO的自动驾驶路径规划方案</p>
+<p><a href="mujoco_running/running/"><strong>人形机器人SAC强化学习步态优化</strong></a> - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真</p>
+<p><a href="mujoco_hci_sim/"><strong>人形机器人自主行走</strong></a> - 基于PPO强化学习的Humanoid人形机器人自主行走仿真</p>
+<p><a href="mujoco_man/mujoco_manrun/"><strong>人形机器人站立行走</strong></a> -  基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）</p>
+<p><a href="td3_carracing/"><strong>td3_carracing</strong></a> - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统</p>
+<p><a href="ant_robot/%E6%9C%BA%E5%99%A8%E4%BA%BA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/"><strong>机器人仿真(MuJoCo)</strong></a></p>
+<p><a href="arm_sim/"><strong>机械臂仿真系统</strong></a> - 基于MuJoCo的机械臂仿真与功能优化</p>
+<h2 id="_5">控制  <span id="control"></span></h2>
 <p><a href="UVA_flight_control_system/"><strong>无人机飞行控制</strong></a> - 基于AirSim的无人机飞行控制系统</p>
-</li>
-<li>
 <p><a href="humanoid_balance/Humanoid_Balance/"><strong>人形机器人平衡控制</strong></a> - 基于强化学习的人形机器人平衡控制仿真</p>
-</li>
-<li>
 <p><a href="improve/project/"><strong>工程规范优化</strong></a> - 多场景仿真与控制优化项目</p>
-</li>
-<li>
-<p><a href="mujoco_man/mujoco_manrun/"><strong>人形机器人站立行走</strong></a> - 基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）</p>
-</li>
-<li>
+<h1 id="_6">其他  <span id="other"></span></h1>
+<p><a href="carla_imu/carla_imu/"><strong>CARLA IMU 数据采集平台</strong></a> — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档</p>
 <p><a href="setup_tool/report/"><strong>setup_tool模块汇报文档</strong></a> - setup_tool 模块背景、改进内容、运行方式与效果总结</p>
-</li>
-<li>
-<p><a href="robot_arm/"><strong>机械臂自动抓取</strong></a> - 基于Franka Panda的机械臂自动抓取仿真项目</p>
-</li>
-<li>
-<p><a href="muscle_humaniod/"><strong>双机器人分区巡逻与动态避障仿真</strong></a> - 基于 MuJoCo 的双人形机器人分区巡逻与动态避障仿真系统</p>
-</li>
-</ul>
-<h2 id="_10">规划 <span id="planning"></span></h2>
-<p><a href="#navigation"><strong>导航</strong></a></p>
-<ul>
-<li><a href="carla_yolo_planner/"><strong>Carla YOLO规划器</strong></a> - Carla环境结合YOLO的自动驾驶路径规划方案</li>
-</ul>
-<h2 id="_11">控制  <span id="control"></span></h2>
-<p>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</p>
-<p>=======
-<a href="#pid">PID</a>
-<a href="carla_imu/carla_imu/"><strong>CARLA IMU 数据采集平台</strong></a> — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档</p>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<p>ebacb9ab55185c039bacca159efd32b9ac410824</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-<p><a href="#pid">PID</a></p>
               
             </div>
           </div><footer>
@@ -381,5 +211,5 @@ title: 主页</p>
 
 <!--
 MkDocs version : 1.5.8
-Build Date UTC : 2026-06-10 13:35:44.835909+00:00
+Build Date UTC : 2026-06-10 13:43:36.376960+00:00
 -->
