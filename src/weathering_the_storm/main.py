@@ -19,6 +19,7 @@ import logging.handlers
 import time
 import random
 import json
+import pygame
 from datetime import datetime
 from pathlib import Path
 
@@ -361,7 +362,7 @@ def run_quick_test(args, sim_logger=None):
         sim_logger: SimulationLogger instance for enhanced logging
     """
     import carla
-    from carla_av_simulation import SimulationDashboard, WeatherScheduler
+    from carla_av_simulation import SimulationDashboard, WeatherScheduler, HUDOverlay
     
     log = sim_logger.logger if sim_logger else logging.getLogger()
 
@@ -470,13 +471,35 @@ def run_quick_test(args, sim_logger=None):
         dashboard.vehicles_count = len(spawned_vehicles)
         dashboard.start()
 
+        if not pygame.get_init():
+            pygame.init()
+        hud_display = pygame.display.set_mode((800, 600), pygame.HWSURFACE | pygame.DOUBLEBUF)
+        pygame.display.set_caption("CARLA AV Simulation - HUD")
+        hud = HUDOverlay((800, 600))
+
         start_time = time.time()
         frame_count = 0
         last_weather_update = 0
+        last_hud_update = 0
 
         try:
             while time.time() - start_time < args.duration and not dashboard.quit_requested:
                 dashboard.check_keyboard()
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        dashboard.quit_requested = True
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_SPACE:
+                            dashboard.paused = not dashboard.paused
+                        elif event.key == pygame.K_h:
+                            hud.toggle()
+                        elif event.key == pygame.K_p:
+                            hud.save_screenshot(hud_display, weather_scheduler.current_phase)
+                        elif event.key == pygame.K_q:
+                            dashboard.quit_requested = True
+                        elif event.key == pygame.K_d:
+                            dashboard.debug_mode = not dashboard.debug_mode
 
                 if dashboard.quit_requested:
                     log.info("Quit requested by user")
@@ -486,6 +509,12 @@ def run_quick_test(args, sim_logger=None):
                     time.sleep(0.05)
                     elapsed = time.time() - start_time
                     dashboard.update(elapsed=elapsed)
+                    hud.render(hud_display, vehicle=vehicle, weather_phase=weather_scheduler.get_phase_label(),
+                               elapsed=elapsed, duration=args.duration, paused=True,
+                               frame_count=frame_count, memory_mb=mem_mb if 'mem_mb' in dir() else 0,
+                               camera_frames=0, lidar_frames=0, radar_frames=0,
+                               vehicles_count=len(spawned_vehicles), debug_mode=dashboard.debug_mode, mode='quick')
+                    pygame.display.flip()
                     continue
 
                 world.tick()
@@ -517,6 +546,18 @@ def run_quick_test(args, sim_logger=None):
                     frame_count=frame_count,
                     weather_phase=weather_scheduler.get_phase_label(),
                 )
+
+                if current_time - last_hud_update >= 0.25:
+                    hud_display.fill((20, 20, 30))
+                    hud.render(hud_display, vehicle=vehicle,
+                               weather_phase=weather_scheduler.get_phase_label(),
+                               fps=fps, elapsed=elapsed, duration=args.duration,
+                               paused=dashboard.paused, frame_count=frame_count,
+                               memory_mb=mem_mb, camera_frames=0, lidar_frames=0, radar_frames=0,
+                               vehicles_count=len(spawned_vehicles),
+                               debug_mode=dashboard.debug_mode, mode='quick')
+                    pygame.display.flip()
+                    last_hud_update = current_time
 
         except KeyboardInterrupt:
             log.info("Simulation interrupted by user")

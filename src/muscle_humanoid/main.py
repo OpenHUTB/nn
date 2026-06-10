@@ -2,133 +2,146 @@ import mujoco
 import mujoco.viewer as viewer
 import numpy as np
 import os
-
-# 步态参数 进一步减速
-GAIT_FREQ = 0.03       # 步态节奏更慢
-BASE_STEP_AMP = 0.15   # 更小步幅
-BASE_ARM_AMP = 0.20    # 小幅摆臂
-ELBOW_AMP = 0.3
-KNEE_AMP = 0.35
-BOUNCE_AMP = 0.02
-
-# 移动边界
-POS_LIMIT = 3.0
-
-class HumanoidStableEnv:
-    def __init__(self, xml_path):
-        self.model = mujoco.MjModel.from_xml_path(xml_path)
-        self.data = mujoco.MjData(self.model)
-        self.reset()
-        self.standup_progress = 0.0  
-
-        # 相机视角
-        self.viewer = viewer.launch_passive(self.model, self.data)
-        self.viewer.cam.distance = 5.0
-        self.viewer.cam.elevation = -20
-        self.viewer.cam.azimuth = 90
-
-    def reset(self):
-        """复位：初始深度蹲下，重新开始起立"""
-        self.data.qpos[:] = 0.0
-        self.data.qvel[:] = 0.0
-        self.data.qpos[2] = 0.65   # 蹲得更深，视觉更明显
-        self.data.qpos[0] = 0.0
-        self.data.qpos[1] = 0.0
-        self.data.qpos[3] = 0.0
-        self.data.qpos[4] = 0.0
-        self.standup_progress = 0.0
-        print("\n>>> 重置完成，开始【深度蹲下 → 超缓慢起立】<<<")
-
-    def step(self, phase):
-        # 越界自动复位
-        if abs(self.data.qpos[0]) > POS_LIMIT or abs(self.data.qpos[1]) > POS_LIMIT:
-            self.reset()
-
-        # 起立阶段：总时长拉到 5000 步，过程极慢，方便观察
-        if self.standup_progress < 1.0:
-            self.standup_progress += 0.0002  # 单步增量极小，起立很慢
-            target_height = 0.65 + 0.55 * self.standup_progress
-            self.data.qpos[2] = target_height
-            
-            # 蹲下/起立过程：膝盖弯曲、肢体不动
-            left_hip = 0
-            right_hip = 0
-            left_knee = 0.9
-            right_knee = 0.9
-            left_arm = 0
-            right_arm = 0
-            left_elbow = 0
-            right_elbow = 0
-            move_speed = 0.0  # 起立阶段完全不移动
-
-        else:
-            # 起立完成：超慢速行走
-            left_hip = BASE_STEP_AMP * np.sin(phase)
-            right_hip = BASE_STEP_AMP * np.sin(phase + np.pi)
-            left_knee = KNEE_AMP * np.clip(np.sin(phase + np.pi/2), 0, 1)
-            right_knee = KNEE_AMP * np.clip(np.sin(phase - np.pi/2), 0, 1)
-
-            left_arm = BASE_ARM_AMP * np.sin(phase + np.pi)
-            right_arm = BASE_ARM_AMP * np.sin(phase)
-            left_elbow = ELBOW_AMP * np.abs(np.sin(phase + np.pi))
-            right_elbow = ELBOW_AMP * np.abs(np.sin(phase))
-
-            self.data.qpos[2] = 1.2 + BOUNCE_AMP * np.abs(np.cos(phase))
-            move_speed = 0.0001  # 行走移动速度降到最低
-
-        # 赋值关节
-        self.data.qpos[self.model.joint("left_hip_pitch").qposadr] = left_hip
-        self.data.qpos[self.model.joint("right_hip_pitch").qposadr] = right_hip
-        self.data.qpos[self.model.joint("left_knee").qposadr] = left_knee
-        self.data.qpos[self.model.joint("right_knee").qposadr] = right_knee
-
-        self.data.qpos[self.model.joint("left_shoulder_pitch").qposadr] = left_arm
-        self.data.qpos[self.model.joint("right_shoulder_pitch").qposadr] = right_arm
-        self.data.qpos[self.model.joint("left_elbow").qposadr] = left_elbow
-        self.data.qpos[self.model.joint("right_elbow").qposadr] = right_elbow
-
-        # 向前移动
-        self.data.qpos[1] += move_speed
-
-        # 姿态限制，防止倒立、翻转
-        self.data.qpos[self.model.joint("root").qposadr + 3] = np.clip(self.data.qpos[3], -0.2, 0.2)
-        self.data.qpos[4] = np.clip(self.data.qpos[4], -1.5, 1.5)
-
-        mujoco.mj_forward(self.model, self.data)
-        self.viewer.sync()
-
-        return self.data.qpos[3], self.standup_progress
-
-    def close(self):
-        self.viewer.close()
+import random
+import time
 
 def main():
     xml_path = os.path.join(os.path.dirname(__file__), "humanoid.xml")
-    env = HumanoidStableEnv(xml_path)
-    total_step = 0
+    model = mujoco.MjModel.from_xml_path(xml_path)
+    data = mujoco.MjData(model)
 
-    print("===== 深度蹲下 + 超长慢速起立 + 极慢行走 =====")
-    print("流程：深蹲 → 缓慢站直 → 低速前行，全过程清晰可见\n")
+    r1_slide_x = model.joint("r1_slide_x").qposadr.item()
+    r1_slide_y = model.joint("r1_slide_y").qposadr.item()
+    r1_arm_l = model.joint("r1_j_larm").qposadr.item()
+    r1_arm_r = model.joint("r1_j_rarm").qposadr.item()
+    r1_hip_l = model.joint("r1_left_hip").qposadr.item()
+    r1_hip_r = model.joint("r1_right_hip").qposadr.item()
+    r1_knee_l = model.joint("r1_left_knee").qposadr.item()
+    r1_knee_r = model.joint("r1_right_knee").qposadr.item()
 
-    try:
-        while env.viewer.is_running():
-            total_step += 1
-            t = total_step * env.model.opt.timestep
-            phase = 2 * np.pi * GAIT_FREQ * t
+    r2_slide_x = model.joint("r2_slide_x").qposadr.item()
+    r2_slide_y = model.joint("r2_slide_y").qposadr.item()
+    r2_arm_l = model.joint("r2_j_larm").qposadr.item()
+    r2_arm_r = model.joint("r2_j_rarm").qposadr.item()
+    r2_hip_l = model.joint("r2_left_hip").qposadr.item()
+    r2_hip_r = model.joint("r2_right_hip").qposadr.item()
+    r2_knee_l = model.joint("r2_left_knee").qposadr.item()
+    r2_knee_r = model.joint("r2_right_knee").qposadr.item()
 
-            tilt, progress = env.step(phase)
+    STAND_KNEE = 0.0
+    MOVE_LIMIT = 0.85
+    MOVE_SPEED = 0.0001
+    DANGER_Z = 0.35
+    DETECT_RANGE = 0.7
+    ROBOT_SAFE_DIST = 0.42
+    ESCAPE_SPEED = 0.00035
+    BALL_INTERVAL = 3.5
+    CUBE_INTERVAL = 4.2
 
-            if total_step % 50 == 0:
-                if progress < 1.0:
-                    print(f"步数:{total_step:04d} | 起立进度:{progress:.1%}")
-                else:
-                    print(f"步数:{total_step:04d} | 正常慢速行走中")
+    # 分区巡逻点位：R1左区、R2右区
+    patrol1 = [[-0.75, -0.3], [-0.3, -0.3], [-0.3, 0.3], [-0.75, 0.3]]
+    patrol2 = [[0.3, -0.3], [0.75, -0.3], [0.75, 0.3], [0.3, 0.3]]
+    idx1, idx2 = 0, 0
+    r1_x, r1_y = -0.5, 0
+    r2_x, r2_y = 0.5, 0
 
-    except KeyboardInterrupt:
-        print("\n模拟终止")
-    finally:
-        env.close()
-        print("环境关闭")
+    last_ball = time.time()
+    last_cube = time.time()
+    swing_t = 0.0
+    data.qpos[r1_slide_x] = r1_x
+    data.qpos[r1_slide_y] = r1_y
+    data.qpos[r2_slide_x] = r2_x
+    data.qpos[r2_slide_y] = r2_y
+    data.qpos[r1_knee_l] = STAND_KNEE
+    data.qpos[r1_knee_r] = STAND_KNEE
+    data.qpos[r2_knee_l] = STAND_KNEE
+    data.qpos[r2_knee_r] = STAND_KNEE
+    data.qvel[:] = 0
+
+    v = viewer.launch_passive(model, data)
+    v.cam.distance = 7.2
+    v.cam.elevation = -22
+    v.cam.lookat[:] = [0, 0, 0.4]
+    swing_k = 0.0001
+    arm_amp = 0.45
+    leg_amp = 0.11
+
+    while v.is_running():
+        swing_t += 1
+        # 高空障碍刷新
+        if time.time() - last_ball > BALL_INTERVAL:
+            last_ball = time.time()
+            for i in range(3):
+                jid = model.joint(i).qposadr.item()
+                data.qpos[jid:jid+3] = [random.uniform(-0.7,0.7),random.uniform(-0.7,0.7),4.2]
+                data.qvel[jid:jid+3]=0
+        if time.time() - last_cube > CUBE_INTERVAL:
+            last_cube = time.time()
+            cid = model.joint(3).qposadr.item()
+            data.qpos[cid:cid+3]=[random.uniform(-0.7,0.7),random.uniform(-0.7,0.7),4.2]
+            data.qvel[cid:cid+3]=0
+
+        danger_pos = []
+        for i in range(4):
+            px,py,pz = data.xpos[model.body(i+1).id]
+            if pz>DANGER_Z: danger_pos.append([px,py])
+        dist_robot = np.hypot(r2_x-r1_x,r2_y-r1_y)
+
+        # R1左区巡逻
+        t1x,t1y = patrol1[idx1]
+        dx1,dy1 = np.sign(t1x-r1_x)*MOVE_SPEED, np.sign(t1y-r1_y)*MOVE_SPEED
+        danger1=False
+        for ox,oy in danger_pos:
+            if np.hypot(ox-r1_x,oy-r1_y)<DETECT_RANGE:
+                dx1=-np.sign(ox-r1_x)*MOVE_SPEED
+                dy1=-np.sign(oy-r1_y)*MOVE_SPEED
+                danger1=True;break
+        if dist_robot<ROBOT_SAFE_DIST:
+            dx1=0;dy1=ESCAPE_SPEED;danger1=True
+        if abs(r1_x-t1x)<0.05 and abs(r1_y-t1y)<0.05:
+            idx1=(idx1+1)%4
+        r1_x += dx1; r1_y += dy1
+        r1_x = np.clip(r1_x,-MOVE_LIMIT,MOVE_LIMIT)
+        r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
+
+        # R2右区巡逻
+        t2x,t2y = patrol2[idx2]
+        dx2,dy2 = np.sign(t2x-r2_x)*MOVE_SPEED, np.sign(t2y-r2_y)*MOVE_SPEED
+        danger2=False
+        for ox,oy in danger_pos:
+            if np.hypot(ox-r2_x,oy-r2_y)<DETECT_RANGE:
+                dx2=-np.sign(ox-r2_x)*MOVE_SPEED
+                dy2=-np.sign(oy-r2_y)*MOVE_SPEED
+                danger2=True;break
+        if dist_robot<ROBOT_SAFE_DIST:
+            dx2=0;dy2=-ESCAPE_SPEED;danger2=True
+        if abs(r2_x-t2x)<0.05 and abs(r2_y-t2y)<0.05:
+            idx2=(idx2+1)%4
+        r2_x += dx2; r2_y += dy2
+        r2_x = np.clip(r2_x,-MOVE_LIMIT,MOVE_LIMIT)
+        r2_y = np.clip(r2_y,-MOVE_LIMIT,MOVE_LIMIT)
+
+        data.qpos[r1_slide_x]=r1_x;data.qpos[r1_slide_y]=r1_y
+        data.qpos[r2_slide_x]=r2_x;data.qpos[r2_slide_y]=r2_y
+        data.qpos[r1_knee_l]=data.qpos[r1_knee_r]=STAND_KNEE
+        data.qpos[r2_knee_l]=data.qpos[r2_knee_r]=STAND_KNEE
+
+        s = np.sin(swing_t*swing_k)
+        if not danger1:
+            data.qpos[r1_arm_l]=arm_amp*s;data.qpos[r1_arm_r]=-arm_amp*s
+            data.qpos[r1_hip_l]=leg_amp*s;data.qpos[r1_hip_r]=-leg_amp*s
+        else:
+            data.qpos[r1_arm_l:r1_arm_r+1]*=0.92
+            data.qpos[r1_hip_l:r1_hip_r+1]*=0.92
+        if not danger2:
+            data.qpos[r2_arm_l]=arm_amp*s;data.qpos[r2_arm_r]=-arm_amp*s
+            data.qpos[r2_hip_l]=leg_amp*s;data.qpos[r2_hip_r]=-leg_amp*s
+        else:
+            data.qpos[r2_arm_l:r2_arm_r+1]*=0.92
+            data.qpos[r2_hip_l:r2_hip_r+1]*=0.92
+
+        mujoco.mj_step(model,data)
+        v.sync()
 
 if __name__ == "__main__":
     main()

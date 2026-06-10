@@ -6,7 +6,7 @@ import carla
 import logging
 
 class EgoVehicleController:
-"""
+    """
     主车辆控制器
     
     功能：
@@ -21,7 +21,7 @@ class EgoVehicleController:
         self.controller = None
   
     def setup_ego_vehicle(self, ego_vehicle):  
-    """
+        """
         配置主车辆初始控制参数
         
         Args:

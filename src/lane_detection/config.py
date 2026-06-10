@@ -9,6 +9,7 @@ CONFIG = {
     "img_path": str(DEFAULT_IMAGE),
 
     # 步骤1：基础版（Canny + 霍夫）
+    "img_path": str(DEFAULT_IMAGE),
     "canny_low": 50,
     "canny_high": 150,
     "gaussian_kernel": (5, 5),

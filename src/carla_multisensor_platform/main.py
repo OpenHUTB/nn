@@ -98,14 +98,13 @@ def main():
     
     # Setup display and sensors
     displaymanager = DisplayManager(
-        grid_size=[2, 4], 
+        grid_size=[1, 1], 
         window_size=[WINDOW_SIZE[0], WINDOW_SIZE[1]]
     )
     
     # sensor = [[x, y, z], [display grid], enabled]
     sensors_dict = {
         'DepthCamera': [[0, 0, 2.4], [0, 0], False],
-        'RGBCamera': [[0, 0, 2.4], [0, 0], True],
         'RGBCamera': [[0, 0, 2.4], [0, 0], True],
         'RGBCamera_BEV': [[0, 0, 20.0], [0, 1], False],
         'RGBCamera_Lane': [[2.0, 0, 2.4], [1, 3], False],
