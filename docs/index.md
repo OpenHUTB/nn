@@ -206,7 +206,7 @@ title: 主页
 
 - [__机械臂自动抓取__](./robot_arm/README.md) - 基于Franka Panda的机械臂自动抓取仿真项目
 
-
+- [__基于自监督学习与PPO强化学习的自动驾驶仿真项目__](autonomous_driving/README.md) - 基于CARLA的SSL+RL自动驾驶仿真系统
 
 
 
@@ -226,4 +226,3 @@ title: 主页
 [__CARLA IMU 数据采集平台__](./carla_imu/carla_imu.md) — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档
 
 [PID](#pid)
-
