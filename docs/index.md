@@ -73,6 +73,7 @@ title: 主页
 
 [__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
 
+[_交通拥堵仿真与智能调控_](./lidar_project/README.md) - 基于 CARLA 与强化学习的多模型融合交通拥堵仿真与智能调控系统
 
 ## 规划 <span id="planning"></span>
 
