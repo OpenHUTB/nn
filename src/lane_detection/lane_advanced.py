@@ -200,10 +200,60 @@ def preprocess_for_advanced(img):
     return combined
 
 
+# ---- 单帧处理 ----
+
+def process_frame(img, save_dir=None):
+    """对单帧图像（numpy 数组）执行完整的高级流水线，返回结果图和中间数据。
+
+    供图片模式和视频模式共用。
+
+    Returns:
+        result_img, intermediates dict 或 None
+        intermediates 包含: binary, binary_warped, sliding_window_img, poly_img,
+                          left_fit, right_fit, left_fitx, right_fitx, ploty
+    """
+    height, width = img.shape[:2]
+    M, Minv = compute_perspective_matrix(width, height)
+
+    binary = preprocess_for_advanced(img)
+    binary_warped = warp_to_birdseye(binary, M, width, height)
+    leftx, lefty, rightx, righty, sliding_window_img = extract_lane_pixels(binary_warped)
+    left_fit, right_fit, left_fitx, right_fitx, ploty, poly_img = \
+        fit_polynomial(binary_warped, leftx, lefty, rightx, righty)
+
+    intermediates = {
+        "binary": binary,
+        "binary_warped": binary_warped,
+        "sliding_window_img": sliding_window_img,
+        "poly_img": poly_img,
+        "left_fit": left_fit,
+        "right_fit": right_fit,
+        "left_fitx": left_fitx,
+        "right_fitx": right_fitx,
+        "ploty": ploty,
+        "Minv": Minv,
+    }
+
+    if left_fitx is None and right_fitx is None:
+        return img, intermediates
+
+    result = draw_lane_on_original(img, binary_warped, Minv, left_fitx, right_fitx, ploty)
+
+    if save_dir:
+        save_dir = str(save_dir)
+        cv2.imwrite(f"{save_dir}/step03_binary.jpg", (binary * 255).astype(np.uint8))
+        cv2.imwrite(f"{save_dir}/step03_birdseye.jpg", (binary_warped * 255).astype(np.uint8))
+        cv2.imwrite(f"{save_dir}/step03_sliding_window.jpg", sliding_window_img.astype(np.uint8))
+        cv2.imwrite(f"{save_dir}/step03_poly_fit.jpg", poly_img.astype(np.uint8))
+        cv2.imwrite(f"{save_dir}/step03_result.jpg", result)
+
+    return result, intermediates
+
+
 # ---- 主流水线 ----
 
 def run_advanced_pipeline(img_path=None, save_dir=None):
-    """运行高级车道线检测流水线：透视变换 + 滑动窗口 + 二次多项式拟合。
+    """运行高级车道线检测流水线（图片文件输入）。
 
     流程：
     1. 结合 HSV + Sobel 梯度提取车道线二值图
@@ -218,33 +268,8 @@ def run_advanced_pipeline(img_path=None, save_dir=None):
         print(f"错误：无法读取图片 {path}")
         return None
 
-    height, width = img.shape[:2]
-    M, Minv = compute_perspective_matrix(width, height)
-
-    # 车道线二值化
-    binary = preprocess_for_advanced(img)
-    binary_warped = warp_to_birdseye(binary, M, width, height)
-
-    # 滑动窗口搜索
-    leftx, lefty, rightx, righty, sliding_window_img = extract_lane_pixels(binary_warped)
-
-    # 多项式拟合
-    left_fit, right_fit, left_fitx, right_fitx, ploty, poly_img = \
-        fit_polynomial(binary_warped, leftx, lefty, rightx, righty)
-
-    if left_fitx is None and right_fitx is None:
+    result, _ = process_frame(img, save_dir=save_dir)
+    if result is None:
         print("警告：未能检测到车道线像素")
         return img
-
-    # 反透视绘制
-    result = draw_lane_on_original(img, binary_warped, Minv, left_fitx, right_fitx, ploty)
-
-    if save_dir:
-        save_dir = str(save_dir)
-        cv2.imwrite(f"{save_dir}/step03_binary.jpg", (binary * 255).astype(np.uint8))
-        cv2.imwrite(f"{save_dir}/step03_birdseye.jpg", (binary_warped * 255).astype(np.uint8))
-        cv2.imwrite(f"{save_dir}/step03_sliding_window.jpg", sliding_window_img.astype(np.uint8))
-        cv2.imwrite(f"{save_dir}/step03_poly_fit.jpg", poly_img.astype(np.uint8))
-        cv2.imwrite(f"{save_dir}/step03_result.jpg", result)
-
     return result
