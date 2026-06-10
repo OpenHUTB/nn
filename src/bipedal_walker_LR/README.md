@@ -1,145 +1,145 @@
-# 双足行走机器人 PPO 训练项目
+# Bipedal Walker PPO Training
 
-本项目基于近端策略优化（PPO）算法，在双足行走机器人（Bipedal Walker）环境中训练智能体。该环境模拟拥有 4 个关节、双腿结构的双足机器人，任务是穿越复杂崎岖地形，项目同时实现了普通模式与硬核模式两种训练场景。
+This project focuses on training an agent using **Proximal Policy Optimization (PPO)** within the **Bipedal Walker** environment. The environment simulates a bipedal robot with 4 joints and 2 legs, challenging the agent to traverse rough terrain. Both normal and hardcore modes are implemented.
 
-## 目录
-- 双足行走机器人环境简介
-- 项目结构
-- 训练流程
-- 普通模式 & 硬核模式 PPO 训练
-- 环境配置
-  - make_env() 环境创建函数
-  - observe_model() 模型观测函数
-- 模型评估
-- 训练日志与分析
-- 优化改进方向
-- 安装依赖
-- 致谢与参考
+## Table of Contents
+0. [About Bipedal Walker](#about-bipedal-walker)
+1. [Project Structure](#project-structure)
+2. [Training Process](#training-process)
+    - Normal and Hardcore modes with PPO
+3. [Environment Setup](#environment-setup)
+    - 3.1 make_env()
+    - 3.2 observe_model()
+4. [Model Evaluation](#model-evaluation)
+5. [Training Logs and Analysis](#training-logs-and-analysis)
+6. [Improvements](#improvements)
+7. [Installation Requirements](#installation-requirements)
+8. [Credits](#credits)
 
----
+## 0. About Bipedal Walker
 
-## 0. 双足行走机器人环境简介
-Bipedal Walker 基于 Box2D 物理引擎开发，模拟双足机器人在各类地形中自主行走。智能体需要学会保持身体平衡、肢体协调以及自主移动，同时规避路面障碍。
+The **Bipedal Walker** environment, based on the Box2D physics engine, simulates a bipedal robot navigating various terrains. The challenge for the agent is to maintain balance, coordination, and locomotion in the face of obstacles.
 
-- **观测空间**：包含 24 个连续数值，涵盖机体倾角、运动速度、关节角度、激光雷达测距数据等。
-- **动作空间**：4 个连续控制量，用于控制髋关节与膝关节的输出扭矩。
-- **奖励机制**：向前行进获得正向奖励；关节扭矩过大、机器人倒地会获得负向惩罚。
-- **终止条件**：机器人倒地，或超出最大步数限制（普通模式上限 1600 步，硬核模式 2000 步）。
+- **Observation Space**: 24 continuous values including hull angles, velocities, joint angles, and LIDAR readings.
+- **Action Space**: 4 continuous values controlling the torque applied to the hip and knee joints.
+- **Rewards**: Positive for forward movement, negative for excessive joint torque and falling.
+- **Termination**: When the agent falls or exceeds the step limit (1600 steps for normal mode, 2000 for hardcore).
 
----
+## 1. Project Structure
 
-## 1. 项目结构
-- `main.py`：主程序文件，包含普通模式和硬核模式的完整训练循环。
-- `env_utils.py`：环境工具脚本，配置双足行走机器人环境，支持帧堆叠、视频录制、奖励归一化等功能。
-- `logs/`：存放训练日志文件目录。
-- `models/`：保存训练完成的 PPO 模型权重目录。
-- `videos/`：开启录制后，智能体对局视频将保存至此目录。
+- **main.py**: Contains the training loop for both normal and hardcore modes.
+- **env_utils.py**: A utility script that configures the Bipedal Walker environment with optional features such as frame stacking, video recording, and reward normalization.
+- **logs/**: Directory for storing training logs.
+- **models/**: Directory for saving trained PPO models.
+- **videos/**: If enabled, recorded video episodes will be saved here.
 
----
+## 2. Training Process
 
-## 2. 训练流程
-### 普通模式
-- 训练总步数：100 万步
-- 环境：标准双足行走环境（BipedalWalker-v3）
-- 训练技术：向量化并行环境、奖励归一化、帧堆叠、对局视频录制。
-- 模型：采用多层感知器（MLP）策略网络的 PPO 算法。
+### Normal Mode
+- **Timesteps**: 1 million
+- **Environment**: Standard Bipedal Walker (`BipedalWalker-v3`)
+- **Techniques**: Vectorized environments, reward normalization, frame stacking, video recording.
+- **Model**: PPO with a Multi-Layer Perceptron (MLP) policy.
 
-### 硬核模式
-- 训练总步数：500 万步
-- 环境：硬核双足行走环境（BipedalWalkerHardcore-v3）
-- 训练技术：与普通模式一致，地形难度更高、训练时长更长。
+### Hardcore Mode
+- **Timesteps**: 5 million
+- **Environment**: Hardcore Bipedal Walker (`BipedalWalkerHardcore-v3`)
+- **Techniques**: Same as normal mode with more challenging terrain and increased training duration.
 
-本项目基于 Stable Baselines3 框架实现 PPO 算法，通过向量化多环境并行加速训练。
+The training uses Stable Baselines3's PPO algorithm and runs with vectorized environments for parallel training.
 
----
+## 3. Environment Setup
 
-## 3. 环境配置
-环境配置主要依赖 `env_utils.py` 中的两个核心函数。
+The environment is set up using two key functions from the **env_utils.py** script:
 
-### 3.1 make_env() 环境创建函数
-`make_env()` 用于初始化训练 / 评估环境，支持多项自定义配置：
+### 3.1 make_env()
 
-- **环境创建**：默认加载 BipedalWalker-v3，传入 `hardcore=True` 即可切换为硬核地形模式 BipedalWalkerHardcore-v3。
-- **渲染模式**：支持实时可视化渲染 `human` 模式，以及用于视频录制的 `rgb_array` 模式。
-- **视频录制**：设置 `record_video=True` 可每 1000 步自动录制对局视频，并保存至指定文件夹。
-- **监控封装**：接入环境监控器，记录单局奖励、对局步数等指标，用于后续训练分析。
-- **向量化运算**：基于 DummyVecEnv 启动多环境并行，大幅提升训练速度。
-- **观测与奖励归一化**：通过 VecNormalize 封装环境，对观测值和奖励做归一化处理，稳定训练过程、提升智能体学习效率。
-- **帧堆叠**：默认堆叠最近 4 帧观测数据（VecFrameStack），为智能体提供时序运动信息，对双足机器人这类动态行走任务至关重要。
-- **观测值截断**：可设置 `clip_obs` 阈值（默认 10.0），截断异常观测离群值，避免干扰训练。
+The `make_env()` function prepares the environment for training and evaluation with several configurable options:
 
-**使用示例**
+- **Environment Creation**: By default, the environment created is `BipedalWalker-v3`. However, you can enable the hardcore mode by passing `hardcore=True` to switch to `BipedalWalkerHardcore-v3`.
+  
+- **Render Mode**: The environment can be rendered in different modes, such as 'human' for real-time visualization or 'rgb_array' for video recording.
+
+- **Video Recording**: If `record_video=True` is set, the environment records every 1000 steps and saves the recordings in the specified folder.
+
+- **Monitor**: The environment can be wrapped with a monitor to log performance metrics such as rewards and episode lengths. These logs are useful for analyzing the training process later.
+
+- **Vectorized Operations**: To speed up training, `DummyVecEnv` is used to enable parallel processing of multiple environment instances.
+
+- **Observation & Reward Normalization**: The environment is wrapped with `VecNormalize` to stabilize training by normalizing both observations and rewards. This helps the agent learn more effectively.
+
+- **Frame Stacking**: The last `n` frames (by default, 4) can be stacked using `VecFrameStack`, providing the agent with temporal context, which is crucial for environments like Bipedal Walker that require an understanding of movement dynamics over time.
+
+- **Clip Observations**: You can clip observations to avoid outliers during training by setting `clip_obs` to a certain value (default: 10.0).
+
+### Example Usage:
+
 ```python
 env = make_env(env_name="BipedalWalker-v3", hardcore=True, record_video=True, use_monitor=True)
 ```
 
-### 3.2 observe_model() 模型观测函数
-该函数加载训练好的 PPO 模型并在环境中进行评估，可自动匹配训练时使用的归一化、帧堆叠等环境封装，保证评估一致性。
+### 3.2 observe_model()
 
-- **模型加载**：从指定路径读取保存的训练模型。
-- **环境适配**：根据是否开启硬核模式，自动匹配对应行走环境。
-- **封装复用**：自动复现训练时的 VecNormalize 归一化、VecFrameStack 帧堆叠配置。
-- **效果评估**：运行指定对局数，输出平均奖励与奖励标准差。
+The observe_model() function loads a trained PPO model and evaluates it in the specified environment. It automatically checks if VecNormalize and VecFrameStack were used during training and applies them accordingly.
 
-**使用示例**
+- **Model Loading:** The trained model is loaded from the specified file path.
+
+- **Environment Setup:** Depending on whether hardcore mode is enabled, the environment BipedalWalker-v3 or BipedalWalkerHardcore-v3 is selected.
+- **VecNormalize & VecFrameStack:** If these wrappers were used during training, they are applied to the evaluation environment to ensure consistent behavior.
+- **Evaluation:** The model is evaluated over a specified number of episodes, and the mean and standard deviation of the rewards are returned.
+
+### Example Usage:
 ```python
 mean_reward, std_reward = observe_model(model_path='models/ppo_bipedalwalker_1M', n_eval_episodes=5, hardcore=False)
 ```
 
-整套环境配置兼顾训练与评估场景，灵活支持视频录制、归一化、帧堆叠等高级功能。
+This setup ensures that the environment is optimized for both training and evaluation, providing flexibility with advanced features like video recording, reward normalization, and frame stacking.
+## 4. Model Evaluation
 
----
+Model evaluation is performed across multiple episodes using the `observe_model()` function, which loads the trained model and runs it in human-render mode for visualization.
 
-## 4. 模型评估
-通过 `observe_model()` 函数进行多局测试评估，同时以真人视角渲染对局过程，直观观察智能体行走效果。
+### Example Evaluation Output:
 
-**评估结果示例**
-- 普通模式：平均奖励 248.39 ± 112.10
-- 硬核模式（300 万步）：平均奖励 -28.23 ± 24.82
-- 硬核模式（500 万步）：平均奖励 -10.66 ± 3.91
-- 硬核模式（700 万步）：平均奖励 -5.45 ± 2.10
+- **Normal Mode**: `Average reward: 248.39 ± 112.10`
+- **Hardcore Mode (3M)**: `Average reward: -28.23 ± 24.82`
+- **Hardcore Mode (5M)**: `Average reward: -10.66 ± 3.91`
+- **Hardcore Mode (7M)**: `Average reward: -5.45 ± 2.10`
 
-结果可见：智能体在普通地形中表现良好，但在高难度硬核地形中仍表现欠佳，需进一步调参或延长训练时间。
+These results show that the agent performs relatively well in the normal environment but struggles in the hardcore version, where further training or parameter tuning may be needed.
 
----
+## 5. Training Logs and Analysis
 
-## 5. 训练日志与分析
-对硬核模式 500 万步训练日志进行数据分析：
+Training logs from the 5 million hardcore timesteps are analyzed for insights into agent performance:
 
-- **奖励变化趋势**：奖励曲线存在波动，但整体随训练逐步趋于稳定。
-- **对局时长趋势**：随着训练推进，智能体存活步数持续增加，偶尔出现小幅回落。
-- **相关性分析**：奖励值与对局时长呈现强正相关（相关系数 0.89），说明智能体存活越久，获得的累积奖励越高。
+- **Reward Trend**: The reward shows fluctuations but tends to stabilize over time.
+- **Episode Length Trend**: The agent consistently learns to survive longer as training progresses, though there are occasional dips.
+- **Correlation**: A strong positive correlation (0.89) between reward and episode length, indicating that the longer the agent survives, the more reward it earns.
 
-项目基于 pandas、matplotlib 绘制奖励趋势图、对局时长移动平均线等可视化图表。
+Visualizations such as reward trends and episode length moving averages are generated using `pandas` and `matplotlib`.
 
----
+## 6. Improvements
 
-## 6. 优化改进方向
-为进一步提升智能体行走性能，可参考以下优化方案：
+Recommendations for improving the agent's performance:
+- **Adjust Learning Rate**: A smaller learning rate may lead to more stable improvements.
+- **Reward Restructuring**: Incentivize the agent to prioritize survival and balance over forward movement.
+- **Increased Exploration**: Methods such as ε-greedy or curiosity-driven exploration can help the agent learn more diverse strategies.
+- **Extended Training**: Additional timesteps can provide the agent with more experience and lead to better policies.
 
-1. **调整学习率**：适当降低学习率，让训练过程更平稳、收敛更稳定。
-2. **重构奖励函数**：优化奖励设计，优先激励智能体保持平衡与存活，其次激励向前行进。
-3. **增强探索能力**：引入 ε-贪心、好奇心驱动探索等策略，让智能体探索更多行走策略。
-4. **延长训练步数**：增加总训练步数，让智能体积累更多地形行走经验，优化决策策略。
+## 7. Installation Requirements
 
----
+To install the necessary dependencies, use the provided `requirements.txt`:
 
-## 7. 安装依赖
-通过项目提供的 `requirements.txt` 一键安装所有依赖库：
 ```bash
 pip install -r requirements.txt
 ```
 
-**主要依赖**
-- Python 3.8 及以上版本
-- gymnasium 强化学习环境库
-- stable-baselines3 PPO 算法实现框架
-- pandas、matplotlib 用于日志数据分析与可视化绘图
+Dependencies include:
 
----
+	•	Python 3.8+
+	•	gymnasium for the environment
+	•	stable-baselines3 for the PPO implementation
+	•	pandas and matplotlib for log analysis and visualizations
 
-## 8. 致谢与参考
-本项目基于开发者 Oleg Klimov 开源环境二次开发，适配 Stable Baselines3 框架实现 PPO 算法训练。
+## 8. Credits
 
----
-
+This project is based on the work of Oleg Klimov, adapted for PPO training using Stable Baselines3.
