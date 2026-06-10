@@ -84,6 +84,7 @@ python main_deep_learning.py --model_path dataset/models/gesture_deep_cnn.pth --
 - **键盘控制**：空格（起飞/降落）、T（起飞）、L（降落）、H（悬停）、Q/ESC（退出）
 ## 深度学习功能
 
+
 | 模型类型 | 说明 | 优势 |
 |---------|------|------|
 | CNN | 1D卷积神经网络 | 捕捉局部特征，计算效率高 |
@@ -122,13 +123,3 @@ python train_deep_gesture.py --compare
 | ok_sign | 悬停 | OK手势 |
 | rock | 左转 | 摇滚手势 |
 | peace | 右转 | 和平手势 |
-
-## 参考项目
-
-- [MediaPipe Hands](https://github.com/google/mediapipe)
-  - Google开源的手部关键点检测框架
-  - 本项目使用其进行实时手势识别
-
-- [PyTorch](https://pytorch.org/)
-  - Facebook开源的深度学习框架
-  - 本项目使用其实现深度学习模型

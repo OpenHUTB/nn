@@ -56,10 +56,11 @@ def main():
             sim.viewer.cam.distance = 0.6
             sim.viewer.cam.lookat = [0.45, -0.15, 0.8]
             viewer_enabled = True
-            print("可视化窗口启动成功！能看到手臂慢速摆动")
+            print("[OK] 可视化窗口启动成功！")
+            print("提示：关闭窗口或按Ctrl+C可退出程序")
         except Exception as e:
-            print(f"可视化启动失败（不影响动作）：{e}")
-            print("无窗口模式：终端打印关节角度，确认动作真实发生！")
+            print(f"[警告] 可视化窗口启动失败: {e}")
+            print("程序将以无窗口模式运行，可通过终端输出查看状态")
             sim.viewer = None
 
         # 循环执行仿真和任务更新
@@ -71,7 +72,7 @@ def main():
 
             # 如果任务完成（成功/超时），重置仿真和任务
             if task_status["done"]:
-                print("\n准备开始新一轮任务...")
+                print("\n[信息] 任务完成，准备开始新一轮...")
                 sim.reset()
                 task.reset()
 
@@ -81,15 +82,17 @@ def main():
                     sim.viewer.sync()
                     time.sleep(0.001)
                 except:
-                    pass
+                    print("[信息] 窗口已关闭，准备退出程序...")
+                    break
 
     except KeyboardInterrupt:
-        print("\n\n检测到Ctrl+C，正在优雅退出仿真...")
+        print("\n\n[信息] 检测到Ctrl+C，正在安全退出...")
         sim.is_running = False
     finally:
         # 关闭资源
         sim.close()
-        print(f"\n仿真正常结束！共运行{sim.current_step}步")
+        print(f"\n[OK] 仿真程序已正常结束！")
+        print(f"共运行 {sim.current_step} 步")
 
 # 新增：导入time（用于渲染延时）
 import time

@@ -9,6 +9,7 @@ from utils import calculate_vehicle_speed_kmh, debounce_check
 from collision_monitor import CollisionMonitor
 from environment_controller import env_controller
 from traffic_light_controller import tl_controller
+from driver_vitals_monitor import vitals_monitor, update_driver_vitals, reset_driver_vitals
 from vehicle_status_gui import gui_instance, create_status_window, stop_gui, update_vehicle_status
 from config import (
     CARLA_HOST, CARLA_PORT, CARLA_TIMEOUT,
@@ -99,7 +100,6 @@ class CarlaDriver:
 
         return world
 
-    # 新增：重置车辆位置方法
     def reset_vehicle_position(self) -> None:
         """将车辆重置到初始生成点"""
         if not self.car or not self.initial_spawn_point:
@@ -117,6 +117,14 @@ class CarlaDriver:
         update_vehicle_status("collision_speed", 0.0)
         update_vehicle_status("speed", 0.0)
 
+        # 重置驾驶员体征
+        reset_driver_vitals()
+        update_vehicle_status("heart_rate", vitals_monitor.current_heart_rate)
+        update_vehicle_status("blood_pressure",
+                              f"{vitals_monitor.current_blood_pressure[0]}/{vitals_monitor.current_blood_pressure[1]}")
+        update_vehicle_status("fatigue", vitals_monitor.current_fatigue)
+        update_vehicle_status("fatigue_level", vitals_monitor.vitals_data["fatigue_level"])
+
         logger.info(f"车辆已重置到初始生成点：{self.initial_spawn_point.location}")
 
     def print_operation_guide(self) -> None:
@@ -127,8 +135,9 @@ class CarlaDriver:
 ↑：前进 | ↓：倒车 | ←：左转 | →：右转 
 空格键：急刹 | C：模拟碰撞 | ESC：退出
 W键：循环切换天气（晴天→雨天→雾天→夜间→晴天...）
-R键：重置车辆到初始生成点  # 新增：R键说明
+R键：重置车辆到初始生成点  
 📊 实时监测：车速 | 天气 | 能见度 | 碰撞状态 | 红绿灯违规
+🧑‍⚕️ 驾驶员体征：心率 | 血压 | 疲惫度（随驾驶时长/车速/天气/碰撞变化）
 ========================================
         """
         print(guide)
@@ -187,7 +196,7 @@ R键：重置车辆到初始生成点  # 新增：R键说明
         spectator.set_transform(carla.Transform(cam_loc, cam_rot))
 
     def main_loop(self, world: carla.World) -> None:
-        """主循环：车辆控制+状态监测"""
+        """主循环：车辆控制+状态监测+体征监测"""
         print_counter = 0
         red_light_violation_flag = False
 
@@ -200,10 +209,12 @@ R键：重置车辆到初始生成点  # 新增：R键说明
             print_counter += 1
             if print_counter % 20 == 0:
                 env_state = env_controller.get_current_environment_state()
+                vitals_data = vitals_monitor.get_vitals_data()
                 env_info = f"天气：{env_state['weather_type']} | 能见度：{env_state['visibility']}%"
-                collision_speed = gui_instance.vehicle_status["collision_speed"]
-                collision_info = f"碰撞车速：{collision_speed} km/h"
-                print(f"\r速度：{current_speed:.1f} km/h | {env_info} | {collision_info} | 闯红灯：否", end="")
+                collision_info = f"碰撞车速：{gui_instance.vehicle_status['collision_speed']} km/h"
+                vitals_info = f"心率：{vitals_data['heart_rate']} | 疲惫度：{vitals_data['fatigue']:.1f}%"
+                print(f"\r速度：{current_speed:.1f} km/h | {env_info} | {collision_info} | {vitals_info} | 闯红灯：否",
+                      end="")
 
                 # 更新GUI的天气、能见度
                 update_vehicle_status("weather", env_state['weather_type'])
@@ -246,11 +257,21 @@ R键：重置车辆到初始生成点  # 新增：R键说明
             elif not red_light_violation:
                 red_light_violation_flag = False
 
-            # 新增：9. 重置车辆位置（R键）
+            # 9. 重置车辆位置（R键）
             if debounce_check(keyboard.is_pressed("r"), self.r_key_triggered):
                 self.reset_vehicle_position()
 
-            # 10. 退出检测
+            # 10. 驾驶员体征更新（核心新增）
+            current_weather = env_controller.get_current_environment_state()["weather_type"]
+            update_driver_vitals(self.car, current_weather, collision_occurred)
+            # 更新GUI体征数据
+            vitals_data = vitals_monitor.get_vitals_data()
+            update_vehicle_status("heart_rate", vitals_data["heart_rate"])
+            update_vehicle_status("blood_pressure", vitals_data["blood_pressure"])
+            update_vehicle_status("fatigue", vitals_data["fatigue"])
+            update_vehicle_status("fatigue_level", vitals_data["fatigue_level"])
+
+            # 11. 退出检测
             if keyboard.is_pressed("esc") and not self.exit_flag:
                 self.exit_flag = True
                 break
