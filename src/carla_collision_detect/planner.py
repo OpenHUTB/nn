@@ -23,7 +23,7 @@ class LanePlanner:
         self.Ki = 0.02  
         self.Kd = 0.2   
 
-    def get_lateral_control(self, current_dist, current_speed_kmh):
+    def get_lateral_control(self, current_dist, current_speed_kmh, obstacle_side=None, is_following=False):
         """
         核心：全时车道保持 (LKA) + 自动变道 (ALC)
         """
@@ -32,25 +32,31 @@ class LanePlanner:
         curr_wp = self.map.get_waypoint(self.ego_vehicle.get_location())
         
         # 1. 障碍物触发变道
-        if not self.is_changing_lane and current_dist < trigger_dist and current_speed_kmh > 10 and current_time > self.cooldown_end_time:
+        if not self.is_changing_lane and current_dist < trigger_dist and current_speed_kmh > 10 and current_time > self.cooldown_end_time and not is_following:
             left_wp = curr_wp.get_left_lane()
             right_wp = curr_wp.get_right_lane()
             
             can_change_right = curr_wp.lane_change in [carla.LaneChange.Right, carla.LaneChange.Both]
             can_change_left = curr_wp.lane_change in [carla.LaneChange.Left, carla.LaneChange.Both]
             
-            if right_wp and right_wp.lane_type == carla.LaneType.Driving and can_change_right:
-                print("\033[92m🚀 执行【右侧】变道...\033[0m")
+            can_go_right = right_wp and right_wp.lane_type == carla.LaneType.Driving and can_change_right
+            can_go_left = left_wp and left_wp.lane_type == carla.LaneType.Driving and can_change_left
+            
+            # 核心逻辑：障碍物在左侧，优先往右躲；障碍物在右侧，优先往左躲
+            first_choice = 'right' if obstacle_side == 'left' else 'left'
+            
+            if first_choice == 'right' and can_go_right:
+                print("\033[92m🚀执行【向右】变道避让...\033[0m")
                 self.is_changing_lane = True
                 self.target_lane_id = right_wp.lane_id
                 self.target_lane_dir = 'right'
-                self.lat_error_sum = 0.0  # 清空历史误差
-                
-            elif left_wp and left_wp.lane_type == carla.LaneType.Driving and can_change_left:
-                print("\033[92m🚀 执行【左侧】变道...\033[0m")
+            elif first_choice == 'left' and can_go_left:
+                print("\033[92m🚀执行【向左】变道避让...\033[0m")
                 self.is_changing_lane = True
                 self.target_lane_id = left_wp.lane_id
                 self.target_lane_dir = 'left'
+                
+            if self.is_changing_lane:
                 self.lat_error_sum = 0.0  # 清空历史误差
                 
         return self._calculate_steer(curr_wp)

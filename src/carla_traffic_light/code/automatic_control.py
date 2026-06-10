@@ -207,8 +207,13 @@ class World(object):
 class KeyboardControl(object):
     def __init__(self, world):
         self.world = world
+        self.autopilot_enabled = True   # 自动驾驶开启状态
+        # 手动驾驶按键状态
+        self.throttle = 0.0
+        self.brake = 0.0
+        self.steer = 0.0
+        self.reverse = False
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-
 
     def parse_events(self):
         for event in pygame.event.get():
@@ -238,11 +243,40 @@ class KeyboardControl(object):
                     self.world.hud.notification("Pedestrian spawned", seconds=1.0)
                 elif event.key == pygame.K_t:
                     # 生成交通车辆
-                    self.spawn_traffic_vehicles(15)  # 生成15辆车
+                    self.spawn_traffic_vehicles(5)  # 生成5辆车
                 elif event.key == pygame.K_y:
-                    # 清除所有交通车辆
-                    self.clear_traffic_vehicles()
+                    self.clear_traffic_vehicles_batch()
+                elif event.key == pygame.K_f:
+                    # 切换自动驾驶开关
+                    self.autopilot_enabled = not self.autopilot_enabled
+                    status = "ON" if self.autopilot_enabled else "OFF"
+                    self.world.hud.notification(f"Autopilot {status}", seconds=1.0)
+                    print(f"Autopilot {status}")
+                # 手动驾驶：释放按键时归零
+                elif event.key == pygame.K_UP or event.key == pygame.K_w:
+                    self.throttle = 0.0
+                elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                    self.brake = 0.0
+                elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                    self.steer = 0.0
+                elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                    self.steer = 0.0
 
+            elif event.type == pygame.KEYDOWN:
+                # 仅在自动驾驶关闭时响应手动驾驶按键
+                if not self.autopilot_enabled:
+                    if event.key == pygame.K_UP or event.key == pygame.K_w:
+                        self.throttle = 0.8
+                        self.brake = 0.0
+                    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                        self.brake = 0.8
+                        self.throttle = 0.0
+                    elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                        self.steer = -0.6
+                    elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                        self.steer = 0.6
+
+        return False
     def spawn_random_pedestrian(self):
         """在车辆附近的人行道上生成一个随机行人"""
         world = self.world.world
@@ -385,15 +419,71 @@ class KeyboardControl(object):
             if vehicle is not None:
                 vehicle.set_autopilot(enabled)
 
-    def clear_traffic_vehicles(self):
-        """清除所有生成的交通车辆"""
-        if not hasattr(self, 'traffic_vehicles'):
+    def clear_traffic_vehicles_batch(self):
+        """使用 CARLA 批量命令安全清除所有交通车辆"""
+        if not hasattr(self, 'traffic_vehicles') or not self.traffic_vehicles:
+            self.world.hud.notification("No traffic vehicles to clear", seconds=1.0)
             return
-        for vehicle in self.traffic_vehicles:
-            if vehicle is not None:
-                vehicle.destroy()
+
+        print(f"批量清除 {len(self.traffic_vehicles)} 辆车")
+
+        # 检查 client 是否存在
+        if not hasattr(self, 'client') or self.client is None:
+            print("错误：client 未设置，无法批量销毁")
+            return
+
+        # 收集所有有效车辆的 ID
+        vehicle_ids = []
+        for v in self.traffic_vehicles:
+            if v is not None and v.is_alive:
+                vehicle_ids.append(v.id)
+
+        if vehicle_ids:
+            try:
+                # 创建销毁命令列表
+                commands = [carla.command.DestroyActor(vid) for vid in vehicle_ids]
+                # 执行批量命令
+                response = self.client.apply_batch_sync(commands, True)
+                destroyed = sum(1 for r in response if not r.has_error())
+                print(f"批量销毁完成，成功 {destroyed} 辆")
+                self.world.hud.notification(f"Cleared {destroyed} vehicles", seconds=2.0)
+            except Exception as e:
+                print(f"批量销毁异常: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("没有有效的车辆需要清除")
+
+        # 清空列表
         self.traffic_vehicles = []
-        self.world.hud.notification("All traffic vehicles cleared", seconds=2.0)
+
+    def clear_traffic_vehicles(self):
+        """清除所有生成的交通车辆（超稳健版，绝不崩溃）"""
+        if not hasattr(self, 'traffic_vehicles') or not self.traffic_vehicles:
+            self.world.hud.notification("No traffic vehicles to clear", seconds=1.0)
+            return
+
+        print(f"开始清除 {len(self.traffic_vehicles)} 辆车")
+        destroyed = 0
+        # 复制一份，避免迭代中修改原列表
+        to_destroy = list(self.traffic_vehicles)
+        for vehicle in to_destroy:
+            if vehicle is None:
+                continue
+            try:
+                # 先检查是否还存活
+                if not vehicle.is_alive:
+                    print(f"  ⚠️ 车辆已失效: {vehicle.type_id}")
+                    continue
+                vehicle.destroy()
+                destroyed += 1
+                print(f"  ✓ 销毁成功: {vehicle.type_id}")
+            except Exception as e:
+                print(f"  ✗ 销毁时异常 ({vehicle.type_id}): {e}")
+                # 注意：这里不打印 traceback 以避免信息过多
+        self.traffic_vehicles = []
+        self.world.hud.notification(f"Cleared {destroyed} vehicles", seconds=2.0)
+        print(f"清除完成，实际销毁 {destroyed} 辆")
     @staticmethod
     def _is_quit_shortcut(key):
         """Shortcut for quitting"""
@@ -614,8 +704,11 @@ class HelpText(object):
             "N        - Next Weather",
             "M        - Previous Weather",
             "G        - Spawn Random Pedestrian",
-            "T        - Spawn Traffic Vehicles (15 cars)",
+            "T        - Spawn Traffic Vehicles (5 cars)",
             "Y        - Clear All Traffic Vehicles",
+            "F        - Toggle Autopilot (ON/OFF)",
+            "Manual mode (Autopilot OFF):",
+            "  Arrow/WASD - Drive",
             "Ctrl+Q   - Quit",
             "ESC      - Quit",
             "",
@@ -900,6 +993,7 @@ def game_loop(args):
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
+        controller.client = client
 
         if args.agent == "Roaming":
             agent = RoamingAgent(world.player)
@@ -941,9 +1035,18 @@ def game_loop(args):
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
-                control = agent.run_step()
-                control.manual_gear_shift = False
-                world.player.apply_control(control)
+                if controller.autopilot_enabled:
+                    control = agent.run_step()
+                    control.manual_gear_shift = False
+                    world.player.apply_control(control)
+                else:
+                    # 手动模式：使用键盘控制
+                    control = carla.VehicleControl()
+                    control.throttle = controller.throttle
+                    control.brake = controller.brake
+                    control.steer = controller.steer
+                    control.reverse = controller.reverse
+                    world.player.apply_control(control)
             else:
                 #agent.update_information()
 

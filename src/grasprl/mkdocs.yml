@@ -1,0 +1,15 @@
+site_name: GraspRL 机械臂抓取强化学习项目
+site_author: wk
+docs_dir: docs
+
+nav:
+  - 项目完整文档: index.md  # 冒号后面必须有空格！
+
+theme: readthedocs
+
+markdown_extensions:
+  - codehilite:
+      linenums: true
+  - toc:
+      permalink: true
+      toc_depth: 3

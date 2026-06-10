@@ -3,7 +3,6 @@ import random
 
 import time
 import logging
-from typing import Optional
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -13,6 +12,7 @@ logger = logging.getLogger(__name__)
 CARLA_CONNECT_TIMEOUT = 30  # 连接超时时间（秒）
 CARLA_RECONNECT_RETRIES = 3  # 重连重试次数
 MAP_LOAD_RETRIES = 2  # 地图加载重试次数
+
 
 class MatrixWorld(object):
     """Builds the world, cars, sensors etc."""
@@ -142,9 +142,8 @@ class MatrixWorld(object):
         the spectator to spawn point."""
         # vehicle_bp = self.bp_lib.filter('vehicle.audi.tt')[0]
 
-
         vehicle_bp = self.bp_lib.filter('vehicle.tesla.model3')[0]
-        #vehicle_bp = self.bp_lib.filter('vehicle.mini.cooperst')[0]
+        # vehicle_bp = self.bp_lib.filter('vehicle.mini.cooperst')[0]
         if not transform and not near_junction:
             transform = random.choice(self.world.get_map().get_spawn_points())
         elif near_junction:

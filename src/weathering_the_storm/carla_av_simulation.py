@@ -908,6 +908,8 @@ class AVSimulation:
                 self._font = pygame.font.Font(None, 36)
                 self._text_cache = {}
                 self._text_cache_frame = -1
+                self.hud = HUDOverlay(tuple(window_size))
+                self._hud_vehicle = None
             except pygame.error as e:
                 raise SimulationError(f"Failed to initialize Pygame display: {str(e)}")
 
@@ -1419,6 +1421,10 @@ class AVSimulation:
             paused = False
             debug_mode = False
             quit_requested = False
+            self._hud_vehicle = vehicle
+            self._hud_duration = duration_seconds
+            self._hud_mode = f'full ({config_name})'
+            self._hud_vehicles_count = len(traffic_vehicles)
 
             start_time = time.time()
             frame_count = 0
@@ -1434,12 +1440,18 @@ class AVSimulation:
                             if event.key == pygame.K_SPACE:
                                 paused = not paused
                                 dashboard.paused = paused
+                                self._hud_paused = paused
                             elif event.key == pygame.K_q:
                                 quit_requested = True
                                 dashboard.quit_requested = True
                             elif event.key == pygame.K_d:
                                 debug_mode = not debug_mode
                                 dashboard.debug_mode = debug_mode
+                                self._hud_debug_mode = debug_mode
+                            elif event.key == pygame.K_h:
+                                self.hud.toggle()
+                            elif event.key == pygame.K_p:
+                                self.hud.save_screenshot(self.display, weather_scheduler.current_phase)
 
                     if paused:
                         time.sleep(0.05)
@@ -1455,6 +1467,8 @@ class AVSimulation:
                     if now - last_weather_update >= 1.0:
                         weather_params = weather_scheduler.update(elapsed)
                         self.world.set_weather(carla.WeatherParameters(**weather_params))
+                        self._hud_weather_phase = weather_scheduler.get_phase_label()
+                        self.hud.auto_screenshot_on_phase_change(self.display, weather_scheduler.current_phase)
                         last_weather_update = now
 
                     mem_status = self.memory_monitor.check_memory(
@@ -1477,6 +1491,8 @@ class AVSimulation:
                     if now - last_dash_update >= 0.25:
                         fps = frame_count / elapsed if elapsed > 0 else 0
                         mem_mb = self.memory_monitor.get_memory_mb()
+                        self._hud_elapsed = elapsed
+                        self._hud_memory_mb = mem_mb
                         dashboard.update(
                             elapsed=elapsed,
                             fps=fps,
@@ -1804,6 +1820,25 @@ class AVSimulation:
             except Exception as e:
                 logging.warning(f"Failed to render text overlay: {str(e)}")
 
+            if hasattr(self, 'hud') and self.hud.visible:
+                self.hud.render(
+                    self.display,
+                    vehicle=self._hud_vehicle,
+                    weather_phase=getattr(self, '_hud_weather_phase', ''),
+                    fps=self._viz_fps,
+                    elapsed=getattr(self, '_hud_elapsed', 0),
+                    duration=getattr(self, '_hud_duration', 0),
+                    paused=getattr(self, '_hud_paused', False),
+                    frame_count=len(self.sensor_data.get('camera', [])),
+                    memory_mb=getattr(self, '_hud_memory_mb', 0),
+                    camera_frames=len(self.sensor_data.get('camera', [])),
+                    lidar_frames=len(self.sensor_data.get('lidar', [])),
+                    radar_frames=len(self.sensor_data.get('radar', [])),
+                    vehicles_count=getattr(self, '_hud_vehicles_count', 0),
+                    debug_mode=getattr(self, '_hud_debug_mode', False),
+                    mode=getattr(self, '_hud_mode', ''),
+                )
+
             pygame.display.flip()
 
         except Exception as e:
@@ -2022,6 +2057,137 @@ class WeatherScheduler:
 
     def get_progress_pct(self):
         return self.phase_progress * 100
+
+
+class HUDOverlay:
+    def __init__(self, display_size):
+        self.width = display_size[0]
+        self.height = display_size[1]
+        self.visible = True
+        self._font_large = pygame.font.Font(None, 36)
+        self._font_small = pygame.font.Font(None, 26)
+        self._font_title = pygame.font.Font(None, 42)
+        self._surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        self._screenshot_dir = 'screenshots'
+        self._screenshot_count = 0
+        self._last_auto_screenshot_phase = None
+        os.makedirs(self._screenshot_dir, exist_ok=True)
+
+    def render(self, display, vehicle=None, weather_phase='', fps=0, elapsed=0,
+               duration=0, paused=False, frame_count=0, memory_mb=0,
+               camera_frames=0, lidar_frames=0, radar_frames=0,
+               vehicles_count=0, debug_mode=False, mode=''):
+        if not self.visible:
+            return
+
+        self._surface.fill((0, 0, 0, 0))
+
+        panel_w = 340
+        panel_h = 200
+        panel_x = 10
+        panel_y = 10
+
+        panel_bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        panel_bg.fill((0, 0, 0, 160))
+        pygame.draw.rect(panel_bg, (0, 200, 255, 180), (0, 0, panel_w, panel_h), 2, border_radius=6)
+        self._surface.blit(panel_bg, (panel_x, panel_y))
+
+        y = panel_y + 8
+        status_text = "PAUSED" if paused else "RUNNING"
+        status_color = (255, 200, 0) if paused else (0, 255, 100)
+        title_surf = self._font_title.render("CARLA AV Simulation", True, (0, 200, 255))
+        self._surface.blit(title_surf, (panel_x + 10, y))
+        y += 35
+
+        status_surf = self._font_small.render(status_text, True, status_color)
+        self._surface.blit(status_surf, (panel_x + panel_w - status_surf.get_width() - 10, panel_y + 14))
+
+        pygame.draw.line(self._surface, (0, 200, 255, 120), (panel_x + 8, y), (panel_x + panel_w - 8, y))
+        y += 8
+
+        speed_kmh = 0.0
+        if vehicle is not None:
+            try:
+                v = vehicle.get_velocity()
+                speed_kmh = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
+            except Exception:
+                pass
+
+        speed_color = (0, 255, 100) if speed_kmh < 60 else (255, 200, 0) if speed_kmh < 100 else (255, 80, 80)
+        speed_surf = self._font_large.render(f"Speed: {speed_kmh:.0f} km/h", True, speed_color)
+        self._surface.blit(speed_surf, (panel_x + 10, y))
+        y += 30
+
+        if weather_phase:
+            weather_surf = self._font_small.render(f"Weather: {weather_phase}", True, (180, 220, 255))
+            self._surface.blit(weather_surf, (panel_x + 10, y))
+            y += 22
+
+        progress_pct = min(elapsed / duration, 1.0) if duration > 0 else 0
+        bar_x = panel_x + 10
+        bar_w = panel_w - 20
+        bar_h = 14
+        pygame.draw.rect(self._surface, (60, 60, 60, 200), (bar_x, y, bar_w, bar_h), border_radius=3)
+        fill_w = int(bar_w * progress_pct)
+        if fill_w > 0:
+            bar_color = (0, 200, 100) if progress_pct < 0.8 else (255, 200, 0)
+            pygame.draw.rect(self._surface, bar_color, (bar_x, y, fill_w, bar_h), border_radius=3)
+        prog_text = self._font_small.render(f"{progress_pct*100:.0f}%  {elapsed:.0f}/{duration}s", True, (255, 255, 255))
+        self._surface.blit(prog_text, (bar_x + bar_w // 2 - prog_text.get_width() // 2, y - 1))
+        y += 20
+
+        info_lines = [
+            f"FPS: {fps:.1f}  |  Mem: {memory_mb:.0f}MB",
+            f"Cam: {camera_frames}  LiDAR: {lidar_frames}  Radar: {radar_frames}",
+        ]
+        for line in info_lines:
+            surf = self._font_small.render(line, True, (200, 200, 200))
+            self._surface.blit(surf, (panel_x + 10, y))
+            y += 20
+
+        if debug_mode:
+            y += 4
+            pygame.draw.line(self._surface, (0, 200, 255, 80), (panel_x + 8, y), (panel_x + panel_w - 8, y))
+            y += 6
+            debug_lines = [
+                f"Frame: {frame_count}  Vehicles: {vehicles_count}",
+                f"Mode: {mode}",
+            ]
+            for line in debug_lines:
+                surf = self._font_small.render(line, True, (160, 160, 160))
+                self._surface.blit(surf, (panel_x + 10, y))
+                y += 18
+
+        hint_y = self.height - 30
+        hint_bg = pygame.Surface((self.width, 30), pygame.SRCALPHA)
+        hint_bg.fill((0, 0, 0, 120))
+        self._surface.blit(hint_bg, (0, hint_y))
+        hints = "[Space] Pause   [H] Toggle HUD   [P] Screenshot   [Q] Quit   [D] Debug"
+        hint_surf = self._font_small.render(hints, True, (160, 160, 160))
+        self._surface.blit(hint_surf, (self.width // 2 - hint_surf.get_width() // 2, hint_y + 5))
+
+        display.blit(self._surface, (0, 0))
+
+    def toggle(self):
+        self.visible = not self.visible
+
+    def save_screenshot(self, display, label=''):
+        self._screenshot_count += 1
+        timestamp = datetime.now().strftime('%H%M%S')
+        filename = f"sim_{timestamp}_{self._screenshot_count}"
+        if label:
+            filename += f"_{label}"
+        filename += ".png"
+        filepath = os.path.join(self._screenshot_dir, filename)
+        pygame.image.save(display, filepath)
+        logging.info(f"Screenshot saved: {filepath}")
+        return filepath
+
+    def auto_screenshot_on_phase_change(self, display, current_phase):
+        if current_phase != self._last_auto_screenshot_phase:
+            self._last_auto_screenshot_phase = current_phase
+            return self.save_screenshot(display, current_phase)
+        return None
 
 
 class SimulationDashboard:

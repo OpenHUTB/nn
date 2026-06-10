@@ -5,10 +5,15 @@ import math
 import carla
 import imutils
 import numpy as np
-from min_carla_env.matrix_world import MatrixWorld
-
 import logging
 from typing import Optional
+
+from min_carla_env.matrix_world import MatrixWorld
+from min_carla_env.config import (
+    REWARD_CONFIG,
+    ACTIONS,
+    CONFIG,  # re-exported for backward compatibility
+)
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -25,7 +30,7 @@ def reconnect_carla_client(original_client, host='localhost', port=2000,
             if original_client:
                 try:
                     original_client.close()
-                except:
+                except Exception:
                     pass
             # 新建连接
             client = carla.Client(host, port)
@@ -41,28 +46,13 @@ def reconnect_carla_client(original_client, host='localhost', port=2000,
     return None
 
 
-CONFIG = {
-    "width": 480,
-    "height": 480,
-    "max_step": 90000,
-    "render": True
-}
-
-# only three actions for simplicty
-# stable, left, right
-ACTIONS = {
-    0: [0.0, 0.0],  # Coast
-    1: [0.0, -0.5],  # Turn Left
-    2: [0.0, 0.5],  # Turn Right
-}
-
-
 class CarlaEnv(gym.Env):
     """Simple gym wrapper for Carla.
     Unfortunately it only uses the gym environment interface.
     Its not that much compatible with gym."""
 
-    def __init__(self, client, config, world_config={}, debug=False, demo=False):
+    def __init__(self, client, config, world_config=None, reward_config=None,
+                 debug=False, demo=False):
         self.debug = debug
         self.done = False
         self.rgb_data = None
@@ -73,9 +63,11 @@ class CarlaEnv(gym.Env):
         self.collision_hist = []
         self.crossed_lane_hist = []
         self.config = config
-        self.max_step = config["max_step"]
+        self.max_step = config.get("max_step", 90000)
         self.demo = demo
         self.client = client  # 保存客户端引用
+        # 奖励系数配置（可单独传入微调）
+        self.reward_config = reward_config if reward_config is not None else REWARD_CONFIG
         self.mw = None  # 初始化MatrixWorld为None
         self.world = None
         self.vehicle = None
@@ -91,7 +83,11 @@ class CarlaEnv(gym.Env):
 
         try:
             # 初始化MatrixWorld（增加重连机制）
-            self.mw = MatrixWorld(self.client, **world_config)
+            # 将观测尺寸从 config 注入到 world_config，确保传感器分辨率一致
+            wcfg = dict(world_config) if world_config else {}
+            wcfg.setdefault("im_width", self.config.get("width", 480))
+            wcfg.setdefault("im_height", self.config.get("height", 480))
+            self.mw = MatrixWorld(self.client, **wcfg)
             self.world = self.mw.world
             # 生成actor
             self.spawn_actors()
@@ -104,7 +100,7 @@ class CarlaEnv(gym.Env):
             new_client = reconnect_carla_client(self.client)
             if new_client:
                 self.client = new_client
-                self.mw = MatrixWorld(self.client, **world_config)
+                self.mw = MatrixWorld(self.client, **wcfg)
                 self.world = self.mw.world
                 self.spawn_actors()
                 logger.info("重连后初始化成功")
@@ -278,6 +274,7 @@ class CarlaEnv(gym.Env):
 
             self.measurements = {"kmh": 0.0, "prev_loc": None}
             time.sleep(1)
+            self.update_spectator_follow()  # 车辆已生成，设置俯视视角
             return self.semantic_data
         except Exception as e:
             logger.error(f"Reset失败: {e}")
@@ -296,16 +293,21 @@ class CarlaEnv(gym.Env):
         return dist
 
     def simple_loc_reward(self, map: carla.Map, location: carla.Location):
-        """Calculates simple reward for given location."""
-        # calc closest drivable point distance
+        """Calculates lane-center reward for given location.
+        调优版本：使用可配置的奖励系数，裁剪惩罚上限，训练更稳定。"""
         reward = 0.0
+        rc = self.reward_config
         wp = map.get_waypoint(location, carla.LaneType.Driving)
         wp_location = wp.transform.location
         dist = self.__euclid_dist(wp_location, location)
-        if dist < 0.5 and dist > -0.5:
-            reward += 0.5
+        threshold = rc["lane_center_threshold"]
+        if dist < threshold:
+            reward += rc["lane_center_reward"]
         else:
-            reward -= np.exp(dist)
+            # 缩放后的指数惩罚，并裁剪上限，防止梯度爆炸
+            penalty = rc["dist_penalty_scale"] * np.exp(dist)
+            penalty = min(penalty, rc["dist_penalty_clip"])
+            reward -= penalty
 
         return reward
 
@@ -343,9 +345,16 @@ class CarlaEnv(gym.Env):
             reverse=reverse, hand_brake=hand_brake))
 
         # calculate reward
+        rc = self.reward_config
         reward = 0.0
         vehicle_location = self.vehicle.get_transform().location
+
+        # 1) 车道中心奖励（核心）
         reward += self.simple_loc_reward(self.mw.world.get_map(), vehicle_location)
+
+        # 2) 速度奖励（新增，鼓励维持目标车速，让训练更稳定）
+        speed_reward = rc["speed_reward_scale"] * kmh
+        reward += speed_reward
 
         # count stuck to be able to stop running
         self.steps += 1
@@ -359,25 +368,25 @@ class CarlaEnv(gym.Env):
             self.done = True
 
         current_w = self.mw.world.get_map().get_waypoint(vehicle_location)
-        if reward <= -1000.0:  # limit the reward
+        if reward <= -rc["dist_penalty_clip"]:  # 使用配置的惩罚裁剪值
             self.done = True
         if len(self.collision_hist) != 0:  # stop on collision
             self.done = True
-            reward *= 2
+            reward *= rc["collision_penalty_mult"]
         if len(self.crossed_lane_hist) != 0:  # stop on crossed lane
             for lane_marking in self.crossed_lane_hist:
                 if lane_marking == carla.LaneMarkingType.Solid or \
                         lane_marking == carla.LaneMarkingType.NONE:
                     self.done = True
-                    reward *= 2
+                    reward *= rc["lane_violation_penalty_mult"]
                     break
             self.crossed_lane_hist = []
         if current_w.lane_type == carla.LaneType.Sidewalk:  # stop on out of road
             self.done = True
-            reward *= 2
-        if self.stuck_count > 20:  # stop on stuck
+            reward *= rc["sidewalk_penalty_mult"]
+        if self.stuck_count > self.config.get("stuck_max_count", 20):  # stop on stuck
             self.done = True
-            reward -= 100.0
+            reward -= rc["stuck_penalty"]
 
         if self.demo and self.stuck_count < 20:
             self.done = False
@@ -400,7 +409,7 @@ class CarlaEnv(gym.Env):
                 self.col_sensor.stop()
             if self.lane_sensor:
                 self.lane_sensor.stop()
-            # 清理MatrixWorld资源
+            # 再清理MatrixWorld资源
             if self.mw:
                 self.mw.clean_world()
             logger.info("CarlaEnv环境关闭成功")
