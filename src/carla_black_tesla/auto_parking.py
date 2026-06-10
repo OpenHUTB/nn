@@ -1,4 +1,4 @@
-wimport carla
+import carla
 import sys
 import time
 import math
