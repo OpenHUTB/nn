@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/drone_hand_gesture/%E6%89%8B%E5%8A%BF%E5%88%86%E7%B1%BB%E7%AE%97%E6%B3%95%E5%AF%B9%E6%AF%94/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>手势分类器算法对比 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u624b\u52bf\u5206\u7c7b\u5668\u7b97\u6cd5\u5bf9\u6bd4";
+        var mkdocs_page_input_path = "drone_hand_gesture/\u624b\u52bf\u5206\u7c7b\u7b97\u6cd5\u5bf9\u6bd4.md";
+        var mkdocs_page_url = "/nn/drone_hand_gesture/%E6%89%8B%E5%8A%BF%E5%88%86%E7%B1%BB%E7%AE%97%E6%B3%95%E5%AF%B9%E6%AF%94/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">手势分类器算法对比</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/drone_hand_gesture/手势分类算法对比.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="_1">手势分类器算法对比</h1>
+<h2 id="_2">一、目的</h2>
+<ol>
+<li>基于nn仓库的<code>Drone_hand_gesture_project</code>模块，扩展KNN、决策树、Adaboost手势分类算法；</li>
+<li>对比6种机器学习算法在手势分类任务中的准确率、训练/推理耗时；</li>
+<li>分析算法优劣，为无人机手势控制场景选型提供依据。</li>
+</ol>
+<h2 id="_3">二、实验环境</h2>
+<ul>
+<li>仓库路径：<code>nn/src/Drone_hand_gesture_project/</code></li>
+<li>操作系统：Windows 10</li>
+<li>Python版本：3.8.18</li>
+<li>核心依赖：scikit-learn==1.3.0、numpy==1.24.3、matplotlib==3.7.1</li>
+</ul>
+<h2 id="_4">三、实验步骤</h2>
+<ol>
+<li>分支创建：基于<code>main</code>分支创建<code>hw-01-gesture-classifier-comparison</code>作业分支；</li>
+<li>代码修改：扩展<code>gesture_classifier.py</code>，新增KNN/决策树/Adaboost算法；</li>
+<li>实验运行：执行<code>compare_algorithms.py</code>，自动生成演示数据集并完成对比实验；</li>
+<li>结果分析：整理准确率/耗时数据，绘制对比图，分析算法适配性。</li>
+</ol>
+<h2 id="_5">四、实验结果</h2>
+<h3 id="1">1. 数值结果</h3>
+<p>算法          训练准确率   测试准确率   训练耗时（秒） 单样本推理耗时（秒）
+SVM             1.0000      1.0000      0.0325          0.000000
+random_forest   1.0000      1.0000      0.1838          0.000163
+MLP             1.0000      1.0000      0.4197          0.000000
+KNN             1.0000      1.0000      1.9513          0.000051
+decision_tree   1.0000      0.9583      0.0115          0.000000
+ada_boost       0.5000      0.4750      0.1443          0.000026</p>
+<h3 id="2">2. 可视化结果</h3>
+<p><img alt="算法对比图" src="algorithm_comparison.png" /></p>
+<h3 id="3">3.  分类报告关键结论</h3>
+<p>SVM / 随机森林 / MLP/KNN：4 种算法测试准确率均达 100%，各类手势的 precision、recall、F1-score 均为 1.00，无分类错误；
+决策树：整体测试准确率 95.83%，其中 closed_fist 类 precision 为 0.87，open_palm 类 recall 为 0.90，存在少量分类偏差；
+Adaboost：测试准确率仅 47.50%，open_palm/pointing_up/ok_sign 三类手势 precision 和 recall 均为 0.00，分类效果极差（触发 sklearn 精度未定义警告）。</p>
+<h2 id="_6">五、结果分析</h2>
+<ol>
+<li>准确率维度
+最优算法：SVM、随机森林、MLP、KNN 均实现 100% 测试准确率，适配手势分类的高精度要求；
+中等算法：决策树准确率 95.83%，虽有少量误差但仍满足基础手势识别需求；
+较差算法：Adaboost 准确率仅 47.50%，因演示数据集特征分布简单，Adaboost 的弱分类器集成策略未发挥优势，且出现多类别识别失效。</li>
+<li>效率维度
+训练耗时：决策树（0.0115s）&lt; SVM（0.0325s）&lt; Adaboost（0.1443s）&lt; 随机森林（0.1838s）&lt; MLP（0.4197s）&lt; KNN（1.9513s）；
+KNN 训练耗时最长是因为其无显式训练过程，耗时实际为数据加载和索引构建；
+MLP 因神经网络迭代训练，耗时显著高于传统机器学习算法。
+推理耗时：SVM/MLP/ 决策树（0.000000s）&lt; Adaboost（0.000026s）&lt; KNN（0.000051s）&lt; 随机森林（0.000163s）；
+推理耗时均处于微秒级，满足无人机实时控制的延迟要求（&lt;10ms）。</li>
+</ol>
+<h2 id="_7">六、总结</h2>
+<p>本次作业基于nn仓库的Drone_hand_gesture_project模块，完成了 6 种机器学习算法的手势分类实现与对比实验，验证了传统机器学习算法在简单手势分类任务中的优势。实验结果表明，SVM 在准确率和效率上均表现最优，是无人机手势控制场景的理想选择；决策树虽准确率略低，但效率极高，可作为资源受限场景的备选方案。后续可结合真实手势数据集和无人机仿真平台，进一步验证算法的工程落地能力。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

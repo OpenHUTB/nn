@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/drone_hand_gesture/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Index - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Index";
+        var mkdocs_page_input_path = "drone_hand_gesture/README.md";
+        var mkdocs_page_url = "/nn/drone_hand_gesture/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Index</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/drone_hand_gesture/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <p align="center">
+  <img src="https://img.shields.io/badge/python-3.8%2B-blue" alt="Python">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/badge/opencv-4.x-green" alt="OpenCV">
+  <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="License">
+</p>
+
+<h1 align="center">🛸 手势控制无人机</h1>
+<p align="center"><strong>基于计算机视觉的实时手势识别无人机控制系统</strong></p>
+<p align="center">支持本地 3D 仿真 & AirSim 模拟器 · 集成深度学习 & 传统机器学习</p>
+
+<hr />
+<h2 id="_1">📋 目录</h2>
+<ul>
+<li><a href="#-功能特性">✨ 功能特性</a></li>
+<li><a href="#-项目结构">📁 项目结构</a></li>
+<li><a href="#-快速开始">🚀 快速开始</a></li>
+<li><a href="#-控制指南">🎮 控制指南</a></li>
+<li><a href="#-手势映射">🖐 手势映射</a></li>
+<li><a href="#-飞行统计面板">📊 飞行统计面板</a></li>
+<li><a href="#-深度学习">🧠 深度学习</a></li>
+<li><a href="#-环境兼容性">🔧 环境兼容性</a></li>
+<li><a href="#-依赖">📦 依赖</a></li>
+</ul>
+<hr />
+<h2 id="_2">✨ 功能特性</h2>
+<h3 id="_3">🎯 核心控制</h3>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🖐 <strong>实时手势识别</strong></td>
+<td>MediaPipe / OpenCV 双模式，自动降级切换</td>
+</tr>
+<tr>
+<td>🎚️ <strong>动态灵敏度调节</strong></td>
+<td>LOW / MEDIUM / HIGH 三档可调，界面实时显示</td>
+</tr>
+<tr>
+<td>🤲 <strong>双手控制模式</strong></td>
+<td>左手控制方向 + 右手控制高度</td>
+</tr>
+<tr>
+<td>🔄 <strong>滑动手势控制</strong></td>
+<td>支持上下左右滑动控制飞行</td>
+</tr>
+<tr>
+<td>🔁 <strong>摄像头镜像切换</strong></td>
+<td>一键翻转画面（<code>M</code> 键）</td>
+</tr>
+<tr>
+<td>✊ <strong>握拳起飞检测</strong></td>
+<td>握拳松手自动起飞，智能降落检测</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">🧭 飞行辅助</h3>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🎬 <strong>轨迹录制与回放</strong></td>
+<td>完整记录飞行路径，支持回放复盘（<code>R</code> / <code>P</code> 键）</td>
+</tr>
+<tr>
+<td>📍 <strong>航点标记导航</strong></td>
+<td>一键标记航点，自动导航到目标位置（<code>N</code> 键）</td>
+</tr>
+<tr>
+<td>📊 <strong>飞行统计面板</strong></td>
+<td>实时展示飞行时长、距离、速度、手势频率、电池消耗（<code>V</code> 键）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ai">🤖 AI 能力</h3>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🧬 <strong>传统 ML 分类</strong></td>
+<td>SVM / 随机森林 / MLP 三种模型可选</td>
+</tr>
+<tr>
+<td>🧠 <strong>深度学习分类</strong></td>
+<td>CNN / Transformer / 深度 MLP，支持对比训练</td>
+</tr>
+<tr>
+<td>📈 <strong>实时可视化</strong></td>
+<td>置信度折线图、手势统计柱状图、3D 关键点投影</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_5">📁 项目结构</h2>
+<pre><code>drone_hand_gesture/
+│
+├── 🎯 主程序
+│   ├── main.py                      # 主程序（本地仿真模式）
+│   ├── main_airsim.py               # AirSim 真实模拟器版本
+│   └── main_deep_learning.py        # 深度学习演示版本
+│
+├── 🛸 控制与仿真
+│   ├── drone_controller.py          # 无人机控制器
+│   ├── airsim_controller.py         # AirSim 控制器
+│   ├── simulation_3d.py             # 3D OpenGL 仿真渲染
+│   └── physics_engine.py            # 物理仿真引擎
+│
+├── 🖐 手势识别
+│   ├── gesture_detector.py          # 基础手势检测器
+│   ├── gesture_detector_enhanced.py # 增强手势检测器（MediaPipe）
+│   ├── gesture_detector_cv.py       # OpenCV 肤色检测器
+│   ├── gesture_classifier.py        # 传统 ML 手势分类器
+│   ├── deep_gesture_classifier.py   # 深度学习手势分类器
+│   ├── deep_gesture_detector.py     # 深度学习手势检测器
+│   └── gesture_visualizer.py        # 手势可视化器
+│
+├── 📊 数据与统计
+│   ├── gesture_data_collector.py    # 手势图像数据收集
+│   └── flight_statistics.py         # 飞行统计数据收集与展示
+│
+├── 🏋️ 模型训练
+│   ├── train_gesture_model.py       # 训练传统 ML 模型
+│   └── train_deep_gesture.py        # 训练深度学习模型
+│
+└── 📦 配置文件
+    └── requirements.txt             # Python 依赖列表
+</code></pre>
+<hr />
+<h2 id="_6">🚀 快速开始</h2>
+<h3 id="_7">环境要求</h3>
+<ul>
+<li><strong>Python</strong>：3.8+</li>
+<li><strong>摄像头</strong>：USB 摄像头或内置摄像头</li>
+<li><strong>GPU</strong>（可选）：训练深度学习模型推荐使用 CUDA</li>
+</ul>
+<h3 id="1">1. 安装依赖</h3>
+<pre><code class="language-bash"># 进入项目目录
+cd src/drone_hand_gesture
+
+# 安装依赖
+pip install -r requirements.txt
+</code></pre>
+<h3 id="2">2. 运行本地仿真</h3>
+<pre><code class="language-bash">python main.py
+</code></pre>
+<blockquote>
+<p>启动后将打开 3D 仿真窗口和摄像头画面，使用手势或键盘控制无人机。</p>
+</blockquote>
+<h3 id="3-airsim">3. 运行 AirSim 模拟器</h3>
+<p><strong>前提条件</strong>：
+1. 安装 AirSim：<code>pip install airsim</code>
+2. 启动 AirSim 模拟器（如 Blocks.exe）</p>
+<pre><code class="language-bash">python main_airsim.py
+</code></pre>
+<h3 id="4">4. 运行深度学习演示</h3>
+<pre><code class="language-bash"># 训练深度学习模型
+python train_deep_gesture.py --model_type cnn --epochs 100
+
+# 运行演示
+python main_deep_learning.py --model_path dataset/models/gesture_deep_cnn.pth --show_charts
+</code></pre>
+<hr />
+<h2 id="_8">🎮 控制指南</h2>
+<h3 id="_9">⌨️ 键盘快捷键</h3>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🛫 飞行控制</td>
+<td><code>空格</code></td>
+<td>起飞 / 降落</td>
+</tr>
+<tr>
+<td></td>
+<td><code>T</code></td>
+<td>起飞</td>
+</tr>
+<tr>
+<td></td>
+<td><code>L</code></td>
+<td>降落</td>
+</tr>
+<tr>
+<td></td>
+<td><code>H</code></td>
+<td>悬停</td>
+</tr>
+<tr>
+<td>🧭 方向移动</td>
+<td><code>W</code> <code>S</code></td>
+<td>前进 / 后退</td>
+</tr>
+<tr>
+<td></td>
+<td><code>A</code> <code>D</code></td>
+<td>左移 / 右移</td>
+</tr>
+<tr>
+<td></td>
+<td><code>Q</code> <code>E</code></td>
+<td>左转 / 右转</td>
+</tr>
+<tr>
+<td></td>
+<td><code>↑</code> <code>↓</code></td>
+<td>上升 / 下降</td>
+</tr>
+<tr>
+<td>🎚️ 灵敏度</td>
+<td><code>1</code></td>
+<td>低灵敏度</td>
+</tr>
+<tr>
+<td></td>
+<td><code>2</code></td>
+<td>中灵敏度</td>
+</tr>
+<tr>
+<td></td>
+<td><code>3</code></td>
+<td>高灵敏度</td>
+</tr>
+<tr>
+<td>🎬 录制回放</td>
+<td><code>R</code></td>
+<td>开始 / 停止录制飞行轨迹</td>
+</tr>
+<tr>
+<td></td>
+<td><code>P</code></td>
+<td>回放飞行轨迹</td>
+</tr>
+<tr>
+<td>📍 航点</td>
+<td><code>N</code></td>
+<td>标记当前航点</td>
+</tr>
+<tr>
+<td>🔄 显示</td>
+<td><code>M</code></td>
+<td>摄像头镜像切换</td>
+</tr>
+<tr>
+<td></td>
+<td><code>V</code></td>
+<td>飞行统计面板 开/关</td>
+</tr>
+<tr>
+<td>❌ 退出</td>
+<td><code>Q</code> / <code>ESC</code></td>
+<td>退出程序</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_10">🖐 手势控制</h3>
+<table>
+<thead>
+<tr>
+<th>手势</th>
+<th>命令</th>
+<th>示意图</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🖐 <strong>张开手掌</strong></td>
+<td>起飞</td>
+<td>五指张开</td>
+</tr>
+<tr>
+<td>✊ <strong>握拳</strong></td>
+<td>降落</td>
+<td>握紧拳头</td>
+</tr>
+<tr>
+<td>☝️ <strong>食指向上</strong></td>
+<td>上升</td>
+<td>食指朝上</td>
+</tr>
+<tr>
+<td>👇 <strong>食指向下</strong></td>
+<td>下降</td>
+<td>食指朝下</td>
+</tr>
+<tr>
+<td>✌️ <strong>V 字手势</strong></td>
+<td>前进</td>
+<td>胜利手势</td>
+</tr>
+<tr>
+<td>👍 <strong>大拇指向上</strong></td>
+<td>后退</td>
+<td>拇指朝上</td>
+</tr>
+<tr>
+<td>👎 <strong>大拇指向下</strong></td>
+<td>停止</td>
+<td>拇指朝下</td>
+</tr>
+<tr>
+<td>👌 <strong>OK 手势</strong></td>
+<td>悬停</td>
+<td>拇指食指圈起</td>
+</tr>
+<tr>
+<td>🤘 <strong>摇滚手势</strong></td>
+<td>左转</td>
+<td>食指小指伸出</td>
+</tr>
+<tr>
+<td>✌️ <strong>和平手势</strong></td>
+<td>右转</td>
+<td>食指中指伸出</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_11">🖐 手势映射</h2>
+<blockquote>
+<p>技术层面对应关系</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>手势标识</th>
+<th>对应命令</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open_palm</code></td>
+<td>起飞</td>
+<td>手掌完全张开</td>
+</tr>
+<tr>
+<td><code>closed_fist</code></td>
+<td>降落</td>
+<td>手指完全握紧</td>
+</tr>
+<tr>
+<td><code>pointing_up</code></td>
+<td>上升</td>
+<td>仅食指伸出朝上</td>
+</tr>
+<tr>
+<td><code>pointing_down</code></td>
+<td>下降</td>
+<td>仅食指伸出朝下</td>
+</tr>
+<tr>
+<td><code>victory</code></td>
+<td>前进</td>
+<td>V 字形（食指+中指）</td>
+</tr>
+<tr>
+<td><code>thumb_up</code></td>
+<td>后退</td>
+<td>拇指朝上，其余握拳</td>
+</tr>
+<tr>
+<td><code>thumb_down</code></td>
+<td>停止</td>
+<td>拇指朝下，其余握拳</td>
+</tr>
+<tr>
+<td><code>ok_sign</code></td>
+<td>悬停</td>
+<td>拇指与食指成圈</td>
+</tr>
+<tr>
+<td><code>rock</code></td>
+<td>左转</td>
+<td>摇滚手势（食指+小指）</td>
+</tr>
+<tr>
+<td><code>peace</code></td>
+<td>右转</td>
+<td>和平手势（食指+中指背面）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_12">📊 飞行统计面板</h2>
+<p>按 <code>V</code> 键打开实时飞行统计面板，显示以下数据：</p>
+<table>
+<thead>
+<tr>
+<th>统计类别</th>
+<th>具体指标</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>⏱️ <strong>时间</strong></td>
+<td>飞行时长、会话时长</td>
+</tr>
+<tr>
+<td>📏 <strong>距离</strong></td>
+<td>累计飞行距离、离起飞点最远距离</td>
+</tr>
+<tr>
+<td>⚡ <strong>速度</strong></td>
+<td>当前速度、最大速度、平均速度</td>
+</tr>
+<tr>
+<td>🏔️ <strong>高度</strong></td>
+<td>当前高度、最大高度</td>
+</tr>
+<tr>
+<td>🔋 <strong>电池</strong></td>
+<td>当前电量、最低电量、耗电率</td>
+</tr>
+<tr>
+<td>🖐 <strong>手势</strong></td>
+<td>各手势触发次数与频率排行</td>
+</tr>
+<tr>
+<td>🎮 <strong>命令</strong></td>
+<td>各命令执行次数与频率排行</td>
+</tr>
+<tr>
+<td>🛫 <strong>起降</strong></td>
+<td>起飞次数、降落次数</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>程序退出时自动打印完整的飞行统计报告到控制台。</p>
+</blockquote>
+<hr />
+<h2 id="_13">🧠 深度学习</h2>
+<h3 id="_14">模型对比</h3>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>架构特点</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CNN</strong></td>
+<td>1D 卷积神经网络</td>
+<td>捕捉局部特征，计算效率高，适合实时场景</td>
+</tr>
+<tr>
+<td><strong>Transformer</strong></td>
+<td>注意力机制模型</td>
+<td>建模长距离依赖关系，准确率更高</td>
+</tr>
+<tr>
+<td><strong>深度 MLP</strong></td>
+<td>多层全连接网络</td>
+<td>结构简单，训练快速，适合小规模数据</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_15">训练命令</h3>
+<pre><code class="language-bash"># 训练单一模型
+python train_deep_gesture.py --model_type cnn --epochs 100 --batch_size 32
+
+# 对比训练所有模型
+python train_deep_gesture.py --compare
+</code></pre>
+<h3 id="_16">可视化功能</h3>
+<ul>
+<li>📊 实时置信度折线图</li>
+<li>📈 手势分类统计柱状图</li>
+<li>🏷️ 手势信息面板</li>
+<li>👆 手势图标叠加显示</li>
+<li>📐 3D 手部关键点投影</li>
+</ul>
+<hr />
+<h2 id="_17">🔧 环境兼容性</h2>
+<h3 id="windows-python-311">Windows + Python 3.11 特别优化</h3>
+<p>本项目针对 <strong>Windows + Python 3.11</strong> 环境做了专项适配：</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>检测器</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🥇 优先方案</td>
+<td><strong>MediaPipe</strong></td>
+<td>完整手部 21 关键点检测，精度最高</td>
+</tr>
+<tr>
+<td>🥈 降级方案</td>
+<td><strong>OpenCV 肤色检测</strong></td>
+<td>纯 OpenCV 实现（YCrCb 色彩空间），零额外依赖</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>自动切换</strong>：MediaPipe 不可用时自动降级为 OpenCV 方案，无需手动配置</li>
+<li><strong>跨平台</strong>：核心功能支持 Windows、macOS、Linux</li>
+</ul>
+<hr />
+<h2 id="_18">📦 依赖</h2>
+<pre><code class="language-text">opencv-python&gt;=4.5.0
+numpy&gt;=1.21.0
+mediapipe&gt;=0.10.0          # 可选，自动降级
+scikit-learn&gt;=1.0.0        # 传统 ML 模型
+torch&gt;=1.10.0              # 深度学习模型
+matplotlib&gt;=3.5.0          # 可视化
+airsim                     # AirSim 模式（可选）
+PyOpenGL&gt;=3.1.0            # 3D 仿真渲染
+</code></pre>
+<hr />
+<p align="center">
+  <sub>Made with ❤️ | 手势控制无人机项目</sub>
+</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

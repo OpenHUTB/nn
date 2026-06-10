@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/drone_hand_gesture/%E8%BF%90%E8%A1%8C%E6%8C%87%E5%8D%97/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>手势控制无人机 - 运行指南 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u624b\u52bf\u63a7\u5236\u65e0\u4eba\u673a - \u8fd0\u884c\u6307\u5357";
+        var mkdocs_page_input_path = "drone_hand_gesture/\u8fd0\u884c\u6307\u5357.md";
+        var mkdocs_page_url = "/nn/drone_hand_gesture/%E8%BF%90%E8%A1%8C%E6%8C%87%E5%8D%97/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">手势控制无人机 - 运行指南</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/drone_hand_gesture/运行指南.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="-">手势控制无人机 - 运行指南</h1>
+<h2 id="_1">🚀 快速开始</h2>
+<h3 id="1">方案 1：本地仿真模式（推荐新手）⭐</h3>
+<p><strong>特点</strong>：
+- ✅ 不需要安装 AirSim
+- ✅ 不需要额外配置
+- ✅ 直接运行即可
+- ✅ 有 3D 仿真显示</p>
+<p><strong>运行步骤</strong>：</p>
+<ol>
+<li>
+<p><strong>打开终端</strong>（PowerShell 或 CMD）</p>
+</li>
+<li>
+<p><strong>进入项目目录</strong>：
+   <code>bash
+   cd path/to/nn/src/drone_hand_gesture</code></p>
+</li>
+<li>
+<p><strong>运行程序</strong>：
+   <code>bash
+   python main.py</code></p>
+</li>
+<li>
+<p><strong>控制无人机</strong>：</p>
+</li>
+<li>对着摄像头做手势</li>
+<li>或按键盘控制：<ul>
+<li><code>T</code> - 起飞</li>
+<li><code>L</code> - 降落</li>
+<li><code>H</code> - 悬停</li>
+<li><code>空格</code> - 重置位置</li>
+<li><code>Q</code> - 退出</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h3 id="2airsim">方案 2：AirSim 真实模拟器模式</h3>
+<p><strong>特点</strong>：
+- ✅ 连接真实的 AirSim 模拟器
+- ✅ 可以获取真实飞行数据
+- ⚠️ 需要安装 AirSim</p>
+<p><strong>前提条件</strong>：</p>
+<ol>
+<li>
+<p><strong>安装 AirSim Python 包</strong>：
+   <code>bash
+   pip install airsim</code></p>
+</li>
+<li>
+<p><strong>启动 AirSim 模拟器</strong>：</p>
+</li>
+<li>双击运行：<code>d:\机械学习\air\Blocks\WindowsNoEditor\Blocks.exe</code></li>
+<li>等待看到无人机和场景加载完成</li>
+</ol>
+<p><strong>运行步骤</strong>：</p>
+<ol>
+<li>
+<p><strong>打开新终端</strong></p>
+</li>
+<li>
+<p><strong>进入项目目录</strong>：
+   <code>bash
+   cd path/to/nn/src/drone_hand_gesture</code></p>
+</li>
+<li>
+<p><strong>运行 AirSim 版本</strong>：
+   <code>bash
+   python main_airsim.py</code></p>
+</li>
+<li>
+<p><strong>控制无人机</strong>：</p>
+</li>
+<li><strong>按空格键或 T 键</strong> - 起飞</li>
+<li><strong>手势控制</strong>：<ul>
+<li>张开手掌 - 悬停</li>
+<li>食指向上 - 上升</li>
+<li>食指向下 - 下降</li>
+<li>指向左右 - 左右移动</li>
+<li>两指向前 - 前进</li>
+<li>握拳 - 降落</li>
+</ul>
+</li>
+<li><strong>键盘控制</strong>：<ul>
+<li><code>L</code> - 降落</li>
+<li><code>H</code> - 悬停</li>
+<li><code>Q/ESC</code> - 退出</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2 id="_2">📹 摄像头使用提示</h2>
+<ol>
+<li><strong>光线充足</strong> - 确保环境光线良好</li>
+<li><strong>手势清晰</strong> - 手放在摄像头中心位置</li>
+<li><strong>保持距离</strong> - 手距离摄像头 30-50cm 最佳</li>
+<li><strong>背景简单</strong> - 避免复杂的背景干扰</li>
+</ol>
+<hr />
+<h2 id="_3">⚠️ 常见问题</h2>
+<h3 id="q">Q: 摄像头打不开？</h3>
+<p><strong>A</strong>: 检查是否有其他程序占用摄像头（如微信、Zoom 等）</p>
+<h3 id="q_1">Q: 手势识别不准确？</h3>
+<p><strong>A</strong>: 
+- 调整光线
+- 手靠近摄像头中心
+- 保持手势稳定 1-2 秒</p>
+<h3 id="q-airsim">Q: AirSim 连接失败？</h3>
+<p><strong>A</strong>:
+- 确保 Blocks.exe 已启动
+- 等待 15 秒让 AirSim 完全启动
+- 检查防火墙设置</p>
+<h3 id="q_2">Q: 程序运行报错？</h3>
+<p><strong>A</strong>: </p>
+<pre><code class="language-bash"># 安装所有依赖
+pip install -r requirements.txt
+</code></pre>
+<hr />
+<h2 id="_4">🎮 完整控制说明</h2>
+<h3 id="_5">本地仿真模式</h3>
+<ul>
+<li><code>T</code> - 手动起飞</li>
+<li><code>L</code> - 手动降落</li>
+<li><code>H</code> - 悬停</li>
+<li><code>空格</code> - 重置位置</li>
+<li><code>Q</code> - 退出程序</li>
+</ul>
+<h3 id="airsim">AirSim 模式</h3>
+<p><strong>键盘</strong>：
+- <code>空格</code> - 起飞/降落
+- <code>T</code> - 手动起飞
+- <code>L</code> - 手动降落
+- <code>H</code> - 悬停
+- <code>Q/ESC</code> - 退出</p>
+<p><strong>手势</strong>：
+- ✋ 张开手掌 - 悬停
+- 👆 食指向上 - 上升
+- 👇 食指向下 - 下降
+- 👈 指向左 - 左移
+- 👉 指向右 - 右移
+- ✌️ 两指向前 - 前进
+- 👍 大拇指 - 后退
+- 👊 握拳 - 降落</p>
+<hr />
+<h2 id="_6">📊 查看运行效果</h2>
+<p>运行成功后，你应该看到：</p>
+<ol>
+<li><strong>摄像头窗口</strong> - 显示你的手和识别结果</li>
+<li><strong>3D 仿真窗口</strong>（本地模式） - 显示无人机飞行</li>
+<li><strong>AirSim 窗口</strong>（AirSim 模式） - 真实模拟器画面</li>
+<li><strong>控制台输出</strong> - 显示状态信息</li>
+</ol>
+<hr />
+<h2 id="_7">💡 建议</h2>
+<p><strong>新手建议</strong>：
+1. 先运行<strong>本地仿真模式</strong>熟悉操作
+2. 确认手势识别正常
+3. 再尝试 AirSim 真实模拟器</p>
+<p><strong>运行顺序</strong>：</p>
+<pre><code class="language-bash"># 1. 本地仿真（简单）
+python main.py
+
+# 2. AirSim 模式（需要 AirSim）
+python main_airsim.py
+</code></pre>
+<p>祝你使用愉快！🚁</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
