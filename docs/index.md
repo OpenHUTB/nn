@@ -90,6 +90,7 @@ title: 主页
 
 [__机械臂仿真系统__](arm_sim.md) - 基于MuJoCo的机械臂仿真与功能优化
 
+[__PilotNet自动驾驶系统__](./pilotnet/index.md) - 基于NVIDIA PilotNet架构的端到端自动驾驶学习系统
 
 ## 控制  <span id="control"></span>
 
