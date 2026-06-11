@@ -244,3 +244,27 @@ python tutorial_minst_fnn-tf2.0-exercise.py
 -   **训练步骤**：`train_one_step()` 函数执行一次训练步骤并更新模型参数。
 -   **测试步骤**：`test()` 函数计算测试集上的损失和准确率。
 
+---
+
+# tf2.0-exercise.py 工程化补充说明
+
+本次对 `tf2.0-exercise.py` 做了小幅工程化改进，在不改变练习目标的前提下提升可运行性与可追踪性：
+
+1. 修复 softmax 交叉熵测试中的变量错误，脚本可直接运行。
+2. 增加随机种子参数（环境变量 `TF2_EXERCISE_SEED`），保证随机测试可复现。
+3. 新增结果导出功能，自动生成 `outputs/tf2_exercise_report.json`，记录 softmax/sigmoid/交叉熵对齐结果。
+
+## 运行方式
+
+```bash
+python tf2.0-exercise.py
+```
+
+Windows PowerShell 示例：
+
+```powershell
+$env:TF2_EXERCISE_SEED=42
+$env:TF2_EXERCISE_REPORT_OUT="outputs/tf2_exercise_report.json"
+python .\tf2.0-exercise.py
+```
+

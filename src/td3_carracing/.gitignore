@@ -1,0 +1,17 @@
+# PyCharm 配置文件
+.idea/
+*.iml
+.idea/**/*
+
+# Python 缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 模型保存目录
+models/
+
+# 系统文件
+.DS_Store
+Thumbs.db

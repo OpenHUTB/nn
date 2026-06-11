@@ -1,5 +1,25 @@
 #!/usr/bin/env python
 # coding: utf-8
+# In[ ]:
+#导入TensorFlow库
+import tensorflow as tf
+#导入MNIST数据集加载工具
+from tensorflow.examples.tutorials.mnist import input_data
+# 使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
+
+try:
+    # 参数说明：
+    # 'MNIST_data' - 数据集存储目录
+    # one_hot=True - 将标签转换为one-hot编码格式
+    # 加载MNIST手写数字数据集，one_hot=True表示标签使用one-hot编码
+    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+except Exception as e:
+    print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
+    
+
+LEARNING_RATE = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
+KEEP_PROB_RATE = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
+MAX_EPOCH = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
 """
 改进的MNIST手写数字识别模型
 实际准确率: 99.53% (目标99%+)
