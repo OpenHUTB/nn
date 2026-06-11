@@ -2,7 +2,7 @@ import carla
 import math
 import logging
 from utils import calculate_vehicle_speed_kmh
-from config import TRAFFIC_LIGHT_DETECT_DISTANCE, TRAFFIC_LIGHT_FILTER
+from nn.src.connected_vehicles.src.config import TRAFFIC_LIGHT_DETECT_DISTANCE, TRAFFIC_LIGHT_FILTER
 
 logger = logging.getLogger(__name__)
 

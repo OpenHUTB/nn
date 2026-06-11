@@ -2,31 +2,50 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
-# 直接调用 MuJoCo 官方自带的 humanoid 模型，绝对正确
+# 加载模型
 model = mujoco.MjModel.from_xml_path("humanoid.xml")
 data = mujoco.MjData(model)
+nu = model.nu
+print(f"模型控制维度 nu = {nu}")
 
-# 用模型自带的关键帧初始化，直接就是标准站立姿态！
-mujoco.mj_resetDataKeyframe(model, data, 0)
+# 初始抬高，防止陷地
+data.qpos[2] = 1.4
+mujoco.mj_forward(model, data)
 
-# PD控制参数（官方推荐的稳定参数）
-kp = 1000.0
-kd = 100.0
+# 增加地面摩擦力，防止滑倒
+for i in range(model.ngeom):
+    if "floor" in model.geom(i).name:
+        model.geom(i).friction = [10, 0.1, 0.1]
 
-# 启动仿真
+# PD控制参数
+kp = 100
+kd = 10
+
 with mujoco.viewer.launch_passive(model, data) as viewer:
-    # 调整视角，方便观察
-    viewer.cam.distance = 5
-    viewer.cam.elevation = -25
-    viewer.cam.lookat[:] = [0, 0, 1.2]
-
+    t = 0.0
     while viewer.is_running():
-        # 获取关节位置和速度
-        q = data.qpos[7: 7 + model.nu]
-        v = data.qvel[6: 6 + model.nu]
+        dt = model.opt.timestep
+        t += dt
 
-        # PD控制，目标就是初始的站立姿态
-        data.ctrl[:] = kp * (np.zeros_like(q) - q) - kd * v
+        # 手臂摆动幅度
+        swing = np.sin(t * 1.2) * 0.3
+        target = np.zeros(nu)
+
+        # 适配nu=16的手臂关节索引
+        if nu >= 16:
+            # 右肩+右肘（索引10、11、12）
+            target[10] = swing
+            target[11] = swing
+            target[12] = swing * 0.4
+            # 左肩+左肘（索引13、14、15）
+            target[13] = -swing
+            target[14] = -swing
+            target[15] = -swing * 0.4
+
+        # 获取关节状态
+        q = data.qpos[7:7+nu]
+        v = data.qvel[6:6+nu]
+        data.ctrl[:] = kp * (target - q) - kd * v
 
         mujoco.mj_step(model, data)
         viewer.sync()

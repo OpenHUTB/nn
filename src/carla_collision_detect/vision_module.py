@@ -57,6 +57,9 @@ class VisionSystem:
             current_seen_classes = set()
             min_distance = float('inf') 
             detected_side = None
+            closest_target_class = None
+            closest_center_x = None
+            aeb_min_distance = float('inf')
             
             roi_left = 200
             roi_right = 440
@@ -72,13 +75,24 @@ class VisionSystem:
                 box_height = y2 - y1
                 box_center_x = (x1 + x2) / 2
                 ratio = max(0.0, min(1.0, (y2 - 240.0) / 240.0))
+                
                 dynamic_roi_left = 320.0 - (220.0 * ratio)
                 dynamic_roi_right = 320.0 + (220.0 * ratio)
-                if dynamic_roi_left < box_center_x < dynamic_roi_right:
-                    if cls_name in ["car", "person"]:
-                        real_height = 1.7 if cls_name == "person" else 1.5
-                        distance = (self.focal_length * real_height) / max(1.0, box_height)
+                
+                wide_roi_left = 320.0 - (150.0 + 150.0 * ratio)
+                wide_roi_right = 320.0 + (150.0 + 150.0 * ratio)
+
+                if cls_name in ["car", "person"]:
+                    real_height = 1.7 if cls_name == "person" else 1.5
+                    distance = (self.focal_length * real_height) / max(1.0, box_height)
                     
+                    if wide_roi_left < box_center_x < wide_roi_right:
+                        if distance < aeb_min_distance:
+                            aeb_min_distance = distance
+                            closest_target_class = cls_name
+                            closest_center_x = box_center_x
+
+                    if dynamic_roi_left < box_center_x < dynamic_roi_right:
                         if distance < min_distance:
                             if self.smoothed_distance == float('inf'):
                                 self.smoothed_distance = distance
@@ -120,8 +134,16 @@ class VisionSystem:
             
             cv2.line(annotated_frame, pt_horizon, pt_bottom_left, (0, 255, 0), 2)
             cv2.line(annotated_frame, pt_horizon, pt_bottom_right, (0, 255, 0), 2)
-            cv2.putText(annotated_frame, "Dynamic Perspective ROI", (100, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.putText(annotated_frame, "ACC Lane ROI", (100, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
+            pt_aeb_top_left = (170, 240)
+            pt_aeb_top_right = (470, 240)
+            pt_aeb_bottom_left = (20, 480)
+            pt_aeb_bottom_right = (620, 480)
+            cv2.line(annotated_frame, pt_aeb_top_left, pt_aeb_bottom_left, (0, 255, 255), 2)
+            cv2.line(annotated_frame, pt_aeb_top_right, pt_aeb_bottom_right, (0, 255, 255), 2)
+            cv2.putText(annotated_frame, "AEB Wide ROI", (20, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
             v = self.ego_vehicle.get_velocity()
             speed_kmh = 3.6 * (v.x**2 + v.y**2 + v.z**2)**0.5
             cv2.putText(annotated_frame, f"Ego Speed: {speed_kmh:.1f} km/h", (20, 40), 
@@ -130,9 +152,9 @@ class VisionSystem:
             cv2.imshow("CARLA YOLOv8 Vision", annotated_frame)
             cv2.waitKey(1)
             
-            return annotated_frame, min_distance, detected_side
+            return annotated_frame, min_distance, detected_side, closest_target_class, closest_center_x, aeb_min_distance
             
-        return None, float('inf'), None
+        return None, float('inf'), None, None, None, float('inf')
 
     def destroy(self):
         if self.camera_sensor:

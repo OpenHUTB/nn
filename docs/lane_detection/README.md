@@ -3,6 +3,7 @@
 基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。
 
 **作者**：ultra223  
+**课题进度**：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
 **课题进度**：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
 **课题进度**：2/10（步骤1 基础检测 + 步骤2 HSV 优化）
 
@@ -15,6 +16,7 @@
 | `lane_preprocess.py` | 步骤1：灰度、Canny、ROI、霍夫 |
 | `lane_detect.py` | 步骤2：HSV 黄白线、双黄线中心轴、左右车道 |
 | `lane_advanced.py` | 步骤3：透视变换、滑动窗口、二次多项式拟合 |
+| `lane_video.py` | 步骤4：视频处理、帧间 EMA 平滑 |
 | `carla_test.jpg` | 少量示例输入（运行依赖） |
 
 ## 开发环境
@@ -42,6 +44,9 @@ python main.py --mode hsv
 # 步骤3：透视变换 + 滑动窗口 + 多项式拟合
 python main.py --mode advanced
 
+# 步骤4：视频模式（逐帧检测 + EMA 平滑）
+python main.py --mode video --video path/to/video.mp4
+
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
@@ -49,6 +54,7 @@ python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
+python main.py --mode advanced --save-docs --no-show
 ```
 
 ## 步骤1：基础版（Canny + 霍夫）
@@ -114,6 +120,28 @@ python main.py --mode hsv --save-docs --no-show
 **最终检测结果**
 
 ![步骤3 检测结果](images/step03_result.jpg)
+
+## 步骤4：视频处理与帧间平滑
+
+在步骤3的基础上，支持视频文件输入，逐帧执行高级车道线检测流水线，并对连续帧的多项式拟合系数做指数移动平均（EMA）平滑，消除相邻帧之间的抖动，输出稳定的车道线跟踪结果。
+
+**关键参数**
+
+| 参数 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `--alpha` | 0.3 | EMA 平滑系数（0~1），越小越平滑 |
+| `--video` | — | 输入视频路径 |
+| `--save-docs` | — | 保存输出视频到文档目录 |
+
+**EMA 平滑公式**
+
+```
+fit_smoothed = α × fit_current + (1 − α) × fit_previous
+```
+
+- α = 1.0：完全使用当前帧结果（无平滑，可能抖动）
+- α = 0.1：高度平滑，响应慢但稳定
+- α = 0.3（默认）：兼顾响应速度和平滑度
 
 ## 参考
 

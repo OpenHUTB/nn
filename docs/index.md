@@ -1,6 +1,6 @@
 title: 主页
 
-=======
+
 # [神经网络](https://github.com/OpenHUTB/nn)
 
 欢迎使用神经网络文档，该页面包含所有内容的索引。
@@ -52,7 +52,7 @@ title: 主页
 
 [__强化学习__](RL.md)
 
-
+[__强化学习工作空间__](rl_workspace.md)
 
 ---
 ## 感知 <span id="perception"></span>
@@ -73,6 +73,8 @@ title: 主页
 
 [__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
 
+[__基于自监督学习与PPO强化学习的自动驾驶仿真项目__](./autonomous_driving/README.md) - 基于CARLA的SSL+RL自动驾驶仿真系统
+
 
 ## 规划 <span id="planning"></span>
 
@@ -92,7 +94,17 @@ title: 主页
 
 [__机械臂仿真系统__](arm_sim.md) - 基于MuJoCo的机械臂仿真与功能优化
 
+<<<<<<< HEAD
 [__自动驾驶系统__](./auto_drive_system/auto_drive_system_README) - 基于强化学习的自动驾驶系统
+=======
+[__CARLA自动驾驶多场景仿真项目__](./DeFIX/docs/index.md)
+
+[__自动驾驶系统__](./auto_drive_system/auto_drive_system_README) - 基于强化学习的自动驾驶系统
+
+[__carla_2d_deeprl__](./carla_2d_deeprl/README.md) - 基于 CARLA 的极简 2D 深度强化学习自动驾驶环境。
+
+
+>>>>>>> a5a22248cdfe7cc50f7bc1c7f2151be66c6f7644
 
 ## 控制  <span id="control"></span>
 
@@ -107,7 +119,6 @@ title: 主页
 
 [__CARLA IMU 数据采集平台__](./carla_imu/carla_imu.md) — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档
 
+[__人形机器人SAC强化学习步态优化__](./mujoco_running/running.md) - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真
+
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
-
-
-

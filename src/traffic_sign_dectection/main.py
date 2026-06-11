@@ -4,41 +4,35 @@ import logging
 import argparse
 import collections
 import datetime
-import glob
 import math
 import random
 import re
 import weakref
+import json  # 新增：JSON处理
 from pathlib import Path
 
-# ========== 全局常量定义（优化：提取魔法常量） ==========
-MIN_WAYPOINTS_QUEUE = 21  # 触发新目的地的最小路径点数量
-CARLA_API_RELATIVE_PATH = "WindowsNoEditor/PythonAPI/carla"
-LOG_DIR = "logs"  # 行驶日志保存目录
-DEFAULT_CAMERA_GAMMA = 2.2
-DEFAULT_SERVER_HOST = "127.0.0.1"
-DEFAULT_SERVER_PORT = 2000
-DEFAULT_WINDOW_RES = "1280x720"
-DEFAULT_VEHICLE_FILTER = "vehicle.*"
+# ========== 全局常量 ==========
+MIN_WAYPOINTS_QUEUE = 21
+CARLA_API_PATH = "WindowsNoEditor/PythonAPI/carla"
+LOG_SAVE_DIR = "logs"
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 2000
 
-# ========== 路径处理（优化：统一且健壮） ==========
-# 获取当前脚本绝对路径
+# ========== 路径初始化 ==========
 script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-# 拼接CARLA PythonAPI路径（自动适配系统）
-carla_api_path = script_dir / CARLA_API_RELATIVE_PATH
+carla_api_full_path = script_dir / CARLA_API_PATH
 
-# 检查API路径是否存在
-if not carla_api_path.exists():
+if not carla_api_full_path.exists():
     raise FileNotFoundError(
-        f"CARLA API路径不存在: {carla_api_path}\n"
-        "请确保脚本与WindowsNoEditor文件夹在同一目录下"
+        f"未找到CARLA API: {carla_api_full_path}\n"
+        "请确认WindowsNoEditor文件夹与脚本在同一目录"
     )
-sys.path.append(str(carla_api_path))
+sys.path.append(str(carla_api_full_path))
 
-# ========== 第三方库导入（优化：集中导入） ==========
+# ========== 第三方库导入 ==========
 try:
     import pygame
-    from pygame.locals import KMOD_CTRL, K_ESCAPE, K_q, K_r, K_h, K_SLASH
+    from pygame.locals import KMOD_CTRL, K_ESCAPE, K_q, K_r, K_h
 except ImportError:
     raise RuntimeError("请安装pygame: pip install pygame")
 
@@ -52,121 +46,163 @@ try:
     from carla import ColorConverter as cc
     from agents.navigation.behavior_agent import BehaviorAgent
     from agents.navigation.basic_agent import BasicAgent
-    # 补充RoamingAgent（原代码未导入，修复潜在报错）
-
 except ImportError as e:
-    raise RuntimeError(f"CARLA PythonAPI导入失败: {e}")
+    raise RuntimeError(f"CARLA API导入失败: {e}")
 
-# ========== 日志配置（优化：统一日志输出） ==========
+# ========== 日志配置 ==========
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
 
-# ========== 新增功能：行驶日志记录类 ==========
+# ========== 新增：行驶日志记录器 ==========
 class DrivingLogger:
-    """行驶日志记录类，保存车辆状态到CSV文件"""
+    """自动记录行驶数据到CSV文件"""
     def __init__(self):
-        # 创建日志目录
-        self.log_dir = Path(LOG_DIR)
+        self.log_dir = Path(LOG_SAVE_DIR)
         self.log_dir.mkdir(exist_ok=True)
-        
-        # 按时间生成日志文件名
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_file = self.log_dir / f"driving_log_{timestamp}.csv"
-        
-        # 初始化CSV文件头
-        self._init_csv()
-        self.last_collision_frame = -1  # 记录最后碰撞帧，避免重复标记
+        time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.log_file = self.log_dir / f"driving_log_{time_str}.csv"
+        self._init_header()
+        self.last_collision_frame = -1
 
-    def _init_csv(self):
-        """初始化CSV文件，写入表头"""
-        headers = [
-            "timestamp", "location_x", "location_y", "location_z",
-            "speed_kmh", "is_collision", "weather", "target_reached_count"
-        ]
+    def _init_header(self):
+        headers = ["timestamp", "x", "y", "z", "speed_kmh", "is_collision", "target_reached"]
         with open(self.log_file, "w", encoding="utf-8", newline="") as f:
             f.write(",".join(headers) + "\n")
 
-    def log_frame(self, world, vehicle, target_reached_count):
-        """记录单帧车辆状态"""
-        # 获取基础信息
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        transform = vehicle.get_transform()
-        vel = vehicle.get_velocity()
-        speed_kmh = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
-        
-        # 判断当前是否碰撞（避免同一碰撞多次记录）
-        is_collision = False
-        collision_history = world.collision_sensor.get_collision_history()
+    def record_frame(self, world, target_count):
+        """记录单帧数据"""
+        transform = world.player.get_transform()
+        vel = world.player.get_velocity()
+        speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+
+        # 碰撞判断
+        is_collision = 0
+        collision_hist = world.collision_sensor.get_collision_history()
         current_frame = world.hud.frame
-        if current_frame in collision_history and current_frame != self.last_collision_frame:
-            is_collision = True
+        if current_frame in collision_hist and current_frame != self.last_collision_frame:
+            is_collision = 1
             self.last_collision_frame = current_frame
-        
-                # 获取天气信息（容错版：比较关键参数而非对象本身）
-        weather = world.player.get_world().get_weather()
-        weather_name = "未知"
-        for preset, name in find_weather_presets():
-            # 比较云量、降水量、雾密度三个关键参数
-            if (abs(preset.cloudiness - weather.cloudiness) < 0.1 and
-                abs(preset.precipitation - weather.precipitation) < 0.1 and
-                abs(preset.fog_density - weather.fog_density) < 0.1):
-                weather_name = name
-                break
-        
+
         # 写入CSV
         row = [
-            timestamp,
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
             f"{transform.location.x:.2f}",
             f"{transform.location.y:.2f}",
             f"{transform.location.z:.2f}",
-            f"{speed_kmh:.1f}",
-            "1" if is_collision else "0",
-            weather_name,
-            str(target_reached_count)
+            f"{speed:.1f}",
+            str(is_collision),
+            str(target_count)
         ]
         with open(self.log_file, "a", encoding="utf-8", newline="") as f:
             f.write(",".join(row) + "\n")
 
-    def get_log_path(self):
-        """返回日志文件路径"""
+    def get_file_path(self):
         return str(self.log_file)
 
-# ========== 工具函数（优化：保持简洁） ==========
-def get_random_destination(current_location, spawn_points):
-    """获取非当前位置的随机生成点作为目的地"""
+# ========== 新增：轨迹记录器（JSON格式） ==========
+class TrajectoryLogger:
+    """记录车辆完整行驶轨迹为JSON文件，支持实时追加和最终格式化"""
+    def __init__(self):
+        self.log_dir = Path(LOG_SAVE_DIR)
+        self.log_dir.mkdir(exist_ok=True)
+        time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.traj_file = self.log_dir / f"trajectory_log_{time_str}.json"
+        self.trajectory_data = {
+            "metadata": {
+                "start_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                "total_frames": 0,
+                "collision_frames": [],
+                "target_reached_count": 0
+            },
+            "frames": []
+        }
+        # 初始化空JSON文件
+        self._save_to_file()
+
+    def record_frame(self, world, target_count):
+        """记录单帧轨迹数据"""
+        transform = world.player.get_transform()
+        vel = world.player.get_velocity()
+        speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        current_frame = world.hud.frame
+
+        # 碰撞判断
+        is_collision = 0
+        collision_hist = world.collision_sensor.get_collision_history()
+        if current_frame in collision_hist:
+            is_collision = 1
+            if current_frame not in self.trajectory_data["metadata"]["collision_frames"]:
+                self.trajectory_data["metadata"]["collision_frames"].append(current_frame)
+
+        # 构造单帧数据
+        frame_data = {
+            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+            "frame_id": current_frame,
+            "location": {
+                "x": round(transform.location.x, 2),
+                "y": round(transform.location.y, 2),
+                "z": round(transform.location.z, 2)
+            },
+            "rotation": {
+                "pitch": round(transform.rotation.pitch, 2),
+                "yaw": round(transform.rotation.yaw, 2),
+                "roll": round(transform.rotation.roll, 2)
+            },
+            "speed_kmh": round(speed, 1),
+            "is_collision": is_collision,
+            "target_reached_count": target_count
+        }
+
+        # 追加数据并更新元信息
+        self.trajectory_data["frames"].append(frame_data)
+        self.trajectory_data["metadata"]["total_frames"] = len(self.trajectory_data["frames"])
+        self.trajectory_data["metadata"]["target_reached_count"] = target_count
+
+        # 实时保存（轻量化写入）
+        self._save_to_file()
+
+    def _save_to_file(self):
+        """将轨迹数据写入JSON文件"""
+        with open(self.traj_file, "w", encoding="utf-8") as f:
+            json.dump(self.trajectory_data, f, ensure_ascii=False, indent=2)
+
+    def get_file_path(self):
+        """获取轨迹文件路径"""
+        return str(self.traj_file)
+
+    def finalize(self):
+        """程序结束时最终化数据（补充结束时间）"""
+        self.trajectory_data["metadata"]["end_time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        self._save_to_file()
+        logger.info(f"轨迹日志已最终化，共记录 {self.trajectory_data['metadata']['total_frames']} 帧")
+
+# ========== 工具函数 ==========
+def get_random_destination(current_loc, spawn_points):
+    """获取非当前位置的随机目的地，兼容浮点误差"""
     if not spawn_points:
-        raise ValueError("无可用的生成点！")
-    # 过滤当前位置（允许微小误差，避免浮点精度问题）
-    valid_spawn_points = [
+        raise ValueError("无可用生成点")
+    valid_points = [
         p for p in spawn_points
-        if not math.isclose(p.location.x, current_location.x, abs_tol=0.1)
-        or not math.isclose(p.location.y, current_location.y, abs_tol=0.1)
+        if math.hypot(p.location.x - current_loc.x, p.location.y - current_loc.y) > 2.0
     ]
-    return (
-        random.choice(valid_spawn_points).location
-        if valid_spawn_points
-        else spawn_points[0].location
-    )
+    return random.choice(valid_points).location if valid_points else spawn_points[0].location
 
 def find_weather_presets():
-    """获取天气预设列表"""
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
     def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
     presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 def get_actor_display_name(actor, truncate=250):
-    """获取Actor的可读名称"""
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
-# ========== World类（优化：修复reset_vehicle、完善逻辑） ==========
+# ========== World类 ==========
 class World(object):
-    """代表CARLA世界环境的类"""
     def __init__(self, carla_world, hud, args):
         self.world = carla_world
         self.hud = hud
@@ -179,44 +215,31 @@ class World(object):
         self._weather_index = 0
         self._actor_filter = args.filter
         self._gamma = args.gamma
-        
+
         try:
             self.map = self.world.get_map()
         except RuntimeError as e:
-            logger.error(f"获取地图失败: {e}")
-            logger.error("请确保OpenDRIVE文件存在且与城镇名称匹配")
+            logger.error(f"加载地图失败: {e}")
             sys.exit(1)
-        
+
         self.restart(args)
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False
         self.recording_start = 0
 
     def restart(self, args):
-        """重启世界（重新生成车辆和传感器）"""
-        # 保留相机配置
         cam_index = self.camera_manager.index if self.camera_manager else 0
         cam_pos_id = self.camera_manager.transform_index if self.camera_manager else 0
-        
-        # 设置随机种子
+
         if args.seed is not None:
             random.seed(args.seed)
-            logger.info(f"设置随机种子: {args.seed}")
 
-        # 选择车辆蓝图
-        blueprint_library = self.world.get_blueprint_library()
-        try:
-            blueprint = random.choice(blueprint_library.filter(self._actor_filter))
-        except IndexError:
-            logger.error(f"未找到匹配的Actor过滤器: {self._actor_filter}")
-            sys.exit(1)
-        
+        blueprint = random.choice(self.world.get_blueprint_library().filter(self._actor_filter))
         blueprint.set_attribute('role_name', 'hero')
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
 
-        # 销毁旧车辆
         if self.player is not None:
             spawn_point = self.player.get_transform()
             spawn_point.location.z += 2.0
@@ -224,23 +247,22 @@ class World(object):
             spawn_point.rotation.pitch = 0.0
             self.destroy()
 
-        # 生成新车辆（重试机制）
-        self.player = None
+        # 重试生成车辆
         spawn_points = self.map.get_spawn_points()
         if not spawn_points:
-            logger.error("地图中无可用的车辆生成点！")
+            logger.error("地图无可用生成点")
             sys.exit(1)
-        
-        for _ in range(5):  # 最多重试5次
+
+        for _ in range(5):
             spawn_point = random.choice(spawn_points)
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
             if self.player:
                 break
-        
+
         if not self.player:
-            logger.error("车辆生成失败（重试5次后仍失败）")
+            logger.error("车辆生成失败")
             sys.exit(1)
-        
+
         # 初始化传感器
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
@@ -248,131 +270,114 @@ class World(object):
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
         self.camera_manager.transform_index = cam_pos_id
         self.camera_manager.set_sensor(cam_index, notify=False)
-        
-        actor_name = get_actor_display_name(self.player)
-        self.hud.notification(f"生成车辆: {actor_name}")
-        logger.info(f"成功生成车辆: {actor_name}")
+
+        actor_type = get_actor_display_name(self.player)
+        self.hud.notification(actor_type)
 
     def next_weather(self, reverse=False):
-        """切换天气预设"""
         self._weather_index += -1 if reverse else 1
         self._weather_index %= len(self._weather_presets)
-        preset, name = self._weather_presets[self._weather_index]
-        self.world.set_weather(preset)
-        self.hud.notification(f"天气切换为: {name}")
-        logger.info(f"天气已切换: {name}")
+        preset = self._weather_presets[self._weather_index]
+        self.hud.notification('Weather: %s' % preset[1])
+        self.player.get_world().set_weather(preset[0])
 
+    # 重置车辆到最近的生成点
     def reset_vehicle(self):
-        """优化：移到类内部，修复self引用"""
-        """重置车辆到最近的生成点，并保留当前目的地"""
+        """重置车辆到最近的生成点"""
         if not self.player:
-            logger.warning("无车辆可重置")
             return
-        
-        # 获取最近的生成点
+
+        # 找最近的生成点
         spawn_points = self.map.get_spawn_points()
         current_loc = self.player.get_location()
-        nearest_spawn = min(
+        nearest = min(
             spawn_points,
             key=lambda p: math.hypot(p.location.x - current_loc.x, p.location.y - current_loc.y)
         )
-        
-        # 销毁旧车辆
+
+        # 销毁旧车辆和传感器
         self.destroy()
-        
+
         # 重生车辆
         blueprint = random.choice(self.world.get_blueprint_library().filter(self._actor_filter))
         blueprint.set_attribute('role_name', 'hero')
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
-        
-        self.player = self.world.try_spawn_actor(blueprint, nearest_spawn)
+
+        self.player = self.world.try_spawn_actor(blueprint, nearest)
         if not self.player:
-            logger.error("车辆重置失败：生成新车辆失败")
+            self.hud.error("车辆重置失败")
             return
-        
-        # 重新初始化传感器
+
+        # 重新初始化所有传感器
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
         self.camera_manager.set_sensor(0, notify=False)
-        
+
         self.hud.notification("车辆已重置到最近生成点", seconds=3.0)
-        logger.info(f"车辆重置到生成点: ({nearest_spawn.location.x:.2f}, {nearest_spawn.location.y:.2f})")
+        logger.info(f"车辆重置到生成点 ({nearest.location.x:.1f}, {nearest.location.y:.1f})")
 
     def tick(self, clock):
-        """每帧更新"""
         self.hud.tick(self, clock)
 
     def render(self, display):
-        """渲染画面"""
         self.camera_manager.render(display)
         self.hud.render(display)
 
     def destroy(self):
-        """销毁所有Actor"""
-        actors = [
+        sensors = [
             self.camera_manager.sensor if self.camera_manager else None,
             self.collision_sensor.sensor if self.collision_sensor else None,
             self.lane_invasion_sensor.sensor if self.lane_invasion_sensor else None,
             self.gnss_sensor.sensor if self.gnss_sensor else None,
             self.player
         ]
-        for actor in actors:
-            if actor and actor.is_alive:
-                try:
-                    actor.destroy()
-                    logger.info(f"销毁Actor: {get_actor_display_name(actor)}")
-                except Exception as e:
-                    logger.warning(f"销毁Actor失败: {e}")
+        for sensor in sensors:
+            if sensor is not None and sensor.is_alive:
+                sensor.destroy()
 
-# ========== 键盘控制（优化：修复self.world初始化） ==========
+# ========== 键盘控制 ==========
 class KeyboardControl(object):
     def __init__(self, world):
-        self.world = world  # 修复：初始化world引用
+        self.world = world
         self.hud = world.hud
-        self.hud.notification("按'H'或'?'查看帮助 | 按'R'重置车辆 | 按'ESC/Q'退出", seconds=4.0)
+        self.hud.notification("按R重置车辆 | 按H查看帮助 | 按ESC退出", seconds=4.0)
 
     def parse_events(self):
-        """解析键盘事件"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
             if event.type == pygame.KEYUP:
-                # 退出快捷键
                 if self._is_quit_shortcut(event.key):
                     return True
-                # 重置车辆
+                # R键重置车辆
                 if event.key == K_r:
                     self.world.reset_vehicle()
-                # 切换帮助信息
-                if event.key in (K_h, K_SLASH):
+                # H键切换帮助
+                if event.key == K_h:
                     self.hud.help.toggle()
-                # 切换天气
-                if event.key == pygame.K_n:
-                    self.world.next_weather()
-                if event.key == pygame.K_m:
-                    self.world.next_weather(reverse=True)
         return False
 
     @staticmethod
     def _is_quit_shortcut(key):
-        """退出快捷键判断"""
         return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
 
-# ========== 原有传感器/HUD类（少量优化：注释/鲁棒性） ==========
+# ========== HUD & 传感器类 ==========
 class HUD(object):
-    """HUD显示类"""
     def __init__(self, width, height):
         self.dim = (width, height)
-        self._font_mono = pygame.font.Font(
-            pygame.font.match_font('ubuntumono' if os.name != 'nt' else 'courier'),
-            12 if os.name == 'nt' else 14
-        )
-        self._notifications = FadingText(pygame.font.Font(None, 20), (width, 40), (0, height - 40))
-        self.help = HelpText(pygame.font.Font(None, 24), width, height)
+        font = pygame.font.Font(pygame.font.get_default_font(), 20)
+        font_name = 'courier' if os.name == 'nt' else 'mono'
+        fonts = [x for x in pygame.font.get_fonts() if font_name in x]
+        default_font = 'ubuntumono'
+        mono = default_font if default_font in fonts else fonts[0]
+        mono = pygame.font.match_font(mono)
+        self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
+        self._notifications = FadingText(font, (width, 40), (0, height - 40))
+        self.help = HelpText(pygame.font.Font(mono, 24), width, height)
         self.server_fps = 0
         self.frame = 0
         self.simulation_time = 0
@@ -381,112 +386,84 @@ class HUD(object):
         self._server_clock = pygame.time.Clock()
 
     def on_world_tick(self, timestamp):
-        """每帧更新世界信息"""
         self._server_clock.tick()
         self.server_fps = self._server_clock.get_fps()
         self.frame = timestamp.frame_count
         self.simulation_time = timestamp.elapsed_seconds
 
     def tick(self, world, clock):
-        """更新HUD内容"""
         self._notifications.tick(world, clock)
         if not self._show_info:
             return
-        
-        # 基础车辆信息
-        transform = world.player.get_transform()
-        vel = world.player.get_velocity()
-        control = world.player.get_control()
-        heading = 'N' if abs(transform.rotation.yaw) < 89.5 else ''
-        heading += 'S' if abs(transform.rotation.yaw) > 90.5 else ''
-        heading += 'E' if 179.5 > transform.rotation.yaw > 0.5 else ''
-        heading += 'W' if -0.5 > transform.rotation.yaw > -179.5 else ''
-        
-        # 碰撞历史
+        t = world.player.get_transform()
+        v = world.player.get_velocity()
+        c = world.player.get_control()
+        heading = 'N' if abs(t.rotation.yaw) < 89.5 else ''
+        heading += 'S' if abs(t.rotation.yaw) > 90.5 else ''
+        heading += 'E' if 179.5 > t.rotation.yaw > 0.5 else ''
+        heading += 'W' if -0.5 > t.rotation.yaw > -179.5 else ''
         colhist = world.collision_sensor.get_collision_history()
-        collision = [colhist[x + self.frame - 200] for x in range(200)]
+        collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
         max_col = max(1.0, max(collision))
         collision = [x / max_col for x in collision]
-        
-        # 周边车辆
         vehicles = world.world.get_actors().filter('vehicle.*')
-        vehicle_count = len(vehicles)
 
-        # 组装信息文本
         self._info_text = [
-            f'Server FPS:  {self.server_fps:.0f}',
-            f'Client FPS:  {clock.get_fps():.0f}',
+            'Server:  % 16.0f FPS' % self.server_fps,
+            'Client:  % 16.0f FPS' % clock.get_fps(),
             '',
-            f'车辆: {get_actor_display_name(world.player, truncate=20)}',
-            f'地图: {world.map.name}',
-            f'仿真时间: {datetime.timedelta(seconds=int(self.simulation_time))}',
+            'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
+            'Map:     % 20s' % world.map.name,
+            'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
             '',
-            f'速度: {3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2):.0f} km/h',
-            f'朝向: {transform.rotation.yaw:.0f}° {heading}',
-            f'位置: ({transform.location.x:.1f}, {transform.location.y:.1f})',
-            f'GNSS: ({world.gnss_sensor.lat:.6f}, {world.gnss_sensor.lon:.6f})',
-            f'高度: {transform.location.z:.0f} m',
-            ''
-        ]
+            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),
+            u'Heading:% 16.0f\N{DEGREE SIGN} % 2s' % (t.rotation.yaw, heading),
+            'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (t.location.x, t.location.y)),
+            'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
+            'Height:  % 18.0f m' % t.location.z,
+            '']
 
-        # 车辆控制信息
-        if isinstance(control, carla.VehicleControl):
+        if isinstance(c, carla.VehicleControl):
             self._info_text += [
-                ('油门:', control.throttle, 0.0, 1.0),
-                ('转向:', control.steer, -1.0, 1.0),
-                ('刹车:', control.brake, 0.0, 1.0),
-                ('倒车:', control.reverse),
-                ('手刹:', control.hand_brake),
-                ('手动换挡:', control.manual_gear_shift),
-                '档位: %s' % {-1: "R", 0: "N"}.get(control.gear, control.gear)
-            ]
-        elif isinstance(control, carla.WalkerControl):
+                ('Throttle:', c.throttle, 0.0, 1.0),
+                ('Steer:', c.steer, -1.0, 1.0),
+                ('Brake:', c.brake, 0.0, 1.0),
+                ('Reverse:', c.reverse),
+                ('Hand brake:', c.hand_brake),
+                ('Manual:', c.manual_gear_shift),
+                'Gear:        %s' % {-1: 'R', 0: 'N'}.get(c.gear, c.gear)]
+        elif isinstance(c, carla.WalkerControl):
             self._info_text += [
-                ('速度:', control.speed, 0.0, 5.556),
-                ('跳跃:', control.jump)
-            ]
+                ('Speed:', c.speed, 0.0, 5.556),
+                ('Jump:', c.jump)]
 
-        # 碰撞和车辆数量
         self._info_text += [
             '',
-            '碰撞强度:',
+            'Collision:',
             collision,
             '',
-            f'车辆总数: {vehicle_count}'
-        ]
+            'Number of vehicles: % 8d' % len(vehicles)]
 
-        # 周边车辆信息
-        if vehicle_count > 1:
-            self._info_text += ['周边车辆:']
-            def dist(l):
-                return math.hypot(
-                    l.x - transform.location.x,
-                    l.y - transform.location.y,
-                    l.z - transform.location.z
-                )
-            nearby_vehicles = sorted(
-                [(dist(v.get_location()), v) for v in vehicles if v.id != world.player.id],
-                key=lambda x: x[0]
-            )
-            for dist, vehicle in nearby_vehicles:
-                if dist > 200.0:
+        if len(vehicles) > 1:
+            self._info_text += ['Nearby vehicles:']
+            distance = lambda l: math.sqrt((l.x - t.location.x)**2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
+            vehicles = [(distance(x.get_location()), x) for x in vehicles if x.id != world.player.id]
+            for d, vehicle in sorted(vehicles):
+                if d > 200.0:
                     break
-                self._info_text.append(f'{dist:.0f}m {get_actor_display_name(vehicle, truncate=22)}')
+                vehicle_type = get_actor_display_name(vehicle, truncate=22)
+                self._info_text.append('% 4dm %s' % (d, vehicle_type))
 
     def toggle_info(self):
-        """切换信息显示"""
         self._show_info = not self._show_info
 
     def notification(self, text, seconds=2.0):
-        """显示通知"""
         self._notifications.set_text(text, seconds=seconds)
 
     def error(self, text):
-        """显示错误"""
-        self._notifications.set_text(f'错误: {text}', (255, 0, 0))
+        self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
     def render(self, display):
-        """渲染HUD"""
         if self._show_info:
             info_surface = pygame.Surface((220, self.dim[1]))
             info_surface.set_alpha(100)
@@ -494,7 +471,6 @@ class HUD(object):
             v_offset = 4
             bar_h_offset = 100
             bar_width = 106
-
             for item in self._info_text:
                 if v_offset + 18 > self.dim[1]:
                     break
@@ -511,100 +487,89 @@ class HUD(object):
                     else:
                         rect_border = pygame.Rect((bar_h_offset, v_offset + 8), (bar_width, 6))
                         pygame.draw.rect(display, (255, 255, 255), rect_border, 1)
-                        fig = (item[1] - item[2]) / (item[3] - item[2])
-                        rect = pygame.Rect(
-                            (bar_h_offset + fig * (bar_width - 6) if item[2] < 0 else bar_h_offset, v_offset + 8),
-                            (6 if item[2] < 0 else fig * bar_width, 6)
-                        )
+                        f = (item[1] - item[2]) / (item[3] - item[2])
+                        if item[2] < 0.0:
+                            rect = pygame.Rect((bar_h_offset + f * (bar_width - 6), v_offset + 8), (6, 6))
+                        else:
+                            rect = pygame.Rect((bar_h_offset, v_offset + 8), (f * bar_width, 6))
                         pygame.draw.rect(display, (255, 255, 255), rect)
                     item = item[0]
-                
                 if item:
                     surface = self._font_mono.render(item, True, (255, 255, 255))
                     display.blit(surface, (8, v_offset))
                 v_offset += 18
-
         self._notifications.render(display)
         self.help.render(display)
 
 class FadingText(object):
-    """渐隐文本类"""
     def __init__(self, font, dim, pos):
         self.font = font
         self.dim = dim
         self.pos = pos
         self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim, pygame.SRCALPHA)
+        self.surface = pygame.Surface(self.dim)
 
     def set_text(self, text, color=(255, 255, 255), seconds=2.0):
-        """设置渐隐文本"""
-        text_surface = self.font.render(text, True, color)
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_surface, (10, 11))
+        text_texture = self.font.render(text, True, color)
+        self.surface = pygame.Surface(self.dim)
         self.seconds_left = seconds
+        self.surface.fill((0, 0, 0, 0))
+        self.surface.blit(text_texture, (10, 11))
 
     def tick(self, _, clock):
-        """更新透明度"""
-        delta = 1e-3 * clock.get_time()
-        self.seconds_left = max(0.0, self.seconds_left - delta)
+        delta_seconds = 1e-3 * clock.get_time()
+        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
         self.surface.set_alpha(500.0 * self.seconds_left)
 
     def render(self, display):
-        """渲染文本"""
         display.blit(self.surface, self.pos)
 
 class HelpText(object):
-    """帮助文本类"""
     def __init__(self, font, width, height):
         lines = [
             "CARLA 自动控制客户端",
             "",
-            "快捷键说明:",
-            "H/? - 显示/隐藏帮助",
+            "快捷键：",
+            "ESC / Ctrl+Q - 退出程序",
             "R - 重置车辆到最近生成点",
-            "N - 下一个天气预设",
-            "M - 上一个天气预设",
-            "ESC/Q - 退出程序",
+            "H - 显示/隐藏本帮助",
             "",
-            "参数说明:",
-            "-l/--loop - 到达目标后自动设置新随机目标",
-            "-b/--behavior - 选择智能体行为（谨慎/正常/激进）",
-            "-a/--agent - 选择智能体类型（Behavior/Roaming/Basic）"
+            "启动参数：",
+            "-l / --loop - 到达目标后自动设置新目的地",
+            "-b / --behavior - 智能体行为: cautious/normal/aggressive",
+            "-a / --agent - 智能体类型: Behavior/Basic"
         ]
         self.font = font
         self.dim = (680, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
-        self.surface = pygame.Surface(self.dim, pygame.SRCALPHA)
-        self.surface.fill((0, 0, 0, 220))
+        self.surface = pygame.Surface(self.dim)
+        self.surface.fill((0, 0, 0, 180))
         for i, line in enumerate(lines):
-            text_surface = self.font.render(line, True, (255, 255, 255))
-            self.surface.blit(text_surface, (22, i * 22))
+            text_texture = self.font.render(line, True, (255, 255, 255))
+            self.surface.blit(text_texture, (22, i * 22))
         self._render = False
+        self.surface.set_alpha(220)
 
     def toggle(self):
-        """切换显示/隐藏"""
         self._render = not self._render
 
     def render(self, display):
-        """渲染帮助文本"""
         if self._render:
             display.blit(self.surface, self.pos)
 
 class CollisionSensor(object):
-    """碰撞传感器"""
     def __init__(self, parent_actor, hud):
         self.sensor = None
         self.history = []
         self._parent = parent_actor
         self.hud = hud
         world = self._parent.get_world()
-        blueprint = world.get_blueprint_library().find('sensor.other.collision')
-        self.sensor = world.spawn_actor(blueprint, carla.Transform(), attach_to=self._parent)
+        bp = world.get_blueprint_library().find('sensor.other.collision')
+        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
 
     def get_collision_history(self):
-        """获取碰撞历史"""
         history = collections.defaultdict(int)
         for frame, intensity in self.history:
             history[frame] += intensity
@@ -612,12 +577,11 @@ class CollisionSensor(object):
 
     @staticmethod
     def _on_collision(weak_self, event):
-        """碰撞回调"""
         self = weak_self()
         if not self:
             return
         actor_type = get_actor_display_name(event.other_actor)
-        self.hud.notification(f'与 {actor_type} 发生碰撞')
+        self.hud.notification('Collision with %r' % actor_type)
         impulse = event.normal_impulse
         intensity = math.sqrt(impulse.x**2 + impulse.y**2 + impulse.z**2)
         self.history.append((event.frame, intensity))
@@ -625,47 +589,39 @@ class CollisionSensor(object):
             self.history.pop(0)
 
 class LaneInvasionSensor(object):
-    """车道入侵传感器"""
     def __init__(self, parent_actor, hud):
         self.sensor = None
         self._parent = parent_actor
         self.hud = hud
         world = self._parent.get_world()
-        blueprint = world.get_blueprint_library().find('sensor.other.lane_invasion')
-        self.sensor = world.spawn_actor(blueprint, carla.Transform(), attach_to=self._parent)
+        bp = world.get_blueprint_library().find('sensor.other.lane_invasion')
+        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
 
     @staticmethod
     def _on_invasion(weak_self, event):
-        """车道入侵回调"""
         self = weak_self()
         if not self:
             return
         lane_types = set(x.type for x in event.crossed_lane_markings)
-        text = [str(x).split()[-1] for x in lane_types]
-        self.hud.notification(f'压线: {" 和 ".join(text)}')
+        text = ['%r' % str(x).split()[-1] for x in lane_types]
+        self.hud.notification('Crossed line %s' % ' and '.join(text))
 
 class GnssSensor(object):
-    """GNSS传感器"""
     def __init__(self, parent_actor):
         self.sensor = None
         self._parent = parent_actor
         self.lat = 0.0
         self.lon = 0.0
         world = self._parent.get_world()
-        blueprint = world.get_blueprint_library().find('sensor.other.gnss')
-        self.sensor = world.spawn_actor(
-            blueprint,
-            carla.Transform(carla.Location(x=1.0, z=2.8)),
-            attach_to=self._parent
-        )
+        bp = world.get_blueprint_library().find('sensor.other.gnss')
+        self.sensor = world.spawn_actor(bp, carla.Transform(carla.Location(x=1.0, z=2.8)), attach_to=self._parent)
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: GnssSensor._on_gnss_event(weak_self, event))
 
     @staticmethod
     def _on_gnss_event(weak_self, event):
-        """GNSS回调"""
         self = weak_self()
         if not self:
             return
@@ -673,266 +629,235 @@ class GnssSensor(object):
         self.lon = event.longitude
 
 class CameraManager(object):
-    """相机管理器"""
     def __init__(self, parent_actor, hud, gamma_correction):
         self.sensor = None
         self.surface = None
         self._parent = parent_actor
         self.hud = hud
         self.recording = False
-        self.transform_index = 1
-        self.index = None
-
-        # 相机位置预设
         bound_y = 0.5 + self._parent.bounding_box.extent.y
-        attachment = carla.AttachmentType
+        Attachment = carla.AttachmentType
         self._camera_transforms = [
-            (carla.Transform(carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=8.0)), attachment.SpringArm),
-            (carla.Transform(carla.Location(x=1.6, z=1.7)), attachment.Rigid),
-            (carla.Transform(carla.Location(x=5.5, y=1.5, z=1.5)), attachment.SpringArm),
-            (carla.Transform(carla.Location(x=-8.0, z=6.0), carla.Rotation(pitch=6.0)), attachment.SpringArm),
-            (carla.Transform(carla.Location(x=-1, y=-bound_y, z=0.5)), attachment.Rigid)
-        ]
-
-        # 传感器预设
+            (carla.Transform(carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=8.0)), Attachment.SpringArm),
+            (carla.Transform(carla.Location(x=1.6, z=1.7)), Attachment.Rigid),
+            (carla.Transform(carla.Location(x=5.5, y=1.5, z=1.5)), Attachment.SpringArm),
+            (carla.Transform(carla.Location(x=-8.0, z=6.0), carla.Rotation(pitch=6.0)), Attachment.SpringArm),
+            (carla.Transform(carla.Location(x=-1, y=-bound_y, z=0.5)), Attachment.Rigid)]
+        self.transform_index = 1
+        self.sensors = [
+            ['sensor.camera.rgb', cc.Raw, 'Camera RGB'],
+            ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)'],
+            ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)'],
+            ['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)'],
+            ['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)'],
+            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette, 'Camera Semantic Segmentation (CityScapes Palette)'],
+            ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)']]
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
-        self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'RGB相机', bp_library.find('sensor.camera.rgb')],
-            ['sensor.camera.depth', cc.Raw, '深度相机（原始）', bp_library.find('sensor.camera.depth')],
-            ['sensor.camera.depth', cc.Depth, '深度相机（灰度）', bp_library.find('sensor.camera.depth')],
-            ['sensor.camera.depth', cc.LogarithmicDepth, '深度相机（对数灰度）', bp_library.find('sensor.camera.depth')],
-            ['sensor.camera.semantic_segmentation', cc.Raw, '语义分割（原始）', bp_library.find('sensor.camera.semantic_segmentation')],
-            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette, '语义分割（CityScapes配色）', bp_library.find('sensor.camera.semantic_segmentation')],
-            ['sensor.lidar.ray_cast', None, '激光雷达', bp_library.find('sensor.lidar.ray_cast')]
-        ]
-
-        # 配置传感器参数
         for item in self.sensors:
+            bp = bp_library.find(item[0])
             if item[0].startswith('sensor.camera'):
-                item[3].set_attribute('image_size_x', str(hud.dim[0]))
-                item[3].set_attribute('image_size_y', str(hud.dim[1]))
-                if item[3].has_attribute('gamma'):
-                    item[3].set_attribute('gamma', str(gamma_correction))
+                bp.set_attribute('image_size_x', str(hud.dim[0]))
+                bp.set_attribute('image_size_y', str(hud.dim[1]))
+                if bp.has_attribute('gamma'):
+                    bp.set_attribute('gamma', str(gamma_correction))
             elif item[0].startswith('sensor.lidar'):
-                item[3].set_attribute('range', '50')
+                bp.set_attribute('range', '50')
+            item.append(bp)
+        self.index = None
 
     def toggle_camera(self):
-        """切换相机位置"""
         self.transform_index = (self.transform_index + 1) % len(self._camera_transforms)
         self.set_sensor(self.index, notify=False, force_respawn=True)
 
     def set_sensor(self, index, notify=True, force_respawn=False):
-        """设置当前传感器"""
         index = index % len(self.sensors)
-        needs_respawn = (
-            self.index is None 
-            or force_respawn 
-            or self.sensors[index][0] != self.sensors[self.index][0]
-        )
-
+        needs_respawn = True if self.index is None else (
+            force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
         if needs_respawn:
-            if self.sensor:
+            if self.sensor is not None:
                 self.sensor.destroy()
                 self.surface = None
             self.sensor = self._parent.get_world().spawn_actor(
-                self.sensors[index][3],
+                self.sensors[index][-1],
                 self._camera_transforms[self.transform_index][0],
                 attach_to=self._parent,
-                attachment_type=self._camera_transforms[self.transform_index][1]
-            )
+                attachment_type=self._camera_transforms[self.transform_index][1])
             weak_self = weakref.ref(self)
             self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
-
         if notify:
             self.hud.notification(self.sensors[index][2])
         self.index = index
 
     def next_sensor(self):
-        """切换到下一个传感器"""
         self.set_sensor(self.index + 1)
 
     def toggle_recording(self):
-        """切换录像状态"""
         self.recording = not self.recording
-        self.hud.notification(f'录像: {"开启" if self.recording else "关闭"}')
+        self.hud.notification('Recording %s' % ('On' if self.recording else 'Off'))
 
     def render(self, display):
-        """渲染相机画面"""
-        if self.surface:
+        if self.surface is not None:
             display.blit(self.surface, (0, 0))
 
     @staticmethod
     def _parse_image(weak_self, image):
-        """解析传感器图像"""
         self = weak_self()
         if not self:
             return
-
         if self.sensors[self.index][0].startswith('sensor.lidar'):
-            # 激光雷达数据处理
-            points = np.frombuffer(image.raw_data, dtype=np.float32).reshape(-1, 4)[:, :2]
-            points *= min(self.hud.dim) / 100.0
-            points += (0.5 * self.hud.dim[0], 0.5 * self.hud.dim[1])
-            points = np.fabs(points).astype(np.int32)
-            lidar_img = np.zeros((self.hud.dim[1], self.hud.dim[0], 3), dtype=np.uint8)
-            lidar_img[tuple(points.T)] = (255, 255, 255)
-            self.surface = pygame.surfarray.make_surface(lidar_img.swapaxes(0, 1))
+            points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
+            points = np.reshape(points, (int(points.shape[0] / 4), 4))
+            lidar_data = np.array(points[:, :2])
+            lidar_data *= min(self.hud.dim) / 100.0
+            lidar_data += (0.5 * self.hud.dim[0], 0.5 * self.hud.dim[1])
+            lidar_data = np.fabs(lidar_data)
+            lidar_data = lidar_data.astype(np.int32)
+            lidar_data = np.reshape(lidar_data, (-1, 2))
+            lidar_img_size = (self.hud.dim[0], self.hud.dim[1], 3)
+            lidar_img = np.zeros(lidar_img_size)
+            lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
+            self.surface = pygame.surfarray.make_surface(lidar_img)
         else:
-            # 相机图像处理
             image.convert(self.sensors[self.index][1])
-            array = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(image.height, image.width, 4)[:, :, :3]
+            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+            array = np.reshape(array, (image.height, image.width, 4))
+            array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-
-        # 保存录像
         if self.recording:
-            Path("_out").mkdir(exist_ok=True)
-            image.save_to_disk(f'_out/{image.frame:08d}')
+            image.save_to_disk('_out/%08d' % image.frame)
 
-# ========== 主游戏循环（新增：日志记录） ==========
+# ========== 主游戏循环 ==========
 def game_loop(args):
-    """主游戏循环"""
     pygame.init()
-    pygame.display.set_caption("CARLA 自动控制客户端（带行驶日志）")
-    display = pygame.display.set_mode(
-        (args.width, args.height),
-        pygame.HWSURFACE | pygame.DOUBLEBUF
-    )
-    clock = pygame.time.Clock()
+    pygame.font.init()
     world = None
     driving_logger = None
+    trajectory_logger = None  # 新增：轨迹日志器
     tot_target_reached = 0
 
     try:
-        # 连接CARLA服务器
         client = carla.Client(args.host, args.port)
-        client.set_timeout(10.0)  # 优化：延长超时时间
-        carla_world = client.get_world()
-        logger.info(f"成功连接到CARLA服务器: {args.host}:{args.port}")
+        client.set_timeout(10.0)
 
-        # 初始化HUD、World、键盘控制
+        display = pygame.display.set_mode(
+            (args.width, args.height),
+            pygame.HWSURFACE | pygame.DOUBLEBUF)
+
         hud = HUD(args.width, args.height)
-        world = World(carla_world, hud, args)
+        world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
 
-        # 初始化行驶日志（新增功能）
+        # 初始化行驶日志和轨迹日志
         driving_logger = DrivingLogger()
-        logger.info(f"行驶日志已创建: {driving_logger.get_log_path()}")
-        hud.notification(f"日志保存至: {driving_logger.get_log_path()}", seconds=5.0)
+        trajectory_logger = TrajectoryLogger()  # 新增：初始化轨迹日志
+        logger.info(f"行驶日志已创建: {driving_logger.get_file_path()}")
+        logger.info(f"轨迹日志已创建: {trajectory_logger.get_file_path()}")
 
-        # 初始化智能体
-      
+        # 初始化智能体（只保留你用的BehaviorAgent和BasicAgent）
         if args.agent == "Basic":
             agent = BasicAgent(world.player)
             spawn_point = world.map.get_spawn_points()[0]
-            agent.set_destination((spawn_point.location.x, spawn_point.location.y, spawn_point.location.z))
-        else:  # Behavior Agent
+            agent.set_destination((spawn_point.location.x,
+                                   spawn_point.location.y,
+                                   spawn_point.location.z))
+        else:
             agent = BehaviorAgent(world.player, behavior=args.behavior)
             spawn_points = world.map.get_spawn_points()
             random.shuffle(spawn_points)
             current_location = world.player.get_location()
             destination = get_random_destination(current_location, spawn_points)
-            agent.set_destination(destination, current_location)
+            agent.set_destination(destination, start_location=current_location)
 
-        # 主循环
+        clock = pygame.time.Clock()
+
         while True:
             clock.tick_busy_loop(60)
-            
-            # 处理键盘事件
             if controller.parse_events():
-                break
-            
-            # 等待服务器tick
+                return
+
             if not world.world.wait_for_tick(10.0):
-                logger.warning("服务器tick超时")
                 continue
 
-            # 更新世界状态
             world.tick(clock)
             world.render(display)
             pygame.display.flip()
 
-            # 智能体控制逻辑
-            if args.agent in ["Roaming", "Basic"]:
+            # 记录行驶日志和轨迹日志
+            driving_logger.record_frame(world, tot_target_reached)
+            trajectory_logger.record_frame(world, tot_target_reached)  # 新增：记录轨迹
+
+            if args.agent == "Basic":
                 control = agent.run_step()
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
             else:
-                # Behavior Agent：到达目标后设置新目标
-                waypoints_queue = agent.get_local_planner()._waypoints_queue
-                if len(waypoints_queue) < MIN_WAYPOINTS_QUEUE and args.loop:
-                    spawn_points = world.map.get_spawn_points()
-                    random.shuffle(spawn_points)
-                    current_location = world.player.get_location()
-                    new_destination = get_random_destination(current_location, spawn_points)
-                    agent.set_destination(current_location, new_destination)
-                    agent.run_step()
-                    tot_target_reached += 1
-                    hud.notification(f"目标已到达 {tot_target_reached} 次", seconds=4.0)
-                    logger.info(f"第 {tot_target_reached} 次到达目标，新目标: ({new_destination.x:.2f}, {new_destination.y:.2f})")
-                elif len(waypoints_queue) == 0 and not args.loop:
-                    logger.info("目标到达，任务完成")
-                    hud.notification("目标到达，任务完成！", seconds=5.0)
-                    break
+                # 判断是否需要设置新目的地
+                if len(agent.get_local_planner()._waypoints_queue) < MIN_WAYPOINTS_QUEUE:
+                    if args.loop:
+                        spawn_points = world.map.get_spawn_points()
+                        random.shuffle(spawn_points)
+                        current_loc = world.player.get_location()
+                        new_dest = get_random_destination(current_loc, spawn_points)
+                        agent.set_destination(new_dest, start_location=current_loc)
+                        agent.run_step()
 
-                # 应用车辆控制
+                        tot_target_reached += 1
+                        world.hud.notification(f"目标已到达 {tot_target_reached} 次", seconds=4.0)
+                        logger.info(f"到达第 {tot_target_reached} 个目标")
+                    else:
+                        print("Target reached, mission accomplished...")
+                        break
+
                 speed_limit = world.player.get_speed_limit()
                 agent.get_local_planner().set_speed(speed_limit)
                 control = agent.run_step()
                 world.player.apply_control(control)
 
-            # 记录行驶日志（新增功能）
-            if driving_logger:
-                driving_logger.log_frame(world, world.player, tot_target_reached)
-
-    except Exception as e:
-        logger.error(f"游戏循环异常: {e}", exc_info=True)
-        if hud:
-            hud.error(f"程序异常: {str(e)}")
     finally:
-        # 清理资源
-        if world:
+        if world is not None:
             world.destroy()
         pygame.quit()
-        logger.info("程序正常退出，资源已清理")
+        # 保存日志
+        if driving_logger:
+            logger.info(f"行驶日志已保存至: {driving_logger.get_file_path()}")
+        if trajectory_logger:  # 新增：最终化并保存轨迹日志
+            trajectory_logger.finalize()
+            logger.info(f"轨迹日志已保存至: {trajectory_logger.get_file_path()}")
 
-# ========== 主函数（优化：参数解析更健壮） ==========
+# ========== 主函数 ==========
 def main():
-    """程序入口"""
-    argparser = argparse.ArgumentParser(description='CARLA 自动控制客户端（带行驶日志功能）')
-    argparser.add_argument('-v', '--verbose', action='store_true', help='打印调试信息')
-    argparser.add_argument('--host', default=DEFAULT_SERVER_HOST, help='服务器IP（默认：127.0.0.1）')
-    argparser.add_argument('-p', '--port', type=int, default=DEFAULT_SERVER_PORT, help='服务器端口（默认：2000）')
-    argparser.add_argument('--res', default=DEFAULT_WINDOW_RES, help='窗口分辨率（默认：1280x720）')
-    argparser.add_argument('--filter', default=DEFAULT_VEHICLE_FILTER, help='Actor过滤器（默认：vehicle.*）')
-    argparser.add_argument('--gamma', type=float, default=DEFAULT_CAMERA_GAMMA, help='相机伽马校正（默认：2.2）')
-    argparser.add_argument('-l', '--loop', action='store_true', help='到达目标后自动设置新随机目标')
-    argparser.add_argument('-b', '--behavior', type=str, choices=["cautious", "normal", "aggressive"], default='normal', help='智能体行为（默认：normal）')
-    argparser.add_argument('-a', '--agent', type=str, choices=["Behavior", "Roaming", "Basic"], default="Behavior", help='智能体类型（默认：Behavior）')
-    argparser.add_argument('-s', '--seed', type=int, default=None, help='随机种子（用于复现实验）')
+    argparser = argparse.ArgumentParser(description='CARLA Automatic Control Client')
+    argparser.add_argument('-v', '--verbose', action='store_true', dest='debug', help='打印调试信息')
+    argparser.add_argument('--host', metavar='H', default=DEFAULT_HOST, help='服务器IP')
+    argparser.add_argument('-p', '--port', metavar='P', default=DEFAULT_PORT, type=int, help='端口')
+    argparser.add_argument('--res', metavar='WIDTHxHEIGHT', default="1280x720", help='窗口分辨率')
+    argparser.add_argument('--filter', metavar='PATTERN', default='vehicle.*', help='车辆过滤器')
+    argparser.add_argument('--gamma', default=2.2, type=float, help='相机伽马值')
+    argparser.add_argument('-l', '--loop', action='store_true', dest='loop', help='循环生成新目的地')
+    argparser.add_argument('-b', '--behavior', type=str, choices=["cautious", "normal", "aggressive"],
+                           default='normal', help='智能体行为模式')
+    argparser.add_argument("-a", "--agent", type=str, choices=["Behavior", "Basic"],
+                           default="Behavior", help="智能体类型")
+    argparser.add_argument('-s', '--seed', default=None, type=int, help='随机种子')
 
     args = argparser.parse_args()
+    args.width, args.height = [int(x) for x in args.res.split('x')]
 
-    # 解析分辨率
-    try:
-        args.width, args.height = [int(x) for x in args.res.split('x')]
-    except ValueError:
-        logger.error(f"分辨率格式错误: {args.res}，使用默认值 {DEFAULT_WINDOW_RES}")
-        args.width, args.height = [int(x) for x in DEFAULT_WINDOW_RES.split('x')]
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.getLogger().setLevel(log_level)
 
-    # 配置日志级别
-    logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    logger.info(f"启动CARLA客户端，连接 {args.host}:{args.port}，分辨率 {args.width}x{args.height}")
+    logging.info('listening to server %s:%s', args.host, args.port)
+    print(__doc__)
 
     try:
         game_loop(args)
     except KeyboardInterrupt:
-        logger.info("用户手动中断程序")
-        print("\n程序已被用户中断，退出中...")
-    except Exception as e:
-        logger.error(f"程序启动失败: {e}", exc_info=True)
-        sys.exit(1)
+        print('\nCancelled by user. Bye!')
 
 if __name__ == '__main__':
     main()
+
+
+    
