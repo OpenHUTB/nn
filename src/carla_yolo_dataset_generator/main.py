@@ -11,6 +11,7 @@ import numpy as np
 import time
 import logging
 import argparse
+from tqdm import tqdm  # 新增：导入进度条库
 
 # from pascal_voc_writer import Writer
 import utils.cva_utils as cva_utils
@@ -68,6 +69,10 @@ def main(args):
 
     # 初始化变量
     actor_list, walkers_list, sensor_list = [], [], []
+# 新增：如果是保存模式，则初始化进度条
+    pbar = None
+    if args.save:
+        pbar = tqdm(total=args.num_save, initial=num_saved, desc="数据采集进度", unit="img")
 
     try:
         bp_lib = world.get_blueprint_library()
@@ -82,8 +87,9 @@ def main(args):
         traffic_manager.set_synchronous_mode(True)
 
         # Reset simulation if car is stuck
+        # Reset simulation if car is stuck
         def reset():
-            world.apply_settings(original_settings)
+            # 移除 original_settings 退化机制，保持严格同步模式
             print('清理旧实体，准备重置场景...')
             # 使用外层已存在的列表进行销毁，防止内存泄漏
             client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
@@ -91,7 +97,9 @@ def main(args):
                 client.apply_batch([carla.command.DestroyActor(x['id']) for x in walkers_list if 'id' in x])
             for sensor in sensor_list:
                 sensor.destroy()
-    
+            
+            # 新增：强制推进一帧，让服务器物理回收上述垃圾，避免 ID 冲突
+            world.tick()
             spawn_success = False
             while not spawn_success:
                 try:
@@ -246,7 +254,9 @@ def main(args):
                     print("Minimum detections not reached, skipping...")
                 else:
                     num_saved += 1
-                    print(f"Saving image {num_saved}")
+                    # 新增：更新进度条，移除原本刷屏的 print
+                    if pbar:
+                        pbar.update(1)
                     cv2.imwrite(os.path.join(output_path, args.map + '_' + '%06d.png' % image.frame), clean_img)
                     with open(os.path.join(output_path, args.map + '_' + '%06d.txt' % image.frame), "a") as f:
                         f.write(annotation_str)
@@ -276,6 +286,9 @@ def main(args):
             f.write(str(num_saved))
 
     finally:
+        # 新增：安全关闭进度条
+        if pbar:
+            pbar.close()
         world.apply_settings(original_settings)
         print('destroying actors')
         client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
@@ -352,4 +365,3 @@ if __name__ == '__main__':
         main(args)
     except KeyboardInterrupt:
         print(' - Exited by user.')
-        #上次提交错文件了这次重新提交。
