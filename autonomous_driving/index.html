@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/autonomous_driving/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>基于自监督学习与PPO强化学习的自动驾驶仿真项目 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u57fa\u4e8e\u81ea\u76d1\u7763\u5b66\u4e60\u4e0ePPO\u5f3a\u5316\u5b66\u4e60\u7684\u81ea\u52a8\u9a7e\u9a76\u4eff\u771f\u9879\u76ee";
+        var mkdocs_page_input_path = "autonomous_driving/README.md";
+        var mkdocs_page_url = "/nn/autonomous_driving/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">基于自监督学习与PPO强化学习的自动驾驶仿真项目</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/autonomous_driving/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="ppo">基于自监督学习与PPO强化学习的自动驾驶仿真项目</h1>
+<p>...</p>
+<h2 id="_1">目录</h2>
+<ul>
+<li><a href="#introduction">项目简介</a></li>
+<li><a href="#installation">运行环境与安装步骤</a></li>
+<li><a href="#quick-start">快速启动项目</a></li>
+<li><a href="#core-technology">核心技术方案</a></li>
+<li><a href="#result-show">运行效果展示</a></li>
+<li><a href="#file-structure">项目文件结构</a></li>
+<li><a href="#references">参考资料</a></li>
+</ul>
+<h2 id="_2">项目简介 <a name="introduction"></a></h2>
+<p>本项目依托 <strong>CARLA 0.9.14 自动驾驶仿真平台</strong>，融合<strong>自监督学习(SSL)</strong> 与 <strong>PPO近端策略优化强化学习算法</strong>，实现端到端自动驾驶环境感知、决策与车辆连续控制全流程仿真验证，规避真实道路测试成本高、风险大的问题。</p>
+<p>核心功能特点：
+1. <strong>无标注视觉特征提取</strong>：自监督对比学习从CARLA原生RGB图像中自主学习道路、车辆、行人通用视觉表征，无需人工像素标注；
+2. <strong>稳定强化学习驾驶策略</strong>：PPO算法训练连续动作控制智能体，输出油门、刹车、转向指令，实现车道保持、障碍物自动避让；
+3. <strong>全仿真闭环测试</strong>：基于CARLA虚拟城市动态车流、多变天气场景完成算法迭代，配套TensorBoard训练可视化工具；
+4. <strong>轻量化可复现</strong>：完整依赖清单、一键启动训练脚本，支持Windows环境直接运行仿真。</p>
+<h2 id="_3">运行环境与安装步骤 <a name="installation"></a></h2>
+<h3 id="_4">基础环境要求</h3>
+<ul>
+<li>Python 版本：3.7 / 3.8</li>
+<li>仿真平台：CARLA Simulator 0.9.14</li>
+<li>深度学习框架：PyTorch 2.1.0</li>
+<li>系统支持：Windows 10/11</li>
+</ul>
+<h3 id="_5">完整安装流程</h3>
+<ol>
+<li>克隆本项目代码仓库</li>
+</ol>
+<pre><code class="language-powershell">git clone https://github.com/lfy666698/nn.git
+cd nn
+</code></pre>
+<ol>
+<li>
+<p>启动 CARLA 仿真器
+进入CARLA安装目录，运行 <code>CarlaUE4.exe</code>，等待仿真服务端口2000启动完成。</p>
+</li>
+<li>
+<p>一键安装全部Python依赖</p>
+</li>
+</ol>
+<pre><code class="language-powershell">pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+</code></pre>
+<h2 id="_6">快速启动项目 <a name="quick-start"></a></h2>
+<h3 id="1">1. 完整训练启动命令</h3>
+<p>在项目根目录执行训练主脚本：</p>
+<pre><code class="language-powershell">python src/run_train.py
+</code></pre>
+<h3 id="2">2. 脚本自定义启动参数</h3>
+<p>查看全部可调超参配置：</p>
+<pre><code class="language-powershell">python src/run_train.py -h
+</code></pre>
+<p>关键参数说明：
+- <code>--ssl_epoch</code>：自监督预训练迭代轮数
+- <code>--ppo_epoch</code>：强化学习策略更新轮数
+- <code>--gamma</code>：强化学习奖励衰减系数
+- <code>--save_freq</code>：模型权重保存间隔步数</p>
+<h3 id="3">3. 训练过程可视化监控</h3>
+<pre><code class="language-powershell">tensorboard --logdir ./tensorboard_logs
+</code></pre>
+<p>浏览器访问地址：<code>http://localhost:6006</code>
+可实时查看：单步奖励曲线、感知损失、车辆行驶轨迹、碰撞惩罚统计。</p>
+<h3 id="_7">预期运行效果</h3>
+<p>CARLA仿真窗口内生成自主行驶车辆：
+1. 基础车道居中行驶，稳定贴合道路中心线；
+2. 识别静态路障、动态往来车辆，自动减速、避让；
+3. 弯道自主调整转向角度，根据车流自适应调节车速。</p>
+<h2 id="_8">核心技术方案 <a name="core-technology"></a></h2>
+<h3 id="_9">一、自监督视觉感知模块</h3>
+<p>基于对比学习实现无标注图像特征提取：
+1. 数据输入：CARLA车载前置RGB摄像头实时画面；
+2. 预处理流程：随机裁剪、亮度扰动、水平翻转数据增强；
+3. 骨干网络：轻量化ResNet特征编码器；
+4. 自监督损失：InfoNCE对比损失，拉近同场景特征、分离无关场景特征；
+5. 输出：固定维度环境特征向量，作为强化学习智能体输入。</p>
+<h3 id="ppo_1">二、PPO强化学习决策控制模块</h3>
+<p>采用近端策略优化算法训练驾驶智能体，解决传统策略梯度训练不稳定问题：
+1. <strong>状态空间</strong>：车辆瞬时速度、车身横摆角、SSL提取环境特征向量；
+2. <strong>连续动作空间</strong>：油门(0~1)、刹车(0~1)、转向角度(-1~1)；
+3. <strong>奖励函数设计</strong>
+    | 奖励项 | 作用说明 |
+    |--------|----------|
+    | 车道保持正向奖励 | 车辆距离车道中心线越近，奖励值越高 |
+    | 前进速度奖励 | 平稳匀速行驶获得基础正向收益 |
+    | 碰撞惩罚项 | 与车辆、建筑、路障碰撞大幅扣除奖励 |
+    | 压线惩罚项 | 车轮越线行驶施加小额负奖励 |
+4. 关键超参配置：<code>γ=0.98</code>、裁剪系数<code>ε=0.2</code>、批次更新轮数10轮。</p>
+<h2 id="_10">运行效果展示 <a name="result-show"></a></h2>
+<ol>
+<li><strong>仿真实时画面</strong>
+CARLA窗口同步渲染车辆行驶画面，叠加可视化车道识别区域，直观展示模型感知范围；</li>
+<li><strong>训练收敛曲线</strong>
+TensorBoard可视化面板可查看完整训练周期奖励变化，2000轮迭代后平均单轮奖励稳定收敛；</li>
+<li><strong>极端场景适配表现</strong>
+雨天低光照、多车拥堵、直角转弯场景下均可完成稳定自主行驶。</li>
+</ol>
+<h2 id="_11">项目文件结构 <a name="file-structure"></a></h2>
+<pre><code>nn/
+├── docs/                    # MkDocs项目文档目录
+│   ├── index.md             # 文档首页总览
+│   └── autonomous_driving/
+│       └── README.md        # 本项目完整说明文档
+├── src/                     # 项目核心源码
+│   ├── ssl_module/          # 自监督学习感知模块代码
+│   │   ├── model.py         # ResNet特征提取网络
+│   │   └── pretrain.py      # SSL预训练脚本
+│   ├── rl_module/           # PPO强化学习决策模块
+│   │   ├── agent.py         # PPO智能体核心逻辑
+│   │   └── train_loop.py    # 强化学习迭代循环
+│   ├── carla_env.py         # CARLA仿真环境封装接口
+│   └── run_train.py         # 项目统一训练入口脚本
+├── checkpoints/             # 模型权重保存目录
+├── tensorboard_logs/        # 训练日志、可视化记录
+├── mkdocs.yml               # MkDocs网页文档配置文件
+├── requirements.txt         # 项目全部依赖清单
+└── install.md               # 简易环境安装指引
+</code></pre>
+<h2 id="_12">参考资料 <a name="references"></a></h2>
+<ol>
+<li>CARLA 官方仿真平台文档：https://carla.readthedocs.io/</li>
+<li>PPO算法论文：Proximal Policy Optimization Algorithms</li>
+<li>InfoNCE自监督对比学习：A Simple Framework for Contrastive Learning of Visual Representations</li>
+<li>自动驾驶强化学习开源项目案例库</li>
+</ol>
+<hr />
+<p><em>本项目基于CARLA 0.9.14仿真平台完成，结合自监督学习与强化学习实现端到端自动驾驶感知控制仿真</em></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
