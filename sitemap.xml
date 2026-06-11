@@ -101,6 +101,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/rl_workspace/</loc>
+         <lastmod>2026-06-11</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/simple_nn/</loc>
          <lastmod>2026-06-11</lastmod>
          <changefreq>daily</changefreq>
