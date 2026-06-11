@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/DeFIX/docs/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>自动驾驶多场景行为仿真系统设计与实现 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u81ea\u52a8\u9a7e\u9a76\u591a\u573a\u666f\u884c\u4e3a\u4eff\u771f\u7cfb\u7edf\u8bbe\u8ba1\u4e0e\u5b9e\u73b0";
+        var mkdocs_page_input_path = "DeFIX/docs/index.md";
+        var mkdocs_page_url = "/nn/DeFIX/docs/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">自动驾驶多场景行为仿真系统设计与实现</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/DeFIX/docs/index.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="_1">自动驾驶多场景行为仿真系统设计与实现</h1>
+<hr />
+<h1 id="_2">目录</h1>
+<ol>
+<li><a href="#1-项目摘要">项目摘要</a></li>
+<li><a href="#2-项目背景与意义">项目背景与意义</a></li>
+<li><a href="#3-相关技术与运行环境">相关技术与运行环境</a></li>
+<li><a href="#4-总体设计与功能架构">总体设计与功能架构</a></li>
+<li><a href="#5-各场景详细设计">各场景详细设计</a></li>
+<li><a href="#6-核心代码模块说明">核心代码模块说明</a></li>
+<li><a href="#7-实验测试与结果展示">实验测试与结果展示</a></li>
+<li><a href="#8-问题分析与优化方案">问题分析与优化方案</a></li>
+<li><a href="#9-项目总结与心得体会">项目总结与心得体会</a></li>
+<li><a href="#10-参考文献">参考文献</a></li>
+</ol>
+<hr />
+<h2 id="1">1. 项目摘要</h2>
+<p>本项目基于 <strong>CARLA 自动驾驶仿真平台</strong>，结合 Python 语言开发一套多场景自动驾驶行为仿真系统。项目模拟城市道路中<strong>车辆拥堵、行人避让、红绿灯通行、路口穿越、闯红灯、前车突发倒车</strong>等6类典型交通场景，实现车辆环境感知、距离检测、速度控制、紧急制动等自动驾驶基础行为。</p>
+<p>系统通过坐标计算、距离判别、状态判断等逻辑完成车辆决策控制，还原真实道路风险场景与合规驾驶行为，可用于自动驾驶行为测试、交通风险模拟与智能驾驶算法入门验证。项目代码结构清晰，场景独立可切换，运行稳定，完成预设全部仿真目标。</p>
+<p><strong>关键词</strong>：CARLA；自动驾驶仿真；场景模拟；车辆控制；紧急制动</p>
+<hr />
+<h2 id="2">2. 项目背景与意义</h2>
+<h3 id="21">2.1 项目背景</h3>
+<p>随着自动驾驶技术快速发展，虚拟仿真测试已成为实车测试的重要补充。CARLA 作为开源自动驾驶仿真平台，支持交通参与者、道路、信号灯、天气等全要素模拟，能够低成本、高安全地复现各类危险交通场景，避免实车测试的安全风险与场地限制。</p>
+<p>城市道路工况复杂，车辆拥堵、行人横穿、信号灯路口、无信号路口、前车突发倒车等都是高频风险场景，也是自动驾驶系统必须应对的核心工况。</p>
+<h3 id="22">2.2 项目意义</h3>
+<ol>
+<li><strong>学习实践</strong>：掌握 CARLA 仿真平台使用、Python 实时逻辑编程、空间距离计算与状态控制。</li>
+<li><strong>工程应用</strong>：实现多场景模块化开发，具备场景扩展、独立运行、统一入口管理能力。</li>
+<li><strong>仿真价值</strong>：模拟合规驾驶与违规驾驶两类行为，对比展示自动驾驶安全决策逻辑。</li>
+<li><strong>课程结合</strong>：结合人工智能、智能感知、决策控制等课程知识点，完成理论到实践的落地。</li>
+</ol>
+<hr />
+<h2 id="3">3. 相关技术与运行环境</h2>
+<h3 id="31">3.1 核心技术栈</h3>
+<ul>
+<li>编程语言：<strong>Python 3.8</strong></li>
+<li>仿真平台：<strong>CARLA 0.9.x</strong>（开源自动驾驶仿真器）</li>
+<li>核心技术：三维坐标运算、距离检测、车辆状态控制、时序逻辑判断、多角色管理</li>
+</ul>
+<h3 id="32">3.2 运行环境</h3>
+<ul>
+<li>操作系统：Windows 11</li>
+<li>依赖库：carla 官方 Python API、time、math 标准库</li>
+<li>运行流程：先启动 CARLA 模拟器 → 再运行 Python 主程序 → 选择场景编号执行仿真</li>
+</ul>
+<h3 id="33-carla">3.3 CARLA 平台简介</h3>
+<p>CARLA 是专为自动驾驶研究打造的开源仿真环境，提供完整城市道路、交通参与者（车辆、行人）、交通信号灯、视角控制等功能，支持通过 Python API 对所有仿真对象进行读取、控制与状态监测。</p>
+<hr />
+<h2 id="4">4. 总体设计与功能架构</h2>
+<h3 id="41">4.1 整体架构</h3>
+<p>本项目采用 <strong>主入口 + 独立场景文件</strong> 的模块化设计：
+1. <strong>main.py 主入口文件</strong>：统一场景选择、调用对应场景脚本。
+2. <strong>run_scenario_0 ~ run_scenario_5</strong>：6个独立场景脚本，各司其职、互不干扰。
+3. <strong>公共逻辑</strong>：仿真环境初始化、角色清空、视角设置、车辆生成、运动控制。</p>
+<h3 id="42">4.2 整体功能列表</h3>
+<table>
+<thead>
+<tr>
+<th>场景编号</th>
+<th>场景名称</th>
+<th>核心功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>场景0</td>
+<td>动态车辆超车碰撞</td>
+<td>模拟道路车辆超车、近距离交会工况</td>
+</tr>
+<tr>
+<td>场景1</td>
+<td>行人礼让场景</td>
+<td>区分前方/侧方/后方行人，实现停车、减速、正常通行</td>
+</tr>
+<tr>
+<td>场景2</td>
+<td>多车拥堵+前车倒车（升级）</td>
+<td>车队拥堵行驶，前车突发倒车，主车紧急制动避障</td>
+</tr>
+<tr>
+<td>场景3</td>
+<td>车辆闯红灯</td>
+<td>模拟违规驾驶，无视红灯正常通过路口</td>
+</tr>
+<tr>
+<td>场景4</td>
+<td>信号灯交叉口通行</td>
+<td>识别红绿灯状态，红灯停车、绿灯正常行驶</td>
+</tr>
+<tr>
+<td>场景5</td>
+<td>无信号灯路口穿越</td>
+<td>接近路口自动减速，模拟谨慎观察通行</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43">4.3 工作流程</h3>
+<ol>
+<li>初始化 CARLA 客户端与世界，清空历史车辆、行人。</li>
+<li>生成主车与场景所需障碍物、行人、信号灯。</li>
+<li>循环读取车辆位置、速度、周边目标距离、信号灯状态。</li>
+<li>根据规则输出油门、刹车、转向指令，控制车辆行为。</li>
+<li>键盘中断，销毁所有仿真角色，退出场景。</li>
+</ol>
+<hr />
+<h2 id="5">5. 各场景详细设计</h2>
+<h3 id="51-0">5.1 场景0：动态车辆超车碰撞</h3>
+<ul>
+<li>场景描述：道路存在同向行驶车辆，主车执行超车动作，模拟近距离交会风险。</li>
+<li>控制逻辑：主车保持匀速前进，与前车距离较近时形成交会效果。</li>
+<li>实现要点：多车辆同步运动、相对位置保持。</li>
+</ul>
+<h3 id="52-1">5.2 场景1：行人礼让场景</h3>
+<ul>
+<li>场景描述：道路出现横穿行人，分三种位置工况。</li>
+<li>控制逻辑：</li>
+<li>前方行人：车辆完全停车礼让；</li>
+<li>侧方行人：车辆减速慢行；</li>
+<li>后方行人：车辆正常行驶不干预。</li>
+<li>实现要点：行人位置判断、方位区分、分级减速控制。</li>
+</ul>
+<h3 id="53-2">5.3 场景2：多车拥堵 + 前车突发倒车（重点升级场景）</h3>
+<ul>
+<li>场景描述：前方形成排队拥堵车队，行驶一段时间后中间车辆突然倒车，制造近距离危险工况。</li>
+<li>控制逻辑：</li>
+<li>主车正常向前行驶；</li>
+<li>3秒后前方车辆挂倒挡低速后退；</li>
+<li>实时计算两车距离，距离小于安全阈值时<strong>紧急全制动</strong>。</li>
+<li>解决难点：关闭物理异常判定、稳定倒车、车辆不消失、不飞散。</li>
+</ul>
+<h3 id="54-3">5.4 场景3：车辆闯红灯</h3>
+<ul>
+<li>场景描述：路口信号灯为红灯，车辆不执行停车操作，直接通过路口。</li>
+<li>控制逻辑：全程保持油门输出，无视信号灯状态，模拟违规驾驶行为。</li>
+</ul>
+<h3 id="55-4">5.5 场景4：信号灯交叉口通行</h3>
+<ul>
+<li>场景描述：路口红绿灯自动循环切换（红/黄/绿），车辆识别灯态并做出响应。</li>
+<li>控制逻辑：</li>
+<li>配置红绿灯时长，解除冻结实现自动切换；</li>
+<li>距离路口较近且红灯亮起时，车辆停车等待；</li>
+<li>绿灯亮起后恢复正常行驶。</li>
+</ul>
+<h3 id="56-5">5.6 场景5：无信号灯路口穿越</h3>
+<ul>
+<li>场景描述：路口无交通信号灯，按照交通规则减速观察通过。</li>
+<li>控制逻辑：通过坐标判断路口区域，进入范围后自动降低油门、轻踩刹车减速通行。</li>
+</ul>
+<hr />
+<h2 id="6">6. 核心代码模块说明</h2>
+<h3 id="61">6.1 公共基础模块（所有场景通用）</h3>
+<ol>
+<li><strong>CARLA 连接与环境清空</strong>
+建立客户端连接，遍历并销毁上一轮残留车辆、行人，保证每次场景启动环境干净。</li>
+</ol>
+<pre><code class="language-python">client = carla.Client('localhost', 2000)
+world = client.get_world()
+# 清空旧角色
+for actor in world.get_actors().filter('*'):
+    if actor.type_id.startswith('vehicle'):
+        actor.destroy()
+</code></pre>
+<ol>
+<li>
+<p><strong>车辆生成与视角设置</strong>
+读取地图生成点，生成主车与障碍车，固定第三方观测视角，方便录制与观察效果。</p>
+</li>
+<li>
+<p><strong>车辆运动控制类</strong>
+使用 <code>carla.VehicleControl()</code> 设置 <code>throttle</code>（油门）、<code>brake</code>（刹车）、<code>steer</code>（转向）实现车辆加减速。</p>
+</li>
+</ol>
+<h3 id="62">6.2 核心算法模块</h3>
+<ol>
+<li><strong>三维距离计算</strong>
+通过欧式距离判断主车与障碍物/行人/路口的远近，是所有决策的基础：</li>
+</ol>
+<pre><code class="language-python">dist = math.sqrt(dx**2 + dy**2)
+</code></pre>
+<ol>
+<li><strong>方向判断</strong>
+向量点积判断目标是否在车辆<strong>正前方</strong>，避免误判侧方、后方物体。</li>
+<li><strong>时序触发逻辑</strong>
+使用 <code>time.time()</code> 计时，实现“运行3秒后开始倒车”等延时动作。</li>
+</ol>
+<h3 id="63-mainpy">6.3 主入口模块（main.py）</h3>
+<p>提供文本菜单，输入编号调用对应场景脚本，统一项目入口，便于使用与演示。</p>
+<hr />
+<h2 id="7">7. 实验测试与结果展示</h2>
+<h3 id="71">7.1 测试环境</h3>
+<ul>
+<li>仿真平台：CARLA 0.9.13</li>
+<li>运行脚本：Python 3.8</li>
+<li>测试地图：Town10HD</li>
+</ul>
+<h3 id="72">7.2 整体测试结论</h3>
+<p>所有6个场景均可独立正常启动、稳定运行，无崩溃、无闪退，角色无异常消失、飞散。各场景行为完全符合设计预期：
+1. 拥堵场景：前车稳定倒车，主车及时紧急制动，成功避障；
+2. 行人场景：按方位分级礼让，行为区分明显；
+3. 红绿灯场景：信号灯自动切换，红灯停车、绿灯通行；
+4. 闯红灯场景：持续行驶，体现违规行为；
+5. 无信号路口：自动减速，符合安全通行规则。</p>
+<h3 id="73">7.3 分场景结果展示</h3>
+<blockquote>
+<p>Markdown 插入图片语法：<code>![图片标题](图片本地路径/网络链接)</code></p>
+</blockquote>
+<h4 id="1-2">图1 场景2 多车拥堵+前车倒车+主车紧急制动</h4>
+<p><img alt="场景2 运行效果" src="images/scene2.jpg" />
+<strong>现象描述</strong>：前方车队静止排队，计时结束后前车平稳倒车，主车检测距离缩短后立刻刹停，未发生碰撞。</p>
+<h4 id="2-4">图2 场景4 红绿灯路口通行</h4>
+<p><img alt="场景4 运行效果" src="images/scene4.jpg" />
+<strong>现象描述</strong>：信号灯自动红绿切换，红灯阶段车辆停车等待，绿灯正常起步行驶。</p>
+<h4 id="3-5">图3 场景5 无信号灯路口减速</h4>
+<p><img alt="场景5 运行效果" src="images/scene5.jpg" />
+<strong>现象描述</strong>：车辆接近路口区域自动减速，低速通过路口。</p>
+<h4 id="4-1">图4 场景1 行人礼让</h4>
+<p><img alt="场景1 运行效果" src="images/scene1.jpg" />
+<strong>现象描述</strong>：前方行人出现，车辆停车；侧方行人出现，车辆减速。</p>
+<hr />
+<h2 id="8">8. 问题分析与优化方案</h2>
+<h3 id="81">8.1 开发中遇到的问题</h3>
+<ol>
+<li>
+<p><strong>CARLA 连接超时</strong>
+   原因：先运行代码、后启动模拟器。
+   解决：固定流程 → 先打开 CarlaUE4.exe，再执行 Python 脚本。</p>
+</li>
+<li>
+<p><strong>车辆设置位置后消失/飞天</strong>
+   原因：直接强制修改坐标触发 CARLA 物理异常检测。
+   解决：放弃坐标硬改，使用<strong>原生车辆挡位+油门</strong>控制倒车，并关闭碰撞检测。</p>
+</li>
+<li>
+<p><strong>红绿灯静止不切换</strong>
+   原因：信号灯默认被冻结状态。
+   解决：调用 <code>tl.freeze(False)</code> 解除冻结，并配置红绿黄时长。</p>
+</li>
+<li>
+<p><strong>路口判断失效，车辆不减速</strong>
+   原因：固定坐标判断，车辆无法到达指定点位。
+   解决：改为<strong>动态距离判定路口区域</strong>，适配车辆行驶路线。</p>
+</li>
+</ol>
+<h3 id="82">8.2 项目优化方向</h3>
+<ol>
+<li>增加速度、距离、灯态屏幕文字可视化，直观展示车辆状态。</li>
+<li>为无信号路口增加横向来车，丰富交互场景。</li>
+<li>引入简单规则分类器，区分正常/危险工况，结合机器学习基础知识点。</li>
+<li>增加自动化连续测试功能，自动遍历全部场景。</li>
+</ol>
+<hr />
+<h2 id="9">9. 项目总结与心得体会</h2>
+<h3 id="91">9.1 项目总结</h3>
+<p>本项目完成了基于 CARLA 平台的 <strong>6大类城市自动驾驶典型场景仿真</strong>，实现车辆感知、决策、控制全流程模拟。系统采用模块化设计，代码易读、易维护、易扩展，完整实现拥堵、行人、红绿灯、路口、违规驾驶、紧急避障等功能。</p>
+<p>项目充分利用空间几何计算、时序逻辑、状态机控制等知识，将编程与智能驾驶应用结合，达到课程项目设计要求。</p>
+<h3 id="92">9.2 心得体会</h3>
+<p>通过本次机器学习/人工智能期末项目，我系统学习了自动驾驶仿真平台的使用，理解了虚拟仿真在智能驾驶测试中的重要作用。在开发过程中，不断解决车辆控制、物理异常、逻辑判断等问题，提升了 Python 实时程序开发、调试与问题排查能力。</p>
+<p>同时，我也认识到自动驾驶是<strong>感知+决策+控制</strong>的综合系统，简单的距离、状态判断即可实现基础智能行为，这也让我对机器学习、智能决策算法有了更直观的理解。本次项目不仅巩固了课堂知识，也为后续学习智能驾驶、机器视觉等方向打下实践基础。</p>
+<hr />
+<h2 id="10">10. 参考文献</h2>
+<p>[1] CARLA 官方文档. CARLA: An Open Urban Driving Simulator.
+[2] 智能车辆原理与应用. 高校人工智能相关教材
+[3] Python 编程：从入门到实践
+[4] 自动驾驶仿真测试技术综述</p>
+<hr />
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
