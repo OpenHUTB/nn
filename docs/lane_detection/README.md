@@ -4,6 +4,8 @@
 
 **作者**：ultra223  
 **课题进度**：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
+**课题进度**：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
+**课题进度**：2/10（步骤1 基础检测 + 步骤2 HSV 优化）
 
 ## 模块结构
 
@@ -45,6 +47,10 @@ python main.py --mode advanced
 # 步骤4：视频模式（逐帧检测 + EMA 平滑）
 python main.py --mode video --video path/to/video.mp4
 
+# 重新生成文档配图（写入 docs/lane_detection/images）
+python main.py --save-docs --no-show
+python main.py --mode hsv --save-docs --no-show
+python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show

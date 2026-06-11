@@ -7,16 +7,21 @@ from config import GUI_WINDOW_SIZE, GUI_TITLE, GUI_UPDATE_INTERVAL_MS
 
 logger = logging.getLogger(__name__)
 
+
 class VehicleStatusGUI:
     def __init__(self):
-        # 车况数据
+        # 车况数据 + 驾驶员体征数据
         self.vehicle_status = {
             "speed": 0.0,
             "weather": "clear",
             "visibility": 100.0,
             "collision_speed": 0.0,
             "red_light_violation": False,
-            "collision_occurred": False
+            "collision_occurred": False,
+            "heart_rate": 75.0,
+            "blood_pressure": "120/80",
+            "fatigue": 0.0,
+            "fatigue_level": "normal"
         }
         self.gui_update_flag = True
         self.root_window = None
@@ -51,6 +56,7 @@ class VehicleStatusGUI:
         style.configure("Title.TLabel", font=("Arial", 14, "bold"))
         style.configure("Status.TLabel", font=("Arial", 12))
         style.configure("Warning.TLabel", font=("Arial", 12), foreground="red")
+        style.configure("Danger.TLabel", font=("Arial", 12), foreground="darkred", fontweight="bold")
 
         # 构建UI组件
         self._build_ui(style)
@@ -111,13 +117,45 @@ class VehicleStatusGUI:
         self.red_light_label = ttk.Label(red_light_frame, text="否", style="Status.TLabel")
         self.red_light_label.pack(side="left", padx=5)
 
+        # 分割线
+        ttk.Separator(self.root_window, orient="horizontal").pack(fill="x", padx=20, pady=10)
+        ttk.Label(self.root_window, text="🧑‍⚕️ 驾驶员体征监测", style="Title.TLabel").pack(pady=5)
+
+        # 心率
+        heart_rate_frame = ttk.Frame(self.root_window)
+        heart_rate_frame.pack(fill="x", padx=20, pady=5)
+        ttk.Label(heart_rate_frame, text="心率：", style="Status.TLabel").pack(side="left")
+        self.heart_rate_label = ttk.Label(heart_rate_frame, text="75.0 次/分钟", style="Status.TLabel")
+        self.heart_rate_label.pack(side="left", padx=5)
+
+        # 血压
+        bp_frame = ttk.Frame(self.root_window)
+        bp_frame.pack(fill="x", padx=20, pady=5)
+        ttk.Label(bp_frame, text="血压：", style="Status.TLabel").pack(side="left")
+        self.bp_label = ttk.Label(bp_frame, text="120/80 mmHg", style="Status.TLabel")
+        self.bp_label.pack(side="left", padx=5)
+
+        # 疲惫度
+        fatigue_frame = ttk.Frame(self.root_window)
+        fatigue_frame.pack(fill="x", padx=20, pady=5)
+        ttk.Label(fatigue_frame, text="疲惫度：", style="Status.TLabel").pack(side="left")
+        self.fatigue_label = ttk.Label(fatigue_frame, text="0.0 %", style="Status.TLabel")
+        self.fatigue_label.pack(side="left", padx=5)
+
+        # 疲惫度等级
+        fatigue_level_frame = ttk.Frame(self.root_window)
+        fatigue_level_frame.pack(fill="x", padx=20, pady=5)
+        ttk.Label(fatigue_level_frame, text="疲惫等级：", style="Status.TLabel").pack(side="left")
+        self.fatigue_level_label = ttk.Label(fatigue_level_frame, text="normal", style="Status.TLabel")
+        self.fatigue_level_label.pack(side="left", padx=5)
+
     def _update_gui(self) -> None:
         """GUI循环更新（线程安全）"""
         if not self.gui_update_flag:
             return
 
         with self.status_lock:
-            # 更新数据
+            # 更新车辆状态
             self.speed_label.config(text=f"{self.vehicle_status['speed']:.1f} km/h")
             self.weather_label.config(text=self.vehicle_status['weather'])
             self.visibility_label.config(text=f"{self.vehicle_status['visibility']:.0f}%")
@@ -135,11 +173,32 @@ class VehicleStatusGUI:
             else:
                 self.red_light_label.config(text="否", style="Status.TLabel")
 
+            # 更新驾驶员体征
+            self.heart_rate_label.config(text=f"{self.vehicle_status['heart_rate']:.1f} 次/分钟")
+            # 心率异常提醒（>120）
+            if self.vehicle_status['heart_rate'] > 120:
+                self.heart_rate_label.config(style="Danger.TLabel")
+            else:
+                self.heart_rate_label.config(style="Status.TLabel")
+
+            self.bp_label.config(text=f"{self.vehicle_status['blood_pressure']} mmHg")
+            self.fatigue_label.config(text=f"{self.vehicle_status['fatigue']:.1f} %")
+
+            # 疲惫度等级样式
+            fatigue_level = self.vehicle_status['fatigue_level']
+            self.fatigue_level_label.config(text=fatigue_level)
+            if fatigue_level == "extreme_fatigue":
+                self.fatigue_level_label.config(style="Danger.TLabel")
+            elif fatigue_level in ["tired", "fatigued"]:
+                self.fatigue_level_label.config(style="Warning.TLabel")
+            else:
+                self.fatigue_level_label.config(style="Status.TLabel")
+
         # 延迟后再次更新
         self.root_window.after(GUI_UPDATE_INTERVAL_MS, self._update_gui)
 
     def update_vehicle_status(self, key: str, value) -> None:
-        """线程安全更新车况数据"""
+        """线程安全更新车况/体征数据"""
         safe_update_dict(self.vehicle_status, key, value)
 
     def stop(self) -> None:
@@ -153,6 +212,7 @@ class VehicleStatusGUI:
                 logger.error(f"关闭GUI窗口失败：{e}")
         self.root_window = None
         logger.info("GUI窗口已关闭")
+
 
 # 全局实例
 gui_instance = VehicleStatusGUI()

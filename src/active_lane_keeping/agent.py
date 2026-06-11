@@ -3,31 +3,36 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from typing import Optional
+
+from data_logger import DataLogger
+
+
 
 class Agent():
     """Agent that outputs the desired behaviour given 
     """
 
-    def __init__(self, tau_p:float = 0, tau_d:float = 0, tau_i:float = 0,
-        surface_lower_threshold:float = 20e6, throttle:float = 0.3,
-        surface_upper_threshold=30e6, controller:str = 'simple') -> None:
+    def __init__(self, tau_p:float = 0.65, tau_d:float = 0.034, tau_i:float = 0.00000002,
+        surface_lower_threshold:float = 20000000.0, throttle:float = 0.3,
+        surface_upper_threshold=30000000.0, controller:str = 'pid') -> None:
         """Constructor
 
         Args:
             tau_p (float, optional): Parameter for the proportional part of the
-                PID-Controller. Defaults to 0.
+                PID-Controller. Defaults to 0.65.
             tau_d (float, optional): Parameter for the derivative part of the
-                PID-Controller. Defaults to 0.
+                PID-Controller. Defaults to 0.034.
             tau_i (float, optional): Parameter for the integral part of the
-                PID-Controller. Defaults to 0.
+                PID-Controller. Defaults to 0.00000002.
             surface_lower_threshold (float, optional): Minimum amount of surface
                 that has to be detected in order to calculate new output. This
-                helps to find suitable lanes. Defaults to 20e6.
+                helps to find suitable lanes. Defaults to 20000000.0.
             throttle (float, optional): Throttle to return at each time step.
                 Defaults to 0.3.
             surface_upper_threshold (float, optional): Maximum amount of surface
                 that has to be detected in order to calculate new output. This
-                helps to find suitable lanes. Defaults to 30e6.
+                helps to find suitable lanes. Defaults to 30000000.0.
             controller (str, optional): Identifies the controller to be used.
                 This can be one of the following:
                     - 'simple': hard coded controller that does not use any of
@@ -36,7 +41,7 @@ class Agent():
                     - 'pd': controller that only uses the proportional and
                         derivative part
                     - 'pid': pid-controller
-                Defaults to 'simple'.
+                Defaults to 'pid'.
         """
         self.tau_p = tau_p
         self.tau_d = tau_d
@@ -49,6 +54,67 @@ class Agent():
         self.errors = []
         self.controller_name = controller
         self._select_controller_method(name=self.controller_name)
+        self.data_logger: Optional[DataLogger] = None
+        self.current_step = 0
+
+    @classmethod
+    def from_config(cls, config: dict) -> 'Agent':
+        """Create an Agent instance from a configuration dictionary.
+
+        Args:
+            config (dict): Configuration dictionary containing controller settings.
+
+        Returns:
+            Agent: A new Agent instance configured according to the provided config.
+        """
+        ctrl = config.get('controller', {})
+        
+        return cls(
+            tau_p=ctrl.get('tau_p', 0.65),
+            tau_d=ctrl.get('tau_d', 0.034),
+            tau_i=ctrl.get('tau_i', 0.00000002),
+            throttle=ctrl.get('throttle', 0.3),
+            surface_lower_threshold=ctrl.get('surface_lower_threshold', 20000000.0),
+            surface_upper_threshold=ctrl.get('surface_upper_threshold', 30000000.0),
+            controller=ctrl.get('default_controller', 'pid')
+        )
+
+    def set_data_logger(self, logger: DataLogger) -> None:
+        """Set the data logger for recording step data.
+
+        Args:
+            logger (DataLogger): DataLogger instance to use for recording.
+        """
+        self.data_logger = logger
+        self.data_logger.set_metadata(
+            controller=self.controller_name,
+            tau_p=self.tau_p,
+            tau_d=self.tau_d,
+            tau_i=self.tau_i,
+            throttle=self.throttle
+        )
+
+    @classmethod
+    def from_config(cls, config: dict) -> 'Agent':
+        """Create an Agent instance from a configuration dictionary.
+
+        Args:
+            config (dict): Configuration dictionary containing controller settings.
+
+        Returns:
+            Agent: A new Agent instance configured according to the provided config.
+        """
+        ctrl = config.get('controller', {})
+        
+        return cls(
+            tau_p=ctrl.get('tau_p', 0.65),
+            tau_d=ctrl.get('tau_d', 0.034),
+            tau_i=ctrl.get('tau_i', 0.00000002),
+            throttle=ctrl.get('throttle', 0.3),
+            surface_lower_threshold=ctrl.get('surface_lower_threshold', 20000000.0),
+            surface_upper_threshold=ctrl.get('surface_upper_threshold', 30000000.0),
+            controller=ctrl.get('default_controller', 'pid')
+        )
 
     def _select_controller_method(self, name:str) -> None:
         """Helper method to select the controller
@@ -101,15 +167,15 @@ class Agent():
         plt.legend()
         plt.pause(1e-10)
 
-    def save_error_fig(self, path:str, id:str) -> None:
+    def save_error_fig(self, path:str, run_id:str) -> None:
         """Save the Figure of the Error Plot
 
         Args:
             path (str): Folder to place the file in.
-            id (str): Unique identifier to prevent overwriting files.
+            run_id (str): Unique identifier to prevent overwriting files.
         """
         plt.figure(1)
-        file_name = os.path.join(path, f'{id}_error.jpg')
+        file_name = os.path.join(path, f'{run_id}_error.jpg')
         plt.savefig(file_name)
 
     def get_actions(self, detection_surface_area:float,
@@ -134,7 +200,24 @@ class Agent():
         else:
             self.errors.append(error)
             steer = self.func(error=error)
+
+        if self.data_logger:
+            self.data_logger.record_step(
+                step=self.current_step,
+                error=error,
+                steer=steer,
+                throttle=self.throttle,
+                detection_surface_area=detection_surface_area
+            )
+            self.current_step += 1
+
         return steer, self.throttle
+
+    def save_data(self) -> None:
+        """Save all recorded data using the data logger."""
+        if self.data_logger:
+            self.data_logger.save_all()
+            self.data_logger.save_summary()
 
     @staticmethod
     def _simple_controller(error:float) -> float:

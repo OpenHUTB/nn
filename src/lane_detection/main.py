@@ -7,6 +7,15 @@
   python main.py --mode advanced     # 步骤3 透视变换 + 滑动窗口 + 多项式拟合
   python main.py --mode video --video path/to/video.mp4  # 步骤4 视频模式
   python main.py --save-docs         # 将效果图写入 docs/lane_detection/images
+  python main.py                  # 默认：步骤1 基础 Canny+霍夫
+  python main.py --mode hsv       # 步骤2 HSV 多车道检测
+  python main.py --mode advanced  # 步骤3 透视变换 + 滑动窗口 + 多项式拟合
+  python main.py --save-docs      # 将效果图写入 docs/lane_detection/images
+"""
+import argparse
+  python main.py              # 默认：步骤1 基础 Canny+霍夫
+  python main.py --mode hsv   # 步骤2 HSV 多车道检测
+  python main.py --save-docs  # 将效果图写入 docs/lane_detection/images
 """
 import argparse
 
@@ -26,6 +35,11 @@ def parse_args():
     parser.add_argument(
         "--mode",
         choices=["basic", "hsv", "advanced", "video"],
+        choices=["basic", "hsv", "advanced"],
+        default="basic",
+        help="basic=灰度+Canny+霍夫；hsv=黄白线提取+多车道拟合；"
+             "advanced=透视变换+滑动窗口+多项式拟合",
+        choices=["basic", "hsv"],
         default="basic",
         help="basic=灰度+Canny+霍夫；hsv=黄白线提取+多车道拟合；"
              "advanced=透视变换+滑动窗口+多项式拟合；"
@@ -84,6 +98,7 @@ def main():
         display = outputs["result"]
         window = "Lane Detection Step1 (Canny + Hough)"
     elif args.mode == "hsv":
+    else:
         display = run_hsv_pipeline(args.image, save_dir=save_dir)
         if display is None:
             return 1
