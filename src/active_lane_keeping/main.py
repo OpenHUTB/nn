@@ -12,6 +12,7 @@ from os.path import join
 from typing import Iterable
 
 from agent import Agent
+from data_logger import DataLogger
 from recorder import Recorder
 from world import World
 
@@ -89,6 +90,7 @@ def run(run_id:str, path:str, world:World, agent:Agent, steps:int = 1000,
             break
 
     agent.save_error_fig(path, run_id)
+    agent.save_data()
     if save:
         recorder.close_recording()
 
@@ -266,6 +268,12 @@ def no_adapt(run_id:str, path:str, config: dict, steps:int=1000,
             agent.controller_name = controller
             agent._select_controller_method(controller)
 
+        sim = config.get('simulation', {})
+        map_name = sim.get('map', 'Unknown')
+        data_logger = DataLogger(folder=path, run_id=run_id)
+        data_logger.set_metadata(map_name=map_name)
+        agent.set_data_logger(data_logger)
+
         save = config.get('run', {}).get('save_video', True)
         run(run_id=run_id, path=path, world=world, agent=agent, steps=steps, save=save)
     finally:
@@ -288,7 +296,7 @@ def make_path(folder:str, run_id:str) -> str:
     Returns:
         str: Path including the id of the run.
     """
-    path = join(os.getcwd(), folder, run_id)
+    path = join(os.path.dirname(__file__), folder, run_id)
 
     if not os.path.exists(path):
         os.makedirs(path)
@@ -327,7 +335,7 @@ if __name__ == '__main__':
 
     run_steps = args.steps if args.steps else config.get('run', {}).get('default_steps', 1000)
 
-    path = make_path(folder='assets', run_id=args.id)
+    path = make_path(folder='data', run_id=args.id)
 
     if args.adapt:
         twiddle(run_id=args.id, path=path, config=config, tolerance=args.tolerance,

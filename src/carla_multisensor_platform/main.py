@@ -220,8 +220,12 @@ def main():
                  # 自动驾驶模式：CARLA 自动控制，无需额外操作
                  pass
             # 更新 ego vehicle control（传入障碍物距离）
-            ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
-            
+            if not autopilot_enabled:
+                # 手动模式：使用你的控制器
+                ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
+            else:
+                # 自动驾驶模式：CARLA 自动控制，无需额外操作
+                pass
             # Update data recorder with current vehicle state
             data_recorder.update_vehicle_state(ego_vehicle)
             data_recorder.update_control_signals(
