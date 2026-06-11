@@ -8,14 +8,18 @@ data = mujoco.MjData(model)
 nu = model.nu
 print(f"模型控制维度 nu = {nu}")
 
-# 关键：抬高初始高度，让机器人双脚扎实踩地，不悬空不下陷
+# 初始抬高，防止陷地
 data.qpos[2] = 1.4
 mujoco.mj_forward(model, data)
 
-# 高摩擦力，牢牢抓地
+# 增加地面摩擦力，防止滑倒
 for i in range(model.ngeom):
     if "floor" in model.geom(i).name:
-        model.geom(i).friction = [120, 0.1, 0.1]
+        model.geom(i).friction = [10, 0.1, 0.1]
+
+# PD控制参数
+kp = 100
+kd = 10
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
     t = 0.0
@@ -23,18 +27,25 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         dt = model.opt.timestep
         t += dt
 
-        # 右手保持抬起、手肘极慢挥手（和你原代码完全一致）
-        data.ctrl[1] = 0.3
-        elbow_wave = np.sin(t * 0.08) * 0.35 + 0.35
-        data.ctrl[2] = elbow_wave
+        # 手臂摆动幅度
+        swing = np.sin(t * 1.2) * 0.3
+        target = np.zeros(nu)
 
-        # 左手超慢速、极小幅度轻晃（保留原样）
-        left_swing = np.sin(t * 0.1) * 0.06
-        data.ctrl[3] = left_swing
-        data.ctrl[4] = left_swing * 0.1
+        # 适配nu=16的手臂关节索引
+        if nu >= 16:
+            # 右肩+右肘（索引10、11、12）
+            target[10] = swing
+            target[11] = swing
+            target[12] = swing * 0.4
+            # 左肩+左肘（索引13、14、15）
+            target[13] = -swing
+            target[14] = -swing
+            target[15] = -swing * 0.4
 
-        # 头部保持固定
-        data.ctrl[0] = 0
+        # 获取关节状态
+        q = data.qpos[7:7+nu]
+        v = data.qvel[6:6+nu]
+        data.ctrl[:] = kp * (target - q) - kd * v
 
         mujoco.mj_step(model, data)
         viewer.sync()

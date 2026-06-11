@@ -7,6 +7,7 @@ import numpy as np
 from vision_module import VisionSystem
 from planner import LanePlanner
 from acc_module import ACCController
+from aeb_module import AEBController
 
 def main():
     print("===================================")
@@ -101,13 +102,13 @@ def main():
                 ego_spawn_point.location.z += 0.5
                 
                 # 4. 在正前方 30 米处生成测试靶标
-                target_waypoint = target_wp.next(15.0)[0]
+                target_waypoint = target_wp.next(20.0)[0]
                 break
                     
         if not ego_spawn_point:
             print("⚠️ 没找到完美的超长直道，将就用默认点。")
             ego_spawn_point = spawn_points[0]
-            target_waypoint = world.get_map().get_waypoint(ego_spawn_point.location).next(15.0)[0]
+            target_waypoint = world.get_map().get_waypoint(ego_spawn_point.location).next(20.0)[0]
 
         # 2. 生成主车
         ego_vehicle = world.try_spawn_actor(vehicle_bp, ego_spawn_point)
@@ -123,6 +124,18 @@ def main():
 
             if choice == '2':
                 target_bp = bp_lib.filter('walker.pedestrian.*')[0]
+
+                pedestrian_wp = target_waypoint
+                while pedestrian_wp.get_right_lane() and \
+                      pedestrian_wp.get_right_lane().lane_type == carla.LaneType.Driving and \
+                      (pedestrian_wp.get_right_lane().lane_id * target_waypoint.lane_id > 0):
+                    pedestrian_wp = pedestrian_wp.get_right_lane()
+
+                target_transform = pedestrian_wp.transform
+                target_transform.location.z += 0.5
+                right_vector = target_waypoint.transform.get_right_vector()
+                target_transform.location.x += right_vector.x * 3.0
+                target_transform.location.y += right_vector.y * 3.0
             else:
                 target_bp = bp_lib.find('vehicle.tesla.model3')
                 
@@ -166,6 +179,7 @@ def main():
             vision_aeb_active = False 
             was_aeb_active = False
             acc_sys = ACCController()
+            vru_aeb_sys = AEBController()
 
             running = True
             while running:
@@ -177,7 +191,26 @@ def main():
                     dummy_target.set_autopilot(True)
                     tm = client.get_trafficmanager()
                     tm.ignore_lights_percentage(dummy_target, 100)
-                    tm.vehicle_percentage_speed_difference(dummy_target, 50.0)        
+                    tm.vehicle_percentage_speed_difference(dummy_target, 50.0)
+                else:
+                    # 必须确保行人成功生成了才给他下指令
+                    if dummy_target is not None:
+                        walker_control = carla.WalkerControl()
+                        # CARLA 只有右向量，我们获取右向量后加负号，就是纯正的左向量
+                        right_vec = target_waypoint.transform.get_right_vector()
+                        walker_control.direction = carla.Vector3D(-right_vec.x, -right_vec.y, 0.0)
+                        
+                        ego_loc = ego_vehicle.get_location()
+                        target_loc = dummy_target.get_location()
+                        dist_to_target = math.sqrt((ego_loc.x - target_loc.x)**2 + (ego_loc.y - target_loc.y)**2)
+
+                        if dist_to_target < 20.0:
+                            walker_control.speed = 3.5
+                        else:
+                            walker_control.speed = 0.0
+
+                        dummy_target.apply_control(walker_control)
+                    
                 if keyboard.is_pressed('esc'):
                     running = False
 
@@ -216,15 +249,17 @@ def main():
                 is_following = False
 
                 if vision_system:
-                    _, min_dist, obstacle_side = vision_system.process_and_render()
+                    _, min_dist, obstacle_side, target_class, target_x, aeb_dist = vision_system.process_and_render()
                     
                     active_target_speed = target_speed_kmh
-                    # 先让 ACC 计算速度，看看前车是死是活
+                    
                     if min_dist != float('inf') and not lane_planner.is_changing_lane:
-                        active_target_speed = acc_sys.update_target_speed(min_dist, current_speed_kmh, target_speed_kmh)
-                        # 🌟 核心：如果前车速度 > 5km/h，判定为活车，开启跟车模式！
-                        if hasattr(acc_sys, 'lead_speed_kmh') and acc_sys.lead_speed_kmh > 5.0:
-                            is_following = True
+                        if target_class == "car":
+                            active_target_speed = acc_sys.update_target_speed(min_dist, current_speed_kmh, target_speed_kmh)
+                            if hasattr(acc_sys, 'lead_speed_kmh') and acc_sys.lead_speed_kmh > 5.0:
+                                is_following = True
+                        else:
+                            is_following = False
 
                 # ==========================================
                 # 3. 规划与横向控制 (决定是否变道)
@@ -232,7 +267,7 @@ def main():
                 if vision_system:
                     safe_dist = min_dist if min_dist != float('inf') else 100.0
                     # 🌟 传入 is_following 标志位。如果是跟车，规划器会放弃变道，老老实实保持车道！
-                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh, obstacle_side, is_following)
+                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh, obstacle_side, is_following, target_class)
                     
                     if not is_reverse and planner_steer is not None:
                         control.steer = planner_steer
@@ -269,15 +304,21 @@ def main():
                     control.throttle, control.brake = 0.0, min(max((-error * Kp) - (error_sum * Ki), 0.0), 0.5)
 
                 # ==========================================
-                # 6. 紧急制动 AEB 兜底 (只对静止障碍物生效)
+                # 6. 紧急制动 AEB
                 # ==========================================
+                vru_aeb_triggered = False
+                if vision_system:
+                    vru_aeb_triggered = vru_aeb_sys.evaluate(aeb_dist, target_class, target_x, lane_planner.is_changing_lane)
+
                 if min_dist != float('inf'):
                     braking_dist = (speed_m_s ** 2) / (2 * 6.0) + 3.0
-                    # 如果距离极近，且没在变道，且不是在跟车(如果是跟车，ACC会柔和减速而不是直接抱死)，触发 AEB
                     if min_dist < braking_dist and not lane_planner.is_changing_lane and not is_following:
                         vision_aeb_active = True
-                        control.throttle = 0.0
-                        control.brake = 1.0
+                        
+                if vru_aeb_triggered or vision_aeb_active:
+                    vision_aeb_active = True
+                    control.throttle = 0.0
+                    control.brake = 1.0
 
                 if curr_space or collision_flag[0]:
                     control.hand_brake, control.throttle, control.brake = True, 0.0, 1.0
