@@ -30,4 +30,8 @@ CONFIG = {
     "sliding_windows": 9,
     "sliding_margin": 100,
     "sliding_minpix": 50,
+
+    # 步骤4：视频模式（帧间平滑）
+    "ema_alpha": 0.3,
+    "video_fourcc": "XVID",
 }

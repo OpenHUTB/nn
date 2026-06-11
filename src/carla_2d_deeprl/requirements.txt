@@ -5,3 +5,5 @@ torch~=2.11.0
 torchvision~=0.26.0
 pillow~=12.2.0
 imutils~=0.5.4
+tensorboard~=2.11.0
+mkdocs~=1.6.0
