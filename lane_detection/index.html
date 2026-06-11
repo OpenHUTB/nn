@@ -59,6 +59,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#3">步骤3：透视变换 + 滑动窗口 + 多项式拟合</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4">步骤4：视频处理与帧间平滑</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#_4">参考</a>
     </li>
     </ul>
@@ -111,6 +113,7 @@
                 <h1 id="lane_detection">车道线检测（lane_detection）</h1>
 <p>基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。</p>
 <p><strong>作者</strong>：ultra223<br />
+<strong>课题进度</strong>：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
 <strong>课题进度</strong>：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
 <strong>课题进度</strong>：2/10（步骤1 基础检测 + 步骤2 HSV 优化）</p>
 <h2 id="_1">模块结构</h2>
@@ -143,6 +146,10 @@
 <td style="text-align: left;">步骤3：透视变换、滑动窗口、二次多项式拟合</td>
 </tr>
 <tr>
+<td style="text-align: left;"><code>lane_video.py</code></td>
+<td style="text-align: left;">步骤4：视频处理、帧间 EMA 平滑</td>
+</tr>
+<tr>
 <td style="text-align: left;"><code>carla_test.jpg</code></td>
 <td style="text-align: left;">少量示例输入（运行依赖）</td>
 </tr>
@@ -166,6 +173,9 @@ python main.py --mode hsv
 # 步骤3：透视变换 + 滑动窗口 + 多项式拟合
 python main.py --mode advanced
 
+# 步骤4：视频模式（逐帧检测 + EMA 平滑）
+python main.py --mode video --video path/to/video.mp4
+
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
@@ -173,6 +183,7 @@ python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
+python main.py --mode advanced --save-docs --no-show
 </code></pre>
 <h2 id="1canny">步骤1：基础版（Canny + 霍夫）</h2>
 <p>对 Carla 测试图做灰度化、高斯模糊、Canny 边缘检测、梯形 ROI 裁剪，再用霍夫变换检测车道线段。</p>
@@ -206,6 +217,43 @@ python main.py --mode hsv --save-docs --no-show
 <p><img alt="步骤3 多项式拟合" src="images/step03_poly_fit.jpg" /></p>
 <p><strong>最终检测结果</strong></p>
 <p><img alt="步骤3 检测结果" src="images/step03_result.jpg" /></p>
+<h2 id="4">步骤4：视频处理与帧间平滑</h2>
+<p>在步骤3的基础上，支持视频文件输入，逐帧执行高级车道线检测流水线，并对连续帧的多项式拟合系数做指数移动平均（EMA）平滑，消除相邻帧之间的抖动，输出稳定的车道线跟踪结果。</p>
+<p><strong>关键参数</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">参数</th>
+<th style="text-align: left;">默认值</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>--alpha</code></td>
+<td style="text-align: left;">0.3</td>
+<td style="text-align: left;">EMA 平滑系数（0~1），越小越平滑</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--video</code></td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">输入视频路径</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--save-docs</code></td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">保存输出视频到文档目录</td>
+</tr>
+</tbody>
+</table>
+<p><strong>EMA 平滑公式</strong></p>
+<pre><code>fit_smoothed = α × fit_current + (1 − α) × fit_previous
+</code></pre>
+<ul>
+<li>α = 1.0：完全使用当前帧结果（无平滑，可能抖动）</li>
+<li>α = 0.1：高度平滑，响应慢但稳定</li>
+<li>α = 0.3（默认）：兼顾响应速度和平滑度</li>
+</ul>
 <h2 id="_4">参考</h2>
 <ul>
 <li><a href="https://github.com/OpenHUTB/nn/blob/main/README.md">OpenHUTB/nn 贡献指南</a></li>
