@@ -1,111 +1,83 @@
-<?xml version="1.0"?>
 <mujoco model="humanoid">
-  <compiler inertiafromgeom="true" angle="degree"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
   <default>
-    <joint limited="true" damping="0.5" armature="0.001"/>
-    <geom condim="3" friction="0.8 0.1 0.1" solref="0.02 1"/>
-    <motor gear="50" ctrllimited="true" ctrlrange="-0.4 0.4"/>
+    <joint armature="0.1" damping="1" limited="true"/>
+    <geom conaffinity="0" condim="3" friction="1.2 0.1 0.1" rgba="0.75 0.75 0.75 1"/>
   </default>
-  <option timestep="0.001" iterations="50"/>
-  <visual>
-    <global offwidth="800" offheight="800"/>
-  </visual>
-  <asset>
-    <texture name="body" type="cube" builtin="flat" width="128" height="128" rgb1="0.8 0.6 0.4"/>
-    <material name="body" texture="body" texuniform="true"/>
-  </asset>
+
   <worldbody>
-    <light pos="0 0 3" dir="0 0 -1" diffuse="1 1 1"/>
-    <geom type="plane" size="10 10 0.1" rgba="0.9 0.9 0.9 1"/>
+    <light pos="0 0 4" dir="0 0 -1" diffuse="1 1 1"/>
+    <geom name="floor" type="plane" size="15 15 0.1" rgba="0.9 0.9 0.9 1"/>
 
     <body name="torso" pos="0 0 1.4">
-      <freejoint/>
-      <geom name="torso_geom" type="capsule" size="0.15" fromto="0 0 0 0 0 0.45" material="body"/>
+      <!-- 躯干旋转 -->
+      <joint type="hinge" axis="0 0 1" range="-40 40"/>
+      <geom type="capsule" size="0.16 0.28" fromto="0 0 0 0 0 0.52"/>
 
-      <!-- 右大腿 -->
-      <body name="right_thigh" pos="0 -0.15 -0.25">
-        <joint name="right_hip_pitch" type="hinge" axis="1 0 0" range="-45 45"/>
-        <joint name="right_hip_roll"  type="hinge" axis="0 1 0" range="-30 30"/>
-        <geom type="capsule" size="0.12" fromto="0 0 0 0 0 -0.4" material="body"/>
-
-        <!-- 右小腿 -->
-        <body name="right_shin" pos="0 0 -0.4">
-          <joint name="right_knee" type="hinge" axis="1 0 0" range="-120 0"/>
-          <geom type="capsule" size="0.1" fromto="0 0 0 0 0 -0.4" material="body"/>
-
-          <!-- 右脚 -->
-          <body name="right_foot" pos="0 0 -0.4">
-            <joint name="right_ankle_pitch" type="hinge" axis="1 0 0" range="-30 30"/>
-            <joint name="right_ankle_roll"  type="hinge" axis="0 1 0" range="-15 15"/>
-            <geom type="box" size="0.15 0.1 0.05" pos="0 0 -0.05" material="body"/>
-          </body>
-        </body>
-      </body>
-
-      <!-- 左大腿 -->
-      <body name="left_thigh" pos="0 0.15 -0.25">
-        <joint name="left_hip_pitch" type="hinge" axis="1 0 0" range="-45 45"/>
-        <joint name="left_hip_roll"  type="hinge" axis="0 1 0" range="-30 30"/>
-        <geom type="capsule" size="0.12" fromto="0 0 0 0 0 -0.4" material="body"/>
-
-        <!-- 左小腿 -->
-        <body name="left_shin" pos="0 0 -0.4">
-          <joint name="left_knee" type="hinge" axis="1 0 0" range="-120 0"/>
-          <geom type="capsule" size="0.1" fromto="0 0 0 0 0 -0.4" material="body"/>
-
-          <!-- 左脚 -->
-          <body name="left_foot" pos="0 0 -0.4">
-            <joint name="left_ankle_pitch" type="hinge" axis="1 0 0" range="-30 30"/>
-            <joint name="left_ankle_roll"  type="hinge" axis="0 1 0" range="-15 15"/>
-            <geom type="box" size="0.15 0.1 0.05" pos="0 0 -0.05" material="body"/>
-          </body>
+      <!-- 颈部 + 头部 -->
+      <body name="neck" pos="0 0 0.52">
+        <joint name="neck_yaw" type="hinge" axis="0 0 1" range="-35 35"/>
+        <geom type="capsule" size="0.09 0.12" fromto="0 0 0 0 0 0.16"/>
+        <body name="head" pos="0 0 0.16">
+          <geom type="sphere" size="0.2" rgba="0.65 0.65 0.65 1"/>
         </body>
       </body>
 
       <!-- 右臂 -->
-      <body name="right_upperarm" pos="0 -0.2 0.2">
-        <joint name="right_shoulder_pitch" type="hinge" axis="1 0 0" range="-90 90"/>
-        <joint name="right_shoulder_roll"  type="hinge" axis="0 1 0" range="-45 45"/>
-        <geom type="capsule" size="0.08" fromto="0 0 0 0 0 -0.3" material="body"/>
-        <body name="right_forearm" pos="0 0 -0.3">
-          <joint name="right_elbow" type="hinge" axis="0 1 0" range="0 90"/>
-          <geom type="capsule" size="0.07" fromto="0 0 0 0 0 -0.25" material="body"/>
+      <body name="r_arm" pos="-0.22 0 0.38">
+        <joint name="r_shoulder" type="hinge" axis="0 1 0" range="-55 55"/>
+        <geom type="capsule" size="0.08 0.24" fromto="0 0 0 0 0 -0.32"/>
+        <body name="r_forearm" pos="0 0 -0.32">
+          <joint name="r_elbow" type="hinge" axis="0 1 0" range="0 85"/>
+          <geom type="capsule" size="0.07 0.22" fromto="0 0 0 0 0 -0.3"/>
         </body>
       </body>
 
       <!-- 左臂 -->
-      <body name="left_upperarm" pos="0 0.2 0.2">
-        <joint name="left_shoulder_pitch" type="hinge" axis="1 0 0" range="-90 90"/>
-        <joint name="left_shoulder_roll"  type="hinge" axis="0 1 0" range="-45 45"/>
-        <geom type="capsule" size="0.08" fromto="0 0 0 0 0 -0.3" material="body"/>
-        <body name="left_forearm" pos="0 0 -0.3">
-          <joint name="left_elbow" type="hinge" axis="0 1 0" range="0 90"/>
-          <geom type="capsule" size="0.07" fromto="0 0 0 0 0 -0.25" material="body"/>
+      <body name="l_arm" pos="0.22 0 0.38">
+        <joint name="l_shoulder" type="hinge" axis="0 1 0" range="-55 55"/>
+        <geom type="capsule" size="0.08 0.24" fromto="0 0 0 0 0 -0.32"/>
+        <body name="l_forearm" pos="0 0 -0.32">
+          <joint name="l_elbow" type="hinge" axis="0 1 0" range="0 85"/>
+          <geom type="capsule" size="0.07 0.22" fromto="0 0 0 0 0 -0.3"/>
         </body>
       </body>
 
+      <!-- 右腿 -->
+      <body name="r_leg" pos="-0.14 0 0.22">
+        <joint type="hinge" axis="0 1 0" range="-40 40"/>
+        <geom type="capsule" size="0.11 0.3" fromto="0 0 0 0 0 -0.42"/>
+        <body pos="0 0 -0.42">
+          <joint type="hinge" axis="0 1 0" range="-85 0"/>
+          <geom type="capsule" size="0.10 0.3" fromto="0 0 0 0 0 -0.42"/>
+          <body pos="0 0 -0.42">
+            <joint type="hinge" axis="0 1 0" range="-25 25"/>
+            <geom type="box" size="0.13 0.09 0.06" pos="0 0 -0.06"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 左腿 -->
+      <body name="l_leg" pos="0.14 0 0.22">
+        <joint type="hinge" axis="0 1 0" range="-40 40"/>
+        <geom type="capsule" size="0.11 0.3" fromto="0 0 0 0 0 -0.42"/>
+        <body pos="0 0 -0.42">
+          <joint type="hinge" axis="0 1 0" range="-85 0"/>
+          <geom type="capsule" size="0.10 0.3" fromto="0 0 0 0 0 -0.42"/>
+          <body pos="0 0 -0.42">
+            <joint type="hinge" axis="0 1 0" range="-25 25"/>
+            <geom type="box" size="0.13 0.09 0.06" pos="0 0 -0.06"/>
+          </body>
+        </body>
+      </body>
     </body>
   </worldbody>
 
   <actuator>
-    <motor joint="right_hip_pitch"/>
-    <motor joint="right_hip_roll"/>
-    <motor joint="right_knee"/>
-    <motor joint="right_ankle_pitch"/>
-    <motor joint="right_ankle_roll"/>
-
-    <motor joint="left_hip_pitch"/>
-    <motor joint="left_hip_roll"/>
-    <motor joint="left_knee"/>
-    <motor joint="left_ankle_pitch"/>
-    <motor joint="left_ankle_roll"/>
-
-    <motor joint="right_shoulder_pitch"/>
-    <motor joint="right_shoulder_roll"/>
-    <motor joint="right_elbow"/>
-
-    <motor joint="left_shoulder_pitch"/>
-    <motor joint="left_shoulder_roll"/>
-    <motor joint="left_elbow"/>
+    <motor joint="neck_yaw" gear="90"/>
+    <motor joint="r_shoulder" gear="75"/>
+    <motor joint="r_elbow" gear="65"/>
+    <motor joint="l_shoulder" gear="75"/>
+    <motor joint="l_elbow" gear="65"/>
   </actuator>
 </mujoco>
