@@ -204,7 +204,7 @@ title: 主页
 
 - [__机械臂自动抓取__](./robot_arm/README.md) - 基于Franka Panda的机械臂自动抓取仿真项目
 
-
+- [__CARLA 多传感器仿真平台__](./carla_multisensor_platform/carla_mutisensor_platform.md) -集成多传感器的自动驾驶仿真与数据采集平台
 
 
 
