@@ -181,6 +181,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_autonomous_control/</loc>
+         <lastmod>2026-06-12</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_imu/carla_imu/</loc>
          <lastmod>2026-06-12</lastmod>
          <changefreq>daily</changefreq>
