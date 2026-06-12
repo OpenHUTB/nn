@@ -186,6 +186,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_temporal_collage/</loc>
+         <lastmod>2026-06-12</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_traffic_sign_recognition/carla_traffic_sign_recognition/</loc>
          <lastmod>2026-06-12</lastmod>
          <changefreq>daily</changefreq>

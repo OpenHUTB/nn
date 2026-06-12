@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_temporal_collage/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Temporal Collage Prompting：驾驶事故视频识别系统 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Temporal Collage Prompting\uff1a\u9a7e\u9a76\u4e8b\u6545\u89c6\u9891\u8bc6\u522b\u7cfb\u7edf";
+        var mkdocs_page_input_path = "carla_temporal_collage/index.md";
+        var mkdocs_page_url = "/nn/carla_temporal_collage/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Temporal Collage Prompting：驾驶事故视频识别系统</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_temporal_collage/index.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="temporal-collage-prompting">Temporal Collage Prompting：驾驶事故视频识别系统</h1>
+<h2 id="_1">项目简介</h2>
+<p>本项目实现了基于 GPT-4o 的低成本模拟器驾驶事故视频识别系统，采用时间拼接提示（Temporal Collage Prompting）方法，通过将视频帧拼接成 collage 图片，利用 GPT-4o 的视觉能力进行事故分类。</p>
+<h2 id="_2">技术架构</h2>
+<h3 id="_3">整体流程</h3>
+<pre><code>视频数据 → 帧提取 → Collage生成 → GPT-4o分析 → 结果输出
+</code></pre>
+<h3 id="_4">模块说明</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>功能</th>
+<th>对应脚本</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>帧提取</td>
+<td>从视频中提取关键帧</td>
+<td><code>main.py extract-frames</code></td>
+</tr>
+<tr>
+<td>Collage生成</td>
+<td>将帧拼接成网格图片</td>
+<td><code>main.py create-collage</code></td>
+</tr>
+<tr>
+<td>事故分析</td>
+<td>使用GPT-4o进行分类</td>
+<td><code>main.py analyze</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="_5">快速开始</h2>
+<h3 id="_6">环境配置</h3>
+<pre><code class="language-bash"># 安装依赖
+pip install -r requirements.txt
+</code></pre>
+<h3 id="_7">运行命令</h3>
+<h4 id="1">1. 提取视频帧</h4>
+<pre><code class="language-bash">python src/main.py extract-frames \
+    --input data/videos \
+    --output data/data-frames/data-frames-3fps \
+    --interval 10
+</code></pre>
+<h4 id="2-collage">2. 生成 Collage</h4>
+<pre><code class="language-bash">python src/main.py create-collage \
+    --input data/data-frames/data-frames-3fps \
+    --output data/collages/collages-3fps-2-3 \
+    --layout 2-3
+</code></pre>
+<h4 id="3">3. 事故分析</h4>
+<pre><code class="language-bash">python src/main.py analyze \
+    --input data/collages/collages-3fps-2-3 \
+    --model gpt-4o-low
+</code></pre>
+<h2 id="_8">数据集</h2>
+<h3 id="_9">数据结构</h3>
+<pre><code>data/
+├── videos/          # 原始视频数据
+│   ├── norm/        # 正常驾驶 (30个视频)
+│   ├── ped/         # 行人事故 (15个视频)
+│   └── col/         # 车辆碰撞 (15个视频)
+├── data-frames/     # 提取的视频帧
+└── collages/        # 生成的Collage图片
+</code></pre>
+<h3 id="_10">数据说明</h3>
+<ul>
+<li><strong>视频分辨率</strong>: 1280x720</li>
+<li><strong>帧率</strong>: 30fps（提取帧时使用3fps）</li>
+<li><strong>时长</strong>: 每个视频约10-30秒</li>
+<li><strong>场景</strong>: CARLA模拟器生成的驾驶场景</li>
+</ul>
+<h2 id="_11">实验结果</h2>
+<h3 id="_12">分类性能</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>准确率</td>
+<td>85%</td>
+</tr>
+<tr>
+<td>行人事故识别</td>
+<td>Precision: 100%, Recall: 93%</td>
+</tr>
+<tr>
+<td>车辆碰撞识别</td>
+<td>Recall: 93%</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_13">混淆矩阵</h3>
+<pre><code>              预测
+            Normal  Ped  Col
+真实  Normal    28    0    2
+     Ped         0   14    1
+     Col         3    0   12
+</code></pre>
+<h2 id="_14">引用</h2>
+<p>如果您觉得我们的工作对您有帮助，请引用：</p>
+<pre><code class="language-bibtex">@inproceedings{suntichaikul2024temporal,
+    title        = {{Temporal Collage Prompting: A Cost-Effective Simulator-Based Driving Accident Video Recognition With GPT-4o}},
+    author       = {Suntichaikul, Pratch and Taveekitworachai, Pittawat and Nukoolkit, Chakarida and Thawonmas, Ruck},
+    year         = 2024,
+    booktitle    = {2024 8th International Conference on Information Technology (InCIT)},
+    pages        = {708--713},
+    doi          = {10.1109/InCIT63192.2024.10810536}
+}
+</code></pre>
+<h2 id="_15">许可证</h2>
+<p>本项目采用 MIT 许可证，详见 <a href="../LICENSE">LICENSE</a> 文件。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
