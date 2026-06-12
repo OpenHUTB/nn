@@ -1,0 +1,7 @@
+# 运行时产物
+models/
+*.zip
+*.pkl
+
+# 根 .gitignore 忽略 *.png，这里放行学习曲线效果图
+!result_learning_curve.png

@@ -98,6 +98,7 @@ title: 主页
 
 [__carla_2d_deeprl__](./carla_2d_deeprl/README.md) - 基于 CARLA 的极简 2D 深度强化学习自动驾驶环境。
 
+[__PilotNet自动驾驶系统__](./pilotnet/index.md) - 基于NVIDIA PilotNet架构的端到端自动驾驶学习系统
 
 ## 控制  <span id="control"></span>
 
@@ -116,3 +117,5 @@ title: 主页
 [__人形机器人SAC强化学习步态优化__](./mujoco_running/running.md) - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真
 
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
+
+[__carla自动驾驶系统辅助监视器__](./autonomous_vehicle_monitor/monitor.md) -carla自动驾驶系统辅助器

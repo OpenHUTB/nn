@@ -1,13 +1,3 @@
----
-AIGC:
-    Label: "1"
-    ContentProducer: 001191110102MACQD9K64018705
-    ProduceID: 142305146964284_0-data_volume/7649677419162616127-files/所有对话/主对话/网联车仿真README/README.md
-    ReservedCode1: ""
-    ContentPropagator: 001191110102MACQD9K64028705
-    PropagateID: 142305146964284#1781080314578
-    ReservedCode2: ""
----
 # 🚗 网联车智慧城市仿真系统
 
 > 基于 **CARLA 0.9.14+** 仿真平台，集成车辆控制、碰撞检测、红绿灯违规识别、动态天气模拟、驾驶员生命体征监测及可视化 GUI 监控的自动驾驶仿真系统。
@@ -73,8 +63,8 @@ AIGC:
 
 ```
                 ┌──────────────────────────────────────────────┐
-                │                  drive.py                    │
-                │  (主入口 / 主循环 / 信号处理 / 资源清理)      │
+                │                  main.py                      │
+                │  (主入口 / 主循环 / 信号处理 / 资源清理)        │
                 └──────────────┬───────────────────────────────┘
                                │
        ┌───────────────┬───────┼───────┬────────────────┐
@@ -136,7 +126,7 @@ AIGC:
 ```
 ┌──────────────┐                              ┌──────────────┐
 │   CARLA      │   vehicle/weather/light      │   主循环     │
-│  World API   │ ──────────────────────────▶  │  drive.py    │
+│  World API   │ ──────────────────────────▶  │   main.py    │
 └──────────────┘                              └──────┬───────┘
                                                       │
                 ┌─────────────────────────────────────┤
@@ -212,7 +202,7 @@ AIGC:
 
 | 文件 | 行数级别 | 核心职责 |
 | --- | --- | --- |
-| `drive.py` | 250+ | 入口、信号处理、主循环、按键映射、视角跟随 |
+| `main.py` | 250+ | 入口、信号处理、主循环、按键映射、视角跟随 |
 | `config.py` | 60 | 集中所有可调参数（连接、控制、GUI、天气、体征） |
 | `vehicle_status_gui.py` | 250+ | Tkinter 窗口构建、线程安全数据更新、样式异常高亮 |
 | `driver_vitals_monitor.py` | 150+ | 体征计算（多因素耦合）、状态机、随机波动、异常日志 |
@@ -257,7 +247,7 @@ CarlaUE4.exe
 **② 运行主程序**
 
 ```bash
-python main.py
+python drive.py
 ```
 
 程序启动后自动完成：
@@ -385,7 +375,7 @@ python main.py
 
 ## ⚙️ 配置参考
 
-所有可调参数集中在 [`config.py`](../src/config.py)：
+所有可调参数集中在 [`config.py`](./config.py)：
 
 ### CARLA 连接
 
@@ -526,10 +516,11 @@ safe_update_dict(d, k, v)                      # 加锁字典更新
 - 减少生成车辆数量，关闭非必要传感器
 
 **Q6. PyCharm 中 README 图片不显示？**
-将图片放入 `images/` 文件夹，使用：
+图片统一放在 `docs/images/` 下，引用时使用相对路径：
 ```markdown
 ![图片名](images/xxx.png)
 ```
+如果以 `docs/README.md` 为入口渲染，路径正确即可显示。
 
 ---
 
@@ -620,5 +611,3 @@ python -c "from vehicle_status_gui import create_status_window, stop_gui, update
 **🤝 贡献指南**：欢迎提交 Issue 和 PR，建议在提交前运行 `python -m py_compile *.py` 确保无语法错误。
 
 ---
-
-> 本内容由 Coze AI 生成，请遵循相关法律法规及《人工智能生成合成内容标识办法》使用与传播。
