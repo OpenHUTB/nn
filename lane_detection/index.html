@@ -61,6 +61,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#4">步骤4：视频处理与帧间平滑</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#5">步骤5：车道曲率与车辆偏移计算</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#_4">参考</a>
     </li>
     </ul>
@@ -113,6 +115,7 @@
                 <h1 id="lane_detection">车道线检测（lane_detection）</h1>
 <p>基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。</p>
 <p><strong>作者</strong>：ultra223<br />
+<strong>课题进度</strong>：5/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算）
 <strong>课题进度</strong>：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
 <strong>课题进度</strong>：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
 <strong>课题进度</strong>：2/10（步骤1 基础检测 + 步骤2 HSV 优化）</p>
@@ -140,6 +143,10 @@
 <tr>
 <td style="text-align: left;"><code>lane_detect.py</code></td>
 <td style="text-align: left;">步骤2：HSV 黄白线、双黄线中心轴、左右车道</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lane_advanced.py</code></td>
+<td style="text-align: left;">步骤3 &amp; 5：透视变换、滑动窗口、多项式拟合、曲率与偏移计算</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>lane_advanced.py</code></td>
@@ -254,6 +261,86 @@ python main.py --mode advanced --save-docs --no-show
 <li>α = 0.1：高度平滑，响应慢但稳定</li>
 <li>α = 0.3（默认）：兼顾响应速度和平滑度</li>
 </ul>
+<h2 id="5">步骤5：车道曲率与车辆偏移计算</h2>
+<p>在步骤3/4的基础上，利用二次多项式拟合系数计算车道曲率半径与车辆相对车道中心的横向偏移，并在结果图上叠加实时信息，帮助评估驾驶状态。</p>
+<p><strong>关键参数</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">参数</th>
+<th style="text-align: left;">默认值</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>--no-metrics</code></td>
+<td style="text-align: left;">否</td>
+<td style="text-align: left;">隐藏曲率与偏移信息</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ym_per_pix</code></td>
+<td style="text-align: left;">30/720</td>
+<td style="text-align: left;">纵向像素→米转换因子</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>xm_per_pix</code></td>
+<td style="text-align: left;">3.7/700</td>
+<td style="text-align: left;">横向像素→米转换因子</td>
+</tr>
+</tbody>
+</table>
+<p><strong>曲率半径公式</strong></p>
+<pre><code>车道线模型: x = A·y² + B·y + C
+曲率半径:   R = (1 + (2Ay + B)²)^(3/2) / |2A|
+</code></pre>
+<ul>
+<li>像素坐标系数先转换为真实世界（米）坐标再计算</li>
+<li>曲率半径 &gt; 800 m 视为直道</li>
+<li>颜色编码：绿色=安全，黄色=弯道，红色=偏移过大</li>
+</ul>
+<p><strong>叠加信息</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">信息</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">曲率半径</td>
+<td style="text-align: left;">左右车道线平均曲率半径（米）</td>
+</tr>
+<tr>
+<td style="text-align: left;">车道方向</td>
+<td style="text-align: left;">直行 / 左弯 / 右弯</td>
+</tr>
+<tr>
+<td style="text-align: left;">车辆偏移</td>
+<td style="text-align: left;">车辆相对车道中心的横向偏移（米）</td>
+</tr>
+<tr>
+<td style="text-align: left;">偏移方向</td>
+<td style="text-align: left;">居中 / 偏左 / 偏右</td>
+</tr>
+<tr>
+<td style="text-align: left;">左右线曲率</td>
+<td style="text-align: left;">各车道线独立的曲率半径</td>
+</tr>
+</tbody>
+</table>
+<p><strong>使用方式</strong></p>
+<pre><code class="language-bash"># 图片模式（自动显示曲率与偏移）
+python main.py --mode advanced
+
+# 视频模式（每帧显示曲率与偏移）
+python main.py --mode video --video path/to/video.mp4
+
+# 隐藏曲率信息
+python main.py --mode advanced --no-metrics
+python main.py --mode video --video path/to/video.mp4 --no-metrics
+</code></pre>
 <h2 id="_4">参考</h2>
 <ul>
 <li><a href="https://github.com/OpenHUTB/nn/blob/main/README.md">OpenHUTB/nn 贡献指南</a></li>
