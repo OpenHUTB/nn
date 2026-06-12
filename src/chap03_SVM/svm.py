@@ -1,5 +1,9 @@
 import numpy as np
 import os
+import argparse
+import json
+from pathlib import Path
+from sklearn.preprocessing import StandardScaler
 
 def load_data(fname):
     """载入数据。"""
@@ -13,7 +17,7 @@ def load_data(fname):
             line = line.strip().split()  # 去除空白并按空格分割
             x1 = float(line[0])  # 特征1：例如坐标x
             x2 = float(line[1])  # 特征2：例如坐标y
-            t = int(line[2])     # 标签：0或1
+            t = int(float(line[2]))     # 标签：处理可能存在的浮点数字符串
             data.append([x1, x2, t])
         return np.array(data)  # 返回numpy数组，便于矩阵运算
 
@@ -30,80 +34,130 @@ def eval_acc(label, pred):
     return np.sum(label == pred) / len(pred)  # 正确预测的样本比例
 
 class SVM:
-    """SVM模型：基于最大间隔分类的监督学习算法。"""
-#支持向量机（Support Vector Machine, SVM） 是一种经典的监督学习算法，主要用于分类（也可用于回归和异常检测）。
-    def __init__(self):
-        # 超参数设置
-        self.learning_rate = 0.01  # 控制梯度下降步长
-        self.reg_lambda = 0.01     # L2正则化系数，平衡间隔最大化与分类误差
-        self.max_iter = 1000       # 最大训练迭代次数
-        self.w = None              # 权重向量，决定分类超平面的方向
-        self.b = None              # 偏置项，决定分类超平面的位置
+    """SVM模型：基于最大间隔分类的监督学习算法。
+
+    改进点：
+    1. 修复 predict() 中 y_train_unique 未初始化的 bug
+    2. 添加学习率指数衰减，兼顾快速收敛和精细调优
+    3. 添加训练损失计算与进度打印，便于监控收敛
+    4. 添加早停机制，收敛后自动停止避免浪费计算
+    5. 默认开启 L2 正则化，防止过拟合
+    """
+
+    def __init__(self, learning_rate=0.1, reg_lambda=0.001, max_iter=20000,
+                 lr_decay=0.9995, print_interval=2000, patience=2000):
+        self.learning_rate = learning_rate
+        self.reg_lambda = reg_lambda
+        self.max_iter = max_iter
+        self.lr_decay = lr_decay          # 学习率衰减系数
+        self.print_interval = print_interval  # 打印间隔
+        self.patience = patience          # 早停耐心值（连续无改善的轮数）
+        self.w = None
+        self.b = None
+        self.scaler = StandardScaler()
+
+    def _compute_hinge_loss(self, X, y):
+        """计算 hinge loss + L2 正则化损失"""
+        score = np.dot(X, self.w) + self.b
+        hinge = np.maximum(0, 1 - y * score)
+        return np.mean(hinge) + self.reg_lambda * np.dot(self.w, self.w)
 
     def train(self, data_train):
         """训练SVM模型（基于hinge loss + L2正则化）
-        
-        算法核心：
-        1. 寻找能最大化间隔的超平面 wx + b = 0
-        2. 间隔定义为：样本到超平面的最小距离
-        3. 使用hinge loss处理分类错误和边界样本
-        4. 添加L2正则化防止过拟合
-        """
-        X = data_train[:, :2]         # 提取特征矩阵
-        y = data_train[:, 2]          # 提取标签
-        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，符合SVM理论要求
-        m, n = X.shape                # m:样本数，n:特征数
 
-        # 初始化模型参数
-        self.w = np.zeros(n)  # 权重向量初始化为0
-        self.b = 0            # 偏置项初始化为0
+        改进：
+        - 学习率指数衰减：lr = lr_0 * decay^epoch
+        - 每个 epoch 计算损失并打印进度
+        - 早停：连续 patience 轮损失不再下降则停止
+        """
+        X_raw = data_train[:, :2]
+        y_raw = data_train[:, 2]
+
+        # 记录原始标签空间，供 predict() 使用（修复原 bug）
+        self.label_set = np.unique(y_raw)
+
+        X = self.scaler.fit_transform(X_raw)
+        y = np.where(y_raw <= 0, -1, 1)
+
+        m, n = X.shape
+        self.w = np.zeros(n)
+        self.b = 0
+
+        lr = self.learning_rate
+        best_loss = float('inf')
+        no_improve_count = 0
 
         for epoch in range(self.max_iter):
-            # 计算函数间隔：y(wx+b)，衡量样本到超平面的距离和方向
-            margin = y * (np.dot(X, self.w) + self.b)
-            
-            # 找出违反间隔条件的样本（margin < 1）
-            # 这些样本包括：误分类样本(margin<0)和间隔内样本(0<=margin<1)
+            score = np.dot(X, self.w) + self.b
+            margin = y * score
             idx = np.where(margin < 1)[0]
-            
-            # 如果所有样本都满足margin>=1，说明已找到完美超平面
-            # 移除continue语句，确保即使所有样本都满足间隔条件
-            # 也会更新权重以优化正则化项
 
-            # 计算梯度：正则化项梯度 + 误分类样本梯度
-            # L2正则化：减小权重，防止过拟合
-            # hinge loss梯度：只对误分类和边界样本计算梯度
-            dw = (2 * self.reg_lambda * self.w) - np.sum(y[idx, None] * X[idx], axis=0) / m if len(
-                idx) > 0 else 2 * self.reg_lambda * self.w
-            db = -np.mean(y[idx]) if len(idx) > 0 else 0
+            if len(idx) > 0:
+                dw = (2 * self.reg_lambda * self.w) - np.sum(y[idx, None] * X[idx], axis=0) / m
+                db = -np.mean(y[idx])
+            else:
+                dw = 2 * self.reg_lambda * self.w
+                db = 0
 
-            # 梯度下降更新参数
-            self.w -= self.learning_rate * dw # 权重更新：w = w - η*dw/dw
-            self.b -= self.learning_rate * db # 偏置更新：b = b - η*db/db
-            
-            # 训练逻辑总结：
-            # - 对误分类样本，向正确方向调整超平面
-            # - 对间隔内样本，微调超平面使其远离
-            # - 正则化项约束权重大小，使间隔更平滑
+            self.w -= lr * dw
+            self.b -= lr * db
 
-    def predict(self, x):
+            # 学习率衰减
+            lr = self.learning_rate * (self.lr_decay ** epoch)
+
+            # 定期打印训练进度
+            if (epoch + 1) % self.print_interval == 0 or epoch == 0:
+                loss = self._compute_hinge_loss(X, y)
+                pred = np.where(np.dot(X, self.w) + self.b >= 0, 1, -1)
+                acc = np.mean(pred == y)
+                print(f"  epoch {epoch+1:>6d} | loss: {loss:.4f} | acc: {acc*100:.1f}% | lr: {lr:.6f}")
+
+            # 早停检查：每 print_interval 轮检查一次损失
+            if (epoch + 1) % self.print_interval == 0:
+                loss = self._compute_hinge_loss(X, y)
+                if loss < best_loss - 1e-6:
+                    best_loss = loss
+                    no_improve_count = 0
+                else:
+                    no_improve_count += self.print_interval
+                    if no_improve_count >= self.patience:
+                        print(f"  早停触发于 epoch {epoch+1}，最佳损失: {best_loss:.4f}")
+                        break
+
+    def predict(self, x_raw):
         """预测标签。
-        数学原理:
-        决策函数: f(x) = w·x + b
-        决策边界: w·x + b = 0
-        预测逻辑：
-        1. 计算样本到超平面的有符号距离 wx + b
-        2. 距离为正 -> 预测为正类(1)
-        3. 距离为负 -> 预测为负类(0)
+
+        修复：使用 train() 中记录的 self.label_set 自动判断返回格式，
+        不再依赖 train_with_label_tracking()。
         """
-        score = np.dot(x, self.w) + self.b     # 计算决策函数值
-        return (score >= 0).astype(np.int32)   # 更简洁高效的布尔转整数方法
+        x = self.scaler.transform(x_raw)
+        score = np.dot(x, self.w) + self.b
+        # 根据训练数据的标签空间决定输出格式
+        if -1 in self.label_set:
+            return np.where(score >= 0, 1, -1)
+        else:
+            return np.where(score >= 0, 1, 0)
+
 
 if __name__ == '__main__':
     # 数据加载部分以及数据路径配置
-    base_dir = os.path.dirname(os.path.abspath(__file__))             # 获取当前脚本的绝对路径
-    train_file = os.path.join(base_dir, 'data', 'train_linear.txt')   # 拼接训练数据文件路径
-    test_file = os.path.join(base_dir, 'data', 'test_linear.txt')     # 拼接测试数据文件路径
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    default_train = os.path.join(base_dir, 'data', 'train_linear.txt')
+    default_test = os.path.join(base_dir, 'data', 'test_linear.txt')
+
+    parser = argparse.ArgumentParser(description='Linear SVM training script')
+    parser.add_argument('--train-file', type=str, default=default_train, help='训练集文件路径')
+    parser.add_argument('--test-file', type=str, default=default_test, help='测试集文件路径')
+    parser.add_argument('--learning-rate', type=float, default=0.1, help='学习率')
+    parser.add_argument('--reg-lambda', type=float, default=0.001, help='L2正则化系数')
+    parser.add_argument('--max-iter', type=int, default=20000, help='最大迭代次数')
+    parser.add_argument('--lr-decay', type=float, default=0.9995, help='学习率衰减系数')
+    parser.add_argument('--patience', type=int, default=2000, help='早停耐心值')
+    parser.add_argument('--out-dir', type=str, default='outputs', help='结果输出目录')
+    args = parser.parse_args()
+
+    train_file = args.train_file if os.path.isabs(args.train_file) else os.path.join(base_dir, args.train_file)
+    test_file = args.test_file if os.path.isabs(args.test_file) else os.path.join(base_dir, args.test_file)
 
     # 加载训练数据
     data_train = load_data(train_file)
@@ -111,7 +165,13 @@ if __name__ == '__main__':
     data_test = load_data(test_file)
 
     # 模型训练
-    svm = SVM()            # 初始化SVM模型
+    svm = SVM(
+        learning_rate=args.learning_rate,
+        reg_lambda=args.reg_lambda,
+        max_iter=args.max_iter,
+        lr_decay=args.lr_decay,
+        patience=args.patience,
+    )
     svm.train(data_train)  # 训练模型寻找最优超平面
 
     # 训练集评估
@@ -130,4 +190,23 @@ if __name__ == '__main__':
     
     print("train accuracy: {:.1f}%".format(acc_train * 100))  # 输出训练集准确率
     print("test accuracy: {:.1f}%".format(acc_test * 100))  # 输出测试集准确率
+
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    metrics_path = out_dir / 'svm_metrics.json'
+    metrics = {
+        'train_accuracy': float(acc_train),
+        'test_accuracy': float(acc_test),
+        'learning_rate': float(args.learning_rate),
+        'reg_lambda': float(args.reg_lambda),
+        'max_iter': int(args.max_iter),
+        'lr_decay': float(args.lr_decay),
+        'patience': int(args.patience),
+        'train_file': str(train_file),
+        'test_file': str(test_file),
+    }
+    with metrics_path.open('w', encoding='utf-8') as f:
+        json.dump(metrics, f, ensure_ascii=False, indent=2)
+    print(f"metrics saved: {metrics_path.resolve()}")
 

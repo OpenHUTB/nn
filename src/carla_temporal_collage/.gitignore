@@ -1,0 +1,5 @@
+# 虚拟环境目录
+venv/
+venv37/
+*.pyc
+__pycache__/

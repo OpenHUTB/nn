@@ -1,0 +1,12 @@
+{
+  "source": "CARLA LiDAR point cloud sample",
+  "points": 96,
+  "clusters": 3,
+  "danger_clusters": 1,
+  "max_risk": 0.5389,
+  "generated_files": [
+    "carla_lidar_clusters.png",
+    "carla_lidar_risk_rank.png",
+    "carla_lidar_cluster_risk.csv"
+  ]
+}

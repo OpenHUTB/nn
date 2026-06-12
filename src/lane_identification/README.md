@@ -5,24 +5,29 @@
 ## 功能特性
 
 ### 🛣️ 道路检测能力
-- **轮廓检测**：基于颜色分割和形态学操作，精确识别道路区域
-- **弯曲道路识别**：采用凸包算法处理弯曲道路轮廓
-- **多方法融合**：结合轮廓检测和车道线检测，提高识别鲁棒性
+- **多模式输入**：支持单张图像、视频文件和摄像头实时流处理
+- **车道线检测**：基于边缘检测和霍夫变换精确识别车道线
+- **方向分析**：智能分析车道线几何特征判断行驶方向
+- **批量处理**：支持文件夹批量图像处理
 
 ### 🧭 方向判断
 - **智能方向识别**：自动判断左转、右转或直行方向
-- **轮廓分析**：通过道路轮廓的几何特征判断方向
-- **车道线分析**：基于车道线交汇点进行方向验证
+- **置信度校准**：基于历史数据动态调整置信度评估
+- **质量评估**：多维度评估检测结果可靠性
+- **场景适配**：支持高速公路、城市道路、乡村道路等不同场景
 
 ### 🎨 可视化界面
 - **用户友好GUI**：基于 Tkinter 的图形界面，操作简单直观
-- **双图对比**：同时显示原图和道路轮廓标出结果
-- **实时反馈**：显示检测状态、方向结果和置信度信息
+- **双图对比**：同时显示原图和检测结果
+- **实时反馈**：显示检测状态、方向结果、置信度和FPS信息
+- **性能监控**：独立的性能监控窗口，实时查看系统状态
 
 ### 🔧 技术特点
-- **自适应处理**：支持不同分辨率、光照条件的道路图片
-- **回退机制**：当主要算法失效时自动切换备用方案
-- **参数可调**：关键参数易于调整以适应不同场景
+- **模块化架构**：清晰的服务层设计，易于扩展和维护
+- **配置管理**：JSON配置文件支持，支持热重载
+- **异常恢复**：自动错误检测和恢复机制
+- **性能优化**：帧缓冲、自适应跳帧等优化策略
+- **数据导出**：支持图片、JSON、CSV多种格式导出
 
 ## 环境要求
 
@@ -50,7 +55,7 @@ pip install tkinter  # 通常Python自带
    ```
 3. 运行主程序：
    ```bash
-   python lane_detection_app.py
+   python software_package\main.py
    ```
 
 ### 方法二：从源码构建
@@ -68,7 +73,7 @@ pip install tkinter  # 通常Python自带
 3. 安装依赖并运行：
    ```bash
    pip install -r requirements.txt
-   python lane_detection_app.py
+   python software_package\main.py
    ```
 
 ## 快速开始
@@ -151,7 +156,7 @@ if __name__ == "__main__":
 ## 使用说明
 
 ### 基本操作流程
-1. **启动应用**：运行 `lane_detection_app.py`
+1. **启动应用**：运行 `software_package\main.py`
 2. **选择图片**：点击"选择道路图片"按钮，选择要分析的图像文件
 3. **查看原图**：原图将显示在左侧面板
 4. **开始检测**：点击"检测道路方向"按钮开始分析
@@ -282,25 +287,28 @@ def determine_direction(contour, image_width, image_height):
 ## 项目结构
 
 ```
-lane-direction-detection/
-│
-├── lane_detection_app.py      # 主应用程序
-├── requirements.txt           # 依赖包列表
-├── README.md                 # 项目说明文档
-│
-├── examples/                 # 示例图片
-│   ├── straight_road.jpg
-│   ├── left_turn.jpg
-│   └── right_turn.jpg
-│
-├── utils/                    # 工具函数
-│   ├── image_processing.py
-│   ├── contour_analysis.py
-│   └── visualization.py
-│
-└── docs/                     # 文档资料
-    ├── algorithm_explanation.md
-    └── user_manual.md
+lane_identification/ 
+│ ├── software_package/        # 主程序包 
+│ ├── main.py                  # 主应用程序入口 
+│ ├── config.py                # 配置管理模块 
+│ ├── detection_service.py     # 检测服务核心 
+│ ├── lane_detector.py         # 车道线检测器 
+│ ├── direction_analyzer.py    # 方向分析器 
+│ ├── image_processor.py       # 图像处理器 
+│ ├── video_processor.py       # 视频处理器 
+│ ├── visualizer.py            # 可视化工具 
+│ ├── batch_processor.py       # 批量处理器 
+│ ├── confidence_calibrator.py # 置信度校准器 
+│ ├── quality_evaluator.py     # 质量评估器 
+│ ├── export_manager.py        # 导出管理器 
+│ ├── performance_window.py    # 性能监控窗口 
+│ └── utils.py                 # 工具函数 
+│ 
+├── lane_venv/                 # Python虚拟环境（git忽略） 
+├── app_config.json            # 应用配置文件 
+├── requirements.txt           # 依赖包列表 
+├── README.md                  # 项目说明文档 
+└── .gitignore                 # Git忽略配置
 ```
 
 ## 参数调整指南
