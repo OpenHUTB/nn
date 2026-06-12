@@ -171,6 +171,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/autonomous_vehicle_monitor/monitor/</loc>
+         <lastmod>2026-06-12</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_2d_deeprl/</loc>
          <lastmod>2026-06-12</lastmod>
          <changefreq>daily</changefreq>

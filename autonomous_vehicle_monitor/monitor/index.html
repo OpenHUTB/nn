@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/autonomous_vehicle_monitor/monitor/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>CARLA  自动驾驶系统辅助监控器 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "CARLA  \u81ea\u52a8\u9a7e\u9a76\u7cfb\u7edf\u8f85\u52a9\u76d1\u63a7\u5668";
+        var mkdocs_page_input_path = "autonomous_vehicle_monitor/monitor.md";
+        var mkdocs_page_url = "/nn/autonomous_vehicle_monitor/monitor/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">CARLA  自动驾驶系统辅助监控器</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/autonomous_vehicle_monitor/monitor.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla">CARLA  自动驾驶系统辅助监控器</h1>
+<p align="center">
+  <strong>多传感器融合 · 环境感知 · 安全预警 · 自动化评估</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.7~3.10-blue" alt="Python">
+  <img src="https://img.shields.io/badge/CARLA-0.9.12+-green" alt="CARLA">
+  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
+</p>
+
+<hr />
+<h2 id="_1">目录</h2>
+<ul>
+<li><a href="#项目概述"> 项目概述</a></li>
+<li><a href="#系统架构"> 系统架构</a></li>
+<li><a href="#核心功能详解"> 核心功能详解</a></li>
+<li><a href="#1-多传感器融合感知">1. 多传感器融合感知</a></li>
+<li><a href="#2-多环境与天气模拟">2. 多环境与天气模拟</a></li>
+<li><a href="#3-安全预警系统">3. 安全预警系统</a></li>
+<li><a href="#4-极端危险场景自动生成">4. 极端危险场景自动生成</a></li>
+<li><a href="#5-kpi-自动化评估与报告">5. KPI 自动化评估与报告</a></li>
+<li><a href="#6-数据记录与回放">6. 数据记录与回放</a></li>
+<li><a href="#7-可视化界面">7. 可视化界面</a></li>
+<li><a href="#项目结构"> 项目结构</a></li>
+<li><a href="#运行环境与依赖"> 运行环境与依赖</a></li>
+<li><a href="#快速启动"> 快速启动</a></li>
+<li><a href="#按键操作说明"> 按键操作说明</a></li>
+<li><a href="#适用场景与价值"> 适用场景与价值</a></li>
+<li><a href="#扩展方向"> 扩展方向</a></li>
+<li><a href="#license"> License</a></li>
+</ul>
+<hr />
+<h2 id="_2">项目概述</h2>
+<p>本项目基于 <a href="http://carla.org/">CARLA</a> 开源自动驾驶仿真平台，构建了一套完整的多传感器融合、环境感知、安全预警与自动化评估系统。项目覆盖从传感器数据采集、多环境场景模拟、危险行为检测到性能指标量化评估的全链路，可用于自动驾驶算法验证、边界场景测试、毕业设计与教学演示。</p>
+<p><strong>核心亮点：</strong></p>
+<ul>
+<li>多传感器融合：四路 RGB 相机 + 激光雷达点云 + BEV 鸟瞰图</li>
+<li>多环境模拟：晴天 / 雨天 / 雾天 / 夜间一键切换</li>
+<li>安全预警：前车碰撞预警（FCW）、车道偏离检测、红绿灯监测</li>
+<li>危险场景：自动生成急刹、鬼探头、加塞、落物等极端工况</li>
+<li>KPI 评估：碰撞率、车道保持率、TTC 等指标自动计算与报告生成</li>
+<li>数据回放：黑匣子记录 + 场景录制/回放</li>
+</ul>
+<hr />
+<h2 id="_3">系统架构</h2>
+<p>系统采用模块化设计，各功能解耦为独立模块，由 <code>main.py</code> 统一调度：</p>
+<p align="center">
+  <img src="../images/1.gif"  width="150%">
+</p>
+
+<hr />
+<h2 id="_4">核心功能详解</h2>
+<h3 id="1">1. 多传感器融合感知</h3>
+<p align="center">
+  <img src="../images/carla_sensors.gif"  width="50%">
+</p>
+
+<p>系统部署了多类传感器，构建车辆周围 360° 的感知能力：</p>
+<p align="center">
+  <img src="../images/2.gif"  width="150%">
+</p>
+
+<ul>
+<li><strong>四路 RGB 相机</strong>：前、后、左、右四视角实时画面拼接，提供车辆全向环境视图，消除盲区</li>
+<li><strong>激光雷达点云可视化</strong>：将三维点云投影到 BEV（鸟瞰图），以颜色编码区分障碍物距离，直观展示周边障碍物分布</li>
+<li><strong>车道线与可行驶区域绘制</strong>：结合 CARLA 地图 Waypoint 信息，在 BEV 中高亮车道边界与可行驶区域，辅助判断车道偏离</li>
+</ul>
+<blockquote>
+<p><strong>设计思路</strong>：多传感器融合是自动驾驶感知的基础。通过相机获取丰富纹理信息，激光雷达获取精确距离信息，BEV 视角提供全局态势感知，三者互补构成完整的感知链路。</p>
+</blockquote>
+<h3 id="2">2. 多环境与天气模拟</h3>
+<p>支持一键切换四种典型天气环境，模拟不同光照与路面条件：</p>
+<table>
+<thead>
+<tr>
+<th>天气模式</th>
+<th>光照条件</th>
+<th>路面状态</th>
+<th>感知影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>晴天</td>
+<td>充足自然光</td>
+<td>干燥</td>
+<td>基准环境，感知最佳</td>
+</tr>
+<tr>
+<td>雨天</td>
+<td>光照减弱</td>
+<td>湿滑积水</td>
+<td>相机清晰度下降，雷达噪点增加</td>
+</tr>
+<tr>
+<td>雾天</td>
+<td>严重散射</td>
+<td>微湿</td>
+<td>能见度骤降，远距目标丢失</td>
+</tr>
+<tr>
+<td>夜间</td>
+<td>仅有车灯</td>
+<td>干燥</td>
+<td>相机暗噪增加，远距感知受限</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>应用场景</strong>：天气模拟可用于验证感知算法在不同环境下的鲁棒性。例如测试雨雾天气下的目标检测准确率衰减，或夜间场景下的车道线识别能力。</p>
+</blockquote>
+<h3 id="3">3. 安全预警系统</h3>
+<p align="center">
+  <img src="../images/carla_fcw.gif" alt="Safety Warning System" width="50%">
+</p>
+
+<p>实时监控车辆行驶安全状态，提供多维度预警：</p>
+<p align="center">
+  <img src="../images/3.gif"  width="150%">
+</p>
+
+<ul>
+<li><strong>前车碰撞预警（FCW）</strong>：实时计算与前车的距离和碰撞时间（TTC），当距离过近时，屏幕闪烁红/黄告警文字，提示危险等级</li>
+<li>黄色预警：TTC &lt; 3s，提醒注意</li>
+<li>红色告警：TTC &lt; 1.5s，紧急危险</li>
+<li><strong>车道偏离检测</strong>：基于地图 Waypoint 判断车辆是否压线，为车道保持率指标提供数据支持</li>
+<li><strong>红绿灯状态监测</strong>：实时获取前方红绿灯状态，并在仪表盘上方可视化显示，支持红灯停、绿灯行的场景验证</li>
+</ul>
+<h3 id="4">4. 极端危险场景自动生成</h3>
+<p>系统可随机触发四类高危场景，用于算法边界性能测试：</p>
+<p align="center">
+  <img src="../images/4.gif"  width="150%">
+</p>
+
+<table>
+<thead>
+<tr>
+<th>场景类型</th>
+<th>英文标识</th>
+<th>触发方式</th>
+<th>测试目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前车急刹</td>
+<td>Sudden Brake</td>
+<td>前方车辆突然减速</td>
+<td>紧急制动响应</td>
+</tr>
+<tr>
+<td>鬼探头行人</td>
+<td>Pedestrian Jump</td>
+<td>行人从遮挡物后方突然出现</td>
+<td>行人检测与避让</td>
+</tr>
+<tr>
+<td>近距离加塞</td>
+<td>Car Cut-in</td>
+<td>旁车突然切入本车道</td>
+<td>变道冲突处理</td>
+</tr>
+<tr>
+<td>道路落物</td>
+<td>Static Obstacle</td>
+<td>前方出现静止障碍物</td>
+<td>静态障碍物识别</td>
+</tr>
+</tbody>
+</table>
+<p>场景触发后，系统自动记录 KPI 变化，便于对比不同算法在极端工况下的表现差异。</p>
+<h3 id="5-kpi">5. KPI 自动化评估与报告</h3>
+<p>系统实时计算并记录多项关键性能指标，程序退出时自动生成 <code>kpi_report.txt</code> 报告：</p>
+<p align="center">
+  <img src="../images/5.gif"  width="150%">
+</p>
+
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>说明</th>
+<th>评估维度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>碰撞次数</td>
+<td>仿真过程中发生的碰撞事件总数</td>
+<td>安全性</td>
+</tr>
+<tr>
+<td>车道保持率</td>
+<td>车辆保持在车道内的时间占比</td>
+<td>稳定性</td>
+</tr>
+<tr>
+<td>最小 TTC</td>
+<td>全程与前车的最小碰撞时间（Time-To-Collision）</td>
+<td>安全裕度</td>
+</tr>
+<tr>
+<td>急加速/急减速次数</td>
+<td>超过阈值的加减速行为次数</td>
+<td>舒适性</td>
+</tr>
+<tr>
+<td>平均速度</td>
+<td>仿真期间的平均车速</td>
+<td>效率</td>
+</tr>
+<tr>
+<td>通行效率</td>
+<td>基于平均车速的通行效率评分</td>
+<td>综合效率</td>
+</tr>
+</tbody>
+</table>
+<p>所有指标实时显示在监控画面右上角，支持过程观察与事后复盘。</p>
+<h3 id="6">6. 数据记录与回放</h3>
+<p align="center">
+  <img src="../images/5.gif"  width="150%">
+</p>
+
+<ul>
+<li><strong>黑匣子数据记录</strong>：将车辆位置、速度、航向角、加速度等数据持续写入 <code>blackbox.csv</code>，支持事后分析与轨迹复现</li>
+<li><strong>场景录制与回放</strong>：支持按键快捷操作，便于复现特定工况</li>
+<li><code>R</code> 键 → 开始录制</li>
+<li><code>S</code> 键 → 停止录制并保存</li>
+<li><code>P</code> 键 → 回放已保存的场景</li>
+</ul>
+<h3 id="7">7. 可视化界面</h3>
+<p align="center">
+  <img src="../images/carla_dashboard.gif" alt="Visualization Interface" width="60%">
+</p>
+
+<ul>
+<li><strong>主监控窗口</strong>：四路相机拼接 + BEV 鸟瞰图 + KPI 指标面板 + 告警信息，一站式掌控全局</li>
+<li><strong>仪表盘窗口</strong>：实时显示车速、红绿灯状态，界面清晰直观，模拟真实驾驶体验</li>
+</ul>
+<hr />
+<h2 id="_5">项目结构</h2>
+<pre><code>carla-rl-project-main/
+├── main.py                      # 主程序入口，统一调度各模块
+├── requirements.txt             # 项目依赖库
+├── README.md                    # 项目说明文档
+└── core/                        # 模块化功能目录
+    ├── __init__.py              # 模块初始化
+    ├── sensors.py               # 相机与激光雷达管理
+    ├── npc_manager.py           # NPC车辆与行人生成管理
+    ├── recorder.py              # 场景录制
+    ├── player.py                # 场景回放控制
+    ├── blackbox.py              # 车辆数据黑匣子记录
+    ├── map_drawer.py            # BEV鸟瞰图与车道绘制
+    ├── ui_dashboard.py          # 虚拟仪表盘
+    ├── traffic_light_monitor.py # 红绿灯状态监测
+    ├── kpi_evaluator.py         # KPI指标自动评估
+    └── hazard_manager.py        # 极端危险场景生成
+</code></pre>
+<hr />
+<h2 id="_6">运行环境与依赖</h2>
+<h3 id="_7">基础环境</h3>
+<table>
+<thead>
+<tr>
+<th>依赖项</th>
+<th>版本要求</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>3.7 ~ 3.10</td>
+<td>推荐 3.8+</td>
+</tr>
+<tr>
+<td>CARLA</td>
+<td>0.9.12+</td>
+<td>推荐 0.9.16</td>
+</tr>
+<tr>
+<td>操作系统</td>
+<td>Windows / Linux</td>
+<td>需支持 CARLA 模拟器</td>
+</tr>
+</tbody>
+</table>
+<h3 id="python">Python 依赖库</h3>
+<pre><code>numpy&gt;=1.21.0
+opencv-python&gt;=4.5.5.62
+carla&gt;=0.9.14
+</code></pre>
+<hr />
+<h2 id="_8">快速启动</h2>
+<h3 id="1-carla">1. 安装 CARLA 模拟器</h3>
+<p>从 <a href="https://github.com/carla-simulator/carla/releases">CARLA Release</a> 下载对应版本，解压后运行：</p>
+<pre><code class="language-bash"># Linux
+./CarlaUE4.sh
+
+# Windows
+CarlaUE4.exe
+</code></pre>
+<p>等待地图加载完成，出现仿真窗口即表示启动成功。</p>
+<h3 id="2-python">2. 安装 Python 依赖</h3>
+<pre><code class="language-bash">pip install -r requirements.txt
+</code></pre>
+<blockquote>
+<p><strong>注意</strong>：<code>carla</code> Python 包的版本需与 CARLA 模拟器版本匹配。CARLA 0.9.14+ 对应 <code>carla&gt;=0.9.14</code>。</p>
+</blockquote>
+<h3 id="3_1">3. 运行主程序</h3>
+<pre><code class="language-bash">python main.py
+</code></pre>
+<p>启动后会出现两个窗口：主监控窗口（四路相机 + BEV + KPI）和仪表盘窗口（车速 + 红绿灯）。</p>
+<hr />
+<h2 id="_9">按键操作说明</h2>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+<th>分类</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n</code></td>
+<td>切换白天/夜间模式</td>
+<td>天气控制</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>开启雨天模式</td>
+<td>天气控制</td>
+</tr>
+<tr>
+<td><code>f</code></td>
+<td>开启雾天模式</td>
+<td>天气控制</td>
+</tr>
+<tr>
+<td><code>c</code></td>
+<td>恢复为晴天</td>
+<td>天气控制</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>开始录制场景</td>
+<td>录制回放</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>停止录制并保存</td>
+<td>录制回放</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>回放已保存的场景</td>
+<td>录制回放</td>
+</tr>
+<tr>
+<td><code>ESC</code></td>
+<td>退出程序</td>
+<td>系统控制</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_10">适用场景与价值</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>毕业设计/课程设计</td>
+<td>完整的系统架构与功能模块，可直接作为课程设计或毕设项目，覆盖感知、决策、评估全链路</td>
+</tr>
+<tr>
+<td>算法验证平台</td>
+<td>支持不同天气、高危场景下的自动驾驶算法性能测试与对比，快速迭代验证</td>
+</tr>
+<tr>
+<td>教学演示</td>
+<td>直观的可视化界面，适合向他人展示自动驾驶感知与安全预警的基本原理</td>
+</tr>
+<tr>
+<td>未来扩展</td>
+<td>模块化设计预留了控制算法接口，可快速接入 PID、MPC 或强化学习控制器</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_11">扩展方向</h2>
+<p>本项目采用模块化架构，预留了多个扩展接口，欢迎在此基础上进行二次开发：</p>
+<ul>
+<li><strong>控制算法接入</strong>：在 <code>core/</code> 下新增控制器模块，接入 PID / MPC / 强化学习等控制算法</li>
+<li><strong>更多传感器</strong>：扩展 <code>sensors.py</code>，添加深度相机、GNSS、IMU 等传感器</li>
+<li><strong>场景库扩充</strong>：在 <code>hazard_manager.py</code> 中添加更多危险场景模板</li>
+<li><strong>多车协同</strong>：基于 <code>npc_manager.py</code> 扩展多车通信与协同决策</li>
+<li><strong>ROS 桥接</strong>：通过 CARLA ROS Bridge 将数据发布到 ROS 生态，对接更丰富的算法栈</li>
+</ul>
+<hr />
+<h2 id="license">License</h2>
+<p>本项目基于 CARLA 开源平台构建，遵循 <a href="LICENSE">MIT License</a>。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
