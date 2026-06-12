@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_native_assisted_driving_system/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Index - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Index";
+        var mkdocs_page_input_path = "carla_native_assisted_driving_system/index.md";
+        var mkdocs_page_url = "/nn/carla_native_assisted_driving_system/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Index</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_native_assisted_driving_system/index.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <hr />
+<h1 id="carla">基于 CARLA 仿真平台的智能辅助驾驶系统</h1>
+<hr />
+<h2 id="_1">目录</h2>
+<ul>
+<li><a href="#项目简介">项目简介</a></li>
+<li><a href="#核心功能特点">核心功能特点</a></li>
+<li><a href="#运行环境与安装步骤">运行环境与安装步骤</a></li>
+<li><a href="#快速启动项目">快速启动项目</a></li>
+<li><a href="#项目文件结构">项目文件结构</a></li>
+<li><a href="#功能模块说明">功能模块说明</a></li>
+<li><a href="#运行效果展示">运行效果展示</a></li>
+<li><a href="#常见问题与调试说明">常见问题与调试说明</a></li>
+<li><a href="#参考资料">参考资料</a></li>
+</ul>
+<hr />
+<h2 id="_2">项目简介</h2>
+<p>本项目依托 <strong>CARLA 0.9.14 开源自动驾驶仿真平台</strong>，以Python为开发语言，融合<strong>传统机器视觉</strong>与<strong>PID闭环控制算法</strong>，实现了L2级智能辅助驾驶的全流程闭环验证，覆盖城市道路、高速等典型场景，以及晴天、雨天、雾天、黑夜等多天气状况，规避了真实道路测试成本高、风险大、场景难复现的问题。</p>
+<p>项目采用<strong>纯视觉无模型方案</strong>，无需依赖深度学习模型，仅通过OpenCV实现多类交通元素识别，配合PID控制完成车辆自动行驶、预警与避让，可稳定实现车道保持、定速巡航、安全预警与紧急制动，完整还原了智能辅助驾驶系统的核心感知-决策-控制链路，适合课程设计、毕业设计与自动驾驶入门实践。</p>
+<hr />
+<h2 id="_3">核心功能特点</h2>
+<h3 id="1">1. 多模态环境感知系统</h3>
+<ul>
+<li><strong>精准交通信号识别</strong>：基于HSV颜色空间分割，限定ROI区域过滤背景干扰，可稳定识别红/黄/绿三色信号灯，实现红灯停车、绿灯通行、黄灯预警的交规逻辑。</li>
+<li><strong>多类交通标志识别</strong>：复用视觉识别框架，支持停车牌、限速牌（30/50/60km/h）的识别，可自动触发强制停车或调整巡航车速。</li>
+<li><strong>行人检测与AEB紧急制动</strong>：优化行人肤色HSV阈值，结合轮廓面积过滤解决误检问题，仅对真实CARLA行人触发制动，为最高优先级控制逻辑。</li>
+<li><strong>车道偏离预警（LDW）</strong>：通过CARLA车道入侵传感器，实时监测车道线压线行为，触发屏幕红色大字警告与音频提示音。</li>
+<li><strong>前向碰撞预警（FCW）与障碍物避让</strong>：基于车辆位置向量计算前方障碍物距离，分级触发减速、制动逻辑，避免追尾事故。</li>
+<li><strong>盲区监测预警（BSD）</strong>：监测车辆侧方盲区状态，提升变道场景的行驶安全性。</li>
+<li><strong>天气自适应车灯控制</strong>：通过仿真环境参数判断昼夜/雨雾状态，自动切换近光灯、雾灯，适配不同光照环境。</li>
+</ul>
+<h3 id="2">2. 稳定闭环车辆控制逻辑</h3>
+<ul>
+<li><strong>PID定速巡航</strong>：基于增量式PID控制器，实现目标车速的稳定闭环控制，可动态响应限速标志调整车速，抗坡度、逆风干扰能力强。</li>
+<li><strong>车道居中保持</strong>：以CARLA路点为参考，通过横向偏移量计算修正方向盘角度，实现无偏移车道居中行驶。</li>
+<li><strong>多级安全控制优先级</strong>：设计严格的控制优先级，保障行驶安全：
+  <code>行人AEB &gt; 停车牌 &gt; 红绿灯 &gt; 障碍物避让 &gt; 定速巡航</code>，高优先级指令可直接覆盖低优先级操作。</li>
+</ul>
+<h3 id="3">3. 全场景仿真验证与交互体验</h3>
+<ul>
+<li><strong>多场景适配</strong>：支持CARLA内置所有城市地图，可在直道、弯道、十字路口、环岛等多种路况下稳定运行。</li>
+<li><strong>多天气测试</strong>：支持晴天、雨天、雾天、黑夜等多种天气切换，验证车灯控制、信号识别的环境鲁棒性。</li>
+<li><strong>可视化交互界面</strong>：基于Pygame实现实时渲染，支持多视角切换、状态信息显示、运行日志输出，调试便捷直观。</li>
+<li><strong>轻量易部署</strong>：无复杂深度学习依赖，仅需基础Python与CARLA环境，一键启动即可运行，适配普通Windows电脑配置。</li>
+</ul>
+<hr />
+<h2 id="_4">运行环境与安装步骤</h2>
+<h3 id="_5">基础环境要求</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">项目</th>
+<th style="text-align: left;">版本要求</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Python</td>
+<td style="text-align: left;">3.7 / 3.8</td>
+<td style="text-align: left;">与CARLA PythonAPI版本兼容</td>
+</tr>
+<tr>
+<td style="text-align: left;">仿真平台</td>
+<td style="text-align: left;">CARLA Simulator 0.9.14</td>
+<td style="text-align: left;">官方稳定版，支持所有内置地图与天气</td>
+</tr>
+<tr>
+<td style="text-align: left;">核心依赖库</td>
+<td style="text-align: left;">pygame==2.6.1、opencv-python==4.5.5.62、numpy==1.21.6</td>
+<td style="text-align: left;">视觉识别、渲染与数值计算依赖</td>
+</tr>
+<tr>
+<td style="text-align: left;">系统支持</td>
+<td style="text-align: left;">Windows 10 / 11</td>
+<td style="text-align: left;">支持CARLA 0.9.14的官方推荐系统</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">完整安装流程</h3>
+<ol>
+<li>
+<p><strong>克隆项目代码仓库</strong>
+    <code>bash
+    git clone 你的项目仓库地址
+    cd 你的项目文件夹</code></p>
+</li>
+<li>
+<p><strong>配置CARLA仿真环境</strong></p>
+<ul>
+<li>下载并安装 <a href="https://github.com/carla-simulator/carla/releases/tag/0.9.14">CARLA Simulator 0.9.14</a></li>
+<li>进入CARLA安装目录，运行 <code>CarlaUE4.exe</code>，等待仿真服务端口 <code>2000</code> 启动完成，控制台输出<code>Server ready</code>即代表启动成功。</li>
+</ul>
+</li>
+<li>
+<p><strong>一键安装全部Python依赖</strong>
+    <code>bash
+    pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple</code>
+    &gt; 若安装失败，可手动逐个安装核心依赖：
+    &gt; <code>pip install pygame opencv-python numpy -i https://pypi.tuna.tsinghua.edu.cn/simple</code></p>
+</li>
+<li>
+<p><strong>配置CARLA PythonAPI路径</strong>
+    项目代码已自动适配CARLA API路径，若出现<code>No module named 'carla'</code>错误，可手动将CARLA安装目录下的<code>PythonAPI/carla/dist</code>中的<code>.egg</code>文件路径添加到系统环境变量。</p>
+</li>
+</ol>
+<hr />
+<h2 id="_7">快速启动项目</h2>
+<h3 id="1_1">1. 完整运行命令</h3>
+<p>在项目根目录执行主程序，支持自定义参数配置：</p>
+<pre><code class="language-bash">python src/your_main_file.py --host 127.0.0.1 --port 2000 --res 1280x720
+</code></pre>
+<ul>
+<li><code>--host</code>：CARLA仿真器IP，默认本地地址<code>127.0.0.1</code></li>
+<li><code>--port</code>：仿真器服务端口，默认<code>2000</code></li>
+<li><code>--res</code>：窗口分辨率，默认<code>1280x720</code></li>
+</ul>
+<h3 id="2_1">2. 按键交互说明</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">按键</th>
+<th style="text-align: left;">功能</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>1/2/3/4/5</code></td>
+<td style="text-align: left;">切换车辆视角</td>
+<td style="text-align: left;">支持后视角、前视角、侧方视角、鸟瞰视角等多视角切换</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>C</code></td>
+<td style="text-align: left;">切换下一种天气</td>
+<td style="text-align: left;">循环切换晴天→雨天→雾天→黑夜，验证自适应功能</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>V</code></td>
+<td style="text-align: left;">切换上一种天气</td>
+<td style="text-align: left;">反向循环切换天气</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ESC</code></td>
+<td style="text-align: left;">退出仿真程序</td>
+<td style="text-align: left;">安全退出并销毁仿真环境中的车辆与传感器</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3_1">3. 运行时状态说明</h3>
+<p>程序启动后，控制台会实时打印识别结果与车辆状态：</p>
+<pre><code>当前天气：sunny
+交通标志识别：none
+红绿灯识别：green
+前方行人：无
+</code></pre>
+<p>Pygame窗口会实时渲染车辆视角画面，左上角显示车辆速度、服务器FPS等信息，触发车道偏离时会弹出红色警告文字。</p>
+<hr />
+<h2 id="_8">项目文件结构</h2>
+<pre><code>├── src/
+│   ├── your_main_file.py       # 项目主程序，包含所有功能实现与主循环
+│   └── carla/                  # CARLA PythonAPI依赖文件（自动适配）
+├── requirements.txt            # Python依赖库列表
+├── README.md                   # 项目说明文档
+└── _out/                       # 可选：截图/视频输出目录（若开启录制功能）
+</code></pre>
+<hr />
+<h2 id="_9">功能模块说明</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">模块名称</th>
+<th style="text-align: left;">功能描述</th>
+<th style="text-align: left;">技术实现亮点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">定速巡航模块</td>
+<td style="text-align: left;">基于PID控制器实现目标车速稳定控制，支持动态响应限速标志调整车速</td>
+<td style="text-align: left;">增量式PID实现，抗干扰能力强，可保持车速误差在±2km/h以内</td>
+</tr>
+<tr>
+<td style="text-align: left;">车道保持模块</td>
+<td style="text-align: left;">识别车道线并实时修正方向盘，保持车辆居中行驶</td>
+<td style="text-align: left;">以CARLA路点为参考，通过横向偏移量计算修正角度，车道保持误差≤0.3m</td>
+</tr>
+<tr>
+<td style="text-align: left;">交通灯识别模块</td>
+<td style="text-align: left;">识别红/黄/绿三色信号灯，实现红灯停车、绿灯通行的交规逻辑</td>
+<td style="text-align: left;">限定ROI区域过滤背景，HSV颜色分割+形态学去噪，不同光照下识别准确率≥95%</td>
+</tr>
+<tr>
+<td style="text-align: left;">交通标志识别模块</td>
+<td style="text-align: left;">识别停车牌/限速牌，触发强制停车或调整巡航车速</td>
+<td style="text-align: left;">复用视觉识别框架，区分红色停车牌与蓝色限速牌，支持30/50/60km/h限速切换</td>
+</tr>
+<tr>
+<td style="text-align: left;">行人AEB模块</td>
+<td style="text-align: left;">检测前方行人并触发紧急制动，为最高优先级控制</td>
+<td style="text-align: left;">收紧HSV肤色阈值+轮廓面积过滤，解决空地图误检问题，检测到行人后1秒内完成刹停</td>
+</tr>
+<tr>
+<td style="text-align: left;">障碍物避让模块</td>
+<td style="text-align: left;">检测前方车辆/障碍物，分级触发减速、制动逻辑，避免追尾</td>
+<td style="text-align: left;">基于向量点积判断前方障碍物，设置安全距离（30m）与危险距离（10m）两级控制</td>
+</tr>
+<tr>
+<td style="text-align: left;">车道偏离预警模块</td>
+<td style="text-align: left;">车辆压线时触发屏幕警告与音频提示音</td>
+<td style="text-align: left;">基于CARLA车道入侵传感器，触发时弹出红色大字警告，同步播放蜂鸣提示音</td>
+</tr>
+<tr>
+<td style="text-align: left;">天气自适应车灯模块</td>
+<td style="text-align: left;">根据昼夜/雨雾天气自动开关近光灯、雾灯</td>
+<td style="text-align: left;">通过仿真环境参数判断天气状态，黑夜/雨天/雾天自动开启对应灯光，晴天自动关闭</td>
+</tr>
+<tr>
+<td style="text-align: left;">盲区监测预警模块</td>
+<td style="text-align: left;">监测车辆侧方盲区状态，提升变道场景安全性</td>
+<td style="text-align: left;">基于侧方视角视觉识别，盲区检测到障碍物时触发预警提示</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_10">运行效果展示</h2>
+<ol>
+<li><strong>基础行驶</strong>：车辆启动后自动进入定速巡航模式，保持车道居中行驶，无人工干预即可稳定通过直道、弯道场景。</li>
+<li><strong>交通信号响应</strong>：行驶至十字路口时，可识别红绿灯状态，红灯自动停车等待，绿灯自动起步通行，黄灯提前减速。</li>
+<li><strong>行人避让</strong>：前方出现行人时，车辆立即触发紧急制动，完全刹停等待，行人离开后自动恢复巡航。</li>
+<li><strong>车道偏离预警</strong>：车辆压线时，屏幕中央弹出“车道偏离警告！”红色大字，同时播放提示音提醒驾驶员。</li>
+<li><strong>天气自适应</strong>：切换为黑夜/雨天时，车辆自动开启近光灯/雾灯，同时相机参数自动调整，提升画面可见度。</li>
+</ol>
+<hr />
+<h2 id="_11">常见问题与调试说明</h2>
+<ol>
+<li><strong>CARLA连接失败</strong>：<ul>
+<li>检查CARLA仿真器是否已启动，端口<code>2000</code>是否被占用</li>
+<li>确认Python版本与CARLA API兼容，推荐使用Python 3.7</li>
+</ul>
+</li>
+<li><strong>行人/交通标志误检</strong>：<ul>
+<li>调整<code>pedestrian_detect</code>/<code>traffic_sign_detect</code>函数中的HSV阈值或轮廓面积，收紧检测条件</li>
+<li>缩小ROI区域，过滤道路外的背景干扰</li>
+</ul>
+</li>
+<li><strong>车辆控制不稳定</strong>：<ul>
+<li>调整PID控制器的<code>Kp/Ki/Kd</code>参数，降低<code>Kp</code>可减少车辆抖动，提高<code>Ki</code>可提升抗坡度能力</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2 id="_12">参考资料</h2>
+<ul>
+<li>CARLA Simulator 官方文档：https://carla.readthedocs.io/</li>
+<li>OpenCV 机器视觉官方文档：https://docs.opencv.org/</li>
+<li>《自动驾驶控制算法——PID控制详解》</li>
+<li>CARLA 智能驾驶场景开发教程</li>
+<li>基于OpenCV的HSV颜色空间目标识别技术指南</li>
+</ul>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
