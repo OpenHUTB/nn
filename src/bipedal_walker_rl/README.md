@@ -145,6 +145,31 @@ python learning_curve.py 5000 demo.png         # 指定 timesteps + 输出文件
 
 ![学习曲线](result_learning_curve.png)
 
+## 6.6 模型评估 + 随机策略基准对比（evaluate.py）
+
+模块新增 `evaluate.py` 脚本，将训练后 PPO 与"随机策略"基准在 BipedalWalker-v3 环境上各跑 N 个 episode，量化对比 episode 奖励与 episode 长度：
+
+```bash
+python evaluate.py                           # 现训 5000 步 + 20 episodes 评估
+python evaluate.py --timesteps 20000         # 调整训练步数
+python evaluate.py --n-episodes 50           # 调整评估 episode 数
+python evaluate.py --model models/x.zip --stats models/x_stats.pkl   # 加载已保存的模型
+```
+
+工作流程：
+1. 若未提供 `--model`，先用 PPO MlpPolicy 短训指定步数，保存模型与 VecNormalize 统计
+2. 加载模型 + 归一化统计（评估时关闭归一化训练态、关闭 reward 归一化以返回真实环境奖励）
+3. 跑 N 个 episode 收集 reward 与 episode length
+4. 用相同 N 跑随机策略基准
+5. 控制台打印每种策略的 mean/std/min/max + markdown 对比表
+6. matplotlib 绘制双栏 PNG（左 reward 柱状图含 std 误差棒，右 episode length 柱状图）
+
+20000 timesteps 训练后 PPO 与随机策略的实测对比：
+
+![PPO vs Random](result_evaluate.png)
+
+可观察到一个有趣的训练阶段现象：**PPO 学会了"不摔"（episode 长度稳定在 1600 步上限，标准差近 0）但仍未学会"前进"（平均奖励 -103.8，与随机策略 -99.2 接近）**——这是早期 RL 训练的典型局部最优。要让 reward 突破到正区间需要更长的训练（如 README §2 提到 hardcore 模式训了 5M 步）。该工具因此既是评估器、也是诊断器，用于判断 PPO 当前所处的学习阶段。
+
 ## 7. Installation Requirements
 
 To install the necessary dependencies, use the provided `requirements.txt`:

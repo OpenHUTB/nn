@@ -3,5 +3,9 @@ models/
 *.zip
 *.pkl
 
-# 根 .gitignore 忽略 *.png，这里放行学习曲线效果图
+# 根 .gitignore 忽略 *.png，这里放行示例效果图
 !result_learning_curve.png
+!result_evaluate.png
+
+# evaluate.py 默认输出名（用户运行时生成的对比图，不入仓）
+evaluate_comparison.png
