@@ -211,6 +211,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_multi_tracking/</loc>
+         <lastmod>2026-06-12</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_native_assisted_driving_system/</loc>
          <lastmod>2026-06-12</lastmod>
          <changefreq>daily</changefreq>
