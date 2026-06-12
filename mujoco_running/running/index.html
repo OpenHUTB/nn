@@ -99,7 +99,7 @@
 <p>项目支持 Windows 键盘实时交互、ROS <code>/cmd_vel</code> 话题远程控制、多步态模式切换、SAC 模型在线加载微调、课程式强化学习训练、仿真域随机化，实现了从纯规则稳定行走到 AI 智能优化步态的完整闭环，兼具工程稳定性与算法研究价值。</p>
 <p>整体系统可直接运行、可复现、可拓展，完美适配人形机器人规则控制基线搭建、强化学习步态优化、Sim2Real 迁移学习等研究与工程开发场景。</p>
 <h3 id="12">1.2 项目整体流程</h3>
-<p><img alt="流程图" src="./image/flowchat.png" /></p>
+<p><img alt="流程图" src="../image/flowchat.png" /></p>
 <p align="center" style="font-size:10px;">图1 项目整体运行流程图</p>
 
 <p>本项目采用<strong>分层控制架构</strong>，其中底层由基于模型的CPG步态生成与PID/PD姿态及关节控制保障机器人基础行走稳定性,该控制器不依赖学习，完全依据物理模型与确定性参数，能够在任意状态下输出保守的控制信号，确保机器人即使在学习模块失效或未激活时仍能稳定行走、转向及启停，从而提供明确的安全下界。上层则引入SAC强化学习模型，该模型不直接生成主控制指令，而是学习输出一个幅值受限的残差动作信号，用以修正底层规则控制器的输出缺陷，例如抑制步态振荡、提升速度跟踪精度以及增强对外部扰动的鲁棒性。</p>
@@ -564,12 +564,12 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
 <h2 id="6">6. 核心技术难点与解决方案</h2>
 <h3 id="61">6.1 难点：躯干后仰弯折与手臂上抬失衡</h3>
 <p><strong>问题</strong>：行走过程中出现两个相互关联的姿态问题。一是躯干自发后仰，腹部多节关节（abdomen_x）弯折变形，如图2所示。
-<img alt="倾斜图" src="./image/recline.png" /></p>
+<img alt="倾斜图" src="../image/recline.png" /></p>
 <p align="center" style="font-size:10px;">图2 行走中躯干后仰弯折</p>
 
 <p><strong>原因</strong>：因为CPG步态中的动态俯仰补偿逻辑不合理，加上腰部PD刚度过低，所以导致迈步时身体向后弯曲。二是手臂不受控制地大幅上抬，摆动幅度过大，反向拉扯上身进一步加剧后仰倾倒，是肩部关节基准坐标偏高且手臂CPG摆动幅值过大导致的。</p>
 <p><strong>解决</strong>：针对躯干问题，将 <code>abdomen_x</code> 俯仰基准值锁定为0，移除所有速度或误差驱动的前倾后仰动态增量；同时大幅提高腰部abdomen三轴PD刚度，对躯干形态进行刚性约束；并在姿态控制环中叠加俯仰积分纠偏力矩，主动拉回竖直姿态，效果如图2所示。针对手臂问题，强制下沉肩部静态基准偏移量，大幅压缩手臂左右摆动幅度；设置肘部固定下垂弯曲角度，提高手臂关节PD增益以限制抬升自由度，并彻底隔绝步态信号对手臂抬升方向的驱动。</p>
-<p><img alt="倾斜图" src="./image/astro_recline%20.png" /></p>
+<p><img alt="倾斜图" src="../image/astro_recline%20.png" /></p>
 <p align="center" style="font-size:10px;">图2 修正后躯干基本保持竖直</p>
 
 <h3 id="62-2sacrl">6.2 难点2：SAC残差RL扰动破坏基础稳定姿态</h3>
@@ -578,22 +578,22 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
 <p><strong>解决</strong>：极限压缩RL动作缩放系数与幅值上下限，限制仅能微调腿部关节；躯干、上身关节的RL增量施加严格硬截断约束；训练奖励函数大幅加大俯仰、抬臂姿态惩罚项，引导AI不破坏上身形态。</p>
 <h3 id="63-3">6.3 难点3：步伐幅度过大、频率过快导致机身晃动、稳定性差</h3>
 <p><strong>问题</strong>：CPG固有振幅、频率参数偏高，大步快节奏迈步造成重心剧烈上下/前后波动，机身摇晃易倾倒，如图4所示：
-<img alt="大跨步图" src="./image/stride.png" /></p>
+<img alt="大跨步图" src="../image/stride.png" /></p>
 <p align="center" style="font-size:10px;">图4 大步快节奏迈步导致机身摇晃</p>
 
 <p><strong>原因</strong>：原始CPG参数为了追求较快的行走速度，默认设置了较大的振幅和频率。振幅过大使得迈步时脚离地过高，髋、膝、踝关节角度变化剧烈，带动质心大幅上下起伏；频率过高则压缩了支撑相的时间，左右腿切换时重心转移来不及平滑过渡。两者叠加，机器人在每一步的落地冲击和起身过程中都会产生明显的前后俯仰和侧向晃动，尤其在速度指令变化时步态无法及时适应，稳定性严重下降。</p>
 <p><strong>解决</strong>：分档位步态配置，默认启用小幅度慢频SLOW稳走模式；缩减腿部hip/knee/ankle步态输出缩放系数，减小实际步高步距；降低CPG耦合强度，左右腿动作过渡更平滑无冲击，如图5所示：
-<img alt="大跨步图" src="./image/astro_stride.png" /></p>
+<img alt="大跨步图" src="../image/astro_stride.png" /></p>
 <p align="center" style="font-size:10px;">图5 调整后步态平稳、晃动减小</p>
 
 <h3 id="64-4">6.4 难点4：站立不稳</h3>
 <p><strong>问题</strong>：仿真重置后关节目标值过渡生硬，7秒预稳定阶段手臂、躯干瞬间出现抬臂弯折姿态，启动阶段就姿态崩坏，无法站立稳定，如图6所示：
-<img alt="站立图" src="./image/stagger.png" /></p>
+<img alt="站立图" src="../image/stagger.png" /></p>
 <p align="center" style="font-size:10px;">图6 启动阶段抬臂弯折、站立不稳</p>
 
 <p><strong>原因</strong>：仿真初始化时，MuJoCo 模型刚加载，关节位置和速度均为零或默认值，而 CPG 控制器和姿态控制器尚未建立有效的反馈。如果直接以满力矩启动，关节目标值的阶跃变化会导致执行器瞬间输出较大力矩，手臂和躯干在重力作用下产生惯性冲击，出现抬臂、弯腰等畸形姿态。同时，CPG 振荡器初始相位随机或未复位，左右腿目标不一致，进一步加剧了启动初期的不稳定。</p>
 <p><strong>解决</strong>：复位函数固化竖直垂臂标准零偏移初始位姿；预稳定阶段力矩随时间线性缓升，禁止瞬间满力矩冲击；站立状态强制重置 CPG 振荡器、清零上身偏移量，可以保持7秒稳定，如图7所示：
-<img alt="站立图" src="./image/stand.png" /></p>
+<img alt="站立图" src="../image/stand.png" /></p>
 <p align="center" style="font-size:10px;">图7 力矩缓升后稳定站立</p>
 
 <h2 id="7">7. 运行说明与效果展示</h2>
@@ -647,9 +647,9 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
 <li>支持前后行走、左右转向、平滑启停</li>
 <li>SAC 模型加载后步态更平顺、抗扰动更强</li>
 <li>接收 ROS 远程指令，可适配机器人自动驾驶系统
-<img alt="运行效果" src="./image/stand-stance%20.png" />
-<img alt="运行效果" src="./image/mince.png" />
-<img alt="运行效果" src="./image/march.png" /></li>
+<img alt="运行效果" src="../image/stand-stance%20.png" />
+<img alt="运行效果" src="../image/mince.png" />
+<img alt="运行效果" src="../image/march.png" /></li>
 </ul>
 <hr />
 <h2 id="8">8. 现存不足与后续优化方向</h2>

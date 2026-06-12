@@ -168,7 +168,7 @@
 <h2 id="_7">系统架构</h2>
 <h3 id="_8">整体架构图</h3>
 <p align="center">
-  <img src="image/system_architecture.jpg" alt="系统架构图" width="600"/>
+  <img src="image/frame.gif" alt="系统架构图" width="600"/>
 </p>
 
 <h3 id="_9">交互流程图</h3>
@@ -740,7 +740,8 @@ python -c &quot;import stable_baselines3; print(f'SB3 version: {stable_baselines
 <p>训练脚本负责整个训练流程的管理，包括参数解析、环境创建、模型初始化、训练循环和检查点保存。</p>
 <h4 id="_23">训练流程</h4>
 <p align="center">
-  <img src="image/training_pipeline.jpg" alt="训练流程图" width="600"/>
+  <img src="image/training.gif
+  " alt="训练流程图" width="600"/>
 </p>
 
 <h4 id="_24">模型命名规则</h4>
@@ -1159,7 +1160,7 @@ tensorboard --logdir=./tensorboard --port 6006
 </tbody>
 </table>
 <p align="center">
-  <img src="image/reward_comparison.jpg" alt="奖励函数对比图" width="600"/>
+  <img src="image/reward_comparison.gif" alt="奖励函数对比图" width="600"/>
 </p>
 
 <p>乘法组合下，只要有一个维度较差（如 0.1），整体奖励就会被严重拉低（0.08~0.10），智能体几乎得不到有效梯度信号来改善其他维度。而加权求和下，每个维度独立贡献，即使一个维度差，其他维度仍能提供正向梯度。</p>
@@ -1423,10 +1424,10 @@ else:
 </tbody>
 </table>
 <h3 id="_37">训练曲线</h3>
-<p><img alt="reward曲线" src="../image/train.gif" />
-<img alt="rollout曲线" src="../image/rollout.gif" />
-<img alt="自定义指标" src="../image/custom.gif" />
-<img alt="时间指标" src="../image/time.gif" /></p>
+<p><img alt="reward曲线" src="../image/train.gif" /></p>
+<p><img alt="rollout曲线" src="../image/rollout.gif" /></p>
+<p><img alt="自定义指标" src="../image/custom.gif" /></p>
+<p><img alt="时间指标" src="../image/time.gif" /></p>
 <blockquote>
 <p>推荐使用 TensorBoard 实时监控：<code>tensorboard --logdir=./tensorboard</code></p>
 </blockquote>
