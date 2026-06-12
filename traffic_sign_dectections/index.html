@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/traffic_sign_dectections/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>CARLA 自动驾驶仿真客户端 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "CARLA \u81ea\u52a8\u9a7e\u9a76\u4eff\u771f\u5ba2\u6237\u7aef";
+        var mkdocs_page_input_path = "traffic_sign_dectections/index.md";
+        var mkdocs_page_url = "/nn/traffic_sign_dectections/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">CARLA 自动驾驶仿真客户端</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/traffic_sign_dectections/index.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla">CARLA 自动驾驶仿真客户端</h1>
+<p>基于 <strong>CARLA 0.9.13</strong> 开发的轻量化自动驾驶仿真控制程序，支持自动巡航、多传感器数据采集、双格式日志记录与车辆一键重置。</p>
+<hr />
+<h2 id="_1">📑 目录</h2>
+<ul>
+<li><a href="#项目简介">项目简介</a></li>
+<li><a href="#核心功能">核心功能</a></li>
+<li><a href="#环境要求">环境要求</a></li>
+<li><a href="#项目结构">项目结构</a></li>
+<li><a href="#快速启动">快速启动</a></li>
+<li><a href="#命令行参数">命令行参数</a></li>
+<li><a href="#操作快捷键">操作快捷键</a></li>
+<li><a href="#日志说明">日志说明</a></li>
+<li><a href="#代码优化说明">代码优化说明</a></li>
+<li><a href="#常见问题">常见问题</a></li>
+<li><a href="#更新日志">更新日志</a></li>
+</ul>
+<hr />
+<h2 id="_2">项目简介</h2>
+<p>本项目基于 <strong>CARLA 0.9.13</strong> 与 <strong>Python 3.7</strong> 开发，提供完整的自动驾驶仿真客户端功能。集成智能驾驶智能体、多传感器可视化、行驶数据记录等核心能力，无需复杂配置即可快速运行。</p>
+<p>适用于：</p>
+<ul>
+<li>自动驾驶算法验证</li>
+<li>仿真场景测试</li>
+<li>数据采集与轨迹分析</li>
+<li>智能驾驶控制逻辑开发</li>
+<li>教学与科研实验</li>
+</ul>
+<hr />
+<h2 id="_3">核心功能</h2>
+<h3 id="_4">🚗 智能驾驶</h3>
+<ul>
+<li>支持 <code>BehaviorAgent</code> 与 <code>BasicAgent</code></li>
+<li>支持多种驾驶风格切换</li>
+<li>Normal（正常）</li>
+<li>Aggressive（激进）</li>
+<li>Cautious（谨慎）</li>
+<li>自动路径规划</li>
+<li>自动避障与交通规则遵循</li>
+<li>循环自动巡航模式</li>
+</ul>
+<h3 id="_5">🔄 自动巡航</h3>
+<ul>
+<li>自动生成随机目标点</li>
+<li>到达终点后自动规划下一段路线</li>
+<li>支持长时间无人值守运行</li>
+</ul>
+<h3 id="_6">🎮 车辆控制</h3>
+<ul>
+<li>一键重置车辆位置</li>
+<li>自动寻找最近合法生成点</li>
+<li>避免车辆卡死或翻车后无法继续运行</li>
+</ul>
+<h3 id="_7">📡 多传感器集成</h3>
+<p>已集成：</p>
+<ul>
+<li>RGB Camera</li>
+<li>LiDAR</li>
+<li>Collision Sensor</li>
+<li>Lane Invasion Sensor</li>
+<li>GNSS Sensor</li>
+</ul>
+<p>支持实时数据获取与后续扩展开发。</p>
+<h3 id="_8">📝 双格式日志系统</h3>
+<p>支持：</p>
+<h4 id="csv">CSV 行驶日志</h4>
+<p>记录：</p>
+<ul>
+<li>时间戳</li>
+<li>车辆位置</li>
+<li>当前速度</li>
+<li>碰撞状态</li>
+<li>到达目标次数</li>
+</ul>
+<h4 id="json">JSON 全量轨迹日志</h4>
+<p>记录：</p>
+<ul>
+<li>Frame ID</li>
+<li>Location</li>
+<li>Rotation</li>
+<li>Velocity</li>
+<li>Timestamp</li>
+<li>Metadata</li>
+</ul>
+<p>便于后续：</p>
+<ul>
+<li>数据分析</li>
+<li>轨迹回放</li>
+<li>可视化展示</li>
+<li>机器学习训练</li>
+</ul>
+<h3 id="hud">📊 实时 HUD</h3>
+<p>显示：</p>
+<ul>
+<li>FPS</li>
+<li>当前车速</li>
+<li>世界坐标</li>
+<li>碰撞状态</li>
+<li>自动驾驶状态</li>
+<li>巡航统计信息</li>
+</ul>
+<hr />
+<h2 id="_9">环境要求</h2>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>版本</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>操作系统</td>
+<td>Windows 10 / 11</td>
+</tr>
+<tr>
+<td>CARLA</td>
+<td>0.9.13</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>3.7.x</td>
+</tr>
+<tr>
+<td>pygame</td>
+<td>最新兼容版本</td>
+</tr>
+<tr>
+<td>numpy</td>
+<td>最新兼容版本</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_10">项目结构</h2>
+<pre><code class="language-text">CARLA-Autonomous-Driving/
+├── main.py
+├── WindowsNoEditor/
+├── logs/
+│   ├── driving_log_*.csv
+│   └── trajectory_log_*.json
+└── README.md
+</code></pre>
+<h3 id="_11">目录说明</h3>
+<table>
+<thead>
+<tr>
+<th>文件/目录</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main.py</td>
+<td>主程序入口</td>
+</tr>
+<tr>
+<td>WindowsNoEditor</td>
+<td>CARLA 服务端目录</td>
+</tr>
+<tr>
+<td>logs</td>
+<td>日志输出目录</td>
+</tr>
+<tr>
+<td>README.md</td>
+<td>项目文档</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_12">快速启动</h2>
+<h3 id="1">1. 安装依赖</h3>
+<pre><code class="language-bash">pip install pygame numpy
+</code></pre>
+<h3 id="2-carla">2. 启动 CARLA 服务端</h3>
+<pre><code class="language-bash">WindowsNoEditor/CarlaUE4.exe
+</code></pre>
+<p>等待地图加载完成。</p>
+<h3 id="3">3. 启动客户端</h3>
+<p>基础运行：</p>
+<pre><code class="language-bash">py -3.7 main.py
+</code></pre>
+<p>循环巡航模式：</p>
+<pre><code class="language-bash">py -3.7 main.py --loop
+</code></pre>
+<p>激进驾驶模式：</p>
+<pre><code class="language-bash">py -3.7 main.py --loop --behavior aggressive
+</code></pre>
+<p>谨慎驾驶模式：</p>
+<pre><code class="language-bash">py -3.7 main.py --loop --behavior cautious
+</code></pre>
+<p>使用 BasicAgent：</p>
+<pre><code class="language-bash">py -3.7 main.py --agent Basic
+</code></pre>
+<hr />
+<h2 id="_13">命令行参数</h2>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>简写</th>
+<th>说明</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>--host</td>
+<td>-</td>
+<td>CARLA 服务端 IP</td>
+<td>127.0.0.1</td>
+</tr>
+<tr>
+<td>--port</td>
+<td>-p</td>
+<td>服务端端口</td>
+<td>2000</td>
+</tr>
+<tr>
+<td>--loop</td>
+<td>-l</td>
+<td>启用循环自动巡航</td>
+<td>False</td>
+</tr>
+<tr>
+<td>--behavior</td>
+<td>-b</td>
+<td>驾驶风格</td>
+<td>normal</td>
+</tr>
+<tr>
+<td>--agent</td>
+<td>-a</td>
+<td>智能体类型</td>
+<td>Behavior</td>
+</tr>
+<tr>
+<td>--res</td>
+<td>-</td>
+<td>窗口分辨率</td>
+<td>1280x720</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_14">示例</h3>
+<pre><code class="language-bash">py -3.7 main.py --loop --behavior aggressive
+</code></pre>
+<pre><code class="language-bash">py -3.7 main.py --agent Basic
+</code></pre>
+<pre><code class="language-bash">py -3.7 main.py --host 192.168.1.100 --port 2000
+</code></pre>
+<hr />
+<h2 id="_15">操作快捷键</h2>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ESC</td>
+<td>退出程序</td>
+</tr>
+<tr>
+<td>Ctrl + Q</td>
+<td>强制退出</td>
+</tr>
+<tr>
+<td>R</td>
+<td>重置车辆</td>
+</tr>
+<tr>
+<td>H</td>
+<td>显示/隐藏帮助</td>
+</tr>
+<tr>
+<td>鼠标滚轮</td>
+<td>切换摄像机视角</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_16">日志说明</h2>
+<h3 id="csv_1">CSV 行驶日志</h3>
+<p>输出路径：</p>
+<pre><code class="language-text">logs/driving_log_时间戳.csv
+</code></pre>
+<p>示例：</p>
+<pre><code class="language-csv">timestamp,x,y,speed,collision,target_count
+1711111111,23.5,12.4,35.6,False,5
+</code></pre>
+<hr />
+<h3 id="json_1">JSON 轨迹日志</h3>
+<p>输出路径：</p>
+<pre><code class="language-text">logs/trajectory_log_时间戳.json
+</code></pre>
+<p>示例：</p>
+<pre><code class="language-json">{
+  &quot;frame&quot;: 100,
+  &quot;location&quot;: {
+    &quot;x&quot;: 12.3,
+    &quot;y&quot;: 45.6,
+    &quot;z&quot;: 0.2
+  },
+  &quot;speed&quot;: 32.5
+}
+</code></pre>
+<hr />
+<h2 id="_17">代码优化说明</h2>
+<h3 id="_18">兼容性优化</h3>
+<ul>
+<li>移除高版本 API 依赖</li>
+<li>完全适配 CARLA 0.9.13</li>
+<li>兼容 Python 3.7</li>
+</ul>
+<h3 id="_19">模块化重构</h3>
+<p>将系统拆分为：</p>
+<ul>
+<li>Agent 模块</li>
+<li>Sensor 模块</li>
+<li>Logging 模块</li>
+<li>HUD 模块</li>
+<li>Vehicle Controller 模块</li>
+</ul>
+<p>降低代码耦合度，提高可维护性。</p>
+<h3 id="_20">稳定性增强</h3>
+<ul>
+<li>车辆生成重试机制</li>
+<li>自动检测空闲生成点</li>
+<li>异常统一捕获</li>
+<li>安全释放 Actor</li>
+<li>安全销毁 Sensor</li>
+<li>防止 CARLA 残留进程</li>
+</ul>
+<h3 id="_21">性能优化</h3>
+<ul>
+<li>固定 60 FPS</li>
+<li>日志流式写入</li>
+<li>减少内存占用</li>
+<li>降低传感器回调阻塞</li>
+<li>优化 HUD 刷新频率</li>
+</ul>
+<h3 id="_22">可扩展性优化</h3>
+<p>支持快速扩展：</p>
+<ul>
+<li>新传感器</li>
+<li>新智能体</li>
+<li>自定义控制器</li>
+<li>自定义地图测试</li>
+</ul>
+<h3 id="_23">调试能力增强</h3>
+<ul>
+<li>更详细的控制台日志</li>
+<li>实时运行状态监控</li>
+<li>HUD 信息展示</li>
+<li>异常堆栈输出</li>
+</ul>
+<hr />
+<h2 id="_24">常见问题</h2>
+<h3 id="carla-api">CARLA API 导入失败</h3>
+<p><strong>原因：</strong></p>
+<p>CARLA Python API 未正确加载。</p>
+<p><strong>解决方案：</strong></p>
+<p>确保目录结构如下：</p>
+<pre><code class="language-text">project/
+├── main.py
+└── WindowsNoEditor/
+</code></pre>
+<hr />
+<h3 id="_25">车辆生成失败</h3>
+<p><strong>原因：</strong></p>
+<p>地图生成点被占用。</p>
+<p><strong>解决方案：</strong></p>
+<ul>
+<li>重启 CARLA</li>
+<li>更换地图</li>
+<li>检查生成点状态</li>
+</ul>
+<hr />
+<h3 id="_26">无法连接服务器</h3>
+<p><strong>原因：</strong></p>
+<p>2000 端口未监听。</p>
+<p><strong>解决方案：</strong></p>
+<p>确认：</p>
+<pre><code class="language-bash">CarlaUE4.exe
+</code></pre>
+<p>已经启动并完成加载。</p>
+<hr />
+<h3 id="_27">日志未生成</h3>
+<p>检查：</p>
+<ul>
+<li>logs 文件夹权限</li>
+<li>程序是否正常退出</li>
+<li>磁盘空间是否充足</li>
+</ul>
+<hr />
+<h3 id="git">Git 推送失败</h3>
+<p>国内网络环境下可能出现超时。</p>
+<p>建议：</p>
+<pre><code class="language-bash">git push
+</code></pre>
+<p>多尝试几次，或配置代理。</p>
+<hr />
+<h2 id="_28">更新日志</h2>
+<h3 id="v120">v1.2.0</h3>
+<h4 id="_29">新增</h4>
+<ul>
+<li>JSON 全量轨迹记录</li>
+<li>轨迹元数据统计</li>
+</ul>
+<h4 id="_30">优化</h4>
+<ul>
+<li>车辆重置逻辑</li>
+<li>日志系统结构</li>
+</ul>
+<h4 id="_31">修复</h4>
+<ul>
+<li>CARLA 0.9.13 兼容性问题</li>
+</ul>
+<hr />
+<h3 id="v110">v1.1.0</h3>
+<h4 id="_32">新增</h4>
+<ul>
+<li>CSV 行驶日志</li>
+<li>HUD 可视化界面</li>
+<li>循环自动巡航</li>
+</ul>
+<hr />
+<h3 id="v100">v1.0.0</h3>
+<h4 id="_33">初始版本</h4>
+<ul>
+<li>自动驾驶控制</li>
+<li>多传感器采集</li>
+<li>车辆控制功能</li>
+<li>基础可视化界面</li>
+</ul>
+<hr />
+<h2 id="license">License</h2>
+<p>仅用于学习研究与自动驾驶仿真测试。</p>
+<p>如需商业使用，请遵循 CARLA 官方许可证要求。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
