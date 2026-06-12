@@ -1,0 +1,71 @@
+site_name: 基于CARLA的自动驾驶可视化监控系统
+site_description: 基于CARLA模拟器的自动驾驶车辆实时监控与可视化解决方案
+site_author: vehicle_HUD Team
+
+docs_dir: docs
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换至暗色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换至亮色模式
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search:
+      lang: zh
+
+nav:
+  - 首页: index.md
+  - 快速开始: quickstart.md
+  - 核心功能:
+    - 实时视觉监控: index.md#实时视觉监控
+    - 车辆状态监控: index.md#车辆状态监控
+    - 多视角切换: index.md#多视角自由切换
+    - 智能导航系统: index.md#智能导航系统
+    - 环境模拟系统: index.md#环境模拟系统
+    - 自动泊车功能: index.md#自动泊车功能
+    - 多车型切换: index.md#多车型切换
+    - 行驶轨迹回放: index.md#行驶轨迹回放
+  - 系统架构: architecture.md
+  - 快捷键汇总: index.md#快捷键汇总
+  - 技术栈: index.md#技术栈
+  - 常见问题: index.md#常见问题

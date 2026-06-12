@@ -1,0 +1,1663 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="基于CARLA模拟器的自动驾驶车辆实时监控与可视化解决方案">
+      
+      
+        <meta name="author" content="vehicle_HUD Team">
+      
+      
+      
+      
+        <link rel="next" href="quickstart/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>基于CARLA的自动驾驶可视化监控系统</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#carla" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="." title="基于CARLA的自动驾驶可视化监控系统" class="md-header__button md-logo" aria-label="基于CARLA的自动驾驶可视化监控系统" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            基于CARLA的自动驾驶可视化监控系统
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              首页
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="切换至暗色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换至暗色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="切换至亮色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换至亮色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+  
+    
+  
+  首页
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="quickstart/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  快速开始
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="index.md#实时视觉监控" class="md-tabs__link">
+          
+  
+  
+  核心功能
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  系统架构
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="index.md#快捷键汇总" class="md-tabs__link">
+        
+  
+  
+    
+  
+  快捷键汇总
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="index.md#技术栈" class="md-tabs__link">
+        
+  
+  
+    
+  
+  技术栈
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="index.md#常见问题" class="md-tabs__link">
+        
+  
+  
+    
+  
+  常见问题
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="基于CARLA的自动驾驶可视化监控系统" class="md-nav__button md-logo" aria-label="基于CARLA的自动驾驶可视化监控系统" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    基于CARLA的自动驾驶可视化监控系统
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核心功能
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="核心功能">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实时视觉监控
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        车辆状态监控
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多视角自由切换
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        智能导航系统
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境模拟系统
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自动泊车功能
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多车型切换
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        行驶轨迹回放
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快速开始
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="快速开始">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境准备
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        运行步骤
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快捷键汇总
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        项目结构
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        技术栈
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        常见问题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    核心功能
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    核心功能
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#实时视觉监控" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    实时视觉监控
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#车辆状态监控" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    车辆状态监控
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#多视角自由切换" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多视角切换
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#智能导航系统" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    智能导航系统
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#环境模拟系统" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    环境模拟系统
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#自动泊车功能" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    自动泊车功能
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#多车型切换" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多车型切换
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#行驶轨迹回放" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    行驶轨迹回放
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    系统架构
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#快捷键汇总" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快捷键汇总
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#技术栈" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    技术栈
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.md#常见问题" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核心功能
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="核心功能">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实时视觉监控
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        车辆状态监控
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多视角自由切换
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        智能导航系统
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境模拟系统
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自动泊车功能
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多车型切换
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        行驶轨迹回放
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快速开始
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="快速开始">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境准备
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        运行步骤
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        快捷键汇总
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        项目结构
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        技术栈
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        常见问题
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="carla">基于CARLA的自动驾驶可视化监控系统</h1>
+<p><a href="https://www.python.org/downloads/"><img alt="Python 3.7+" src="https://img.shields.io/badge/python-3.7+-blue.svg" /></a>
+<a href="https://carla.org/"><img alt="CARLA 0.9.14+" src="https://img.shields.io/badge/CARLA-0.9.14+-orange.svg" /></a></p>
+<p>本项目基于 <a href="https://carla.org/">CARLA</a> 模拟器构建，为自动驾驶车辆提供一站式实时监控与可视化 HUD（Head-Up Display）解决方案。</p>
+<h2 id="_1">核心功能</h2>
+<h3 id="_2">实时视觉监控</h3>
+<ul>
+<li>前置 RGB 摄像头，640×480 分辨率，安装于车辆前方 2.5m、高度 1.5m 处</li>
+<li>基于 CARLA 同步模式（<code>fixed_delta_seconds = 0.05</code>），帧率稳定在 20 FPS</li>
+<li>摄像头数据通过 <code>listen(callback)</code> 异步回调，经 NumPy 解码后由 OpenCV 渲染</li>
+</ul>
+<h3 id="_3">车辆状态监控</h3>
+<ul>
+<li>实时计算并显示行驶速度（由 <code>get_velocity()</code> 三轴分量合成，转换为 km/h）</li>
+<li>可调节超速阈值（默认 60 km/h，最低 10 km/h），超速时速度数字变红</li>
+<li>速度警告可独立开关（<code>W/w</code> 键）</li>
+</ul>
+<h3 id="_4">多视角自由切换</h3>
+<p>支持 5 种视角模式，大小写不敏感：</p>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>视角模式</th>
+<th>实现方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>T/t</code></td>
+<td>俯视视角</td>
+<td>车辆上方 50m，俯角 -90°</td>
+</tr>
+<tr>
+<td><code>F/f</code></td>
+<td>跟随视角</td>
+<td>后方 5m、上方 3m，俯角 -15°</td>
+</tr>
+<tr>
+<td><code>C/c</code></td>
+<td>追逐视角</td>
+<td>后方 5m、上方 2m，俯角 -10°</td>
+</tr>
+<tr>
+<td><code>S/s</code></td>
+<td>侧视视角</td>
+<td>侧方 5m、上方 3m，偏航 +90°</td>
+</tr>
+<tr>
+<td><code>X/x</code></td>
+<td>近距离视角</td>
+<td>后方 5m、上方 4m，俯角 -25°</td>
+</tr>
+</tbody>
+</table>
+<p>所有视角通过 <code>world.get_spectator().set_transform()</code> 实时更新，跟随车辆位置与朝向。</p>
+<h3 id="_5">智能导航系统</h3>
+<ul>
+<li>从地图生成点中随机选取距离当前位置 &gt; 50m 的目的地</li>
+<li>HUD 面板显示导航开关状态</li>
+<li>按 <code>N/n</code> 键重新随机选择导航目的地</li>
+</ul>
+<h3 id="_6">环境模拟系统</h3>
+<p>5 种天气模式，每种天气有独立的物理参数配置：</p>
+<table>
+<thead>
+<tr>
+<th>天气</th>
+<th>云量</th>
+<th>降水</th>
+<th>雾密度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>晴天 Clear</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>多云 Cloudy</td>
+<td>80</td>
+<td>0</td>
+<td>20</td>
+</tr>
+<tr>
+<td>雨天 Rain</td>
+<td>100</td>
+<td>80</td>
+<td>30</td>
+</tr>
+<tr>
+<td>雾天 Fog</td>
+<td>90</td>
+<td>20</td>
+<td>60</td>
+</tr>
+<tr>
+<td>雪天 Snow</td>
+<td>100</td>
+<td>100</td>
+<td>40</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>24 小时时间系统：太阳高度角 = <code>(hour - 6) × 15°</code></li>
+<li><code>V/v</code> 循环切换天气，<code>U/u</code> 每次增加 3 小时</li>
+</ul>
+<h3 id="_7">自动泊车功能</h3>
+<p>6 阶段侧方位停车状态机：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>操作</th>
+<th>触发条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>全力制动</td>
+<td>启动泊车</td>
+</tr>
+<tr>
+<td>1</td>
+<td>油门 0.4 + 左满舵</td>
+<td>阶段 0 完成</td>
+</tr>
+<tr>
+<td>2</td>
+<td>全力制动</td>
+<td>车速 &gt; 2 m/s</td>
+</tr>
+<tr>
+<td>3</td>
+<td>油门 0.4 + 右满舵 + 倒档</td>
+<td>阶段 2 完成</td>
+</tr>
+<tr>
+<td>4</td>
+<td>油门 0.3 + 倒档</td>
+<td>阶段 3 完成</td>
+</tr>
+<tr>
+<td>5</td>
+<td>制动停车，恢复自动驾驶</td>
+<td>阶段 4 完成</td>
+</tr>
+</tbody>
+</table>
+<p>按 <code>P/p</code> 键启动，泊车期间禁用自动驾驶，完成后自动恢复。</p>
+<h3 id="_8">多车型切换</h3>
+<p>支持 5 种车型（切换后保持当前位置）：</p>
+<ul>
+<li><code>vehicle.tesla.model3</code> — Tesla Model 3</li>
+<li><code>vehicle.mercedes.coupe</code> — Mercedes Coupe</li>
+<li><code>vehicle.audi.a2</code> — Audi A2</li>
+<li><code>vehicle.bmw.isetta</code> — BMW Isetta</li>
+<li><code>vehicle.ford.crown</code> — Ford Crown</li>
+</ul>
+<p>按 <code>K/k</code> 键顺序切换。</p>
+<h3 id="_9">行驶轨迹回放</h3>
+<ul>
+<li>实时记录车辆位置至轨迹点队列，最大容量 200 个点</li>
+<li>超过上限时移除最旧的点（FIFO 队列）</li>
+<li>世界坐标 → 图像坐标转换：<code>img_x = 320 + (world_x - current_x) × 5</code></li>
+<li>渐变色绘制：蓝色（最新）→ 绿色（中间）→ 红色（最旧）</li>
+<li>仅在画面范围内（0-640, 0-480）绘制线段</li>
+<li>按 <code>R/r</code> 键重置轨迹</li>
+</ul>
+<h2 id="_10">快速开始</h2>
+<h3 id="_11">环境准备</h3>
+<ul>
+<li>CARLA Simulator 0.9.14+</li>
+<li>Python 3.7+</li>
+<li>依赖安装：</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>opencv-python<span class="w"> </span>numpy
+</code></pre></div>
+<h3 id="_12">运行步骤</h3>
+<ol>
+<li>启动 CARLA 模拟器（需先安装 CARLA）：</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>CarlaUE4.exe
+</code></pre></div>
+<ol>
+<li>运行主程序：</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>main.py
+</code></pre></div>
+<ol>
+<li>程序启动后自动在随机位置生成 Tesla Model 3 并开启自动驾驶，HUD 窗口显示实时画面。</li>
+</ol>
+<h2 id="_13">快捷键汇总</h2>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>T</code> / <code>t</code></td>
+<td>切换到俯视视角</td>
+</tr>
+<tr>
+<td><code>F</code> / <code>f</code></td>
+<td>切换到跟随视角</td>
+</tr>
+<tr>
+<td><code>C</code> / <code>c</code></td>
+<td>切换到追逐视角</td>
+</tr>
+<tr>
+<td><code>S</code> / <code>s</code></td>
+<td>切换到侧视视角</td>
+</tr>
+<tr>
+<td><code>X</code> / <code>x</code></td>
+<td>切换到近距离视角</td>
+</tr>
+<tr>
+<td><code>K</code> / <code>k</code></td>
+<td>切换车辆类型</td>
+</tr>
+<tr>
+<td><code>P</code> / <code>p</code></td>
+<td>启动自动泊车</td>
+</tr>
+<tr>
+<td><code>V</code> / <code>v</code></td>
+<td>切换天气模式（循环 5 种）</td>
+</tr>
+<tr>
+<td><code>U</code> / <code>u</code></td>
+<td>切换时间（每次 +3 小时）</td>
+</tr>
+<tr>
+<td><code>N</code> / <code>n</code></td>
+<td>设置/重置导航目的地</td>
+</tr>
+<tr>
+<td><code>W</code> / <code>w</code></td>
+<td>开关速度警告</td>
+</tr>
+<tr>
+<td><code>R</code> / <code>r</code></td>
+<td>重置行驶轨迹</td>
+</tr>
+<tr>
+<td><code>+</code> / <code>-</code></td>
+<td>调整限速阈值（±10 km/h）</td>
+</tr>
+<tr>
+<td><code>ESC</code></td>
+<td>退出程序</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_14">项目结构</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>vehicle_HUD/
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── main.py          # 主程序入口（全部核心逻辑）
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>└── README.md        # 项目说明文档
+</code></pre></div>
+<h2 id="_15">技术栈</h2>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>技术</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模拟引擎</td>
+<td>CARLA Simulator 0.9.14+</td>
+<td>车辆物理、传感器、环境模拟</td>
+</tr>
+<tr>
+<td>编程语言</td>
+<td>Python 3.7+</td>
+<td>整体逻辑实现</td>
+</tr>
+<tr>
+<td>图像处理</td>
+<td>OpenCV (<code>cv2</code>)</td>
+<td>画面渲染、轨迹绘制、HUD 文字叠加</td>
+</tr>
+<tr>
+<td>数值计算</td>
+<td>NumPy</td>
+<td>摄像头原始数据解码与数组重塑</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_16">常见问题</h2>
+<p><strong>画面卡顿</strong></p>
+<p>检查 CARLA 模拟器资源占用，可尝试降低摄像头分辨率（修改 <code>image_size_x</code> / <code>image_size_y</code> 属性），或增大 <code>fixed_delta_seconds</code> 降低帧率。</p>
+<p><strong>视角切换无响应</strong></p>
+<p>确认键盘焦点在 OpenCV 窗口中（窗口标题 "HUD"），按键判断使用 <code>cv2.waitKey()</code>，大小写均支持。</p>
+<p><strong>自动泊车失败</strong></p>
+<p>确保车辆已完全停止（泊车阶段 0 先执行制动），且泊车区域周围无障碍物阻挡。</p>
+<p><strong>导航不生成</strong></p>
+<p>确认 CARLA 地图已完全加载，且车辆当前位置周围存在距离 &gt; 50m 的生成点。如所有生成点均 ≤ 50m，不会生成导航。</p>
+<p><strong>连接 CARLA 超时</strong></p>
+<p>确认 CARLA 模拟器已在 <code>localhost:2000</code> 运行。程序连接超时设置为 20 秒，超时未连接将抛出异常。</p>
+<hr />
+<p><em>本项目持续维护中。如需扩展功能，可修改 <code>main.py</code> 中的对应逻辑模块。</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
