@@ -8,9 +8,9 @@ Usage:
     python main.py
 """
 
+import argparse
 import time
 import sys
-from datetime import datetime, timedelta
 
 
 class ProgressDemo:
@@ -94,102 +94,182 @@ class ProgressDemo:
         print("=" * 80)
         print()
 
+def parse_args():
+    """解析命令行参数。"""
+    parser = argparse.ArgumentParser(
+        description="Setup tool progress display demo"
+    )
+    parser.add_argument(
+        "--speed",
+        choices=["fast", "normal", "slow"],
+        default="normal",
+        help="Set demo speed: fast, normal, or slow",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["basic", "full"],
+        default="full",
+        help="Set demo mode: basic or full",
+    )
+    return parser.parse_args()
+
 
 def main():
-    """按顺序执行 setup 进度显示演示"""
-    print()
-    print("=" * 80)
-    print("              Setup.bat Progress Display - DEMO VERSION")
-    print("=" * 80)
-    print("  This is a demonstration of the progress display features.")
-    print("  No actual downloads or installations will be performed.")
-    print("=" * 80)
-    print()
+   """按顺序执行 setup 进度显示演示。"""
+   args = parse_args()
 
-    demo = ProgressDemo()
+   speed_map = {
+        "fast": 0.3,
+        "normal": 1.0,
+        "slow": 1.5,
+    }
+   speed_factor = speed_map[args.speed]
 
-    # Step 1
-    demo.show_progress("Checking hutb_downloader.exe")
-    time.sleep(1)
-    demo.step_result("skip", "hutb_downloader.exe already exists")
+   print()
+   print("=" * 80)
+   print("              Setup.bat Progress Display - DEMO VERSION")
+   print("=" * 80)
+   print("  This is a demonstration of the progress display features.")
+   print("  No actual downloads or installations will be performed.")
+   print(f"  Demo speed: {args.speed}")
+   print(f"  Demo mode: {args.mode}")
+   print("=" * 80)
+   print()
 
-    # Step 2
-    demo.show_progress("Checking dependencies directory")
-    time.sleep(1)
-    demo.step_result("skip", "dependencies directory already exists")
 
-    # Step 3
-    demo.show_progress("Checking for existing processes")
-    time.sleep(1)
-    demo.step_result("ok", "Killed 2 process(es) on port 2000")
+   full_steps = [
+        {
+            "description": "Checking hutb_downloader.exe",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "skip", "message": "hutb_downloader.exe already exists"},
+            ],
+        },
+        {
+            "description": "Checking dependencies directory",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "skip", "message": "dependencies directory already exists"},
+            ],
+        },
+        {
+            "description": "Checking for existing processes",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "ok", "message": "Killed 2 process(es) on port 2000"},
+            ],
+        },
+        {
+            "description": "Checking hutb directory",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "skip", "message": "hutb directory already exists"},
+            ],
+        },
+        {
+            "description": "Checking 7zip prerequisites",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "ok", "message": "7zip extracted successfully"},
+            ],
+        },
+        {
+            "description": "Checking miniconda3 prerequisites",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "print", "message": "  Extracting miniconda3 (simulated delay)..."},
+                {"type": "sleep", "seconds": 2},
+                {"type": "result", "status": "ok", "message": "miniconda3 extracted successfully"},
+            ],
+        },
+        {
+            "description": "Validating Python environment",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "ok", "message": "Virtual environment found"},
+                {"type": "result", "status": "ok", "message": "Python interpreter found"},
+                {"type": "result", "status": "ok", "message": "numpy_tutorial.py found"},
+            ],
+        },
+        {
+            "description": "Initializing Python environment",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "print", "message": "  Activating virtual environment..."},
+                {"type": "print", "message": "  Python version: 3.10.0"},
+                {"type": "result", "status": "ok", "message": "Python environment ready"},
+            ],
+        },
+        {
+            "description": "Starting numpy_tutorial.py",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "ok", "message": "numpy_tutorial.py process started"},
+            ],
+        },
+        {
+            "description": "Waiting for service to be ready",
+            "actions": [
+                {"type": "sleep", "seconds": 2},
+                {"type": "print", "message": "  Waiting for service startup..."},
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "ok", "message": "numpy_tutorial.py is ready at http://192.168.1.100:3000"},
+            ],
+        },
+        {
+            "description": "Starting CarlaUE4.exe",
+            "actions": [
+                {"type": "sleep", "seconds": 1},
+                {"type": "result", "status": "ok", "message": "CarlaUE4.exe started"},
+            ],
+        },
+    ]
+   
+   basic_steps = [
+        full_steps[0],
+        full_steps[2],
+        full_steps[6],
+        full_steps[8],
+        full_steps[10],
+    ]
+   
+   if args.mode == "basic":
+        steps = basic_steps
+   else:
+        steps = full_steps
 
-    # Step 4
-    demo.show_progress("Checking hutb directory")
-    time.sleep(1)
-    demo.step_result("skip", "hutb directory already exists")
+   demo = ProgressDemo(total_steps=len(steps))
 
-    # Step 5
-    demo.show_progress("Checking 7zip prerequisites")
-    time.sleep(1)
-    demo.step_result("ok", "7zip extracted successfully")
+    # 使用统一的数据结构描述步骤，减少 main() 中的重复逻辑
+   for step in steps:
+        demo.show_progress(step["description"])
 
-    # Step 6
-    demo.show_progress("Checking miniconda3 prerequisites")
-    time.sleep(1)
-    print("  Extracting miniconda3 (simulated delay)...")
-    time.sleep(2)
-    demo.step_result("ok", "miniconda3 extracted successfully")
+        for action in step["actions"]:
+            if action["type"] == "sleep":
+                time.sleep(action["seconds"] * speed_factor)
+            elif action["type"] == "print":
+                print(action["message"])
+            elif action["type"] == "result":
+                demo.step_result(action["status"], action["message"])
 
-    # Step 7
-    demo.show_progress("Validating Python environment")
-    time.sleep(1)
-    demo.step_result("ok", "Virtual environment found")
-    demo.step_result("ok", "Python interpreter found")
-    demo.step_result("ok", "numpy_tutorial.py found")
+   demo.show_summary()
 
-    # Step 8
-    demo.show_progress("Initializing Python environment")
-    time.sleep(1)
-    print("  Activating virtual environment...")
-    print("  Python version: 3.10.0")
-    demo.step_result("ok", "Python environment ready")
-
-    # Step 9
-    demo.show_progress("Starting numpy_tutorial.py")
-    time.sleep(1)
-    demo.step_result("ok", "numpy_tutorial.py process started")
-
-    # Step 10
-    demo.show_progress("Waiting for service to be ready")
-    time.sleep(2)
-    print("  Waiting for service startup...")
-    time.sleep(1)
-    demo.step_result("ok", "numpy_tutorial.py is ready at http://192.168.1.100:3000")
-
-    # Step 11
-    demo.show_progress("Starting CarlaUE4.exe")
-    time.sleep(1)
-    demo.step_result("ok", "CarlaUE4.exe started")
-
-    # Summary
-    demo.show_summary()
-
-    print()
-    print("=" * 80)
-    print("                         DEMO COMPLETE")
-    print("=" * 80)
-    print()
-    print("The progress display features demonstrated:")
-    print("  - Real-time progress bar with percentage")
-    print("  - Step numbering (1/11, 2/11, etc.)")
-    print("  - Elapsed time tracking")
-    print("  - Estimated time remaining (ETA)")
-    print("  - Standardized status output ([OK], [SKIP], [DOWNLOAD], [ERROR])")
-    print("  - Final summary with statistics")
-    print()
-    print("To use the actual setup script, run: setup.bat")
-    print("=" * 80)
-    print()
+   print()
+   print("=" * 80)
+   print("                         DEMO COMPLETE")
+   print("=" * 80)
+   print()
+   print("The progress display features demonstrated:")
+   print("  - Real-time progress bar with percentage")
+   print("  - Step numbering (1/11, 2/11, etc.)")
+   print("  - Elapsed time tracking")
+   print("  - Estimated time remaining (ETA)")
+   print("  - Standardized status output ([OK], [SKIP], [DOWNLOAD], [ERROR])")
+   print("  - Final summary with statistics")
+   print()
+   print("To use the actual setup script, run: setup.bat")
+   print("=" * 80)
+   print()
 
 
 if __name__ == "__main__":

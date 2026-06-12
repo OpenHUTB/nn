@@ -1,5 +1,5 @@
 """
-3D仿真显示模块 - 无需GLUT版本
+3D仿真显示模块 - 无需GLUT版本，支持多无人机渲染
 """
 import pygame
 import numpy as np
@@ -41,11 +41,21 @@ class Drone3DViewer:
         self.show_grid = True
         self.show_trajectory = True
         self.show_axes = True
+        self.show_waypoints = True
 
         # 相机参数
         self.camera_distance = 15.0
         self.camera_angle_x = 0.0
         self.camera_angle_y = -20.0
+
+        # 多无人机支持
+        self.multi_drone_mode = False
+        self.drone_colors = [
+            (0.0, 0.6, 1.0),   # 青色 - Drone 1
+            (1.0, 0.4, 0.0),   # 橙色 - Drone 2
+            (0.6, 0.0, 1.0),   # 紫色 - Drone 3
+            (0.0, 1.0, 0.4),   # 绿色 - Drone 4
+        ]
 
     def update_camera(self):
         """更新相机位置"""
@@ -61,8 +71,14 @@ class Drone3DViewer:
                   0, 0, 0,  # 观察点
                   0, 1, 0)  # 上方向
 
-    def render(self, drone_state=None, trajectory=None):
-        """渲染整个场景"""
+    def render(self, drone_state=None, trajectory=None, waypoints=None):
+        """渲染整个场景
+        
+        Args:
+            drone_state: 无人机状态
+            trajectory: 轨迹数据
+            waypoints: 航点列表
+        """
         # 清除缓冲区
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClearColor(0.1, 0.1, 0.15, 1.0)  # 深蓝色背景
@@ -94,14 +110,59 @@ class Drone3DViewer:
         if self.show_trajectory and trajectory:
             self._draw_trajectory(trajectory)
 
+        # 绘制航点（如果有）
+        if self.show_waypoints and waypoints:
+            self._draw_waypoints(waypoints)
+
         # 绘制状态信息
         if drone_state:
             self._draw_status_overlay(drone_state)
         else:
-            self._draw_default_overlay()
+            # 单无人机模式（向后兼容）
+            if drone_state:
+                self._draw_drone(drone_state)
+            else:
+                # 如果没有状态数据，绘制默认位置的无人机
+                default_state = {
+                    'position': [0.0, 2.0, 0.0],
+                    'orientation': [0.0, 0.0, 0.0],
+                    'armed': True,
+                    'mode': 'HOVER'
+                }
+                self._draw_drone(default_state)
+
+            # 绘制轨迹（如果有）
+            if self.show_trajectory and trajectory:
+                self._draw_trajectory(trajectory)
+
+            # 绘制状态信息
+            if drone_state:
+                self._draw_status_overlay(drone_state)
+            else:
+                self._draw_default_overlay()
 
         # 交换缓冲区
         pygame.display.flip()
+
+    def _render_multi_drones(self, all_drones_state, all_trajectories):
+        """渲染多架无人机"""
+        # 绘制所有无人机的轨迹
+        if self.show_trajectory and all_trajectories:
+            for i, trajectory in enumerate(all_trajectories):
+                if trajectory and len(trajectory) > 1:
+                    self._draw_trajectory(trajectory, drone_index=i)
+
+        # 绘制所有无人机
+        for i, drone_state in enumerate(all_drones_state):
+            self._draw_drone(drone_state, drone_index=i)
+
+    def set_multi_drone_mode(self, enabled):
+        """设置多无人机渲染模式"""
+        self.multi_drone_mode = enabled
+        if enabled:
+            pygame.display.set_caption("无人机3D仿真系统 [多机模式]")
+        else:
+            pygame.display.set_caption("无人机3D仿真系统")
 
     def _draw_grid(self):
         """绘制地面网格"""
@@ -141,37 +202,66 @@ class Drone3DViewer:
         glEnd()
         glLineWidth(1.0)
 
-    def _draw_drone(self, state):
+    def _draw_drone(self, state, drone_index=0):
         """绘制无人机"""
         x, y, z = state.get('position', [0.0, 2.0, 0.0])
         roll, pitch, yaw = state.get('orientation', [0.0, 0.0, 0.0])
 
         glPushMatrix()
         glTranslatef(x, y, z)
-        glRotatef(np.degrees(yaw), 0, 1, 0)
-        glRotatef(np.degrees(pitch), 1, 0, 0)
-        glRotatef(np.degrees(roll), 0, 0, 1)
+        glRotatef(yaw, 0, 1, 0)
+        glRotatef(pitch, 1, 0, 0)
+        glRotatef(roll, 0, 0, 1)
 
         # 根据状态设置颜色
         armed = state.get('armed', True)
         mode = state.get('mode', 'HOVER')
 
-        if armed:
-            if mode == 'TAKEOFF':
-                color = (0.0, 1.0, 0.0)  # 绿色：起飞中
-            elif mode == 'LAND':
-                color = (1.0, 0.5, 0.0)  # 橙色：降落中
-            elif mode == 'HOVER':
-                color = (0.0, 0.8, 1.0)  # 青色：悬停
+        # 多无人机模式使用独特颜色
+        if self.multi_drone_mode:
+            base_color = self.drone_colors[drone_index % len(self.drone_colors)]
+            if armed:
+                if mode == 'TAKEOFF':
+                    color = (0.0, 1.0, 0.0)  # 绿色：起飞中
+                elif mode == 'LAND':
+                    color = (1.0, 0.5, 0.0)  # 橙色：降落中
+                elif mode == 'HOVER':
+                    color = base_color  # 使用基础颜色
+                else:
+                    # 在基础颜色上增加亮度
+                    color = tuple(min(c * 1.2, 1.0) for c in base_color)
             else:
-                color = (0.0, 0.6, 0.0)  # 深绿色：飞行中
+                color = (0.5, 0.5, 0.5)  # 灰色：未解锁
         else:
-            color = (0.5, 0.5, 0.5)  # 灰色：未解锁
+            # 单无人机模式（原有逻辑）
+            if armed:
+                if mode == 'TAKEOFF':
+                    color = (0.0, 1.0, 0.0)  # 绿色：起飞中
+                elif mode == 'LAND':
+                    color = (1.0, 0.5, 0.0)  # 橙色：降落中
+                elif mode == 'HOVER':
+                    color = (0.0, 0.8, 1.0)  # 青色：悬停
+                else:
+                    color = (0.0, 0.6, 0.0)  # 深绿色：飞行中
+            else:
+                color = (0.5, 0.5, 0.5)  # 灰色：未解锁
 
         self.drone_model.draw(color)
+
+        # 如果是多无人机模式，绘制编号标识
+        if self.multi_drone_mode and armed:
+            self._draw_drone_label(drone_index, y + 1.0)
+
         glPopMatrix()
 
-    def _draw_trajectory(self, trajectory):
+    def _draw_drone_label(self, drone_index, y_offset):
+        """绘制无人机编号标签"""
+        # 在无人机上方绘制编号
+        glColor3f(1.0, 1.0, 1.0)
+        # 简化版本：使用不同颜色的无人机代替文字标签
+        pass  # 实际渲染时使用颜色区分
+
+    def _draw_trajectory(self, trajectory, drone_index=0):
         """绘制飞行轨迹"""
         if len(trajectory) < 2:
             return
@@ -179,17 +269,109 @@ class Drone3DViewer:
         glLineWidth(2.0)
         glBegin(GL_LINE_STRIP)
 
-        # 渐变颜色：从蓝色到红色
-        for i, (x, y, z) in enumerate(trajectory):
-            t = i / len(trajectory)
-            r = t
-            g = 0.5 - 0.5 * t
-            b = 1.0 - t
-            glColor3f(r, g, b)
-            glVertex3f(x, y, z)
+        # 多无人机模式使用不同颜色
+        if self.multi_drone_mode:
+            base_color = self.drone_colors[drone_index % len(self.drone_colors)]
+            for i, (x, y, z) in enumerate(trajectory):
+                t = i / len(trajectory)
+                # 颜色随轨迹渐变
+                color = tuple(c * (0.5 + 0.5 * t) for c in base_color)
+                glColor3f(*color)
+                glVertex3f(x, y, z)
+        else:
+            # 单无人机模式（原有逻辑）
+            for i, (x, y, z) in enumerate(trajectory):
+                t = i / len(trajectory)
+                r = t
+                g = 0.5 - 0.5 * t
+                b = 1.0 - t
+                glColor3f(r, g, b)
+                glVertex3f(x, y, z)
 
         glEnd()
         glLineWidth(1.0)
+
+    def _draw_waypoints(self, waypoints):
+        """绘制航点标记"""
+        if not waypoints:
+            return
+
+        # 航点颜色配置
+        waypoint_colors = {
+            '起飞': (0.0, 1.0, 0.0),      # 绿色
+            '左转': (1.0, 0.5, 0.0),      # 橙色
+            '右转': (1.0, 0.5, 0.0),      # 橙色
+            '上升': (0.0, 0.5, 1.0),      # 蓝色
+            '下降': (0.5, 0.5, 1.0),      # 浅蓝色
+            '悬停': (1.0, 1.0, 0.0),      # 黄色
+            '降落': (1.0, 0.0, 0.0),      # 红色
+        }
+
+        for i, waypoint in enumerate(waypoints):
+            # 获取航点位置
+            if hasattr(waypoint, 'position'):
+                pos = waypoint.position
+                label = waypoint.label
+                index = waypoint.index
+            else:
+                pos = waypoint.get('position', [0, 0, 0])
+                label = waypoint.get('label', f'WP{i}')
+                index = waypoint.get('index', i)
+
+            x, y, z = pos[0], pos[1], pos[2]
+
+            # 获取颜色
+            color = waypoint_colors.get(label, (1.0, 1.0, 0.0))  # 默认黄色
+
+            # 绘制航点标记（带圆环的立柱）
+            glColor3f(*color)
+
+            # 绘制立柱
+            glLineWidth(2.0)
+            glBegin(GL_LINES)
+            glVertex3f(x, 0, z)
+            glVertex3f(x, y, z)
+            glEnd()
+            glLineWidth(1.0)
+
+            # 绘制地面圆圈
+            glColor3f(color[0] * 0.7, color[1] * 0.7, color[2] * 0.7)
+            glBegin(GL_LINE_LOOP)
+            for j in range(32):
+                angle = 2 * np.pi * j / 32
+                circle_x = x + 0.3 * np.cos(angle)
+                circle_z = z + 0.3 * np.sin(angle)
+                glVertex3f(circle_x, 0.01, circle_z)
+            glEnd()
+
+            # 绘制顶部标记
+            glColor3f(*color)
+            self._draw_waypoint_marker(x, y, z)
+
+    def _draw_waypoint_marker(self, x, y, z):
+        """绘制航点标记（菱形）"""
+        marker_size = 0.2
+
+        glBegin(GL_TRIANGLES)
+        # 四个三角形组成的菱形
+        # 顶部
+        glVertex3f(x, y + marker_size, z)
+        glVertex3f(x - marker_size * 0.5, y, z - marker_size * 0.5)
+        glVertex3f(x + marker_size * 0.5, y, z + marker_size * 0.5)
+
+        glVertex3f(x, y + marker_size, z)
+        glVertex3f(x + marker_size * 0.5, y, z - marker_size * 0.5)
+        glVertex3f(x - marker_size * 0.5, y, z + marker_size * 0.5)
+
+        # 底部
+        glVertex3f(x, y - marker_size * 0.5, z)
+        glVertex3f(x - marker_size * 0.5, y, z - marker_size * 0.5)
+        glVertex3f(x + marker_size * 0.5, y, z + marker_size * 0.5)
+
+        glVertex3f(x, y - marker_size * 0.5, z)
+        glVertex3f(x + marker_size * 0.5, y, z - marker_size * 0.5)
+        glVertex3f(x - marker_size * 0.5, y, z + marker_size * 0.5)
+        glEnd()
 
     def _draw_status_overlay(self, state):
         """绘制状态信息覆盖层"""
@@ -236,6 +418,9 @@ class Drone3DViewer:
                     self.camera_distance = max(5, self.camera_distance - 1)
                 elif event.key == pygame.K_MINUS:
                     self.camera_distance = min(50, self.camera_distance + 1)
+                elif event.key == pygame.K_w:
+                    self.show_waypoints = not self.show_waypoints
+                    print(f"航点显示: {'开' if self.show_waypoints else '关'}")
         return True
 
 

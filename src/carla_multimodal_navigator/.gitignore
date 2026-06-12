@@ -1,0 +1,51 @@
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.carla_env/
+car_nav/
+*.venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log files
+*.log
+logs/
+
+# CARLA specific
+*.egg-info/
+build/
+dist/
+*.egg
+
+# Video capture/output
+*.mp4
+*.avi
+*.jpg
+*.png
+captures/
+
+# Python packaging
+MANIFEST
+*.spec
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

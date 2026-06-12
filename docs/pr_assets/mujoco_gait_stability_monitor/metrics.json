@@ -1,0 +1,13 @@
+{
+  "source": "MuJoCo humanoid gait state log",
+  "steps": 22,
+  "fall_warning_steps": 2,
+  "unstable_steps": 4,
+  "max_gait_risk": 0.7246,
+  "lowest_com_height_m": 0.84,
+  "generated_files": [
+    "mujoco_com_height_risk.png",
+    "mujoco_pitch_risk_scatter.png",
+    "mujoco_gait_scores.csv"
+  ]
+}
