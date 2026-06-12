@@ -125,6 +125,26 @@ Recommendations for improving the agent's performance:
 - **Increased Exploration**: Methods such as ε-greedy or curiosity-driven exploration can help the agent learn more diverse strategies.
 - **Extended Training**: Additional timesteps can provide the agent with more experience and lead to better policies.
 
+## 6.5 学习曲线可视化（learning_curve.py）
+
+模块新增 `learning_curve.py` 脚本，自动完成"短训 → 读日志 → 画曲线"全流程，无需任何先决条件即可一键运行：
+
+```bash
+python learning_curve.py                       # 默认 5000 timesteps
+python learning_curve.py 20000                 # 指定 timesteps
+python learning_curve.py 5000 demo.png         # 指定 timesteps + 输出文件
+```
+
+工作流程：
+1. 调用 `env_utils.py` 的 Monitor wrapper 创建 `BipedalWalker-v3` 环境，自动写入 `logs/*.monitor.csv`
+2. 用 PPO MlpPolicy 训练指定步数（CPU 上 20000 步约 50 秒）
+3. 读取 Monitor 日志，控制台打印 markdown 训练摘要表（总 episode 数、平均/最高/末段奖励、平均轮长）
+4. 用 matplotlib 绘制双栏 PNG：左图 = reward vs episode + 滚动均值；右图 = episode length vs episode + 滚动均值
+
+下图为 20000 timesteps 训练 80 个 episode 后的输出（可见 episode length 从初始 1600 步逐步下降到 ~100 步，体现 agent 在学习避免无效探索）：
+
+![学习曲线](result_learning_curve.png)
+
 ## 7. Installation Requirements
 
 To install the necessary dependencies, use the provided `requirements.txt`:
