@@ -6,12 +6,12 @@ from pathlib import Path
 import carla
 import logging
 from utils import calculate_vehicle_speed_kmh, debounce_check
-from collision_monitor import CollisionMonitor
-from environment_controller import env_controller
+from nn.src.connected_vehicles.src.collision_monitor import CollisionMonitor
+from nn.src.connected_vehicles.src.environment_controller import env_controller
 from traffic_light_controller import tl_controller
-from driver_vitals_monitor import vitals_monitor, update_driver_vitals, reset_driver_vitals
+from nn.src.connected_vehicles.src.driver_vitals_monitor import vitals_monitor, update_driver_vitals, reset_driver_vitals
 from vehicle_status_gui import gui_instance, create_status_window, stop_gui, update_vehicle_status
-from config import (
+from nn.src.connected_vehicles.src.config import (
     CARLA_HOST, CARLA_PORT, CARLA_TIMEOUT,
     MAX_SPEED_KMH, SPAWN_POINT_OFFSET, STEER_ANGLE, BRAKE_INTENSITY,
     WEATHER_LIST
@@ -261,7 +261,7 @@ R键：重置车辆到初始生成点
             if debounce_check(keyboard.is_pressed("r"), self.r_key_triggered):
                 self.reset_vehicle_position()
 
-            # 10. 驾驶员体征更新（核心新增）
+            # 10. 驾驶员体征更新
             current_weather = env_controller.get_current_environment_state()["weather_type"]
             update_driver_vitals(self.car, current_weather, collision_occurred)
             # 更新GUI体征数据
