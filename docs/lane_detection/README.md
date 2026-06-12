@@ -3,9 +3,7 @@
 基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。
 
 **作者**：ultra223  
-**课题进度**：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
-**课题进度**：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
-**课题进度**：2/10（步骤1 基础检测 + 步骤2 HSV 优化）
+**课题进度**：5/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算）
 
 ## 模块结构
 
@@ -15,7 +13,7 @@
 | `config.py` | 路径与算法参数 |
 | `lane_preprocess.py` | 步骤1：灰度、Canny、ROI、霍夫 |
 | `lane_detect.py` | 步骤2：HSV 黄白线、双黄线中心轴、左右车道 |
-| `lane_advanced.py` | 步骤3：透视变换、滑动窗口、二次多项式拟合 |
+| `lane_advanced.py` | 步骤3 & 5：透视变换、滑动窗口、多项式拟合、曲率与偏移计算 |
 | `lane_video.py` | 步骤4：视频处理、帧间 EMA 平滑 |
 | `carla_test.jpg` | 少量示例输入（运行依赖） |
 
@@ -47,10 +45,6 @@ python main.py --mode advanced
 # 步骤4：视频模式（逐帧检测 + EMA 平滑）
 python main.py --mode video --video path/to/video.mp4
 
-# 重新生成文档配图（写入 docs/lane_detection/images）
-python main.py --save-docs --no-show
-python main.py --mode hsv --save-docs --no-show
-python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
@@ -142,6 +136,53 @@ fit_smoothed = α × fit_current + (1 − α) × fit_previous
 - α = 1.0：完全使用当前帧结果（无平滑，可能抖动）
 - α = 0.1：高度平滑，响应慢但稳定
 - α = 0.3（默认）：兼顾响应速度和平滑度
+
+## 步骤5：车道曲率与车辆偏移计算
+
+在步骤3/4的基础上，利用二次多项式拟合系数计算车道曲率半径与车辆相对车道中心的横向偏移，并在结果图上叠加实时信息，帮助评估驾驶状态。
+
+**关键参数**
+
+| 参数 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `--no-metrics` | 否 | 隐藏曲率与偏移信息 |
+| `ym_per_pix` | 30/720 | 纵向像素→米转换因子 |
+| `xm_per_pix` | 3.7/700 | 横向像素→米转换因子 |
+
+**曲率半径公式**
+
+```
+车道线模型: x = A·y² + B·y + C
+曲率半径:   R = (1 + (2Ay + B)²)^(3/2) / |2A|
+```
+
+- 像素坐标系数先转换为真实世界（米）坐标再计算
+- 曲率半径 > 800 m 视为直道
+- 颜色编码：绿色=安全，黄色=弯道，红色=偏移过大
+
+**叠加信息**
+
+| 信息 | 说明 |
+| :--- | :--- |
+| 曲率半径 | 左右车道线平均曲率半径（米） |
+| 车道方向 | 直行 / 左弯 / 右弯 |
+| 车辆偏移 | 车辆相对车道中心的横向偏移（米） |
+| 偏移方向 | 居中 / 偏左 / 偏右 |
+| 左右线曲率 | 各车道线独立的曲率半径 |
+
+**使用方式**
+
+```bash
+# 图片模式（自动显示曲率与偏移）
+python main.py --mode advanced
+
+# 视频模式（每帧显示曲率与偏移）
+python main.py --mode video --video path/to/video.mp4
+
+# 隐藏曲率信息
+python main.py --mode advanced --no-metrics
+python main.py --mode video --video path/to/video.mp4 --no-metrics
+```
 
 ## 参考
 
