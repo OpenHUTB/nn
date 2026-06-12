@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/bipedal_walker_LR/bipedal_walker_LR/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>双足行走机器人** - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u53cc\u8db3\u884c\u8d70\u673a\u5668\u4eba**";
+        var mkdocs_page_input_path = "bipedal_walker_LR/bipedal_walker_LR.md";
+        var mkdocs_page_url = "/nn/bipedal_walker_LR/bipedal_walker_LR/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">双足行走机器人**</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/bipedal_walker_LR/bipedal_walker_LR.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="_1"><strong>双足行走机器人</strong>**</h1>
+<p><strong>**PPO 训练项目</strong></p>
+<p>基于近端策略优化（PPO）算法，在 BipedalWalker 环境中实现标准模式与硬核模式双足行走智能体训练</p>
+<p>算法Proximal Policy Optimization</p>
+<p>环境BipedalWalker-v3 / Hardcore</p>
+<p>框架Stable Baselines3 + Gymnasium</p>
+<p>日期2026 年 6 月</p>
+<h2 id="_2">目录</h2>
+<p>0.关于 Bipedal Walker 环境</p>
+<p>1.项目结构</p>
+<p>2.训练流程</p>
+<p>3.环境配置</p>
+<p>4.模型评估</p>
+<p>5.训练日志与分析</p>
+<p>6.改进方向</p>
+<p>7.安装依赖</p>
+<p>8.致谢</p>
+<h2 id="_3">核心指标</h2>
+<p>标准模式最优奖励</p>
+<p>248</p>
+<p>平均奖励分</p>
+<p>硬核最长训练步数</p>
+<p>700万</p>
+<p>训练步数</p>
+<p>Section 0</p>
+<h2 id="bipedal-walker"><strong>关于 Bipedal Walker 环境</strong></h2>
+<p>Bipedal Walker 是基于 Box2D 物理引擎开发的经典强化学习环境，由 Oleg Klimov 开发并集成于 OpenAI Gym（现为 Gymnasium）。该环境模拟了一个双足机器人在二维侧视地形中的行走任务，要求智能体通过协调髋关节和膝关节来保持平衡，同时尽可能向前移动。</p>
+<p>观测空间分布（24维）</p>
+<p>机身角度/速度</p>
+<p>6</p>
+<p>关节角度/速度</p>
+<p>8</p>
+<p>LIDAR 雷达读数</p>
+<p>10</p>
+<p>共 24 个连续观测值，覆盖姿态、速度与感知信息</p>
+<p>环境关键参数</p>
+<p>标准模式 BipedalWalker-v3硬核模式 BipedalWalkerHardcore-v3前进奖励 ≈ 248 ± 112!</p>
+<p>图1：标准模式（左）与硬核模式（右）环境对比示意图</p>
+<p>奖励机制设计：智能体每向前移动一步获得约 +1 奖励，使用关节扭矩消耗负惩罚（-0.00035×扭矩²），摔倒后立即获得 -100 惩罚并终止回合。成功通过整个赛道可额外获得约 +300 奖励。</p>
+<p>Section 1</p>
+<h2 id="_4"><strong>项目结构</strong></h2>
+<p>本项目采用模块化设计，核心代码分为两个主要文件，辅以日志、模型和视频三个输出目录。</p>
+<p>项目根目录BipedalWalker-PPO/main.py训练主循环env_utils.py环境工具脚本logs/训练日志models/ &amp; videos/PPO 模型训练Stable Baselines3make_env()observe_model()模型文件评估报告</p>
+<p>图2：项目模块依赖与数据流向图</p>
+<p>核心代码文件</p>
+<p>2</p>
+<p>main.py + env_utils.py</p>
+<p>输出目录</p>
+<p>3</p>
+<p>logs / models / videos</p>
+<p>训练模式</p>
+<p>2</p>
+<p>标准模式 + 硬核模式</p>
+<p>核心函数</p>
+<p>2</p>
+<p>make_env + observe_model</p>
+<p>Section 2</p>
+<h2 id="_5"><strong>训练流程</strong></h2>
+<p>本项目使用 Proximal Policy Optimization（PPO） 算法，这是一种基于策略梯度的 Actor-Critic 方法，通过裁剪目标函数限制策略更新幅度，在训练稳定性与样本效率之间取得良好平衡。</p>
+<p>PPO 算法核心流程</p>
+<p>采样Actor 与环境交互计算优势GAE 估计 Aₜ裁剪目标min(rₜAₜ, clip·Aₜ)梯度更新Adam 优化器策略更新完成进入下一轮采样循环迭代</p>
+<h4 id="_6">标准模式训练</h4>
+<p>训练步数：100 万步</p>
+<p>环境：BipedalWalker-v3</p>
+<p>并行向量化环境加速</p>
+<p>奖励归一化（VecNormalize）</p>
+<p>帧堆叠（最近4帧）</p>
+<p>视频录制（每1000步）</p>
+<p>MLP 策略网络</p>
+<p>主要挑战</p>
+<h4 id="_7">硬核模式训练</h4>
+<p>训练步数：500 万步起（最高700万）</p>
+<p>环境：BipedalWalkerHardcore-v3</p>
+<p>包含阶梯、坑洞、树桩障碍</p>
+<p>相同训练优化技术</p>
+<p>更复杂地形需更多探索</p>
+<p>更长训练周期</p>
+<p>性能收益边际递减</p>
+<h3 id="_8">关键优化技术</h3>
+<p>并行环境</p>
+<p>DummyVecEnv</p>
+<p>多实例并行训练</p>
+<p>观测归一化</p>
+<p>VecNormalize</p>
+<p>均值方差标准化</p>
+<p>帧堆叠</p>
+<p>×4</p>
+<p>时序上下文感知</p>
+<p>裁剪系数 ε</p>
+<p>0.2</p>
+<p>PPO clip 默认值</p>
+<p>Section 3</p>
+<h2 id="_9"><strong>环境配置</strong></h2>
+<p>环境配置通过 env_utils.py 中的两个核心函数实现，提供灵活的训练与评估环境搭建能力。</p>
+<h3 id="31-make_env">3.1 make_env() 函数</h3>
+<p>负责创建并配置训练/评估环境，支持多种可配置选项，实现了从环境创建到观测归一化的完整配置流程。</p>
+<p>make_env() 包装器堆叠结构</p>
+<p>BipedalWalker-v3 / BipedalWalkerHardcore-v3（原始环境）Monitor 包装器（记录奖励、回合长度）DummyVecEnv（向量化并行环境）VecNormalize（观测 &amp; 奖励归一化，clip_obs=10.0）VecFrameStack（帧堆叠 n=4）RecordVideo（每1000步录制，可选）底层顶层</p>
+<h1 id="make_env-from-env_utils-import-make_env">make_env() 示例调用from env_utils import make_env</h1>
+<h1 id="_10">创建标准模式训练环境</h1>
+<p>env = make_env(</p>
+<p>env_name="BipedalWalker-v3",</p>
+<p>hardcore=False,</p>
+<p>record_video=True,</p>
+<p>use_monitor=True,</p>
+<p>n_stack=4,</p>
+<p>clip_obs=10.0</p>
+<p>)</p>
+<h1 id="_11">创建硬核模式训练环境</h1>
+<p>env_hc = make_env(</p>
+<p>env_name="BipedalWalker-v3",</p>
+<p>hardcore=True,</p>
+<p>record_video=True,</p>
+<p>use_monitor=True</p>
+<p>)</p>
+<h3 id="32-observe_model">3.2 observe_model() 函数</h3>
+<p>负责加载训练好的 PPO 模型，并在评估环境中运行，自动适配训练时所用的 VecNormalize 和 VecFrameStack 包装器，确保评估行为与训练一致。</p>
+<p>1</p>
+<p>模型加载</p>
+<p>从指定路径加载训练完成的 PPO 模型文件（.zip 格式），使用 Stable Baselines3 的 PPO.load() 接口。</p>
+<p>2</p>
+<p>环境配置</p>
+<p>根据 hardcore 参数自动选择对应环境，以 human 或 rgb_array 渲染模式初始化。</p>
+<p>3</p>
+<p>包装器适配</p>
+<p>自动恢复 VecNormalize 统计参数（均值、方差），加载对应的 VecFrameStack 配置，确保评估与训练分布一致。</p>
+<p>4</p>
+<p>评估执行</p>
+<p>在 n_eval_episodes 个回合内运行模型，返回 平均奖励 与 奖励标准差。</p>
+<h1 id="observe_model-from-env_utils-import-observe_model">observe_model() 示例调用from env_utils import observe_model</h1>
+<p>mean_reward, std_reward = observe_model(</p>
+<p>model_path='models/ppo_bipedalwalker_1M',</p>
+<p>n_eval_episodes=5,</p>
+<p>hardcore=False</p>
+<p>)print(f"平均奖励: {mean_reward:.2f} ± {std_reward:.2f}")</p>
+<p>Section 4</p>
+<h2 id="_12"><strong>模型评估</strong></h2>
+<p>模型评估通过 observe_model() 函数完成。以下是各训练阶段的评估结果，可以清晰地看出随训练步数增加，智能体性能的渐进提升趋势。</p>
+<p>各模式 / 训练阶段平均奖励对比</p>
+<p>标准模式（100万步）硬核模式</p>
+<p>硬核模式奖励随训练步数变化（趋势）</p>
+<p>硬核 - 300 万步</p>
+<p>-28.23</p>
+<p>硬核 - 500 万步</p>
+<p>-10.66</p>
+<p>硬核 - 700 万步</p>
+<p>-5.45</p>
+<p>标准 - 100 万步</p>
+<p>+248.39</p>
+<p>注：以标准模式 248.39 为 100% 基准，负值表示仍在收敛中</p>
+<p>分析：标准模式下智能体已能较稳定行走（奖励 248.39），接近通关阈值（300）。硬核模式因地形复杂、障碍多样，即使经过 700 万步训练，奖励仍为负值，说明障碍应对策略尚需继续优化。但从 300 万到 700 万步的负奖励绝对值逐步缩小（-28 → -5.45），显示训练方向正确，标准差也明显收窄，说明策略趋于稳定。</p>
+<p>Section 5</p>
+<h2 id="_13"><strong>训练日志与分析</strong></h2>
+<p>本节对 500 万步硬核模式训练日志进行深度分析，使用 pandas 和 matplotlib 对关键指标进行可视化，揭示训练过程中的规律与趋势。</p>
+<p>模拟回合长度变化趋势（500万步硬核模式）</p>
+<p>原始回合长度50步移动平均</p>
+<p>奖励分布（500万步硬核）</p>
+<p>奖励与回合长度相关性</p>
+<p>奖励与回合长度相关系数</p>
+<p>0.89</p>
+<p>强正相关</p>
+<p>奖励整体趋势</p>
+<p>上升</p>
+<p>波动中趋于稳定</p>
+<p>500万步最终平均奖励</p>
+<p>-10.66</p>
+<p>较300万提升62%</p>
+<p>标准差收窄</p>
+<p>24→3.9</p>
+<p>策略逐步稳定</p>
+<p>关键结论：奖励值与回合长度呈现显著正相关（相关系数 0.89），说明智能体在环境中存活时间越长，获得的奖励也越高。这验证了生存时间是本任务最核心的性能指标之一，优化存活策略应作为首要优化目标。</p>
+<h3 id="_14">分析代码示例</h3>
+<p>import pandas as pdimport matplotlib.pyplot as plt</p>
+<h1 id="_15">加载训练日志</h1>
+<p>df = pd.read_csv('logs/monitor.csv', skiprows=1)</p>
+<p>df.columns = ['reward', 'ep_length', 'time']</p>
+<h1 id="_16">移动平均平滑处理</h1>
+<p>df['reward_ma'] = df['reward'].rolling(window=50).mean()</p>
+<p>df['ep_len_ma'] = df['ep_length'].rolling(window=50).mean()</p>
+<h1 id="_17">计算相关系数</h1>
+<p>corr = df['reward'].corr(df['ep_length'])print(f"相关系数: {corr:.2f}")  # → 0.89</p>
+<p>Section 6</p>
+<h2 id="_18"><strong>改进方向</strong></h2>
+<p>基于当前实验结果，提出以下四个主要优化方向，帮助进一步提升硬核模式下的智能体性能。</p>
+<h4 id="_19">调整学习率</h4>
+<p>降低学习率（如从 3e-4 调整为 1e-4）可减少训练震荡，使策略更新更平稳，提升收敛稳定性。</p>
+<h4 id="_20">重构奖励函数</h4>
+<p>调整奖励权重，增加平衡与生存奖励比重，减少单纯前进奖励权重，引导智能体优先学习稳定运动模式。</p>
+<h4 id="_21">增强探索能力</h4>
+<p>引入好奇心驱动探索（ICM）或最大熵强化学习方法，帮助智能体探索更多样化的运动策略。</p>
+<h4 id="_22">延长训练周期</h4>
+<p>增加训练至 1000 万步以上，继续挖掘硬核模式性能潜力，观察奖励是否能进入正值区间。</p>
+<p>额外建议：可考虑引入课程学习（Curriculum Learning）策略，先在简单地形训练，逐步增加障碍难度；也可尝试更强的策略网络架构（如 LSTM 处理时序信息），或使用 SAC、TD3 等 off-policy 算法提升样本效率。</p>
+<p>Section 7</p>
+<h2 id="_23"><strong>安装依赖</strong></h2>
+<p>使用项目提供的 requirements.txt 文件一键安装所有依赖：</p>
+<h1 id="_24">一键安装所有依赖</h1>
+<p>pip install -r requirements.txt</p>
+<p>环境建议：推荐在 Python 虚拟环境（venv 或 conda）中安装依赖，避免包版本冲突。GPU 用户可安装 PyTorch CUDA 版本以加速训练。</p>
+<p>Section 8</p>
+<h2 id="_25"><strong>致谢</strong></h2>
+<p>本项目基于以下开源项目与工具完成，在此表示诚挚感谢：</p>
+<p>Bipedal Walker 环境</p>
+<p>由 Oleg Klimov 开发，基于 Box2D 物理引擎实现。作为强化学习连续控制领域的经典 Benchmark，为本项目提供了标准化的训练与评估平台。</p>
+<p>Stable Baselines3</p>
+<p>由 Antonin Raffin 等人开发的高质量强化学习算法库，提供了稳定、易用的 PPO 实现，支持向量化环境、归一化包装器等关键特性。</p>
+<p>Gymnasium（OpenAI Gym）</p>
+<p>提供了标准化的强化学习环境接口，使算法与环境的解耦实现变得简单，大幅降低了强化学习实验的开发门槛。</p>
+<p>PyTorch + NumPy + Matplotlib</p>
+<p>深度学习框架与科学计算工具链，为模型训练、数值计算和结果可视化提供了坚实的技术支撑。</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准</th>
+<th>硬核</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>动作空间</td>
+<td>4维连续（关节扭矩）</td>
+<td>4维连续（关节扭矩）</td>
+</tr>
+<tr>
+<td>观测空间</td>
+<td>24维连续</td>
+<td>24维连续</td>
+</tr>
+<tr>
+<td>最大步数</td>
+<td>1600</td>
+<td>2000</td>
+</tr>
+<tr>
+<td>地形难度</td>
+<td>平坦</td>
+<td>障碍+坑洞</td>
+</tr>
+<tr>
+<td>过关奖励</td>
+<td>+300</td>
+<td>+300</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>训练模式</th>
+<th>训练步数</th>
+<th>平均奖励</th>
+<th>标准差</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>标准模式</td>
+<td>100 万</td>
+<td>+248.39</td>
+<td>± 112.10</td>
+<td>良好</td>
+</tr>
+<tr>
+<td>硬核模式</td>
+<td>300 万</td>
+<td>-28.23</td>
+<td>± 24.82</td>
+<td>早期</td>
+</tr>
+<tr>
+<td>硬核模式</td>
+<td>500 万</td>
+<td>-10.66</td>
+<td>± 3.91</td>
+<td>提升中</td>
+</tr>
+<tr>
+<td>硬核模式</td>
+<td>700 万</td>
+<td>-5.45</td>
+<td>± 2.10</td>
+<td>趋势良好</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>依赖包</th>
+<th>版本要求</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>3.8+</td>
+<td>运行环境</td>
+</tr>
+<tr>
+<td>gymnasium</td>
+<td>≥ 0.26</td>
+<td>强化学习环境接口（BipedalWalker）</td>
+</tr>
+<tr>
+<td>gymnasium[box2d]</td>
+<td>随 gymnasium</td>
+<td>Box2D 物理引擎支持</td>
+</tr>
+<tr>
+<td>stable-baselines3</td>
+<td>≥ 2.0</td>
+<td>PPO 算法实现库</td>
+</tr>
+<tr>
+<td>pandas</td>
+<td>≥ 1.5</td>
+<td>日志数据处理与分析</td>
+</tr>
+<tr>
+<td>matplotlib</td>
+<td>≥ 3.5</td>
+<td>训练曲线可视化</td>
+</tr>
+<tr>
+<td>numpy</td>
+<td>≥ 1.22</td>
+<td>数值计算基础</td>
+</tr>
+<tr>
+<td>torch</td>
+<td>≥ 1.13</td>
+<td>SB3 深度学习后端</td>
+</tr>
+</tbody>
+</table>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
