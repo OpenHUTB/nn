@@ -226,6 +226,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_weather_robustness/</loc>
+         <lastmod>2026-06-12</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_yolo_detection/</loc>
          <lastmod>2026-06-12</lastmod>
          <changefreq>daily</changefreq>

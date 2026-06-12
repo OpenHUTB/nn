@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_weather_robustness/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>CARLA天气鲁棒性测试 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "CARLA\u5929\u6c14\u9c81\u68d2\u6027\u6d4b\u8bd5";
+        var mkdocs_page_input_path = "carla_weather_robustness/README.md";
+        var mkdocs_page_url = "/nn/carla_weather_robustness/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">CARLA天气鲁棒性测试</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#_1">项目简介</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_2">系统模块组成</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_3">核心功能</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1">1. 道路循迹控制</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-7">2. 7 维图像质量评估</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-dbscan">3. DBSCAN 聚类障碍物检测</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4">4. 自适应传感器融合</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#5">5. 天气渐变过渡</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#6">6. 视觉效果缓存</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_4">碰撞检测与评分体系</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_5">多天气对比图表</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">CARLA天气鲁棒性测试</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_weather_robustness/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla">CARLA 天气鲁棒性测试系统</h1>
+<h2 id="_1">项目简介</h2>
+<p>在 CARLA 模拟器中测试自动驾驶车辆在 10 种天气条件下的感知鲁棒性，评估图像质量、传感器融合、障碍物检测和碰撞安全的综合表现。</p>
+<p><img alt="HUD实时画面" src="assets/hud_screenshot.png" /></p>
+<h2 id="_2">系统模块组成</h2>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>类名</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>道路循迹控制</td>
+<td><code>RoadFollowController</code></td>
+<td>沿道路中心线行驶，Waypoint API</td>
+</tr>
+<tr>
+<td>图像质量评估</td>
+<td><code>ImageQualityAssessor</code></td>
+<td>7 维图像质量分解</td>
+</tr>
+<tr>
+<td>自适应融合</td>
+<td><code>AdaptiveFusionPerceiver</code></td>
+<td>图像+LiDAR 动态融合</td>
+</tr>
+<tr>
+<td>DBSCAN 障碍物检测</td>
+<td><code>LidarAdaptivePerceiver</code></td>
+<td>LiDAR 点云聚类检测</td>
+</tr>
+<tr>
+<td>天气渐变过渡</td>
+<td><code>WeatherSimulator._update_weather_transition</code></td>
+<td>天气平滑切换</td>
+</tr>
+<tr>
+<td>鲁棒性评分</td>
+<td><code>RobustnessScorer</code></td>
+<td>综合评分输出</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_3">核心功能</h2>
+<h3 id="1">1. 道路循迹控制</h3>
+<pre><code class="language-python"># 旧代码：使用 Carla 内置 Autopilot
+vehicle.set_autopilot(True)  # 不可控
+</code></pre>
+<pre><code class="language-python"># 新代码：自定义道路循迹控制器
+class RoadFollowController:
+    def __init__(self, world, vehicle):
+        self._map = world.get_map()
+
+    def get_control(self):
+        waypoint = self._map.get_waypoint(self._vehicle.get_location())
+        # 计算目标方向，PID 控制转向
+        ...
+</code></pre>
+<p>原代码使用 Carla 内置 Autopilot，无法精确控制。修改后使用 Waypoint API 沿道路中心线行驶，配合 PID 控制转向，保持 30 km/h 匀速。</p>
+<h3 id="2-7">2. 7 维图像质量评估</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>含义</th>
+<th>权重</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>亮度</td>
+<td>平均亮度 (0-1)</td>
+<td>15%</td>
+</tr>
+<tr>
+<td>对比度</td>
+<td>像素标准差</td>
+<td>15%</td>
+</tr>
+<tr>
+<td>清晰度</td>
+<td>Laplacian 方差</td>
+<td>20%</td>
+</tr>
+<tr>
+<td>噪声</td>
+<td>高频噪声水平</td>
+<td>10%</td>
+</tr>
+<tr>
+<td>色彩饱和度</td>
+<td>平均饱和度</td>
+<td>10%</td>
+</tr>
+<tr>
+<td>可见度</td>
+<td>远景可见性</td>
+<td>15%</td>
+</tr>
+<tr>
+<td>结构相似度</td>
+<td>与晴朗天气对比</td>
+<td>15%</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-python"># 旧代码：单一质量分数
+quality = assess_image(image)  # 只输出一个值
+</code></pre>
+<pre><code class="language-python"># 新代码：7 维分解
+class ImageQualityAssessor:
+    def assess(self, image):
+        return {
+            &quot;brightness&quot;: ...,
+            &quot;contrast&quot;: ...,
+            &quot;sharpness&quot;: ...,
+            &quot;noise&quot;: ...,
+            &quot;saturation&quot;: ...,
+            &quot;visibility&quot;: ...,
+            &quot;ssim&quot;: ...
+        }
+</code></pre>
+<p>原代码只输出单一质量分数，无法定位性能瓶颈。修改后分解为 7 个维度，精确定位恶劣天气对图像质量的具体影响。</p>
+<h3 id="3-dbscan">3. DBSCAN 聚类障碍物检测</h3>
+<pre><code class="language-python"># 旧代码：简单距离阈值
+obstacles = [p for p in points if p.distance &lt; threshold]  # 不准确
+</code></pre>
+<pre><code class="language-python"># 新代码：先过滤地面点，再 DBSCAN 聚类
+class LidarAdaptivePerceiver:
+    def process_point_cloud(self, points):
+        # 1. 过滤地面点 (z &lt; -1.8m)
+        non_ground = [p for p in points if p.z &gt; -1.8]
+        # 2. 只取前方 30m 范围
+        front_points = [p for p in non_ground if 0 &lt; p.x &lt; 30 and abs(p.y) &lt; 10]
+        # 3. DBSCAN 聚类
+        clustering = DBSCAN(eps=1.5, min_samples=5).fit(front_points)
+        # 4. 提取障碍物
+        obstacles = []
+        for cluster_id in set(clustering.labels_):
+            if cluster_id == -1: continue  # 跳过噪声
+            cluster_points = front_points[clustering.labels_ == cluster_id]
+            obstacles.append(cluster_points)
+</code></pre>
+<p>原代码用简单距离阈值过滤，无法区分分散的小障碍物和聚集的大障碍物。修改后先用 DBSCAN 聚类，再提取每个簇的边界框，检测更精确。</p>
+<h3 id="4">4. 自适应传感器融合</h3>
+<pre><code class="language-python"># 旧代码：固定权重融合
+weight = 0.5  # 固定
+fusion = weight * camera + (1 - weight) * lidar
+</code></pre>
+<pre><code class="language-python"># 新代码：根据图像质量动态调整
+class AdaptiveFusionPerceiver:
+    def update_weights(self, img_quality):
+        if img_quality &lt; 0.3:       # 图像质量极差
+            self.camera_weight = 0.2
+            self.lidar_weight = 0.8  # 重度依赖 LiDAR
+        elif img_quality &lt; 0.6:      # 图像质量一般
+            self.camera_weight = 0.5
+            self.lidar_weight = 0.5  # 均衡
+        else:                        # 图像质量好
+            self.camera_weight = 0.7
+            self.lidar_weight = 0.3  # 主要依赖相机
+</code></pre>
+<p>原代码使用固定权重，恶劣天气下相机失效时仍大量依赖相机。修改后根据图像质量动态调整权重，图像差时自动切换到 LiDAR 主导模式。</p>
+<h3 id="5">5. 天气渐变过渡</h3>
+<pre><code class="language-python"># 旧代码：天气瞬间切换
+world.set_weather(weather)  # 突然变化
+</code></pre>
+<pre><code class="language-python"># 新代码：两阶段过渡
+class WeatherSimulator:
+    def _update_weather_transition(self, target_params):
+        # 阶段1：稳定期 (STEPS_PER_WEATHER - TRANSITION_STEPS 步)
+        # 阶段2：过渡期 (TRANSITION_STEPS 步) - 线性插值
+        if self._is_transitioning:
+            t = self._transition_step / WEATHER_TRANSITION_STEPS
+            current = lerp(current_params, target_params, t)
+            world.set_weather(current)
+</code></pre>
+<p>原代码天气瞬间切换，传感器来不及适应。修改后实现稳定期 + 过渡期两阶段，过渡期内天气参数线性插值，模拟真实天气变化。</p>
+<h3 id="6">6. 视觉效果缓存</h3>
+<pre><code class="language-python"># 旧代码：每帧重新生成雨滴/雪花
+raindrops = np.random.rand(500, 2)  # 每帧 O(n)
+</code></pre>
+<pre><code class="language-python"># 新代码：缓存雨滴/雪花/沙尘粒子
+class WeatherSimulator:
+    def _add_rain_effect(self, image):
+        if self._rain_cache is None or self._rain_seed != seed:
+            self._rain_cache = generate_raindrops(seed)
+        # 每帧只偏移位置，不重新生成
+</code></pre>
+<p>原代码每帧都重新随机生成雨滴和雪花，CPU 开销大。修改后引入缓存机制，仅在随机种子或尺寸变化时重建，大幅降低每帧计算量。</p>
+<h2 id="_4">碰撞检测与评分体系</h2>
+<pre><code class="language-python"># 旧代码：简单碰撞计数
+collisions += 1  # 只看有没有碰撞
+</code></pre>
+<pre><code class="language-python"># 新代码：综合评分
+class RobustnessScorer:
+    def compute_robustness_score(self, records):
+        collision_rate = collisions / total_frames
+        collision_score = 40 * (1 - collision_rate * 5)  # 碰撞安全 (40分)
+        image_score = 30 * avg_img_quality               # 图像质量 (30分)
+
+        if avg_img_quality &lt; 0.3:  # 恶劣天气
+            fusion_score = 30 * lidar_ratio               # 自适应融合 (30分)
+        else:
+            fusion_score = 30 * (1 - lidar_ratio)         # 正常天气依赖相机
+
+        detect_score = 20 * detection_rate                # 检测率 (20分)
+
+        return clip(collision_score + image_score + fusion_score + detect_score, 0, 100)
+</code></pre>
+<p>原代码只统计碰撞次数。修改后引入 100 分制综合评分，分四个维度：碰撞安全（40分）、图像质量（30分）、自适应融合（30分）、检测率（20分），并用 <code>np.clip</code> 限制在 0-100。</p>
+<h2 id="_5">多天气对比图表</h2>
+<pre><code class="language-python"># 旧代码：只打印文字报告
+print(f&quot;Clear: score={s1}, collisions={c1}&quot;)
+print(f&quot;Rain: score={s2}, collisions={c2}&quot;)
+</code></pre>
+<pre><code class="language-python"># 新代码：matplotlib 2×3 子图
+def _plot_comparison_chart(self, results):
+    fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+    # 子图1: 鲁棒性评分柱状图
+    # 子图2: 碰撞安全分析
+    # 子图3: 平均图像质量柱状图
+    # 子图4: 传感器融合分析
+    # 子图5: 障碍物检测率柱状图
+    # 子图6: 各天气评分汇总
+</code></pre>
+<p>原代码只打印文字报告，难以直观对比不同天气的表现。修改后使用 matplotlib 生成 2×3 共 6 张子图的对比图表，一目了然。</p>
+<p><img alt="多天气对比图表" src="assets/comparison_chart.png" /></p>
+<h1 id="_6">系统模块组成</h1>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>类名</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>道路循迹控制</td>
+<td><code>RoadFollowController</code></td>
+<td>沿道路中心线行驶，Waypoint API</td>
+</tr>
+<tr>
+<td>图像质量评估</td>
+<td><code>ImageQualityAssessor</code></td>
+<td>7 维图像质量分解</td>
+</tr>
+<tr>
+<td>自适应融合</td>
+<td><code>AdaptiveFusionPerceiver</code></td>
+<td>图像+LiDAR 动态融合</td>
+</tr>
+<tr>
+<td>DBSCAN 障碍物检测</td>
+<td><code>LidarAdaptivePerceiver</code></td>
+<td>LiDAR 点云聚类检测</td>
+</tr>
+<tr>
+<td>天气渐变过渡</td>
+<td><code>WeatherSimulator._update_weather_transition</code></td>
+<td>天气平滑切换</td>
+</tr>
+<tr>
+<td>鲁棒性评分</td>
+<td><code>RobustnessScorer</code></td>
+<td>综合评分输出</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_7">天气参数一览</h2>
+<table>
+<thead>
+<tr>
+<th>天气</th>
+<th>云量</th>
+<th>降水量</th>
+<th>雾浓度</th>
+<th>风速</th>
+<th>太阳方位角</th>
+<th>太阳高度角</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Clear</td>
+<td>10</td>
+<td>0</td>
+<td>0</td>
+<td>10</td>
+<td>0</td>
+<td>45</td>
+</tr>
+<tr>
+<td>Cloudy</td>
+<td>80</td>
+<td>0</td>
+<td>0</td>
+<td>10</td>
+<td>0</td>
+<td>30</td>
+</tr>
+<tr>
+<td>Light Rain</td>
+<td>60</td>
+<td>30</td>
+<td>0</td>
+<td>20</td>
+<td>0</td>
+<td>20</td>
+</tr>
+<tr>
+<td>Heavy Rain</td>
+<td>100</td>
+<td>80</td>
+<td>5</td>
+<td>40</td>
+<td>0</td>
+<td>15</td>
+</tr>
+<tr>
+<td>Fog</td>
+<td>10</td>
+<td>0</td>
+<td>80</td>
+<td>5</td>
+<td>0</td>
+<td>30</td>
+</tr>
+<tr>
+<td>Night</td>
+<td>10</td>
+<td>0</td>
+<td>0</td>
+<td>10</td>
+<td>0</td>
+<td>-80</td>
+</tr>
+<tr>
+<td>Night Rain</td>
+<td>60</td>
+<td>30</td>
+<td>0</td>
+<td>20</td>
+<td>0</td>
+<td>-70</td>
+</tr>
+<tr>
+<td>Snow</td>
+<td>90</td>
+<td>30</td>
+<td>0</td>
+<td>15</td>
+<td>0</td>
+<td>20</td>
+</tr>
+<tr>
+<td>Night Snow</td>
+<td>90</td>
+<td>30</td>
+<td>0</td>
+<td>15</td>
+<td>0</td>
+<td>-70</td>
+</tr>
+<tr>
+<td>Dust Storm</td>
+<td>100</td>
+<td>0</td>
+<td>90</td>
+<td>5</td>
+<td>20</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="十种天气画面对比" src="assets/weather_comparison.png" /></p>
+<h1 id="_8">后期计划</h1>
+<ul>
+<li>[ ] 添加更多天气类型（如沙尘暴、暴风雪）</li>
+<li>[ ] 支持多车辆并行测试</li>
+<li>[ ] 集成 ROS2 数据流</li>
+<li>[ ] 增加雨天 LiDAR 衰减模拟</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../mujoco_hci_sim/" class="btn btn-neutral float-left" title="人形机器人项目"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../mujoco_hci_sim/" style="color: #fcfcfc">&laquo; 前一页</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
