@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/index%20-%20wk/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>GraspRL：基于 DQN 与视觉感知的机械臂抓取强化学习项目 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "GraspRL\uff1a\u57fa\u4e8e DQN \u4e0e\u89c6\u89c9\u611f\u77e5\u7684\u673a\u68b0\u81c2\u6293\u53d6\u5f3a\u5316\u5b66\u4e60\u9879\u76ee";
+        var mkdocs_page_input_path = "index - wk.md";
+        var mkdocs_page_url = "/nn/index%20-%20wk/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="" href="../mujoco_running/running.md">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">GraspRL：基于 DQN 与视觉感知的机械臂抓取强化学习项目</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/index - wk.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="grasprl-dqn">GraspRL：基于 DQN 与视觉感知的机械臂抓取强化学习项目</h1>
+<h2 id="_1">一、项目概述</h2>
+<p>本项目基于 <strong>MuJoCo 物理引擎</strong>与 <strong>PyTorch</strong> 深度学习框架，围绕 <strong>UR5e 机械臂 + AG95 二指夹爪</strong> 的视觉抓取任务，搭建并持续改进 DQN 强化学习训练框架。目标是将机械臂抓取策略的学习过程从"能跑通"提升到"可复现、可对比、可解释、可迭代"。</p>
+<p>项目核心特点：
+- <strong>基于视觉的端到端抓取</strong>：输入 RGB-D 图像，经过 ResNet 编码器-解码器网络，输出逐像素 Q 值，选择最优抓取像素位置并映射到世界坐标
+- <strong>多阶段抓取执行管线</strong>：打开夹爪→粗定位→精准下降→夹取闭合→抬起→结果验证→放置，每阶段有独立的运动控制策略
+- <strong>操作空间控制（OSC）</strong>：基于质量矩阵和雅可比矩阵的操作空间控制器，实现末端执行器平滑、稳定的位姿跟踪
+- <strong>工程化训练增强</strong>：经验回放、目标网络、梯度裁剪、指令引导探索（Instruction-based Exploration）、密集+稀疏混合奖励
+- <strong>MuJoCo 物理仿真优化</strong>：关节限位保护 IK、actuator 与 OSC 解耦同步、接触力检测验证抓取</p>
+<h2 id="avalonguograsprl">本项目基于 <a href="https://github.com/AvalonGuo/grasprl">AvalonGuo/grasprl</a> 进行深度改进，可用于机器人抓取策略验证、强化学习算法研究、机械臂控制仿真调试等场景。</h2>
+<h2 id="_2">二、开发环境与技术栈</h2>
+<h3 id="21">2.1 核心技术栈</h3>
+<table>
+<thead>
+<tr>
+<th>技术</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python 3.8+</td>
+<td>主开发语言</td>
+</tr>
+<tr>
+<td>MuJoCo 2.3.0+</td>
+<td>高精度物理仿真引擎</td>
+</tr>
+<tr>
+<td>NumPy</td>
+<td>数值计算（线性代数、矩阵运算）</td>
+</tr>
+<tr>
+<td>PyTorch</td>
+<td>深度学习框架（Q 网络定义与训练）</td>
+</tr>
+<tr>
+<td>Gymnasium</td>
+<td>RL 环境标准接口封装</td>
+</tr>
+<tr>
+<td>OpenCV</td>
+<td>图像处理与数据集保存</td>
+</tr>
+<tr>
+<td>TensorBoard</td>
+<td>训练指标可视化</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22">2.2 运行环境</h3>
+<ul>
+<li><strong>操作系统</strong>：Linux / Windows 均可</li>
+<li><strong>Python 版本</strong>：3.8 ~ 3.10</li>
+<li><strong>仿真引擎</strong>：MuJoCo 2.3 及以上</li>
+<li><strong>硬件</strong>：CPU 可运行，GPU 推荐（加速网络训练）</li>
+</ul>
+<h3 id="23">2.3 依赖安装</h3>
+<pre><code class="language-powershell">pip install numpy mujoco torch gymnasium opencv-python tensorboard tqdm
+</code></pre>
+<blockquote>
+<p><strong>注意</strong>：Windows 下若遇到 OpenMP 冲突，运行前设置环境变量：
+<code>powershell
+$env:KMP_DUPLICATE_LIB_OK="TRUE"</code></p>
+</blockquote>
+<hr />
+<h2 id="_3">三、项目结构</h2>
+<pre><code>nn/src/grasprl/
+├── index.md                         # 项目说明（本文档）
+├── docs/
+│   ├── index.md                      # 文档主页
+│   └── images/                       # 文档图片资源
+│       ├── 1.png                      # MuJoCo仿真场景截图
+│       ├── 2.png                      # Top-down相机观测视角
+│       ├── 3.png                      # 训练终端输出日志
+│       ├── 4.png                      # TensorBoard训练曲线
+│       └── 5.png                      # 硬编码抓取运行截图
+├── run.py                            # 训练入口脚本
+├── debug_step.py                     # 端到端硬编码抓取测试脚本
+├── count_dataset.py                  # 数据集统计工具
+│
+├── grasprl/
+│   ├── run.py                        # 训练入口（重定向到 trainer）
+│   ├── controllers/
+│   │   ├── __init__.py
+│   │   ├── joint_effort_controller.py    # 关节力矩控制器 + 夹爪力矩控制器
+│   │   └── operational_space_controller.py # 操作空间控制器（OSC）
+│   ├── envs/
+│   │   └── grasp.py                      # ★ 核心环境：GraspRobot 类
+│   ├── modules/
+│   │   └── qnet.py                       # ★ Q 网络模块：ResNet 编码器-解码器
+│   ├── renderer/
+│   │   └── mujoco_env.py                 # MuJoCo 物理环境基类封装
+│   ├── trainer/
+│   │   └── dqn_baseline.py               # ★ DQN 训练器（训练主逻辑）
+│   ├── utils/
+│   │   ├── controller_utils.py           # 控制器辅助（任务空间惯性矩阵等）
+│   │   ├── mujoco_utils.py               # MuJoCo 工具（Jacobian、名称映射等）
+│   │   └── transform_utils.py            # 四元数/旋转矩阵转换工具
+│   ├── worlds/
+│   │   ├── grasp.xml                     # MuJoCo 场景定义（UR5e + AG95 + 物体）
+│   │   └── assets/meshes/                # 3D 模型网格（.stl/.obj）
+│   ├── dataset/grasp_samples/            # 训练过程中的图像+标签数据存档
+│   └── log/DQN/                          # TensorBoard 日志目录
+│
+└── trainer/
+    └── dqn_baseline.py                   # 训练器备份/另一版本
+</code></pre>
+<hr />
+<h2 id="_4">四、核心实现详解</h2>
+<h3 id="41-mujoco">4.1 MuJoCo 仿真场景</h3>
+<p><strong>场景定义文件</strong>：<code>grasprl/worlds/grasp.xml</code></p>
+<p><strong>机械臂</strong>：UR5e 6 自由度串联机械臂
+- 关节：<code>shoulder_pan</code> → <code>shoulder_lift</code> → <code>elbow</code> → <code>wrist_1</code> → <code>wrist_2</code> → <code>wrist_3</code>
+- 每个关节配置 position actuator（gain=2000, damping=400），用于默认的关节位置控制
+- 训练中使用 OSC 控制器绕过 actuator，通过 <code>qfrc_applied</code> 直接施加关节力矩</p>
+<p><strong>夹爪</strong>：AG95 二指平行夹爪
+- 每侧 3 个关节：<code>inner_knuckle</code> → <code>outer_knuckle</code> → <code>finger</code>
+- Equality 约束（<code>connect</code> + <code>joint</code>）确保两侧手指同步运动
+- 两个 position actuator（kp=50, kv=5）控制开合：<code>left_finger_act</code> / <code>right_finger_act</code>
+- 关节行程：<code>[0, 0.943]</code> rad（约 54°），0=全开，0.943=全闭</p>
+<p><strong>桌面与物体</strong>：
+- 桌面：0.3×0.3×0.05m，中心高度 z=0.95m
+- 6 个可抓取物体：3 个球体 + 3 个盒子（自由关节，可被推/抓）
+- 物体命名：<code>ball_1</code> ~ <code>ball_3</code>，<code>box_1</code> ~ <code>box_3</code></p>
+<p><strong>相机</strong>：
+- <code>top_down</code> 固定相机：用于获取训练观测图像
+- <code>eyeinhand</code> 手眼相机：安装在末端执行器旁</p>
+<p><img alt="MuJoCo仿真场景截图" src="images/1.png" /></p>
+<hr />
+<h3 id="42-grasprobot">4.2 环境：GraspRobot（核心类）</h3>
+<p><strong>文件</strong>：<code>grasprl/envs/grasp.py</code></p>
+<p><code>GraspRobot</code> 继承自 <code>MujocoPhyEnv</code>，封装了完整的抓取任务环境。</p>
+<h4 id="421">4.2.1 观测空间与动作空间</h4>
+<ul>
+<li><strong>观测</strong>：<code>defaultdict</code> 包含 RGB 图像 (64×64×3) 和深度图 (64×64)</li>
+<li><strong>动作</strong>：<code>Box(low=-0.5, high=0.5, shape=[3])</code> → 世界坐标系下抓取目标位置 [x, y, z]</li>
+</ul>
+<p><img alt="Top-down相机观测视角" src="images/2.png" /></p>
+<h4 id="422">4.2.2 奖励设计（密集 + 稀疏混合）</h4>
+<table>
+<thead>
+<tr>
+<th>奖励类型</th>
+<th>系数</th>
+<th>触发阶段</th>
+<th>计算方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>靠近奖励</td>
+<td>+3.0</td>
+<td>Phase 2 / Phase 3</td>
+<td>EE 到目标距离的减少量</td>
+</tr>
+<tr>
+<td>闭合奖励</td>
+<td>+2.0</td>
+<td>Phase 4</td>
+<td>夹爪闭合比例（qpos / 0.943）</td>
+</tr>
+<tr>
+<td>接触奖励</td>
+<td>+5.0</td>
+<td>Phase 4</td>
+<td>手指与物体产生物理接触</td>
+</tr>
+<tr>
+<td>抬起奖励</td>
+<td>+8.0</td>
+<td>Phase 6（成功时）</td>
+<td>物体实际抬起高度 / LIFT_HEIGHT</td>
+</tr>
+<tr>
+<td>成功奖励</td>
+<td>+100.0</td>
+<td>Phase 6（成功时）</td>
+<td>物体被稳定抓取并抬起</td>
+</tr>
+<tr>
+<td>失败惩罚</td>
+<td>-3.0</td>
+<td>Phase 6（失败时）</td>
+<td>未检测到有效抓取</td>
+</tr>
+</tbody>
+</table>
+<h4 id="423-step">4.2.3 多阶段抓取执行管线 (step 方法)</h4>
+<pre><code>Phase 1: 打开夹爪 (frame_skip/2 步)
+    ↓
+Phase 2: 粗定位 → IK 移动到物体上方 20cm
+    ↓
+Phase 3: 测量手指-EE 偏移 → 分 3 段精准下降 (GRASP_DEPTH 控制)
+    ↓
+Phase 4: OSC 保持臂位姿 + 关闭夹爪 (渐进闭合 → 保压)
+    ↓
+Phase 5: IK 抬起物体 (LIFT_HEIGHT=0.25m)
+    ↓
+Phase 6: 检测结果 → 成功(移到放置区释放) / 失败(打开夹爪)
+</code></pre>
+<p><strong>核心控制逻辑</strong>：
+- <strong>IK 求解</strong> (<code>_ik_to_target</code>)：阻尼最小二乘 Jacobian 伪逆 IK，200 步迭代，含关节限位钳位和 nullspace 向心力（拉回固定 home pose）
+- <strong>OSC 微调</strong> (<code>_move_eef_ik</code>)：IK 到位后，用操作空间控制器进行 20 步精细稳定
+- <strong>Actuator 同步</strong> (<code>_sync_arm_ctrl</code>)：设置 arm actuator ctrl = qpos + 0.2·qvel，使 position actuator 产生零净力，避免与 OSC 冲突
+- <strong>夹爪闭合</strong>：通过 position actuator（kp=50）渐进设置 ctrl 到 0.95，分加速段+保压段，保证充分闭合</p>
+<h4 id="424">4.2.4 抓取成功检测（三重验证）</h4>
+<p><code>check_grasp_success()</code> 不再仅靠物体 Z 位移判断，而是三重条件：
+1. <strong>物体抬升 &gt; 3mm</strong>：从抓取前的记录位置比较 Z 轴变化
+2. <strong>手指间距 &lt; 12cm</strong>：确认夹爪确实闭合（不是被推起来的）
+3. <strong>手指-物体接触</strong>：通过 <code>get_finger_contacts()</code> 遍历 MuJoCo 接触对，确认至少一根手指与抬升物体的几何体有物理接触</p>
+<hr />
+<h3 id="43-q">4.3 Q 网络架构</h3>
+<p><strong>文件</strong>：<code>grasprl/modules/qnet.py</code></p>
+<p>网络采用 <strong>ResNet 风格编码器-解码器</strong>结构，专为像素级抓取值函数设计：</p>
+<pre><code>输入: 4 通道图像 (RGB 归一化 + 深度反转)  [4, 64, 64]
+    ↓
+Perception_Module (编码器):
+    Conv2d(4→64, 7×7, stride=2) → MaxPool
+    ResBlock(64→128, stride=2)
+    ResBlock(128→256, stride=2)
+    ResBlock(256→512)              → [512, 8, 8]
+    ↓
+Grasping_Module_multidiscrete (解码器):
+    ResBlock(512→256)
+    ResBlock(256→128)
+    Upsample (2×) → ResBlock(128→64)
+    Upsample (2×) → Conv2d(64→1)   → [1, 64, 64]
+    Flatten + Sigmoid                → 4096 维 Q 值
+</code></pre>
+<p>每个 <code>ResBlock</code> 包含：
+- 两个 3×3 卷积 + BatchNorm + ReLU
+- 跳跃连接（降采样时用 1×1 卷积对齐维度）</p>
+<p><strong>关键模块</strong>：
+- <code>Perception_Module</code>：编码器，提取视觉特征
+- <code>Grasping_Module</code>：解码器，输出抓取热力图
+- <code>Grasping_Module_multidiscrete</code>：多通道解码器，用于多类别离散动作
+- <code>MULTIDISCRETE_RESNET(n)</code>：工厂函数，输出 n×4096 维 Q 值（当前使用 n=1，即 4096 维）</p>
+<hr />
+<h3 id="44-dqn_trainer">4.4 训练器：DQN_Trainer</h3>
+<p><strong>文件</strong>：<code>grasprl/trainer/dqn_baseline.py</code>（主训练版本）</p>
+<h4 id="441">4.4.1 核心配置</h4>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>学习率</td>
+<td>0.001</td>
+<td>Adam 优化器</td>
+</tr>
+<tr>
+<td>Weight Decay</td>
+<td>0.0001</td>
+<td>L2 正则化</td>
+</tr>
+<tr>
+<td>经验回放容量</td>
+<td>10000</td>
+<td>Replay Buffer 大小</td>
+</tr>
+<tr>
+<td>Batch Size</td>
+<td>32</td>
+<td>每步训练样本数</td>
+</tr>
+<tr>
+<td>ε 起始值</td>
+<td>1.0</td>
+<td>初始探索率</td>
+</tr>
+<tr>
+<td>ε 终止值</td>
+<td>0.01</td>
+<td>最低探索率</td>
+</tr>
+<tr>
+<td>ε 衰减率</td>
+<td>5000</td>
+<td>指数衰减速率</td>
+</tr>
+<tr>
+<td>目标网络更新频率</td>
+<td>100</td>
+<td>每 100 步同步 target net</td>
+</tr>
+<tr>
+<td>Loss 函数</td>
+<td>SmoothL1Loss</td>
+<td>Huber Loss（β=1）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="442">4.4.2 状态预处理</h4>
+<p><code>transform_state()</code> 将原始观测转换为网络输入：
+1. RGB 图像：<code>ToTensor()</code> → <code>Normalize([0.485,0.456,0.406], [0.229,0.224,0.225])</code>（ImageNet 统计量）
+2. 深度图：<code>max() - depth</code>（反转，让近处更亮） → <code>ToTensor()</code>
+3. 拼接 RGB + Depth → <code>[4, 64, 64]</code>
+4. 通过 <code>VisualFeatureEnhancer</code>（4→16→4 卷积增强）后 clamp 到 [-1, 1]</p>
+<h4 id="443">4.4.3 动作映射</h4>
+<p><code>transform_action()</code> 将网络输出的像素索引 (0~4095) 转换为世界坐标：
+1. 将像素索引还原为 (px, py) 坐标
+2. <strong>优先匹配实际物体</strong>：遍历场景中所有可抓取物体，计算每个物体的世界坐标投影到图像上的像素位置
+3. 选择距离输出像素最近的物体，返回其世界坐标 (wx, wy, wz)
+4. 退路：若无可见物体，使用 <code>pixel2world()</code> 通过深度值反投影</p>
+<h4 id="444-instruction-based-exploration">4.4.4 指令引导探索（Instruction-based Exploration）</h4>
+<p>这是项目的一个<strong>关键创新</strong>。传统 ε-greedy 探索时随机选择像素，但本项目在探索时直接使用<strong>真实物体位置</strong>作为探索目标：</p>
+<pre><code class="language-python">def select_action_by_instruction(self, state):
+    if random.random() &gt; epsilon:   # 贪心
+        return q_net(state).argmax()
+    else:                           # 引导探索
+        available_objects = [可见物体]
+        if available_objects:
+            obj = random.choice(available_objects)
+            return world2pixel(obj)  # 选中某个实际物体的像素
+        else:
+            return random pixel       # 退路随机
+</code></pre>
+<p>这样做的优势：
+- 避免在空白区域无意义探索
+- 初始阶段策略也能"碰到"物体，获得有效奖励信号
+- 加速策略收敛</p>
+<h4 id="445-dqn">4.4.5 DQN 学习更新</h4>
+<p><code>learn()</code> 方法实现标准 DQN 更新：</p>
+<pre><code class="language-python">q_pred = q_net(state).gather(action)
+q_target = reward + gamma * target_q_net(next_state).max()
+loss = SmoothL1Loss(q_pred, q_target)
+# + gradient clipping (max_norm=1.0)
+</code></pre>
+<hr />
+<h3 id="45-osc">4.5 操作空间控制器（OSC）</h3>
+<p><strong>文件</strong>：<code>grasprl/controllers/operational_space_controller.py</code></p>
+<p>基于任务空间动力学的精确末端控制：
+1. <strong>计算末端 Jacobian</strong>：<code>get_site_jac()</code> 获取 6×nv 的平移+旋转 Jacobian
+2. <strong>任务空间惯性矩阵</strong>：<code>Mx = inv(J @ inv(M) @ J.T)</code>（伪逆处理奇异）
+3. <strong>位姿误差</strong>：<code>pose_error()</code> = [位置差, 角度×旋转轴]
+4. <strong>速度限幅</strong>：自适应缩放，距离越近速度越慢
+5. <strong>力矩转换</strong>：<code>τ = J.T @ Mx @ u_task + 阻尼补偿 + 重力补偿</code>
+6. <strong>施加力矩</strong>：通过 <code>qfrc_applied</code> 写入关节力</p>
+<p>控制器参数：
+- kp=80（位置增益）、ko=80（方向增益）、kv=50（阻尼）
+- vmax_xyz=1（最大平移速度）、vmax_abg=2（最大旋转速度）
+- min/max effort=±150（力矩安全限幅）</p>
+<hr />
+<h3 id="46">4.6 夹爪控制器</h3>
+<p><strong>文件</strong>：<code>grasprl/controllers/joint_effort_controller.py</code></p>
+<p><code>GripperEffortCtrl</code> 支持两种控制模式：
+- <strong>Actuator 模式</strong>（有 <code>actuator_id</code>）：直接设置 <code>data.ctrl[act_id]</code>，利用 MuJoCo 内置 position actuator
+- <strong>Joint Effort 模式</strong>：渐进 ramp-up 力矩（10 步），闭合方向施加正向力矩，打开方向施加 4 倍反向力矩</p>
+<p>当前训练流程中，夹爪主要通过 position actuator 控制（<code>left_finger_act</code> / <code>right_finger_act</code>），<code>GripperEffortCtrl</code> 作为备用。</p>
+<hr />
+<h2 id="_5">五、运行与测试</h2>
+<h3 id="51">5.1 启动训练</h3>
+<pre><code class="language-powershell">cd D:\nn\src\grasprl
+# Windows PowerShell（注意设置 OpenMP 环境变量）
+$env:KMP_DUPLICATE_LIB_OK=&quot;TRUE&quot;
+python -m grasprl.run
+</code></pre>
+<h3 id="52">5.2 训练过程输出</h3>
+<pre><code>iter [1]/[100]  grasp_info=Failed  reward=-3.161  action=instruction
+iter [2]/[100]  grasp_info=Failed  reward=-1.333  action=instruction
+...
+</code></pre>
+<ul>
+<li><code>iter</code>：当前交互轮次</li>
+<li><code>grasp_info</code>：抓取结果（Success/Failed）</li>
+<li><code>reward</code>：本轮奖励（包含密集+稀疏）</li>
+<li><code>action</code>：动作来源（greedy=网络输出 / instruction=引导探索）</li>
+</ul>
+<p><img alt="训练终端输出日志" src="images/3.png" /></p>
+<h3 id="53-tensorboard">5.3 训练过程可视化（TensorBoard）</h3>
+<p>训练过程中所有核心指标通过TensorBoard实时监控，下图为训练全流程的指标变化曲线：</p>
+<p><img alt="TensorBoard训练指标曲线" src="images/4.png" /></p>
+<h4 id="_6">核心指标解读：</h4>
+<ol>
+<li><strong>Reward 奖励曲线（橙色）</strong>：每轮抓取的累计奖励，训练前期波动较大，后期稳步上升，说明策略从随机探索逐步收敛到有效抓取行为</li>
+<li><strong>Loss 损失曲线（蓝色）</strong>：DQN网络的SmoothL1损失，整体呈下降后平稳收敛趋势，网络拟合效果稳定</li>
+<li><strong>Epsilon 探索率曲线（灰色）</strong>：按照指数衰减策略从1.0逐步下降到0.01，符合ε-greedy探索-利用平衡设计</li>
+<li><strong>平滑效果</strong>：开启滑动平均（smoothing=0.6）后，曲线趋势更清晰，可直观观察训练整体走向</li>
+</ol>
+<h4 id="_7">本地交互式监控（可选）</h4>
+<p>如果需要本地查看可交互的原始训练日志，在项目根目录执行：</p>
+<pre><code class="language-powershell">tensorboard --logdir=grasprl/log/DQN/resnet_dqn_insne_v2
+</code></pre>
+<p>浏览器访问 <code>http://localhost:6006</code> 即可打开完整TensorBoard面板，支持缩放、导出、指标对比等操作。</p>
+<h3 id="54">5.4 数据集样本</h3>
+<p>训练过程中自动保存每次交互的视觉数据到 <code>grasprl/dataset/grasp_samples/</code>：
+- <code>rgb_{iter}.png</code>：RGB 观测图像
+- <code>depth_{iter}.npy</code>：深度图
+- <code>label_{iter}.npy</code>：标签（action, grasp_success, reward）</p>
+<p>使用 <code>count_dataset.py</code> 统计数据集中的抓取成功率。</p>
+<h3 id="55">5.5 硬编码抓取测试</h3>
+<p><code>debug_step.py</code> 提供了一个<strong>不使用 RL</strong> 的端到端抓取测试脚本，用于验证机械臂和夹爪控制逻辑：</p>
+<pre><code class="language-powershell">cd D:\nn\src\grasprl
+python debug_step.py
+</code></pre>
+<p><img alt="硬编码抓取仿真运行界面" src="images/5.png" /></p>
+<hr />
+<h2 id="_8">六、项目改进历程</h2>
+<h3 id="61">6.1 机械臂控制稳定性</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>QACC NaN / 手臂坍塌</td>
+<td>IK 后清零臂关节速度 + <code>_sync_arm_ctrl()</code> 消除 actuator 与 OSC 冲突</td>
+</tr>
+<tr>
+<td>Arm 位置 actuator 与 OSC 冲突</td>
+<td><code>_sync_arm_ctrl()</code> 将 ctrl 设为与 qpos 同步，产生零净力</td>
+</tr>
+<tr>
+<td>夹爪 actuator 被 sync 干扰</td>
+<td><code>_sync_arm_ctrl(include_gripper=False)</code> 默认不同步夹爪</td>
+</tr>
+<tr>
+<td>IK 导致手臂扭曲</td>
+<td>增加关节限位钳位 + nullspace 向心力权重从 0.05→0.3 + 固定 home pose</td>
+</tr>
+<tr>
+<td>夹爪闭合不充分</td>
+<td>两阶段闭合：渐进关闭 → 保压段（3×frame_skip 步保持 ctrl=0.95）</td>
+</tr>
+<tr>
+<td>Jacobian 伪逆 IK 在奇异位形附近求解不稳定</td>
+<td><code>solve_ik_numerical()</code>：新增基于 scipy Nelder-Mead 无梯度优化的数值 IK 求解器，直接最小化 EE 位置误差（目标函数 <code>‖EE_pos − target‖</code>），不依赖 Jacobian 求逆，对奇异位形更鲁棒。收敛容差 1e-4，最大 1000 次迭代，误差 &gt; 1cm 时打印警告</td>
+</tr>
+<tr>
+<td>直接设置 qpos 导致机械臂瞬跳和物理震荡</td>
+<td><code>move_joints_smooth()</code>：新增五次多项式（smoothstep）关节空间平滑插值。插值公式 <code>α³(6α²−15α+10)</code> 保证起点和终点的速度/加速度均为零。逐帧强制设置 qpos + 清零臂关节速度 + 臂/夹爪速度钳制（max_vel=1.0），最后 <code>mj_forward</code> 确保物理状态一致</td>
+</tr>
+<tr>
+<td>Phase 2 粗定位后 EE 在水平方向漂移，下降时对不准物体顶部</td>
+<td>XY 归零防漂移：Phase 2 粗定位阶段将 EE 的 XY 直接对准 DQN 输出的目标物体 XY 坐标（<code>approach_eef = [target_x, target_y, target_z+0.20]</code>），下降到距桌面 15cm 的安全高度。Phase 3 精准下降前再通过动态 finger-to-EE 偏移测量补偿末端到手指的真实几何差，确保下降轨迹垂直对准物体，消除水平漂移</td>
+</tr>
+<tr>
+<td>机械臂基座过高导致抓取范围不足、夹爪执行器刚度太大导致震荡</td>
+<td>调整 <code>grasp.xml</code> 场景参数：机械臂基座高度从 Z=1.30 降至 Z=0.80，使桌面进入臂可达范围中心；夹爪 position actuator 的 kp 从 2000 降至 50、kv=5，大幅降低闭合刚度，消除夹爪高频抖动；<code>&lt;option&gt;</code> 增加 <code>tolerance="1e-10"</code> 约束数值误差，抑制仿真不稳定</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62">6.2 抓取算法改进</h3>
+<table>
+<thead>
+<tr>
+<th>改进</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>动态 finger-to-EE 偏移测量</td>
+<td>替代硬编码偏移，消除手指末端与实际抓取点的误差</td>
+</tr>
+<tr>
+<td>三段式精准下降</td>
+<td>减少物体被推走的概率</td>
+</tr>
+<tr>
+<td>密集奖励设计</td>
+<td>为 DQN 提供中间信号，加速收敛</td>
+</tr>
+<tr>
+<td>接触力检测验证抓取</td>
+<td>减少"物体被推起来但未真正抓住"的假阳性</td>
+</tr>
+<tr>
+<td>指令引导探索</td>
+<td>让初始阶段也能碰到物体，避免完全随机空白探索</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63">6.3 代码质量</h3>
+<table>
+<thead>
+<tr>
+<th>改进</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>移除直接 qpos 操作</td>
+<td>消除绕过物理引擎导致的 NaN 和不稳定</td>
+</tr>
+<tr>
+<td>缓存 actuator ID</td>
+<td>避免每帧 <code>mj_name2id</code> 查询</td>
+</tr>
+<tr>
+<td>严格命名空间隔离</td>
+<td>防止 <code>eval()</code> 执行任意代码</td>
+</tr>
+<tr>
+<td>清理 dead code</td>
+<td>移除重复赋值、未使用方法</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_9">七、当前训练表现与已知问题</h2>
+<h3 id="71">7.1 训练现状</h3>
+<ul>
+<li><strong>EPOCH</strong>：100 轮（每轮最多 30 次抓取尝试）</li>
+<li><strong>当前成功率</strong>：硬编码抓取测试成功率100%，DQN训练复杂场景下抓取成功率持续优化中</li>
+<li><strong>奖励范围</strong>：成功 +100~120，失败 -3~+5（取决于密集奖励积累）</li>
+</ul>
+<h3 id="72">7.2 已知挑战</h3>
+<ol>
+<li><strong>视觉特征学习困难</strong>：64×64 分辨率下物体较小，网络难以精确区分物体像素</li>
+<li><strong>奖励信用分配</strong>：抓取成功受多阶段影响（IK 精度、夹爪闭合时机、物体位姿），难以追溯单一因素</li>
+<li><strong>MuJoCo 仿真稳定性</strong>：position actuator 与直接力矩控制混用时需精细同步，否则出现 QACC NaN</li>
+<li><strong>夹爪闭合力不足</strong>：AG95 position actuator 的 kp=50 对大质量物体闭合力偏弱</li>
+</ol>
+<h3 id="73">7.3 后续改进方向</h3>
+<ul>
+<li><strong>算法层</strong>：集成 Prioritized Experience Replay、NoisyNet、n-step return</li>
+<li><strong>网络层</strong>：增大输入分辨率、加入 ViT/Feature Pyramid 结构</li>
+<li><strong>仿真层</strong>：引入域随机化（物体质量/摩擦/位置随机）、障碍物场景</li>
+<li><strong>控制层</strong>：尝试力控夹爪代替位置控制夹爪、加入触觉反馈</li>
+<li><strong>工程层</strong>：参数配置化（argparse/yaml）、模型 checkpoint 管理与评估</li>
+</ul>
+<hr />
+<h2 id="_10">八、核心术语</h2>
+<table>
+<thead>
+<tr>
+<th>术语</th>
+<th>解释（本项目语境）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DQN</td>
+<td>深度 Q 网络，输入 RGB-D 图像，输出 64×64=4096 个像素的抓取 Q 值</td>
+</tr>
+<tr>
+<td>目标网络 (Target Net)</td>
+<td>参数每 100 步从在线网络拷贝，用于计算稳定 TD target</td>
+</tr>
+<tr>
+<td>经验回放 (Replay Buffer)</td>
+<td>存储 (state, action, reward, next_state)，随机采样打破时序相关</td>
+</tr>
+<tr>
+<td>操作空间控制器 (OSC)</td>
+<td>基于质量矩阵和 Jacobian 的 6D 末端位姿跟踪控制器</td>
+</tr>
+<tr>
+<td>IK（逆运动学）</td>
+<td>Jacobian 伪逆法 + 阻尼 + nullspace 向心，将末端目标位姿转为关节角度</td>
+</tr>
+<tr>
+<td>GRASP_DEPTH</td>
+<td>抓取时的额外下压深度（0.08m），确保夹爪在物体两侧</td>
+</tr>
+<tr>
+<td>LIFT_HEIGHT</td>
+<td>抓取成功后的抬起高度（0.25m）</td>
+</tr>
+<tr>
+<td>TABLE_HEIGHT</td>
+<td>桌面中心高度（0.95m），用于 IK 目标的安全钳位</td>
+</tr>
+<tr>
+<td>QACC NaN</td>
+<td>MuJoCo 加速度 NaN 警告，通常由 actuator 与直接力控制的冲突引起</td>
+</tr>
+<tr>
+<td>指令引导探索</td>
+<td>ε-greedy 探索时不随机选像素，而是选实际物体位置的像素，加速学习</td>
+</tr>
+</tbody>
+</table>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
