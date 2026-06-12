@@ -1,6 +1,6 @@
 import carla
 import logging
-from config import DEFAULT_WEATHER
+from nn.src.connected_vehicles.src.config import DEFAULT_WEATHER
 
 logger = logging.getLogger(__name__)
 

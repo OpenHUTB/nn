@@ -2,8 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import logging
-from utils import safe_update_dict
-from config import GUI_WINDOW_SIZE, GUI_TITLE, GUI_UPDATE_INTERVAL_MS
+from nn.src.connected_vehicles.src.utils import safe_update_dict
+from nn.src.connected_vehicles.src.config import GUI_WINDOW_SIZE, GUI_TITLE, GUI_UPDATE_INTERVAL_MS
 
 logger = logging.getLogger(__name__)
 

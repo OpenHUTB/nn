@@ -426,6 +426,43 @@ def process_frame(img, save_dir=None):
         "right_fitx": right_fitx,
         "ploty": ploty,
         "Minv": Minv,
+    }
+
+    if left_fitx is None and right_fitx is None:
+        return img, intermediates
+
+# ---- 主流水线 ----
+
+def process_frame(img, save_dir=None):
+    """对单帧图像（numpy 数组）执行完整的高级流水线，返回结果图和中间数据。
+
+    供图片模式和视频模式共用。
+
+    Returns:
+        result_img, intermediates dict 或 None
+        intermediates 包含: binary, binary_warped, sliding_window_img, poly_img,
+                          left_fit, right_fit, left_fitx, right_fitx, ploty
+    """
+    height, width = img.shape[:2]
+    M, Minv = compute_perspective_matrix(width, height)
+
+    binary = preprocess_for_advanced(img)
+    binary_warped = warp_to_birdseye(binary, M, width, height)
+    leftx, lefty, rightx, righty, sliding_window_img = extract_lane_pixels(binary_warped)
+    left_fit, right_fit, left_fitx, right_fitx, ploty, poly_img = \
+        fit_polynomial(binary_warped, leftx, lefty, rightx, righty)
+
+    intermediates = {
+        "binary": binary,
+        "binary_warped": binary_warped,
+        "sliding_window_img": sliding_window_img,
+        "poly_img": poly_img,
+        "left_fit": left_fit,
+        "right_fit": right_fit,
+        "left_fitx": left_fitx,
+        "right_fitx": right_fitx,
+        "ploty": ploty,
+        "Minv": Minv,
         "width": width,
         "height": height,
     }

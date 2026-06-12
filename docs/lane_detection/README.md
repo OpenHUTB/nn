@@ -4,6 +4,9 @@
 
 **作者**：ultra223  
 **课题进度**：5/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算）
+**课题进度**：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
+**课题进度**：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
+**课题进度**：2/10（步骤1 基础检测 + 步骤2 HSV 优化）
 
 ## 模块结构
 
@@ -14,6 +17,7 @@
 | `lane_preprocess.py` | 步骤1：灰度、Canny、ROI、霍夫 |
 | `lane_detect.py` | 步骤2：HSV 黄白线、双黄线中心轴、左右车道 |
 | `lane_advanced.py` | 步骤3 & 5：透视变换、滑动窗口、多项式拟合、曲率与偏移计算 |
+| `lane_advanced.py` | 步骤3：透视变换、滑动窗口、二次多项式拟合 |
 | `lane_video.py` | 步骤4：视频处理、帧间 EMA 平滑 |
 | `carla_test.jpg` | 少量示例输入（运行依赖） |
 
@@ -45,6 +49,10 @@ python main.py --mode advanced
 # 步骤4：视频模式（逐帧检测 + EMA 平滑）
 python main.py --mode video --video path/to/video.mp4
 
+# 重新生成文档配图（写入 docs/lane_detection/images）
+python main.py --save-docs --no-show
+python main.py --mode hsv --save-docs --no-show
+python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show

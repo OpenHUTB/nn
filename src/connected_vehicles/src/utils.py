@@ -2,7 +2,7 @@ import carla
 import math
 import logging
 import threading
-from config import LOG_LEVEL, LOG_FORMAT
+from nn.src.connected_vehicles.src.config import LOG_LEVEL, LOG_FORMAT
 
 # 初始化日志
 logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
