@@ -3,6 +3,10 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from typing import Optional
+
+from data_logger import DataLogger
+
 
 
 class Agent():
@@ -50,6 +54,45 @@ class Agent():
         self.errors = []
         self.controller_name = controller
         self._select_controller_method(name=self.controller_name)
+        self.data_logger: Optional[DataLogger] = None
+        self.current_step = 0
+
+    @classmethod
+    def from_config(cls, config: dict) -> 'Agent':
+        """Create an Agent instance from a configuration dictionary.
+
+        Args:
+            config (dict): Configuration dictionary containing controller settings.
+
+        Returns:
+            Agent: A new Agent instance configured according to the provided config.
+        """
+        ctrl = config.get('controller', {})
+        
+        return cls(
+            tau_p=ctrl.get('tau_p', 0.65),
+            tau_d=ctrl.get('tau_d', 0.034),
+            tau_i=ctrl.get('tau_i', 0.00000002),
+            throttle=ctrl.get('throttle', 0.3),
+            surface_lower_threshold=ctrl.get('surface_lower_threshold', 20000000.0),
+            surface_upper_threshold=ctrl.get('surface_upper_threshold', 30000000.0),
+            controller=ctrl.get('default_controller', 'pid')
+        )
+
+    def set_data_logger(self, logger: DataLogger) -> None:
+        """Set the data logger for recording step data.
+
+        Args:
+            logger (DataLogger): DataLogger instance to use for recording.
+        """
+        self.data_logger = logger
+        self.data_logger.set_metadata(
+            controller=self.controller_name,
+            tau_p=self.tau_p,
+            tau_d=self.tau_d,
+            tau_i=self.tau_i,
+            throttle=self.throttle
+        )
 
     @classmethod
     def from_config(cls, config: dict) -> 'Agent':
@@ -157,7 +200,24 @@ class Agent():
         else:
             self.errors.append(error)
             steer = self.func(error=error)
+
+        if self.data_logger:
+            self.data_logger.record_step(
+                step=self.current_step,
+                error=error,
+                steer=steer,
+                throttle=self.throttle,
+                detection_surface_area=detection_surface_area
+            )
+            self.current_step += 1
+
         return steer, self.throttle
+
+    def save_data(self) -> None:
+        """Save all recorded data using the data logger."""
+        if self.data_logger:
+            self.data_logger.save_all()
+            self.data_logger.save_summary()
 
     @staticmethod
     def _simple_controller(error:float) -> float:

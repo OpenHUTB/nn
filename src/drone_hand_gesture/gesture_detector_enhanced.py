@@ -35,12 +35,12 @@ class EnhancedGestureDetector:
                 
                 self.hands = self.mp_hands.Hands(
                     static_image_mode=False,
-                    max_num_hands=2,  # 支持双手
+                    max_num_hands=1,
                     min_detection_confidence=0.5,
                     min_tracking_confidence=0.5
                 )
                 self.mode = "mediapipe"
-                print("[INFO] 使用 MediaPipe 手势检测模式 + 滑动手势支持")
+                print("[INFO] 使用 MediaPipe 手势检测模式")
             except Exception as e:
                 print(f"[WARNING] MediaPipe 初始化失败: {e}")
                 self.mode = "opencv"

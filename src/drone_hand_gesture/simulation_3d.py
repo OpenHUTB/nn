@@ -71,15 +71,13 @@ class Drone3DViewer:
                   0, 0, 0,  # 观察点
                   0, 1, 0)  # 上方向
 
-    def render(self, drone_state=None, trajectory=None, all_drones_state=None, all_trajectories=None):
-        """
-        渲染整个场景
-
+    def render(self, drone_state=None, trajectory=None, waypoints=None):
+        """渲染整个场景
+        
         Args:
-            drone_state: 单无人机状态（向后兼容）
-            trajectory: 单无人机轨迹（向后兼容）
-            all_drones_state: 多无人机状态列表
-            all_trajectories: 多无人机轨迹列表
+            drone_state: 无人机状态
+            trajectory: 轨迹数据
+            waypoints: 航点列表
         """
         # 清除缓冲区
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -95,9 +93,30 @@ class Drone3DViewer:
         if self.show_axes:
             self._draw_coordinate_axes()
 
-        # 多无人机模式
-        if self.multi_drone_mode and all_drones_state:
-            self._render_multi_drones(all_drones_state, all_trajectories)
+        # 绘制无人机（如果有状态数据）
+        if drone_state:
+            self._draw_drone(drone_state)
+        else:
+            # 如果没有状态数据，绘制默认位置的无人机
+            default_state = {
+                'position': [0.0, 2.0, 0.0],
+                'orientation': [0.0, 0.0, 0.0],
+                'armed': True,
+                'mode': 'HOVER'
+            }
+            self._draw_drone(default_state)
+
+        # 绘制轨迹（如果有）
+        if self.show_trajectory and trajectory:
+            self._draw_trajectory(trajectory)
+
+        # 绘制航点（如果有）
+        if self.show_waypoints and waypoints:
+            self._draw_waypoints(waypoints)
+
+        # 绘制状态信息
+        if drone_state:
+            self._draw_status_overlay(drone_state)
         else:
             # 单无人机模式（向后兼容）
             if drone_state:

@@ -43,8 +43,6 @@
 - [调参经验](#调参经验)
 - [常见问题](#常见问题)
 - [未来工作](#未来工作)
-- [媒体文件说明](#媒体文件说明)
-- [注意事项](#注意事项)
 - [致谢](#致谢)
 - [参考文献](#参考文献)
 
@@ -98,7 +96,7 @@ CARLA (Car Learning to Act) 是一个开源的高保真自动驾驶仿真平台�
 ### 整体架构图
 
 <p align="center">
-  <img src="image/system_architecture.jpg" alt="系统架构图" width="600"/>
+  <img src="image/frame.gif" alt="系统架构图" width="600"/>
 </p>
 
 ### 交互流程图
@@ -444,7 +442,8 @@ def create_reward_fn(reward_fn):
 #### 训练流程
 
 <p align="center">
-  <img src="image/training_pipeline.jpg" alt="训练流程图" width="600"/>
+  <img src="image/training.gif
+  " alt="训练流程图" width="600"/>
 </p>
 
 #### 模型命名规则
@@ -630,7 +629,7 @@ reward = speed_reward * centering_factor * angle_factor
 | 一项差两项好 | 0.1 | 1.0 | 1.0 | **0.10** | **0.645** |
 
 <p align="center">
-  <img src="image/reward_comparison.jpg" alt="奖励函数对比图" width="600"/>
+  <img src="image/reward_comparison.gif" alt="奖励函数对比图" width="600"/>
 </p>
 
 乘法组合下，只要有一个维度较差（如 0.1），整体奖励就会被严重拉低（0.08~0.10），智能体几乎得不到有效梯度信号来改善其他维度。而加权求和下，每个维度独立贡献，即使一个维度差，其他维度仍能提供正向梯度。
@@ -833,8 +832,11 @@ def reward_fn_waypoints(env):
 ### 训练曲线
 
 ![reward曲线](image/train.gif)
+
 ![rollout曲线](image/rollout.gif)
+
 ![自定义指标](image/custom.gif)
+
 ![时间指标](image/time.gif)
 
 > 推荐使用 TensorBoard 实时监控：`tensorboard --logdir=./tensorboard`
@@ -951,39 +953,6 @@ def reward_fn_waypoints(env):
 2. **域随机化**：随机化天气、光照、交通密度等条件，提高模型鲁棒性
 3. **安全约束强化**：使用 Constrained RL (CPO) 或 Safety Layer，将安全约束显式建模
 4. **真实场景迁移**：在仿真器训练好的模型迁移到真实车辆，研究 Sim-to-Real Gap
-
-## 媒体文件说明
-
-README 中引用了以下图片和视频文件，需放置在仓库的对应目录下：
-
-### 架构图与对比图（已包含）
-
-| 文件路径 | 说明 | 来源 |
-|----------|------|------|
-| `image/system_architecture.jpg` | 系统架构图 | 项目自带 |
-| `image/reward_comparison.jpg` | 乘法 vs 加权求和奖励对比图 | 项目自带 |
-| `image/training_pipeline.jpg` | 训练流程图 | 项目自带 |
-
-### 训练曲线截图（需手动导出）
-
-| 文件路径 | 说明 | 导出方式 |
-|----------|------|----------|
-| `image/train.gif` | reward 训练曲线 | TensorBoard 截图/录屏 |
-| `image/rollout.gif` | rollout 指标曲线 | TensorBoard 截图/录屏 |
-| `image/custom.gif` | 自定义指标曲线（avg_speed、avg_center_dev 等） | TensorBoard 截图/录屏 |
-| `image/time.gif` | 时间相关指标曲线 | TensorBoard 截图/录屏 |
-
-导出方法：打开 TensorBoard（`tensorboard --logdir=./tensorboard`），在对应面板截图或录屏，保存为 GIF 放入 `image/` 目录。
-
-### 运行效果视频（需手动录制）
-
-| 文件路径 | 说明 | 录制方式 |
-|----------|------|----------|
-| `video/RL_SB3_carla.gif` | 自动驾驶运行效果动图 | 运行 `evaluate.py` 时录屏 |
-
-录制方法：运行 `python evaluate.py`，使用屏幕录制工具（如 LICEcap、ScreenToGif）录制 Pygame 窗口，保存为 GIF 放入 `video/` 目录。
-
-> **提示**：如果暂时没有 GIF 文件，也可以使用 PNG 截图代替，将 README 中的对应路径后缀从 `.gif` 改为 `.png` 即可。
 
 ## 注意事项
 

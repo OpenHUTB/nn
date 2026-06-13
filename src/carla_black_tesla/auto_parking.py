@@ -8,8 +8,6 @@ class RoadEdgeParking:
         self.vehicle = vehicle
         self.world = vehicle.get_world()
         self.map = self.world.get_map()
-        
-        # 停车状态
         self.state = 'driving'  # driving, slowing_down, parking, parked
         self.edge_distance = 0.0
         self.target_edge = 3.0  # 靠边距离（米）
