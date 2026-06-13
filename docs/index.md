@@ -11,6 +11,7 @@ title: 主页
 * [__控制__](#control)
 * [__其他__](#other)
 
+
 ---
 
 ## 入门 <span id="primary"></span>
@@ -75,6 +76,7 @@ title: 主页
 
 [__基于自监督学习与PPO强化学习的自动驾驶仿真项目__](./autonomous_driving/README.md) - 基于CARLA的SSL+RL自动驾驶仿真系统
 
+[__CARLA 多车辆跟踪系统__](./carla_multi_tracking/README.md) - 基于 YOLOv8 和 DeepSORT 的 CARLA 自动驾驶模拟器多目标跟踪系统
 
 ## 规划 <span id="planning"></span>
 
@@ -105,8 +107,15 @@ title: 主页
 [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
 
 
+
+
+
+
+
 # 其他  <span id="other"></span>
 
 [__CARLA IMU 数据采集平台__](./carla_imu/carla_imu.md) — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档
 
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
+
+
