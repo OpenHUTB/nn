@@ -3,6 +3,7 @@
 基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。
 
 **作者**：ultra223  
+**课题进度**：6/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警）
 **课题进度**：5/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算）
 **课题进度**：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
 **课题进度**：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
@@ -19,6 +20,7 @@
 | `lane_advanced.py` | 步骤3 & 5：透视变换、滑动窗口、多项式拟合、曲率与偏移计算 |
 | `lane_advanced.py` | 步骤3：透视变换、滑动窗口、二次多项式拟合 |
 | `lane_video.py` | 步骤4：视频处理、帧间 EMA 平滑 |
+| `lane_warning.py` | 步骤6：车道偏离预警、三级风险判定 |
 | `carla_test.jpg` | 少量示例输入（运行依赖） |
 
 ## 开发环境
@@ -49,10 +51,6 @@ python main.py --mode advanced
 # 步骤4：视频模式（逐帧检测 + EMA 平滑）
 python main.py --mode video --video path/to/video.mp4
 
-# 重新生成文档配图（写入 docs/lane_detection/images）
-python main.py --save-docs --no-show
-python main.py --mode hsv --save-docs --no-show
-python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
@@ -190,6 +188,48 @@ python main.py --mode video --video path/to/video.mp4
 # 隐藏曲率信息
 python main.py --mode advanced --no-metrics
 python main.py --mode video --video path/to/video.mp4 --no-metrics
+```
+
+## 步骤6：车道偏离预警系统
+
+基于曲率半径和车辆偏移量，实时判定三级驾驶风险，并通过车道区域颜色变化和信息面板给出视觉预警。
+
+**三级预警**
+
+| 等级 | 颜色 | 触发条件 |
+| :--- | :--- | :--- |
+| 安全 | 绿色 | 偏移 < 0.15m 且曲率半径 > 500m 且双侧车道线正常 |
+| 注意 | 黄色 | 偏移 0.15~0.40m 或 曲率半径 200~500m |
+| 危险 | 红色 | 偏移 > 0.40m 或 曲率半径 < 200m 或 车道线丢失 |
+
+**视觉反馈**
+
+- 车道区域填充色随预警级别变化（绿/黄/红）
+- 左上角信息面板第一条显示 `STATUS: 安全/注意/危险`
+- 仪表盘风格：彩色背景条 + 白色标签文字
+
+**关键参数**
+
+| 参数 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `--no-warning` | 否 | 隐藏预警信息（车道区域恢复默认绿色） |
+| `warning_offset_caution` | 0.15m | 偏移超过此值触发注意 |
+| `warning_offset_danger` | 0.40m | 偏移超过此值触发危险 |
+| `warning_curve_caution` | 500m | 曲率低于此值触发注意 |
+| `warning_curve_danger` | 200m | 曲率低于此值触发危险 |
+
+**使用方式**
+
+```bash
+# 图片模式（自动显示预警状态）
+python main.py --mode advanced
+
+# 视频模式（每帧实时显示预警）
+python main.py --mode video --video path/to/video.mp4
+
+# 隐藏预警信息
+python main.py --mode advanced --no-warning
+python main.py --mode video --video path/to/video.mp4 --no-warning
 ```
 
 ## 参考

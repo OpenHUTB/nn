@@ -7,6 +7,8 @@
   python main.py --mode advanced     # 步骤3 透视变换 + 滑动窗口 + 多项式拟合
   python main.py --mode video --video path/to/video.mp4  # 步骤4 视频模式
   python main.py --no-metrics              # 隐藏曲率与偏移信息
+  python main.py --no-warning              # 隐藏预警状态（关掉车道区域颜色变化）
+  python main.py --save-docs               # 将效果图写入 docs/lane_detection/images
   python main.py --save-docs               # 将效果图写入 docs/lane_detection/images
 """
 import argparse
@@ -82,6 +84,11 @@ def parse_args():
         action="store_true",
         help="隐藏曲率半径与偏移量信息（仅 advanced / video 模式）",
     )
+    parser.add_argument(
+        "--no-warning",
+        action="store_true",
+        help="隐藏车道偏离预警信息（仅 advanced / video 模式）",
+    )
     return parser.parse_args()
 
 
@@ -94,6 +101,10 @@ def main():
     # 处理 --no-metrics 标志
     if args.no_metrics:
         CONFIG["show_metrics"] = False
+
+    # 处理 --no-warning 标志
+    if args.no_warning:
+        CONFIG["show_warning"] = False
 
     if args.mode == "video":
         video_path = args.video
