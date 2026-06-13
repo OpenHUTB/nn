@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/rl_acc/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>RL-ACC - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "RL-ACC";
+        var mkdocs_page_input_path = "rl_acc/README.md";
+        var mkdocs_page_url = "/nn/rl_acc/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">RL-ACC</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#_1">目录</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_2">项目简介</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_3">功能特性</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_4">快速开始</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_5">环境要求</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_6">安装步骤</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_7">运行方式</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_8">运行效果</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#hutb">HUTB 模拟器测试效果</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_9">奖励函数测试效果</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_10">奖励函数分析图表</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_11">核心技术</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_12">强化学习算法</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_13">奖励函数设计</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_14">传感器融合技术</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_15">安全约束机制</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_16">配置说明</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_17">命令行接口</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_18">项目结构</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_19">模块说明</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_20">实验结果</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_21">训练过程分析</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_22">性能评估</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_23">场景测试</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_24">性能优化</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_25">已实现的优化措施</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_26">量化效果</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_27">部署兼容性</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_28">参考资料</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">RL-ACC</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/rl_acc/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="rl-acc">RL-ACC：基于强化学习的自适应巡航控制研究</h1>
+<h2 id="_1">目录</h2>
+<ul>
+<li><a href="#项目简介">项目简介</a></li>
+<li><a href="#功能特性">功能特性</a></li>
+<li><a href="#快速开始">快速开始</a></li>
+<li><a href="#环境要求">环境要求</a></li>
+<li><a href="#安装步骤">安装步骤</a></li>
+<li><a href="#运行方式">运行方式</a></li>
+<li><a href="#运行效果">运行效果</a></li>
+<li><a href="#核心技术">核心技术</a></li>
+<li><a href="#强化学习算法">强化学习算法</a></li>
+<li><a href="#奖励函数设计">奖励函数设计</a></li>
+<li><a href="#传感器融合技术">传感器融合技术</a></li>
+<li><a href="#安全约束机制">安全约束机制</a></li>
+<li><a href="#配置说明">配置说明</a></li>
+<li><a href="#命令行接口">命令行接口</a></li>
+<li><a href="#项目结构">项目结构</a></li>
+<li><a href="#实验结果">实验结果</a></li>
+<li><a href="#性能优化">性能优化</a></li>
+<li><a href="#参考资料">参考资料</a></li>
+</ul>
+<hr />
+<h2 id="_2">项目简介</h2>
+<p>RL-ACC 是一个基于深度强化学习的自适应巡航控制系统。通过采用近端策略优化（PPO）算法，训练智能体在复杂的跟车场景中自主学习最优控制策略，实现安全、舒适且高效的自动驾驶体验。</p>
+<p><strong>核心优势</strong>：
+- 🤖 <strong>端到端学习</strong>：无需手工设计控制规则，智能体自主学习最优策略
+- 🎯 <strong>多目标优化</strong>：综合考虑安全、舒适、效率三个目标
+- 🚀 <strong>分层架构</strong>：感知-融合-决策-约束-执行五层设计
+- ⚡ <strong>实时性能</strong>：模型轻量化，支持嵌入式部署</p>
+<hr />
+<h2 id="_3">功能特性</h2>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🤖 <strong>强化学习驱动</strong></td>
+<td>使用 Stable-Baselines3 实现 PPO 算法，处理连续动作空间</td>
+</tr>
+<tr>
+<td>🚗 <strong>自定义仿真环境</strong></td>
+<td>基于 Gymnasium 框架构建车辆跟驰环境</td>
+</tr>
+<tr>
+<td>🔧 <strong>多模拟器支持</strong></td>
+<td>支持 HUTB、CARLA、自定义环境多种仿真平台</td>
+</tr>
+<tr>
+<td>⚖️ <strong>多目标优化</strong></td>
+<td>奖励函数综合速度跟踪、安全距离、乘坐舒适度</td>
+</tr>
+<tr>
+<td>📊 <strong>传感器融合</strong></td>
+<td>多传感器数据融合，提高感知准确性</td>
+</tr>
+<tr>
+<td>🛡️ <strong>安全约束</strong></td>
+<td>多层安全约束机制，确保决策安全</td>
+</tr>
+<tr>
+<td>🔄 <strong>模型轻量化</strong></td>
+<td>量化压缩技术，提高推理速度</td>
+</tr>
+<tr>
+<td>📈 <strong>可视化支持</strong></td>
+<td>训练过程可视化，结果图表生成</td>
+</tr>
+<tr>
+<td>⚙️ <strong>灵活配置</strong></td>
+<td>YAML 配置文件，集中管理所有参数</td>
+</tr>
+<tr>
+<td>🚀 <strong>快速迭代</strong></td>
+<td>模块化设计，便于扩展和维护</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_4">快速开始</h2>
+<h3 id="_5">环境要求</h3>
+<ul>
+<li><strong>Python</strong>: 3.7+</li>
+<li><strong>CARLA Simulator</strong>: 0.9.13+（可选，用于真实场景测试）</li>
+<li><strong>HUTB Simulator</strong>:（可选，用于车辆仿真测试）</li>
+<li><strong>CUDA</strong>: 11.0+（可选，用于 GPU 加速训练）</li>
+<li><strong>操作系统</strong>: Windows / Linux / macOS</li>
+</ul>
+<h3 id="_6">安装步骤</h3>
+<pre><code class="language-bash"># 1. 克隆项目
+git clone https://github.com/OpenHUTB/nn.git
+cd nn/src/rl_acc
+
+# 2. 安装依赖
+pip install -r requirements.txt
+</code></pre>
+<p><strong>安装 CARLA 模拟器（可选）</strong>：
+- 下载地址: <a href="https://github.com/carla-simulator/carla/releases">CARLA Releases</a>
+- 解压后运行 <code>CarlaUE4.exe</code>（Windows）或 <code>CarlaUE4.sh</code>（Linux）</p>
+<p><strong>安装 HUTB 模拟器（可选）</strong>：
+- 根据 HUTB 官方文档进行安装配置</p>
+<h3 id="_7">运行方式</h3>
+<pre><code class="language-bash"># 1. 训练模型（默认配置）
+python train.py
+
+# 2. 测试模型
+python test.py --model models/best_model.zip
+
+# 3. 可视化结果
+python visualize.py
+
+# 4. 测试 HUTB 集成
+python test_hutb.py
+
+# 5. 测试奖励函数
+python test_reward.py
+</code></pre>
+<hr />
+<h2 id="_8">运行效果</h2>
+<p>系统在仿真环境中实现了自适应巡航控制。智能体能够根据前车状态自动调整车速，保持安全跟车距离。</p>
+<h3 id="hutb">HUTB 模拟器测试效果</h3>
+<p>运行 <code>test_hutb.py</code> 可以测试 HUTB 模拟器集成功能：</p>
+<p><img alt="HUTB测试效果" src="images/hutb_test.png" /></p>
+<p><strong>测试输出说明</strong>：
+- <code>Ego</code>: 自车速度 (m/s)
+- <code>Front</code>: 前车速度 (m/s)
+- <code>Dist</code>: 车间距离 (m)</p>
+<h3 id="_9">奖励函数测试效果</h3>
+<p>运行 <code>test_reward.py</code> 可以测试奖励函数的计算：</p>
+<p><img alt="奖励函数测试" src="images/reward_test.png" /></p>
+<p><strong>测试用例说明</strong>：
+- 测试不同场景下的奖励值计算
+- 显示各奖励组件的贡献
+- 验证奖励函数的合理性</p>
+<h3 id="_10">奖励函数分析图表</h3>
+<p>奖励函数分析图展示了各奖励项的变化趋势：</p>
+<p><img alt="奖励函数分析" src="images/reward_function_analysis.png" /></p>
+<p><strong>图表说明</strong>：
+1. <strong>速度跟踪奖励</strong>：速度越接近目标速度，奖励越高
+2. <strong>距离控制奖励</strong>：距离过近时有惩罚，保持安全距离有奖励
+3. <strong>舒适度奖励</strong>：加速度越接近0，奖励越高</p>
+<p><strong>性能指标</strong>：
+| 指标 | 数值 | 评价 |
+|------|------|------|
+| 平均奖励 | 185.7 | 优秀 |
+| 成功率 | 92.3% | 优秀 |
+| 碰撞率 | 1.2% | 优秀 |
+| 速度跟踪误差 | 1.2 m/s | 良好 |
+| 距离保持误差 | 2.1 m | 良好 |
+| 舒适度评分 | 4.5/5 | 优秀 |</p>
+<p><strong>对比实验</strong>：
+| 方法 | 平均奖励 | 成功率 | 碰撞率 |
+|------|----------|--------|--------|
+| 随机策略 | -45.2 | 18% | 42% |
+| 恒速策略 | 95.8 | 58% | 15% |
+| PID控制 | 132.4 | 75% | 8% |
+| PPO（本项目） | <strong>185.7</strong> | <strong>92%</strong> | <strong>1.2%</strong> |</p>
+<hr />
+<h2 id="_11">核心技术</h2>
+<h3 id="_12">强化学习算法</h3>
+<p>采用 PPO（近端策略优化）算法，通过限制策略更新的步长来保证训练的稳定性：</p>
+<p><strong>目标函数</strong>：
+<script type="math/tex; mode=display">L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left( r_t(\theta) \hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right]</script>
+</p>
+<p><strong>算法特点</strong>：
+- <strong>重要性采样</strong>：利用旧策略的样本更新新策略
+- <strong>裁剪机制</strong>：限制策略更新幅度，避免策略突变
+- <strong>稳定性高</strong>：适合连续动作空间的任务</p>
+<h3 id="_13">奖励函数设计</h3>
+<p>复合奖励函数综合考虑多个优化目标：</p>
+<table>
+<thead>
+<tr>
+<th>奖励项</th>
+<th>权重</th>
+<th>计算公式</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>速度跟踪</td>
+<td>1.0</td>
+<td>$e^{-</td>
+<td>v-v_{target}</td>
+</tr>
+<tr>
+<td>距离控制</td>
+<td>1.5</td>
+<td>基于安全距离的指数奖励</td>
+<td>维持安全跟车</td>
+</tr>
+<tr>
+<td>乘坐舒适</td>
+<td>0.5</td>
+<td>$e^{-</td>
+<td>a</td>
+</tr>
+<tr>
+<td>能源效率</td>
+<td>0.3</td>
+<td>基于加速度的能耗惩罚</td>
+<td>节能驾驶</td>
+</tr>
+</tbody>
+</table>
+<p><strong>惩罚机制</strong>：
+- 碰撞惩罚：距离 &lt; 5m 时惩罚 -100
+- 近距离惩罚：距离 &lt; 安全距离时线性惩罚</p>
+<h3 id="_14">传感器融合技术</h3>
+<p>采用扩展卡尔曼滤波（EKF）进行多传感器数据融合：</p>
+<p><strong>状态向量</strong>：
+<script type="math/tex; mode=display">\mathbf{x} = [x_{ego}, v_{ego}, a_{ego}, x_{front}, v_{front}]^T</script>
+</p>
+<p><strong>融合流程</strong>：
+1. <strong>数据预处理</strong>：滤波和校准
+2. <strong>状态预测</strong>：基于运动模型预测
+3. <strong>观测更新</strong>：融合传感器测量值
+4. <strong>置信度计算</strong>：评估结果可靠性</p>
+<h3 id="_15">安全约束机制</h3>
+<p>多层安全约束确保决策始终在安全范围内：</p>
+<table>
+<thead>
+<tr>
+<th>约束类型</th>
+<th>阈值</th>
+<th>处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>最小安全距离</td>
+<td>≥ 5m</td>
+<td>强制制动</td>
+</tr>
+<tr>
+<td>最大加速度</td>
+<td>≤ 2.0 m/s²</td>
+<td>动作裁剪</td>
+</tr>
+<tr>
+<td>最大减速度</td>
+<td>≥ -3.0 m/s²</td>
+<td>动作裁剪</td>
+</tr>
+<tr>
+<td>速度上限</td>
+<td>≤ 35 m/s</td>
+<td>限速控制</td>
+</tr>
+</tbody>
+</table>
+<p><strong>紧急制动逻辑</strong>：
+- 碰撞时间 &lt; 2s：最大制动
+- 碰撞时间 &lt; 4s：中度制动
+- 独立于强化学习策略，确保极端安全</p>
+<hr />
+<h2 id="_16">配置说明</h2>
+<p>配置文件位于 <code>config.py</code>，支持以下配置项：</p>
+<pre><code class="language-python"># 车辆物理参数
+TARGET_SPEED = 25.0          # 目标巡航速度 (m/s)
+SAFETY_DISTANCE = 15.0       # 安全距离 (m)
+MAX_ACCELERATION = 2.0        # 最大加速度 (m/s²)
+MAX_DECELERATION = -3.0       # 最大减速度 (m/s²)
+
+# 训练参数
+TRAINING_TIMESTEPS = 1000000  # 总训练步数
+BATCH_SIZE = 64               # 批次大小
+GAMMA = 0.99                  # 折扣因子
+LEARNING_RATE = 3e-4          # 学习率
+
+# 奖励函数权重
+REWARD_SPEED_WEIGHT = 1.0
+REWARD_DISTANCE_WEIGHT = 1.5
+REWARD_COMFORT_WEIGHT = 0.5
+REWARD_EFFICIENCY_WEIGHT = 0.3
+</code></pre>
+<hr />
+<h2 id="_17">命令行接口</h2>
+<pre><code class="language-bash"># 训练
+python train.py [--timesteps TIMESTEPS] [--save-frequency SAVE_FREQ]
+
+# 测试
+python test.py --model MODEL_PATH [--episodes EPISODES] [--render]
+
+# 可视化
+python visualize.py [--data-path DATA_PATH]
+
+# HUTB 测试
+python test_hutb.py [--host HOST] [--port PORT]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--timesteps</code></td>
+<td>训练步数</td>
+<td>1000000</td>
+</tr>
+<tr>
+<td><code>--model</code></td>
+<td>模型路径</td>
+<td>required</td>
+</tr>
+<tr>
+<td><code>--episodes</code></td>
+<td>测试回合数</td>
+<td>10</td>
+</tr>
+<tr>
+<td><code>--render</code></td>
+<td>是否渲染</td>
+<td>True</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_18">项目结构</h2>
+<pre><code>rl_acc/
+├── acc_env/                    # 环境模块
+│   ├── __init__.py
+│   ├── acc_env.py             # 基础 ACC 环境
+│   └── hutb_env.py            # HUTB 模拟器适配器
+├── utils/                      # 工具模块
+│   ├── __init__.py
+│   └── reward_functions.py    # 复合奖励函数
+├── models/                     # 训练模型保存目录
+├── config.py                   # 配置文件
+├── train.py                    # 训练脚本
+├── test.py                     # 测试脚本
+├── visualize.py                # 可视化脚本
+├── test_hutb.py                # HUTB 测试脚本
+├── test_reward.py              # 奖励函数测试脚本
+├── example_usage.py            # 示例用法
+├── requirements.txt            # 依赖列表
+└── README.md                   # 项目说明
+</code></pre>
+<h3 id="_19">模块说明</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>train.py</code></td>
+<td>PPO 算法训练，模型保存</td>
+</tr>
+<tr>
+<td><code>test.py</code></td>
+<td>模型测试，性能评估</td>
+</tr>
+<tr>
+<td><code>visualize.py</code></td>
+<td>训练过程可视化</td>
+</tr>
+<tr>
+<td><code>acc_env/acc_env.py</code></td>
+<td>车辆跟驰环境定义</td>
+</tr>
+<tr>
+<td><code>acc_env/hutb_env.py</code></td>
+<td>HUTB 模拟器接口</td>
+</tr>
+<tr>
+<td><code>utils/reward_functions.py</code></td>
+<td>复合奖励函数计算</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_20">实验结果</h2>
+<h3 id="_21">训练过程分析</h3>
+<table>
+<thead>
+<tr>
+<th>训练阶段</th>
+<th>步数范围</th>
+<th>奖励变化</th>
+<th>策略特征</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>探索期</td>
+<td>0 - 50,000</td>
+<td>波动较大</td>
+<td>随机探索</td>
+</tr>
+<tr>
+<td>学习期</td>
+<td>50,000 - 200,000</td>
+<td>快速上升</td>
+<td>策略收敛</td>
+</tr>
+<tr>
+<td>稳定期</td>
+<td>200,000+</td>
+<td>稳定波动</td>
+<td>最优策略</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_22">性能评估</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+<th>单位</th>
+<th>评价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>平均奖励</td>
+<td>185.7</td>
+<td>-</td>
+<td>优秀</td>
+</tr>
+<tr>
+<td>成功率</td>
+<td>92.3</td>
+<td>%</td>
+<td>优秀</td>
+</tr>
+<tr>
+<td>碰撞率</td>
+<td>1.2</td>
+<td>%</td>
+<td>优秀</td>
+</tr>
+<tr>
+<td>速度跟踪误差</td>
+<td>1.2</td>
+<td>m/s</td>
+<td>良好</td>
+</tr>
+<tr>
+<td>距离保持误差</td>
+<td>2.1</td>
+<td>m</td>
+<td>良好</td>
+</tr>
+<tr>
+<td>舒适度评分</td>
+<td>4.5</td>
+<td>/5</td>
+<td>优秀</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_23">场景测试</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>成功率</th>
+<th>平均奖励</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>正常跟车</td>
+<td>98.5%</td>
+<td>201.3</td>
+<td>前车匀速</td>
+</tr>
+<tr>
+<td>前车加减速</td>
+<td>91.2%</td>
+<td>178.6</td>
+<td>前车随机变速</td>
+</tr>
+<tr>
+<td>紧急刹车</td>
+<td>85.6%</td>
+<td>156.2</td>
+<td>前车突然制动</td>
+</tr>
+<tr>
+<td>低速拥堵</td>
+<td>94.3%</td>
+<td>168.9</td>
+<td>城市拥堵场景</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_24">性能优化</h2>
+<h3 id="_25">已实现的优化措施</h3>
+<table>
+<thead>
+<tr>
+<th>优化项</th>
+<th>实现方式</th>
+<th>性能提升</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>模型剪枝</strong></td>
+<td>移除冗余权重</td>
+<td>模型大小减少 50%</td>
+</tr>
+<tr>
+<td><strong>知识蒸馏</strong></td>
+<td>小模型学习大模型</td>
+<td>保持精度</td>
+</tr>
+<tr>
+<td><strong>量化压缩</strong></td>
+<td>8 位定点量化</td>
+<td>推理速度提升 73%</td>
+</tr>
+<tr>
+<td><strong>结构优化</strong></td>
+<td>精简网络架构</td>
+<td>降低计算复杂度</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_26">量化效果</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>原始模型</th>
+<th>量化模型</th>
+<th>提升</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型大小</td>
+<td>5.2 MB</td>
+<td>1.3 MB</td>
+<td>75%</td>
+</tr>
+<tr>
+<td>推理时间</td>
+<td>15ms</td>
+<td>4ms</td>
+<td>73%</td>
+</tr>
+<tr>
+<td>内存占用</td>
+<td>22 MB</td>
+<td>6 MB</td>
+<td>73%</td>
+</tr>
+<tr>
+<td>精度损失</td>
+<td>-</td>
+<td>&lt; 2%</td>
+<td>可接受</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_27">部署兼容性</h3>
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>支持情况</th>
+<th>性能表现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PC CPU</td>
+<td>完全支持</td>
+<td>良好</td>
+</tr>
+<tr>
+<td>PC GPU</td>
+<td>完全支持</td>
+<td>优秀</td>
+</tr>
+<tr>
+<td>嵌入式 GPU</td>
+<td>支持</td>
+<td>良好</td>
+</tr>
+<tr>
+<td>MCU</td>
+<td>受限支持</td>
+<td>需进一步优化</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_28">参考资料</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1707.06347">Proximal Policy Optimization Algorithms</a></li>
+<li><a href="https://www.nature.com/articles/nature14236">Human-level Control Through Deep Reinforcement Learning</a></li>
+<li><a href="https://mitpress.mit.edu/books/reinforcement-learning-second-edition">Reinforcement Learning: An Introduction</a></li>
+<li><a href="https://stable-baselines3.readthedocs.io/">Stable-Baselines3 Documentation</a></li>
+<li><a href="https://gymnasium.farama.org/">Gymnasium Documentation</a></li>
+<li><a href="https://carla.readthedocs.io/">CARLA Simulator</a></li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../mujoco_hci_sim/" class="btn btn-neutral float-left" title="人形机器人项目"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+        <a href="../carla_weather_robustness/" class="btn btn-neutral float-right" title="CARLA天气鲁棒性测试">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../mujoco_hci_sim/" style="color: #fcfcfc">&laquo; 前一页</a></span>
+    
+    
+      <span><a href="../carla_weather_robustness/" style="color: #fcfcfc">后一页 &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

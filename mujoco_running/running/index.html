@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/mujoco_running/running/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>基于 CPG+PD+SAC残差强化学习的人形机器人行走仿真 - 神经网络</title>
+    <title>双足人形机器人SAC步态仿真 - 神经网络</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "\u57fa\u4e8e CPG+PD+SAC\u6b8b\u5dee\u5f3a\u5316\u5b66\u4e60\u7684\u4eba\u5f62\u673a\u5668\u4eba\u884c\u8d70\u4eff\u771f";
+        var mkdocs_page_name = "\u53cc\u8db3\u4eba\u5f62\u673a\u5668\u4ebaSAC\u6b65\u6001\u4eff\u771f";
         var mkdocs_page_input_path = "mujoco_running/running.md";
         var mkdocs_page_url = "/nn/mujoco_running/running/";
       </script>
@@ -60,12 +60,110 @@
                 <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
                 </li>
               </ul>
-              <ul>
-                <li class="toctree-l1"><a class="" href="../running.md">双足人形机器人SAC步态仿真</a>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">双足人形机器人SAC步态仿真</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#1">1. 项目概述</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#11">1.1 项目简介</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#12">1.2 项目整体流程</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#13">1.3 项目组成</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#14">1.4 核心技术特点</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#15">1.5 运行模式说明</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2">2. 项目背景与问题定义</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#21">2.1 项目背景</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#22">2.2 现存痛点</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#23">2.3 项目建设目标</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3">3. 核心技术栈与理论基础</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#31">3.1 核心技术栈</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#32-mujoco">3.2 仿真层：MuJoCo 物理引擎</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#33">3.3 系统状态机控制</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#34">3.4 核心控制算法理论</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#35">3.5 关键工程化核心机制</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4">4. 系统整体架构</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#5">5. 系统核心优化点</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#51">5.1 双线程异步交互优化</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#52">5.2 精准关节地址映射</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#53">5.3 四模式自适应步态</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#54">5.4 重心动态平衡优化</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#55">5.5 手臂协同摆动优化</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#56-sac">5.6 SAC 梯度裁剪优化</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#57">5.7 低通滤波降噪</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#6">6. 核心技术难点与解决方案</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#61">6.1 难点：躯干后仰弯折与手臂上抬失衡</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#62-2sacrl">6.2 难点2：SAC残差RL扰动破坏基础稳定姿态</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#63-3">6.3 难点3：步伐幅度过大、频率过快导致机身晃动、稳定性差</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#64-4">6.4 难点4：站立不稳</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#7">7. 运行说明与效果展示</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#71">7.1 键盘控制指令</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#72">7.2 运行效果</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#8">8. 现存不足与后续优化方向</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#81">8.1 现存不足</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#82">8.2 后续优化方向</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#9">9. 项目总结</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_1">参考文献</a>
+    </li>
+    </ul>
                 </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../rl_acc/">RL-ACC</a>
                 </li>
               </ul>
               <ul>
@@ -86,7 +184,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">基于 CPG+PD+SAC残差强化学习的人形机器人行走仿真</li>
+      <li class="breadcrumb-item active">双足人形机器人SAC步态仿真</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenHUTB/nn/edit/main/docs/mujoco_running/running.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
@@ -674,6 +772,10 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
               
             </div>
           </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../../auto_drive_seg/" class="btn btn-neutral float-left" title="自动驾驶车辆语义分割"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+        <a href="../../mujoco_hci_sim/" class="btn btn-neutral float-right" title="人形机器人项目">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
 
   <hr/>
 
@@ -699,6 +801,10 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
         </span>
     
     
+      <span><a href="../../auto_drive_seg/" style="color: #fcfcfc">&laquo; 前一页</a></span>
+    
+    
+      <span><a href="../../mujoco_hci_sim/" style="color: #fcfcfc">后一页 &raquo;</a></span>
     
   </span>
 </div>
