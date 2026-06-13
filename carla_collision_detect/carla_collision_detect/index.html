@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_collision_detect/carla_collision_detect/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>CARLA 模拟器中的物体与碰撞检测系统 (CARLA ADAS Simulation) - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "CARLA \u6a21\u62df\u5668\u4e2d\u7684\u7269\u4f53\u4e0e\u78b0\u649e\u68c0\u6d4b\u7cfb\u7edf (CARLA ADAS Simulation)";
+        var mkdocs_page_input_path = "carla_collision_detect/carla_collision_detect.md";
+        var mkdocs_page_url = "/nn/carla_collision_detect/carla_collision_detect/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">CARLA 模拟器中的物体与碰撞检测系统 (CARLA ADAS Simulation)</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_collision_detect/carla_collision_detect.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla-carla-adas-simulation">CARLA 模拟器中的物体与碰撞检测系统 (CARLA ADAS Simulation)</h1>
+<h2 id="_1">一、项目简介</h2>
+<p>本项目基于 <strong>CARLA 自动驾驶模拟器</strong> 开发，结合计算机视觉与控制理论，实现了一套包含感知、规划与控制的自动驾驶辅助系统（ADAS）。系统利用单目摄像头和YOLOv8进行实时目标检测与测距，实现了车辆定速巡航、自适应跟车（ACC）、自动变道避让（ALC）以及针对横穿马路行人的自动紧急制动（AEB）等核心高级驾驶辅助功能。</p>
+<h2 id="_2">二、核心功能特性</h2>
+<p>结合项目的开发历程，本项目已实现以下核心功能：</p>
+<ol>
+<li><strong>基础定速巡航</strong>：车辆能够根据设定的目标速度，通过底层 PI 控制器平滑控制油门和刹车，保持稳定行驶。</li>
+<li><strong>碰撞检测与预警</strong>：集成 CARLA 物理碰撞传感器，实时捕捉并输出碰撞物类型及冲量数据，为系统提供底线的安全记录。</li>
+<li><strong>前向碰撞预警与紧急制动 (FCW &amp; AEB)</strong>：通过视觉雷达实时测算前方障碍物距离。当距离小于安全制动阈值时，自动切断油门并全量输出刹车。</li>
+<li><strong>自动变道避障 (ALC - Automated Lane Change)</strong>：检测到前方存在慢速车辆或静止障碍物且存在变道空间时，系统会自动规划并执行向左或向右的安全变道，并在完成避让后自动恢复原定巡航速度。</li>
+<li><strong>自适应巡航控制 (ACC - Adaptive Cruise Control)</strong>：当检测到前方有车辆且不满足变道条件时，系统会过滤视觉检测的抖动，平滑地调整自身车速以“咬住”前车，保持动态安全车距。</li>
+<li><strong>VRU 弱势道路使用者保护 (横穿行人检测制动)</strong>：针对行人目标，系统会结合连续多帧的横向像素位移，精准预判行人横穿马路的意图，并提前触发强制急刹锁死机制。</li>
+</ol>
+<h2 id="_3">三、系统架构与模块设计</h2>
+<p>系统采用模块化设计，主要分为四大核心模块：</p>
+<h3 id="1-vision_modulepy">1. <code>vision_module.py</code> (视觉感知模块)</h3>
+<ul>
+<li><strong>模型</strong>：集成 <code>YOLOv8</code> 轻量级模型 (<code>yolov8n.pt</code>) 进行实时目标检测。</li>
+<li><strong>测距原理</strong>：利用单目相机的焦距和目标的真实物理高度（车辆1.5m，行人1.7m），结合图像中 Bounding Box 的像素高度估算绝对距离。</li>
+<li><strong>动态 ROI（感兴趣区域）</strong>：根据目标在画面中的位置和远近，动态划分 ACC 车道保持区域与 AEB 宽幅检测区域，减少误报。</li>
+</ul>
+<h3 id="2-plannerpy">2. <code>planner.py</code> (局部规划与横向控制模块)</h3>
+<ul>
+<li><strong>车道保持 (LKA)</strong>：通过计算当前位置与前方路点的航向角偏差，使用 PID 算法输出平滑的方向盘转向控制量。</li>
+<li><strong>自动变道逻辑</strong>：当满足触发距离（35m内）且非跟随状态时，判断左右车道的合法性，选择最优避让方向，重置误差积分，实现平稳切线。</li>
+</ul>
+<h3 id="3-acc_modulepy">3. <code>acc_module.py</code> (自适应巡航控制模块)</h3>
+<ul>
+<li><strong>时距控制</strong>：基于安全时距（<code>headway_time</code>）和最小缓冲距离（<code>safe_buffer</code>）计算理想跟车距离。</li>
+<li><strong>极致滤波</strong>：针对视觉检测框闪烁带来的“假速度”问题，采用 98% 历史权重 + 2% 当前帧权重的极强低通滤波，确保目标车速计算的平滑性，防止底层控制器“发癫”。</li>
+</ul>
+<h3 id="4-aeb_modulepy">4. <code>aeb_module.py</code> (自动紧急制动模块)</h3>
+<ul>
+<li><strong>行人横穿预测</strong>：维护一个时间与像素 X 坐标的历史队列。当积攒3帧数据发现行人横向移动速度（<code>pixel_speed</code>）极快，且距离小于10米时，瞬间触发 AEB。</li>
+<li><strong>安全抱死机制</strong>：一旦触发针对行人的急刹，强制抱死车辆 4.0 秒，确保车辆彻底停稳，避免由于行人短暂离开视野导致的“溜车”二次碰撞。</li>
+</ul>
+<h3 id="5-mainpy">5. <code>main.py</code> (主控引擎)</h3>
+<ul>
+<li>负责 CARLA 环境的初始化、无路口纯直道生成点的寻找、主车与测试靶标（车辆/行人）的生成。</li>
+<li>提供基于 <code>PyGame</code> 的实时数据仪表盘，展示当前车速、设定巡航速度、档位及底层控制输出（油门/刹车状态）。</li>
+</ul>
+<h2 id="_4">四、运行环境与依赖</h2>
+<ul>
+<li><strong>仿真器</strong>: CARLA Simulator (版本: 0.9.15)</li>
+<li><strong>编程语言</strong>: Python 3.10</li>
+<li><strong>核心依赖库</strong>:
+    <code>pip install carla pygame opencv-python ultralytics numpy keyboard</code></li>
+</ul>
+<h2 id="_5">五、使用说明</h2>
+<ol>
+<li>启动 CARLA 模拟器服务器 (<code>CarlaUE4.exe</code> 或 <code>./CarlaUE4.sh</code>)。</li>
+<li>运行主程序：
+    <code>python main.py</code></li>
+<li><strong>交互式配置</strong>：<ul>
+<li>在终端根据提示输入 <code>1</code> 生成测试车辆，或输入 <code>2</code> 生成横穿马路的测试行人。</li>
+<li>根据提示选择障碍物生成在左侧还是右侧车道。</li>
+</ul>
+</li>
+<li><strong>快捷键操作面板</strong>：<ul>
+<li><code>W</code> : 增加巡航目标车速 (+5 km/h)</li>
+<li><code>S</code> : 降低巡航目标车速 (-5 km/h)</li>
+<li><code>Q</code> : 切换前进 [D] / 倒车 [R] 档位</li>
+<li><code>Space</code> : 手动紧急制动 (手刹)</li>
+<li><code>ESC</code> : 退出测试程序</li>
+</ul>
+</li>
+</ol>
+<h2 id="_6">六、运行效果展示</h2>
+<h3 id="61">6.1 车辆自动定速驾驶</h3>
+<ul>
+<li><strong>对应功能</strong>：主车在无障碍物的超长直道上运行。通过纵向 PI 控制器自动调整油门输出，实现从 0 加速并稳定保持在用户通过快捷键（W/S）设定的巡航目标车速。</li>
+<li><strong>效果演示</strong>：
+<img alt="车辆自动定速驾驶" src="../images/1.gif" /></li>
+</ul>
+<h3 id="62">6.2 碰撞传感器挂载与物理碰撞监听</h3>
+<ul>
+<li><strong>对应功能</strong>：挂载 <code>sensor.other.collision</code> 传感器。当主车主动撞击前车或撞击行人时，黑色的终端控制台能瞬间捕捉触发，并以红色高亮文本实时输出撞击对象的具体类别、具体空间物理坐标以及撞击冲量。</li>
+<li><strong>效果演示</strong>：
+<img alt="碰撞车辆" src="../images/2.gif" /></li>
+</ul>
+<h3 id="63">6.3 检测到前方物体后自动刹车避免碰撞</h3>
+<ul>
+<li><strong>对应功能</strong>：基础前向碰撞预警（FCW）与自动紧急制动（AEB）。当主车正前方突现静止靶标车，且当前车道由于双黄线或边界限制无法变道时，系统计算刹车距离并在临界点全量输出刹车（<code>brake = 1.0</code>）平稳停下。</li>
+<li><strong>效果演示</strong>：
+<img alt="避免碰撞车辆" src="../images/3.gif" /></li>
+</ul>
+<h3 id="64">6.4 检测到前方车/人时自动变道避让</h3>
+<ul>
+<li><strong>对应功能</strong>：自动车道变换（ALC）。当主车以高巡航速度行驶时，若前方 35 米内检测到静止障碍车辆，规划器启动。检测到左侧/右侧车道线允许变道且无逆行风险时，系统自动打方向盘切入旁车道执行避让。</li>
+<li><strong>效果演示</strong>：
+<img alt="检测到车辆后自动避让" src="../images/4.gif" /></li>
+</ul>
+<h3 id="65">6.5 向右避让与避让后自动恢复避让前速度</h3>
+<ul>
+<li><strong>对应功能</strong>：ALC 状态机与速度管理闭环。主车检测到左侧有障碍物，优先触发【向右】变道。在变道执行过程中，车速被强制限制在安全慢行速度（15 km/h）。当主车彻底切入右侧车道、航向角完成对齐并恢复平稳居中后，系统自动恢复到变道前设定的高巡航速度。</li>
+<li><strong>效果演示</strong>：
+<img alt="检测到车辆后自动避让" src="../images/5.gif" /></li>
+</ul>
+<h3 id="66">6.6 检测到前方车辆后减速自动跟车</h3>
+<ul>
+<li><strong>对应功能</strong>：自适应巡航控制（ACC）。当前方车辆同样在行驶，或主车判断由于车道限制无法变道避让时，系统放弃变道，老老实实执行跟车。通过 98% 历史权重的低通滤波器消除了视觉框的异常抖动，直接咬住前车速度。当车距误差在 $\pm 5$ 米内时触发死区逻辑，消除微小颠簸，实现舒适的跟车。</li>
+<li><strong>效果演示</strong>：
+<img alt="自动跟车" src="../images/6.gif" /></li>
+</ul>
+<h3 id="67">6.7 检测到行人横穿马路时自动刹车避免碰撞</h3>
+<ul>
+<li><strong>对应功能</strong>：弱势道路使用者保护（VRU-AEB）。当测试场景切换为行人横穿马路时，AEB 控制器通过连续 3 帧的像素横向位移变化计算行人的瞬时移动速度趋势。一旦判定行人正极速向车道中央横穿且距离小于 10 米，瞬间触发强力刹车。同时启动抱死机制，强行锁死刹车 4.0 秒，直到车辆及行人彻底安全。</li>
+<li><strong>效果演示</strong>：
+<img alt="自动刹车" src="../images/7.gif" /></li>
+</ul>
+<h2 id="_7">七、开发历程与版本演进</h2>
+<p>本项目通过标准的 Git 工作流进行迭代开发，主要功能特性已全部合入主分支：</p>
+<ul>
+<li>✅ <strong>[Merged]</strong> <code>#7255</code>: 实现检测到行人横穿马路时自动刹车避免碰撞的功能 <em>(AEB 横穿预测)</em></li>
+<li>✅ <strong>[Merged]</strong> <code>#7148</code>: 实现检测到前方车辆后减速自动跟车功能 <em>(ACC 自适应跟车)</em></li>
+<li>✅ <strong>[Merged]</strong> <code>#7118</code>: 新增向右避让与避让后自动恢复避让前速度的功能 <em>(ALC 速度恢复机制)</em></li>
+<li>✅ <strong>[Merged]</strong> <code>#5874</code>: 新增检测到前方车/人时自动变道避让避免碰撞 <em>(规划器动态变道)</em></li>
+<li>✅ <strong>[Merged]</strong> <code>#5829</code>: 实现检测到前方物体后自动刹车避免碰撞的功能 <em>(基础 FCW/AEB)</em></li>
+<li>✅ <strong>[Merged]</strong> <code>#5763</code>: 实现碰撞传感器并测试碰撞行人与车辆 <em>(CARLA 物理碰撞监听)</em></li>
+<li>✅ <strong>[Merged]</strong> <code>#5700</code>: 实现车辆自动定速驾驶 <em>(底层 PI 纵向控制)</em></li>
+</ul>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -206,6 +206,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_collision_detect/carla_collision_detect/</loc>
+         <lastmod>2026-06-13</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_imu/carla_imu/</loc>
          <lastmod>2026-06-13</lastmod>
          <changefreq>daily</changefreq>
