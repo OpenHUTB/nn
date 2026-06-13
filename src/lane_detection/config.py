@@ -53,4 +53,10 @@ CONFIG = {
     "warning_curve_danger": 200,      # 低于此值触发 危险
     # 是否默认启用预警（advanced / video 模式）
     "show_warning": True,
+
+    # 步骤7：快速搜索（视频模式）
+    "use_fast_search": True,          # 是否默认启用快速搜索
+    "fast_search_margin": 50,         # 带搜索宽度（像素）
+    "fast_search_min_pixels": 30,     # 最少有效像素数
+    "fast_max_consecutive_fallback": 5,  # 连续回退上限，超过后重新校准
 }
