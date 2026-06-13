@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/drone_path_learning/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>无人机路径学习 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u65e0\u4eba\u673a\u8def\u5f84\u5b66\u4e60";
+        var mkdocs_page_input_path = "drone_path_learning/README.md";
+        var mkdocs_page_url = "/nn/drone_path_learning/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">无人机路径学习</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#_1">目录</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_2">项目简介</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_3">核心特性</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_4">运行效果展示</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_5">训练可视化界面</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_6">评估可视化界面</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_7">评估结果展示</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_8">项目结构</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_9">技术架构</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_10">环境准备</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1">1. 前置条件</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-python">2. 安装 Python 依赖</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-gym">3. 安装本地 Gym 环境包</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-airsim">4. 启动 AirSim</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_11">快速开始</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_12">方式一：使用统一入口</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_13">方式二：直接启动训练可视化</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_14">方式三：直接启动命令行训练</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_15">训练流程</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_16">评估流程</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_17">配置文件说明</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#options">[options]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#environment">[environment]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#drl">[DRL]</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#multirotor">[multirotor]</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_18">观测空间与动作空间</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#_19">观测空间</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#_20">动作空间</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_21">奖励与终止条件</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_22">训练产物</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_23">测试工具</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#pytorch-cuda">PyTorch / CUDA 检查</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#airsim">AirSim 环境快速测试</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_24">常见问题</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-gymmakeairsim-env-v0">1. gym.make("airsim-env-v0") 找不到环境</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-airsim">2. AirSim 连接失败</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3">3. 深度图读取失败或一直重试</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#4-ui">4. 训练 UI 无法打开</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#5-gpu">5. GPU 不可用</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#6">6. 模型评估时找不到配置或模型</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#7">7. 续训没有生效</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_25">扩展方向</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#_26">参考入口</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">无人机路径学习</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/drone_path_learning/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="drone_path_learning">drone_path_learning</h1>
+<p>基于 AirSim、Gym 和 Stable-Baselines3 的无人机视觉导航强化学习项目。项目把 AirSim 多旋翼无人机封装为标准 Gym 环境 <code>airsim-env-v0</code>，支持深度图、向量特征和 LGMD 仿生视觉等观测方式，并提供 PPO、SAC、TD3 训练与 PyQt5 可视化评估流程。</p>
+<hr />
+<h2 id="_1">目录</h2>
+<ul>
+<li><a href="#项目简介">项目简介</a></li>
+<li><a href="#核心特性">核心特性</a></li>
+<li><a href="#运行效果展示">运行效果展示</a></li>
+<li><a href="#项目结构">项目结构</a></li>
+<li><a href="#技术架构">技术架构</a></li>
+<li><a href="#环境准备">环境准备</a></li>
+<li><a href="#快速开始">快速开始</a></li>
+<li><a href="#训练流程">训练流程</a></li>
+<li><a href="#评估流程">评估流程</a></li>
+<li><a href="#配置文件说明">配置文件说明</a></li>
+<li><a href="#观测空间与动作空间">观测空间与动作空间</a></li>
+<li><a href="#奖励与终止条件">奖励与终止条件</a></li>
+<li><a href="#训练产物">训练产物</a></li>
+<li><a href="#测试工具">测试工具</a></li>
+<li><a href="#常见问题">常见问题</a></li>
+<li><a href="#扩展方向">扩展方向</a></li>
+</ul>
+<hr />
+<h2 id="_2">项目简介</h2>
+<p><code>drone_path_learning</code> 面向无人机自主路径学习与避障导航实验，核心目标是让多旋翼无人机在 AirSim 仿真环境中根据视觉和状态信息学习从起点飞向目标点的控制策略。</p>
+<p>项目提供了完整的强化学习实验闭环：</p>
+<ol>
+<li>通过 AirSim 获取深度图、场景图、无人机位姿、速度和目标相对状态。</li>
+<li>将仿真交互封装为 Gym 风格的 <code>reset()</code>、<code>step(action)</code>、<code>observation_space</code> 和 <code>action_space</code>。</li>
+<li>使用 Stable-Baselines3 中的 PPO、SAC 或 TD3 训练策略。</li>
+<li>通过自定义 CNN/MLP 特征提取器处理深度图和状态特征。</li>
+<li>使用 PyQt5 界面实时展示动作、状态、姿态、奖励和轨迹。</li>
+<li>将模型、TensorBoard 日志、配置文件和评估结果统一保存到 <code>logs/</code>。</li>
+</ol>
+<p>适合用于：</p>
+<ul>
+<li>无人机视觉导航强化学习实验；</li>
+<li>AirSim 与 Gym 环境封装学习；</li>
+<li>PPO/SAC/TD3 在连续控制任务上的对比；</li>
+<li>深度图、向量特征、LGMD 特征在避障导航中的效果比较；</li>
+<li>课程式训练、模型续训和策略评估。</li>
+</ul>
+<hr />
+<h2 id="_3">核心特性</h2>
+<ul>
+<li><strong>AirSim 多旋翼仿真</strong>：通过 <code>airsim.MultirotorClient</code> 控制无人机起飞、重置、移动、暂停仿真和读取传感器。</li>
+<li><strong>Gym 环境接口</strong>：本地包 <code>gym_env</code> 注册 <code>airsim-env-v0</code>，可直接 <code>gym.make("airsim-env-v0")</code> 创建环境。</li>
+<li><strong>多算法支持</strong>：训练线程支持 <code>PPO</code>、<code>SAC</code>、<code>TD3</code>。</li>
+<li><strong>多观测模式</strong>：支持 <code>depth</code>、<code>vector</code>、<code>lgmd</code> 三类感知方式。</li>
+<li><strong>多策略网络</strong>：支持 <code>mlp</code>、<code>CNN_FC</code>、<code>CNN_GAP</code>、<code>CNN_GAP_BN</code>、<code>CNN_MobileNet</code>、<code>No_CNN</code>。</li>
+<li><strong>3D/2D 控制切换</strong>：通过 <code>navigation_3d</code> 控制动作维度，支持水平速度、垂直速度和偏航角速度控制。</li>
+<li><strong>课程式配置</strong>：提供多个 <code>NH_center</code> 阶段配置，逐步调整目标距离、初始朝向和目标方向范围。</li>
+<li><strong>训练可视化</strong>：PyQt5 UI 展示动作、状态、姿态、奖励曲线和飞行轨迹。</li>
+<li><strong>评估结果落盘</strong>：保存轨迹、动作、状态、观测和汇总指标，便于后续分析。</li>
+<li><strong>WandB 可选集成</strong>：配置 <code>use_wandb=True</code> 后可同步 TensorBoard 与训练代码。</li>
+</ul>
+<hr />
+<h2 id="_4">运行效果展示</h2>
+<h3 id="_5">训练可视化界面</h3>
+<p><img alt="训练可视化界面" src="img/train.png" /></p>
+<h3 id="_6">评估可视化界面</h3>
+<p><img alt="评估可视化界面" src="img/evaluate.png" /></p>
+<h3 id="_7">评估结果展示</h3>
+<p><img alt="评估结果展示" src="img/evaluate_result.png" /></p>
+<hr />
+<h2 id="_8">项目结构</h2>
+<pre><code class="language-text">src/drone_path_learning/
+├── README.md
+├── requirements.txt
+├── main.py
+├── configs/
+│   ├── config_NH_center_Multirotor_3D.ini
+│   ├── config_NH_center_Multirotor_Phase1_Fixed10m.ini
+│   ├── config_NH_center_Multirotor_Phase2_Fixed20m.ini
+│   ├── config_NH_center_Multirotor_Phase3A_Yaw90_20m.ini
+│   ├── config_NH_center_Multirotor_Phase3B_Yaw90_Goal90_20m.ini
+│   ├── config_NH_center_Multirotor_Phase3C_Yaw90_Goal180_20m.ini
+│   └── config_NH_center_Multirotor_Phase3D_Yaw180_Goal180_20m.ini
+├── gym_env/
+│   ├── setup.py
+│   └── gym_env/
+│       ├── __init__.py
+│       └── envs/
+│           ├── airsim_env.py
+│           └── dynamics/
+│               └── multirotor_airsim.py
+├── resources/
+│   └── env_maps/
+│       └── NH_center.png
+├── scripts/
+│   ├── train.py
+│   ├── evaluation.py
+│   ├── start_train_with_plot.py
+│   ├── start_evaluate_with_plot.py
+│   └── utils/
+│       ├── custom_policy_sb3.py
+│       ├── thread_train.py
+│       ├── thread_evaluation.py
+│       └── ui_train.py
+└── tools/
+    ├── map_generation/
+    │   └── map_generation.py
+    └── test/
+        ├── env_test.py
+        └── torch_gpu_cpu_test.py
+</code></pre>
+<p>关键文件说明：</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../../src/drone_path_learning/main.py">main.py</a></td>
+<td>统一启动入口，支持训练、评估、Torch/CUDA 检查和环境测试</td>
+</tr>
+<tr>
+<td><a href="../../src/drone_path_learning/gym_env/gym_env/__init__.py">gym_env/gym_env/<strong>init</strong>.py</a></td>
+<td>注册 Gym 环境 <code>airsim-env-v0</code></td>
+</tr>
+<tr>
+<td><a href="../../src/drone_path_learning/gym_env/gym_env/envs/airsim_env.py">gym_env/gym_env/envs/airsim_env.py</a></td>
+<td>AirSim Gym 环境主体，定义观测、奖励、终止条件和 PyQt 信号</td>
+</tr>
+<tr>
+<td><a href="../../src/drone_path_learning/gym_env/gym_env/envs/dynamics/multirotor_airsim.py">gym_env/gym_env/envs/dynamics/multirotor_airsim.py</a></td>
+<td>多旋翼动力学与 AirSim 控制接口</td>
+</tr>
+<tr>
+<td><a href="../../src/drone_path_learning/scripts/utils/thread_train.py">scripts/utils/thread_train.py</a></td>
+<td>配置化训练线程，创建 SB3 模型并保存日志和模型</td>
+</tr>
+<tr>
+<td><a href="../../src/drone_path_learning/scripts/utils/thread_evaluation.py">scripts/utils/thread_evaluation.py</a></td>
+<td>评估线程，加载模型并保存评估轨迹与指标</td>
+</tr>
+<tr>
+<td><a href="../../src/drone_path_learning/scripts/utils/custom_policy_sb3.py">scripts/utils/custom_policy_sb3.py</a></td>
+<td>自定义 CNN/MLP 特征提取器</td>
+</tr>
+<tr>
+<td><a href="../../src/drone_path_learning/scripts/utils/ui_train.py">scripts/utils/ui_train.py</a></td>
+<td>PyQt5 可视化界面</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_9">技术架构</h2>
+<p>项目整体可以分为五层：</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>核心功能</th>
+<th>对应代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>仿真层</td>
+<td>AirSim 场景、无人机、深度相机、碰撞信息和仿真暂停/恢复</td>
+<td><a href="../../src/drone_path_learning/gym_env/gym_env/envs/dynamics/multirotor_airsim.py">multirotor_airsim.py</a></td>
+</tr>
+<tr>
+<td>环境层</td>
+<td>Gym 接口、观测构造、奖励计算、终止判断、工作空间约束</td>
+<td><a href="../../src/drone_path_learning/gym_env/gym_env/envs/airsim_env.py">airsim_env.py</a></td>
+</tr>
+<tr>
+<td>算法层</td>
+<td>PPO/SAC/TD3 初始化、超参数读取、模型训练、断点续训</td>
+<td><a href="../../src/drone_path_learning/scripts/utils/thread_train.py">thread_train.py</a></td>
+</tr>
+<tr>
+<td>网络层</td>
+<td>CNN、MobileNet、No-CNN 和 MLP 特征提取</td>
+<td><a href="../../src/drone_path_learning/scripts/utils/custom_policy_sb3.py">custom_policy_sb3.py</a></td>
+</tr>
+<tr>
+<td>展示与分析层</td>
+<td>PyQt5 训练 UI、评估 UI、TensorBoard、WandB、<code>.npy</code> 结果保存</td>
+<td><a href="../../src/drone_path_learning/scripts/utils/ui_train.py">ui_train.py</a>、<a href="../../src/drone_path_learning/scripts/utils/thread_evaluation.py">thread_evaluation.py</a></td>
+</tr>
+</tbody>
+</table>
+<p>训练交互流程：</p>
+<pre><code class="language-text">AirSim 场景
+  ↓ 深度图 / 状态 / 碰撞信息
+AirsimGymEnv.get_obs()
+  ↓ depth / vector / lgmd 观测
+Stable-Baselines3 策略网络
+  ↓ action: 速度与偏航控制
+MultirotorDynamicsAirsim.set_action()
+  ↓ moveByVelocityAsync / moveByVelocityZAsync
+AirSim 执行动作并返回新状态
+  ↓
+奖励计算、终止判断、日志和 UI 更新
+</code></pre>
+<hr />
+<h2 id="_10">环境准备</h2>
+<h3 id="1">1. 前置条件</h3>
+<ul>
+<li>Windows 或 Linux；</li>
+<li>Python 环境；</li>
+<li>AirSim 可运行，并已准备包含多旋翼无人机的仿真场景；</li>
+<li>支持 CUDA 的 NVIDIA GPU 可显著提升训练速度，但不是必需；</li>
+<li>如果使用可视化界面，需要本机图形界面支持 PyQt5 窗口显示。</li>
+</ul>
+<p>项目依赖文件位于：</p>
+<p><a href="../../src/drone_path_learning/requirements.txt">requirements.txt</a></p>
+<p>主要依赖包括：</p>
+<ul>
+<li><code>airsim==1.6.0</code></li>
+<li><code>gym==0.17.3</code></li>
+<li><code>stable-baselines3</code></li>
+<li><code>torch==2.0.0+cu118</code></li>
+<li><code>torchvision==0.15.0+cu118</code></li>
+<li><code>opencv-contrib-python</code></li>
+<li><code>pyqt5</code></li>
+<li><code>pyqtgraph</code></li>
+<li><code>wandb</code></li>
+<li><code>tensorboard</code></li>
+</ul>
+<h3 id="2-python">2. 安装 Python 依赖</h3>
+<pre><code class="language-bash">cd src/drone_path_learning
+pip install -r requirements.txt
+</code></pre>
+<h3 id="3-gym">3. 安装本地 Gym 环境包</h3>
+<pre><code class="language-bash">cd src/drone_path_learning
+pip install -e gym_env
+</code></pre>
+<p>安装后，<code>gym_env</code> 会注册：</p>
+<pre><code class="language-python">gym.make(&quot;airsim-env-v0&quot;)
+</code></pre>
+<h3 id="4-airsim">4. 启动 AirSim</h3>
+<p>运行训练或测试前，需要先启动 AirSim 仿真器，并确保：</p>
+<ul>
+<li>AirSim 可以正常连接；</li>
+<li>多旋翼无人机可用；</li>
+<li>相机名称为代码中使用的 <code>"0"</code>；</li>
+<li>深度图接口 <code>airsim.ImageType.DepthVis</code> 可以返回有效图像；</li>
+<li>当前场景与配置中的 <code>env_name</code> 相匹配，例如 <code>NH_center</code>。</li>
+</ul>
+<hr />
+<h2 id="_11">快速开始</h2>
+<h3 id="_12">方式一：使用统一入口</h3>
+<pre><code class="language-bash">cd src/drone_path_learning
+python main.py
+</code></pre>
+<p>不传参数时，程序会显示交互菜单：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">编号</th>
+<th>模式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td><code>train</code></td>
+<td>启动带 PyQt5 UI 的训练</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td><code>eval</code></td>
+<td>启动带 PyQt5 UI 的评估</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td><code>torch_check</code></td>
+<td>检查 PyTorch / CUDA</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><code>env_test</code></td>
+<td>执行 AirSim 环境快速步进测试</td>
+</tr>
+</tbody>
+</table>
+<p>也可以直接指定模式：</p>
+<pre><code class="language-bash">python main.py train -- --config configs/config_NH_center_Multirotor_3D.ini
+python main.py env_test -- --config configs/config_NH_center_Multirotor_3D.ini
+python main.py torch_check
+</code></pre>
+<p>说明：<code>main.py</code> 会把 <code>--</code> 后面的参数透传给目标脚本。</p>
+<h3 id="_13">方式二：直接启动训练可视化</h3>
+<pre><code class="language-bash">cd src/drone_path_learning
+python scripts/start_train_with_plot.py --config configs/config_NH_center_Multirotor_3D.ini
+</code></pre>
+<p>如果不指定 <code>--config</code>，默认使用：</p>
+<pre><code class="language-text">configs/config_NH_center_Multirotor_Phase3D_Yaw180_Goal180_20m.ini
+</code></pre>
+<h3 id="_14">方式三：直接启动命令行训练</h3>
+<pre><code class="language-bash">cd src/drone_path_learning
+python scripts/utils/thread_train.py --config config_NH_center_Multirotor_3D
+</code></pre>
+<p><code>--config</code> 既可以传 <code>configs/</code> 下不带 <code>.ini</code> 后缀的配置名，也可以传显式 <code>.ini</code> 路径。</p>
+<hr />
+<h2 id="_15">训练流程</h2>
+<p>训练入口推荐使用：</p>
+<p><a href="../../src/drone_path_learning/scripts/start_train_with_plot.py">scripts/start_train_with_plot.py</a></p>
+<p>内部核心训练逻辑位于：</p>
+<p><a href="../../src/drone_path_learning/scripts/utils/thread_train.py">scripts/utils/thread_train.py</a></p>
+<p>训练过程如下：</p>
+<ol>
+<li>读取 <code>.ini</code> 配置文件。</li>
+<li>创建 <code>gym.make("airsim-env-v0")</code> 环境。</li>
+<li>调用 <code>env.set_config(cfg)</code> 设置场景、动力学、观测方式、奖励方式和动作空间。</li>
+<li>根据 <code>policy_name</code> 选择 <code>MlpPolicy</code> 或 <code>CnnPolicy</code>。</li>
+<li>根据 <code>algo</code> 创建 PPO、SAC 或 TD3 模型。</li>
+<li>如果配置了 <code>resume_model_path</code>，加载已有模型继续训练。</li>
+<li>创建日志目录、模型目录、配置备份目录和数据目录。</li>
+<li>使用 <code>CheckpointCallback</code> 定期保存 checkpoint。</li>
+<li>训练结束后保存最终模型 <code>model_sb3.zip</code>。</li>
+</ol>
+<p>常用训练命令：</p>
+<pre><code class="language-bash">python scripts/start_train_with_plot.py --config configs/config_NH_center_Multirotor_3D.ini
+python scripts/start_train_with_plot.py --config configs/config_NH_center_Multirotor_Phase1_Fixed10m.ini
+python scripts/start_train_with_plot.py --config configs/config_NH_center_Multirotor_Phase3D_Yaw180_Goal180_20m.ini
+</code></pre>
+<p>当前提供的课程式配置：</p>
+<table>
+<thead>
+<tr>
+<th>配置文件</th>
+<th>训练意图</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config_NH_center_Multirotor_3D.ini</code></td>
+<td>基础 3D 导航配置，使用深度图和 CNN</td>
+</tr>
+<tr>
+<td><code>config_NH_center_Multirotor_Phase1_Fixed10m.ini</code></td>
+<td>固定 10m 目标距离，适合初期收敛</td>
+</tr>
+<tr>
+<td><code>config_NH_center_Multirotor_Phase2_Fixed20m.ini</code></td>
+<td>固定 20m 目标距离，提高任务距离</td>
+</tr>
+<tr>
+<td><code>config_NH_center_Multirotor_Phase3A_Yaw90_20m.ini</code></td>
+<td>扩展初始偏航角范围</td>
+</tr>
+<tr>
+<td><code>config_NH_center_Multirotor_Phase3B_Yaw90_Goal90_20m.ini</code></td>
+<td>同时扩展初始朝向与目标方向</td>
+</tr>
+<tr>
+<td><code>config_NH_center_Multirotor_Phase3C_Yaw90_Goal180_20m.ini</code></td>
+<td>继续扩大目标方向范围</td>
+</tr>
+<tr>
+<td><code>config_NH_center_Multirotor_Phase3D_Yaw180_Goal180_20m.ini</code></td>
+<td>更完整的随机朝向/目标方向训练配置</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_16">评估流程</h2>
+<p>评估入口推荐使用：</p>
+<p><a href="../../src/drone_path_learning/scripts/start_evaluate_with_plot.py">scripts/start_evaluate_with_plot.py</a></p>
+<p>示例：</p>
+<pre><code class="language-bash">cd src/drone_path_learning
+python scripts/start_evaluate_with_plot.py --eval-path logs/NH_center/&lt;your_run_dir&gt; --eval-eps 50
+</code></pre>
+<p>可选参数：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--eval-path</code></td>
+<td>示例训练目录</td>
+<td>训练产物目录，内部应包含 <code>config/</code> 和 <code>models/</code></td>
+</tr>
+<tr>
+<td><code>--config</code></td>
+<td><code>&lt;eval-path&gt;/config/config.ini</code></td>
+<td>指定评估配置</td>
+</tr>
+<tr>
+<td><code>--model-file</code></td>
+<td><code>&lt;eval-path&gt;/models/model_sb3.zip</code></td>
+<td>指定模型文件</td>
+</tr>
+<tr>
+<td><code>--eval-eps</code></td>
+<td><code>50</code></td>
+<td>评估回合数</td>
+</tr>
+<tr>
+<td><code>--eval-env</code></td>
+<td>不覆盖</td>
+<td>覆盖配置中的 <code>env_name</code></td>
+</tr>
+<tr>
+<td><code>--eval-dynamics</code></td>
+<td>不覆盖</td>
+<td>覆盖配置中的 <code>dynamic_name</code></td>
+</tr>
+</tbody>
+</table>
+<p>命令行评估：</p>
+<pre><code class="language-bash">python scripts/evaluation.py --mode single --eval-path logs/NH_center/&lt;your_run_dir&gt; --eval-eps 50
+</code></pre>
+<p>批量评估：</p>
+<pre><code class="language-bash">python scripts/evaluation.py --mode multi --eval-logs-path logs/NH_center --eval-logs-name NH_center --eval-env NH_center --eval-dynamics Multirotor
+</code></pre>
+<p>评估会保存：</p>
+<pre><code class="language-text">&lt;eval-path&gt;/eval_&lt;eval_eps&gt;_&lt;env_name&gt;_&lt;dynamic_name&gt;/
+├── traj_eval.npy
+├── action_eval.npy
+├── state_eval.npy
+├── obs_eval.npy
+└── results.npy
+</code></pre>
+<p><code>results.npy</code> 包含：</p>
+<pre><code class="language-text">[平均奖励, 成功率, 碰撞率, 成功回合平均步数]
+</code></pre>
+<hr />
+<h2 id="_17">配置文件说明</h2>
+<p>配置文件采用 <code>.ini</code> 格式，核心分区包括：</p>
+<h3 id="options"><code>[options]</code></h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>env_name</code></td>
+<td><code>NH_center</code></td>
+<td>环境名称，目前代码支持 <code>NH_center</code>、<code>NH_tree</code>、<code>City</code>、<code>City_400</code>、<code>Tree_200</code>、<code>SimpleAvoid</code>、<code>Forest</code>、<code>Trees</code></td>
+</tr>
+<tr>
+<td><code>dynamic_name</code></td>
+<td><code>Multirotor</code></td>
+<td>动力学类型，清理后的代码仅支持 <code>Multirotor</code></td>
+</tr>
+<tr>
+<td><code>navigation_3d</code></td>
+<td><code>True</code></td>
+<td>是否启用 3D 动作空间</td>
+</tr>
+<tr>
+<td><code>using_velocity_state</code></td>
+<td><code>True</code></td>
+<td>状态特征中是否包含速度信息</td>
+</tr>
+<tr>
+<td><code>perception</code></td>
+<td><code>depth</code> / <code>vector</code> / <code>lgmd</code></td>
+<td>观测模式</td>
+</tr>
+<tr>
+<td><code>algo</code></td>
+<td><code>PPO</code> / <code>SAC</code> / <code>TD3</code></td>
+<td>强化学习算法</td>
+</tr>
+<tr>
+<td><code>policy_name</code></td>
+<td><code>CNN_FC</code> / <code>mlp</code></td>
+<td>策略网络类型</td>
+</tr>
+<tr>
+<td><code>net_arch</code></td>
+<td><code>[256, 128]</code></td>
+<td>Actor/Critic 或 MLP 网络结构</td>
+</tr>
+<tr>
+<td><code>activation_function</code></td>
+<td><code>relu</code> / <code>tanh</code></td>
+<td>激活函数</td>
+</tr>
+<tr>
+<td><code>cnn_feature_num</code></td>
+<td><code>64</code></td>
+<td>CNN 或视觉分支输出特征数</td>
+</tr>
+<tr>
+<td><code>keyboard_debug</code></td>
+<td><code>False</code></td>
+<td>是否开启键盘步进调试</td>
+</tr>
+<tr>
+<td><code>generate_q_map</code></td>
+<td><code>False</code></td>
+<td>是否生成 Q 值地图，主要用于 TD3/SAC</td>
+</tr>
+<tr>
+<td><code>use_wandb</code></td>
+<td><code>False</code></td>
+<td>是否启用 WandB</td>
+</tr>
+<tr>
+<td><code>total_timesteps</code></td>
+<td><code>250000</code></td>
+<td>训练总步数</td>
+</tr>
+<tr>
+<td><code>resume_model_path</code></td>
+<td>空或模型路径</td>
+<td>续训模型路径</td>
+</tr>
+<tr>
+<td><code>reset_num_timesteps</code></td>
+<td><code>True</code></td>
+<td>续训时是否重置 SB3 时间步</td>
+</tr>
+<tr>
+<td><code>checkpoint_freq</code></td>
+<td><code>10000</code></td>
+<td>checkpoint 保存间隔</td>
+</tr>
+</tbody>
+</table>
+<h3 id="environment"><code>[environment]</code></h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_depth_meters</code></td>
+<td><code>15</code></td>
+<td>深度图裁剪最大距离</td>
+</tr>
+<tr>
+<td><code>screen_height</code> / <code>screen_width</code></td>
+<td><code>48</code> / <code>64</code></td>
+<td>输入图像尺寸</td>
+</tr>
+<tr>
+<td><code>reward_type</code></td>
+<td><code>reward_distance_based</code></td>
+<td>奖励函数类型</td>
+</tr>
+<tr>
+<td><code>crash_distance</code></td>
+<td><code>1.0</code></td>
+<td>深度碰撞阈值</td>
+</tr>
+<tr>
+<td><code>depth_collision_percentile</code></td>
+<td><code>5</code></td>
+<td>使用深度图低分位估计障碍距离</td>
+</tr>
+<tr>
+<td><code>depth_collision_roi_top_ratio</code></td>
+<td><code>0.65</code></td>
+<td>碰撞检测使用的图像上部 ROI 比例</td>
+</tr>
+<tr>
+<td><code>accept_radius</code></td>
+<td><code>4</code></td>
+<td>到达目标判定半径</td>
+</tr>
+<tr>
+<td><code>success_check_mode</code></td>
+<td><code>planar_with_altitude</code></td>
+<td>成功判定模式</td>
+</tr>
+<tr>
+<td><code>success_altitude_tolerance</code></td>
+<td><code>8.0</code></td>
+<td>高度误差容忍度</td>
+</tr>
+<tr>
+<td><code>max_episode_steps</code></td>
+<td><code>900</code></td>
+<td>单回合最大步数</td>
+</tr>
+<tr>
+<td><code>start_position</code></td>
+<td><code>[0, 0, 5]</code></td>
+<td>可选，覆盖默认起点</td>
+</tr>
+<tr>
+<td><code>start_random_angle</code></td>
+<td><code>3.14159265359</code></td>
+<td>可选，起始偏航随机范围</td>
+</tr>
+<tr>
+<td><code>goal_distance</code></td>
+<td><code>20</code></td>
+<td>可选，目标距离</td>
+</tr>
+<tr>
+<td><code>goal_random_angle</code></td>
+<td><code>3.14159265359</code></td>
+<td>可选，目标方向随机范围</td>
+</tr>
+</tbody>
+</table>
+<h3 id="drl"><code>[DRL]</code></h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gamma</code></td>
+<td>折扣因子</td>
+</tr>
+<tr>
+<td><code>learning_rate</code></td>
+<td>学习率</td>
+</tr>
+<tr>
+<td><code>n_steps</code></td>
+<td>PPO 每轮 rollout 步数</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>batch 大小</td>
+</tr>
+<tr>
+<td><code>n_epochs</code></td>
+<td>PPO 每轮更新 epoch 数</td>
+</tr>
+<tr>
+<td><code>gae_lambda</code></td>
+<td>GAE 参数</td>
+</tr>
+<tr>
+<td><code>ent_coef</code></td>
+<td>熵奖励系数</td>
+</tr>
+<tr>
+<td><code>vf_coef</code></td>
+<td>Value loss 系数</td>
+</tr>
+<tr>
+<td><code>clip_range</code></td>
+<td>PPO clip 范围</td>
+</tr>
+<tr>
+<td><code>target_kl</code></td>
+<td>PPO KL 早停阈值</td>
+</tr>
+<tr>
+<td><code>max_grad_norm</code></td>
+<td>梯度裁剪</td>
+</tr>
+<tr>
+<td><code>buffer_size</code></td>
+<td>SAC/TD3 回放缓冲区大小，相关配置中使用</td>
+</tr>
+<tr>
+<td><code>learning_starts</code></td>
+<td>SAC/TD3 开始训练前的随机探索步数</td>
+</tr>
+<tr>
+<td><code>train_freq</code></td>
+<td>SAC/TD3 训练频率</td>
+</tr>
+<tr>
+<td><code>gradient_steps</code></td>
+<td>SAC/TD3 每次训练的梯度步数</td>
+</tr>
+<tr>
+<td><code>action_noise_sigma</code></td>
+<td>SAC/TD3 动作噪声强度</td>
+</tr>
+</tbody>
+</table>
+<h3 id="multirotor"><code>[multirotor]</code></h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dt</code></td>
+<td><code>0.1</code></td>
+<td>控制步长</td>
+</tr>
+<tr>
+<td><code>acc_xy_max</code></td>
+<td><code>2.0</code></td>
+<td>水平速度变化限制</td>
+</tr>
+<tr>
+<td><code>v_xy_max</code></td>
+<td><code>5</code></td>
+<td>最大水平速度</td>
+</tr>
+<tr>
+<td><code>v_xy_min</code></td>
+<td><code>0.5</code></td>
+<td>最小水平速度</td>
+</tr>
+<tr>
+<td><code>v_z_max</code></td>
+<td><code>2.0</code></td>
+<td>最大垂直速度</td>
+</tr>
+<tr>
+<td><code>yaw_rate_max_deg</code></td>
+<td><code>30.0</code></td>
+<td>最大偏航角速度</td>
+</tr>
+<tr>
+<td><code>action_smoothing_alpha</code></td>
+<td><code>0.25</code></td>
+<td>动作平滑系数</td>
+</tr>
+<tr>
+<td><code>yaw_rate_change_max_deg</code></td>
+<td><code>5.0</code></td>
+<td>单步偏航角速度变化限制</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_18">观测空间与动作空间</h2>
+<h3 id="_19">观测空间</h3>
+<p>环境根据 <code>perception</code> 返回不同观测：</p>
+<table>
+<thead>
+<tr>
+<th><code>perception</code></th>
+<th>观测形状</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>depth</code></td>
+<td><code>(screen_height, screen_width, 2)</code></td>
+<td>两通道图像：深度图通道 + 状态特征嵌入通道</td>
+</tr>
+<tr>
+<td><code>vector</code></td>
+<td><code>(1, cnn_feature_num + state_feature_length)</code></td>
+<td>深度图分块特征 + 状态特征</td>
+</tr>
+<tr>
+<td><code>lgmd</code></td>
+<td><code>(1, cnn_feature_num + state_feature_length)</code></td>
+<td>LGMD 输出分块特征 + 状态特征</td>
+</tr>
+</tbody>
+</table>
+<p><code>depth</code> 模式处理逻辑：</p>
+<ol>
+<li>读取 AirSim 深度图。</li>
+<li>resize 到配置中的 <code>screen_width x screen_height</code>。</li>
+<li>将深度限制在 <code>max_depth_meters</code> 内。</li>
+<li>归一化并反转，使近处障碍更醒目。</li>
+<li>将状态特征写入第二通道左上角。</li>
+</ol>
+<p><code>vector</code> 模式处理逻辑：</p>
+<ol>
+<li>读取深度图。</li>
+<li>将图像划分为 5 个水平区域。</li>
+<li>每个区域取最大激活值，形成 5 维视觉特征。</li>
+<li>拼接无人机状态特征。</li>
+</ol>
+<p>状态特征由 <code>MultirotorDynamicsAirsim._get_state_feature()</code> 生成，通常包含：</p>
+<ul>
+<li>到目标点的水平距离；</li>
+<li>当前高度相对目标高度的误差；</li>
+<li>指向目标的相对偏航角；</li>
+<li>水平速度；</li>
+<li>垂直速度；</li>
+<li>偏航角速度。</li>
+</ul>
+<p>如果 <code>navigation_3d=False</code> 或 <code>using_velocity_state=False</code>，状态特征维度会相应减少。</p>
+<h3 id="_20">动作空间</h3>
+<p>动作空间由 <a href="../../src/drone_path_learning/gym_env/gym_env/envs/dynamics/multirotor_airsim.py">multirotor_airsim.py</a> 定义。</p>
+<p>3D 导航时：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">动作索引</th>
+<th>含义</th>
+<th>范围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>水平速度 <code>v_xy</code></td>
+<td><code>[v_xy_min, v_xy_max]</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>垂直速度 <code>v_z</code></td>
+<td><code>[-v_z_max, v_z_max]</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>偏航角速度 <code>yaw_rate</code></td>
+<td><code>[-yaw_rate_max_rad, yaw_rate_max_rad]</code></td>
+</tr>
+</tbody>
+</table>
+<p>2D 导航时：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">动作索引</th>
+<th>含义</th>
+<th>范围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>水平速度 <code>v_xy</code></td>
+<td><code>[v_xy_min, v_xy_max]</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>偏航角速度 <code>yaw_rate</code></td>
+<td><code>[-yaw_rate_max_rad, yaw_rate_max_rad]</code></td>
+</tr>
+</tbody>
+</table>
+<p>动作在执行前会经过：</p>
+<ul>
+<li>范围裁剪；</li>
+<li>指数平滑；</li>
+<li>水平加速度限制；</li>
+<li>偏航角速度变化率限制；</li>
+<li>AirSim <code>moveByVelocityAsync</code> 或 <code>moveByVelocityZAsync</code> 控制。</li>
+</ul>
+<hr />
+<h2 id="_21">奖励与终止条件</h2>
+<p>默认推荐奖励类型为：</p>
+<pre><code class="language-ini">reward_type = reward_distance_based
+</code></pre>
+<p>默认奖励函数 <code>compute_reward()</code> 综合考虑：</p>
+<ul>
+<li>向目标点靠近的距离增量奖励；</li>
+<li>朝向目标方向的额外奖励；</li>
+<li>偏航角速度惩罚；</li>
+<li>垂直速度和高度误差惩罚；</li>
+<li>相对目标方向偏差惩罚；</li>
+<li>障碍物距离过近惩罚；</li>
+<li>成功到达奖励；</li>
+<li>碰撞、飞出工作空间、超时惩罚。</li>
+</ul>
+<p>其他奖励函数：</p>
+<table>
+<thead>
+<tr>
+<th>奖励类型</th>
+<th>对应方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reward_distance_based</code> / <code>reward_default</code></td>
+<td><code>compute_reward</code></td>
+<td>当前默认距离进展奖励</td>
+</tr>
+<tr>
+<td><code>reward_with_action</code></td>
+<td><code>compute_reward_with_action</code></td>
+<td>更强调动作代价</td>
+</tr>
+<tr>
+<td><code>reward_new</code></td>
+<td><code>compute_reward_multirotor_new</code></td>
+<td>旧版多旋翼奖励</td>
+</tr>
+<tr>
+<td><code>reward_lqr</code></td>
+<td><code>compute_reward_lqr</code></td>
+<td>LQR 风格状态/动作二次惩罚</td>
+</tr>
+<tr>
+<td><code>reward_final</code></td>
+<td><code>compute_reward_final</code></td>
+<td>综合距离、姿态、障碍和动作代价</td>
+</tr>
+</tbody>
+</table>
+<p>回合终止条件：</p>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>说明</th>
+<th><code>info</code> 字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>到达目标</td>
+<td>满足 <code>accept_radius</code> 和高度容忍度</td>
+<td><code>is_success=True</code></td>
+</tr>
+<tr>
+<td>碰撞</td>
+<td>AirSim 物理碰撞或深度估计障碍距离小于 <code>crash_distance</code></td>
+<td><code>is_crash=True</code></td>
+</tr>
+<tr>
+<td>飞出工作空间</td>
+<td>超出当前环境设定的 x/y/z 范围</td>
+<td><code>is_not_in_workspace=True</code></td>
+</tr>
+<tr>
+<td>超过最大步数</td>
+<td><code>step_num &gt;= max_episode_steps</code></td>
+<td><code>is_max_steps=True</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>info["done_reason"]</code> 会返回：</p>
+<pre><code class="language-text">success / collision / out_of_workspace / max_steps
+</code></pre>
+<hr />
+<h2 id="_22">训练产物</h2>
+<p>每次训练默认输出到：</p>
+<pre><code class="language-text">src/drone_path_learning/logs/&lt;env_name&gt;/&lt;timestamp&gt;_&lt;dynamic_name&gt;_&lt;policy_name&gt;_&lt;algo&gt;/
+</code></pre>
+<p>目录示例：</p>
+<pre><code class="language-text">logs/NH_center/2026_05_31_18_25_Multirotor_mlp_PPO/
+├── tb_logs/
+├── models/
+│   ├── model_sb3.zip
+│   ├── model_sb3_ckpt_10000_steps.zip
+│   └── ...
+├── config/
+│   └── config.ini
+└── data/
+</code></pre>
+<p>各目录含义：</p>
+<table>
+<thead>
+<tr>
+<th>目录</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tb_logs/</code></td>
+<td>TensorBoard 日志</td>
+</tr>
+<tr>
+<td><code>models/</code></td>
+<td>最终模型和 checkpoint</td>
+</tr>
+<tr>
+<td><code>config/</code></td>
+<td>本次训练使用的配置备份</td>
+</tr>
+<tr>
+<td><code>data/</code></td>
+<td>Q 值地图等额外数据</td>
+</tr>
+</tbody>
+</table>
+<p>查看 TensorBoard：</p>
+<pre><code class="language-bash">cd src/drone_path_learning
+tensorboard --logdir logs
+</code></pre>
+<hr />
+<h2 id="_23">测试工具</h2>
+<h3 id="pytorch-cuda">PyTorch / CUDA 检查</h3>
+<pre><code class="language-bash">cd src/drone_path_learning
+python tools/test/torch_gpu_cpu_test.py
+</code></pre>
+<p>该脚本会输出：</p>
+<ul>
+<li>PyTorch 版本；</li>
+<li>PyTorch 编译使用的 CUDA 版本；</li>
+<li>当前 CUDA 是否可用；</li>
+<li>GPU 名称；</li>
+<li>cuDNN 是否可用。</li>
+</ul>
+<h3 id="airsim">AirSim 环境快速测试</h3>
+<pre><code class="language-bash">cd src/drone_path_learning
+python tools/test/env_test.py --config configs/config_NH_center_Multirotor_3D.ini
+</code></pre>
+<p>该脚本会：</p>
+<ol>
+<li>创建 <code>airsim-env-v0</code>；</li>
+<li>加载配置；</li>
+<li>重置 AirSim 环境；</li>
+<li>使用固定动作执行 50 步；</li>
+<li>输出平均 FPS；</li>
+<li>结束时调用 <code>env.close()</code> 释放 AirSim 控制。</li>
+</ol>
+<hr />
+<h2 id="_24">常见问题</h2>
+<h3 id="1-gymmakeairsim-env-v0">1. <code>gym.make("airsim-env-v0")</code> 找不到环境</h3>
+<p>可能原因：本地 <code>gym_env</code> 没有安装。</p>
+<p>解决方法：</p>
+<pre><code class="language-bash">cd src/drone_path_learning
+pip install -e gym_env
+</code></pre>
+<h3 id="2-airsim">2. AirSim 连接失败</h3>
+<p>可能原因：</p>
+<ul>
+<li>AirSim 仿真器没有启动；</li>
+<li>AirSim RPC 端口不可用；</li>
+<li>当前环境不是多旋翼配置；</li>
+<li>Python 环境中的 <code>airsim</code> 包版本不兼容。</li>
+</ul>
+<p>处理建议：</p>
+<ul>
+<li>先手动打开 AirSim 场景；</li>
+<li>确认无人机可以正常起飞；</li>
+<li>再运行 <code>tools/test/env_test.py</code>。</li>
+</ul>
+<h3 id="3">3. 深度图读取失败或一直重试</h3>
+<p>代码会在 <code>responses[0].width == 0</code> 时持续重试。常见原因是相机名称或 AirSim settings 不匹配。</p>
+<p>检查点：</p>
+<ul>
+<li>相机名称是否为 <code>"0"</code>；</li>
+<li>AirSim 是否启用深度相机；</li>
+<li>场景是否已完全加载；</li>
+<li>仿真窗口是否处于可交互状态。</li>
+</ul>
+<h3 id="4-ui">4. 训练 UI 无法打开</h3>
+<p>可能原因：</p>
+<ul>
+<li>当前运行环境没有图形界面；</li>
+<li>PyQt5 安装失败；</li>
+<li>远程服务器未配置 X11/桌面转发。</li>
+</ul>
+<p>可先使用命令行训练入口：</p>
+<pre><code class="language-bash">python scripts/utils/thread_train.py --config config_NH_center_Multirotor_3D
+</code></pre>
+<h3 id="5-gpu">5. GPU 不可用</h3>
+<p>先运行：</p>
+<pre><code class="language-bash">python tools/test/torch_gpu_cpu_test.py
+</code></pre>
+<p>如果 CUDA 不可用，训练会退回 CPU，速度会明显变慢。检查 NVIDIA 驱动、CUDA 运行时和 PyTorch CUDA 版本是否匹配。</p>
+<h3 id="6">6. 模型评估时找不到配置或模型</h3>
+<p>评估默认查找：</p>
+<pre><code class="language-text">&lt;eval-path&gt;/config/config.ini
+&lt;eval-path&gt;/models/model_sb3.zip
+</code></pre>
+<p>如果文件名不同，显式指定：</p>
+<pre><code class="language-bash">python scripts/start_evaluate_with_plot.py ^
+  --eval-path logs/NH_center/&lt;your_run_dir&gt; ^
+  --config logs/NH_center/&lt;your_run_dir&gt;/config/config.ini ^
+  --model-file logs/NH_center/&lt;your_run_dir&gt;/models/model_sb3.zip
+</code></pre>
+<h3 id="7">7. 续训没有生效</h3>
+<p>检查配置：</p>
+<pre><code class="language-ini">resume_model_path = logs\NH_center\&lt;run&gt;\models\model_sb3.zip
+reset_num_timesteps = False
+</code></pre>
+<p>如果 <code>resume_model_path</code> 为空，训练会从头初始化模型。</p>
+<hr />
+<h2 id="_25">扩展方向</h2>
+<ol>
+<li><strong>更多 AirSim 场景</strong></li>
+<li>增加城市、森林、室内、窄通道等任务；</li>
+<li>为不同场景补充地图截图和起终点示意图；</li>
+<li>
+<p>将 <code>resources/env_maps/</code> 中的地图与评估轨迹自动叠加。</p>
+</li>
+<li>
+<p><strong>更完整的课程学习</strong></p>
+</li>
+<li>按目标距离、随机朝向、障碍密度、高度变化逐级训练；</li>
+<li>自动从上一阶段最优模型续训下一阶段；</li>
+<li>
+<p>记录每阶段成功率、碰撞率和平均步数。</p>
+</li>
+<li>
+<p><strong>更多感知模型</strong></p>
+</li>
+<li>对比深度图 CNN、向量特征、LGMD、光流、语义分割特征；</li>
+<li>引入轻量化视觉 backbone；</li>
+<li>
+<p>加入注意力机制分析避障决策区域。</p>
+</li>
+<li>
+<p><strong>强化学习算法对比</strong></p>
+</li>
+<li>系统比较 PPO、SAC、TD3 的收敛速度、稳定性和安全性；</li>
+<li>增加 HER、BC、离线 RL 或模仿学习；</li>
+<li>
+<p>添加安全约束或代价函数用于 Safe RL。</p>
+</li>
+<li>
+<p><strong>评估与可视化增强</strong></p>
+</li>
+<li>自动生成成功/失败轨迹图；</li>
+<li>绘制深度最小距离、偏航误差、动作平滑度曲线；</li>
+<li>将评估结果导出为表格和报告。</li>
+</ol>
+<hr />
+<h2 id="_26">参考入口</h2>
+<ul>
+<li>项目源码: <a href="https://github.com/OpenHUTB/nn/tree/main/src/drone_path_learning">src/drone_path_learning</a></li>
+<li>参考仓库: <a href="https://github.com/eRGiBi/DRL-DroneNavigation">DRL-DroneNavigation</a></li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../auto_drive_seg/" class="btn btn-neutral float-left" title="自动驾驶车辆语义分割"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+        <a href="../mujoco_running/running/" class="btn btn-neutral float-right" title="双足人形机器人SAC步态仿真">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../auto_drive_seg/" style="color: #fcfcfc">&laquo; 前一页</a></span>
+    
+    
+      <span><a href="../mujoco_running/running/" style="color: #fcfcfc">后一页 &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
