@@ -1,10 +1,9 @@
 import carla
-import time
 import random
 import logging
 from datetime import datetime
 from utils import calculate_vehicle_speed_kmh, safe_update_dict
-from config import (
+from nn.src.connected_vehicles.src.config import (
     VITALS_BASE_HEART_RATE, VITALS_BASE_BLOOD_PRESSURE, VITALS_BASE_FATIGUE,
     VITALS_SPEED_FACTOR, VITALS_TIME_FACTOR, VITALS_WEATHER_FACTORS,
     VITALS_COLLISION_FACTOR
@@ -96,9 +95,8 @@ class DriverVitalsMonitor:
         )
         self.current_blood_pressure = (round(new_sys), round(new_dia))
 
-        # ===================== 【10倍速！疲惫度 必涨、只升、不降、不卡】 =====================
-        # 时间流速 ×10 倍！！！
-        time_fatigue = driving_duration * VITALS_TIME_FACTOR["fatigue"] * 100
+        # 时间流速 ×10 倍
+        time_fatigue = driving_duration * VITALS_TIME_FACTOR["fatigue"] * 10
         weather_fatigue = time_fatigue * weather_factor
         collision_fatigue = self.last_collision_speed * 0.3 if collision_occurred else 0
 

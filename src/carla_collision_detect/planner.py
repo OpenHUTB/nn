@@ -23,7 +23,7 @@ class LanePlanner:
         self.Ki = 0.02  
         self.Kd = 0.2   
 
-    def get_lateral_control(self, current_dist, current_speed_kmh, obstacle_side=None, is_following=False):
+    def get_lateral_control(self, current_dist, current_speed_kmh, obstacle_side=None, is_following=False, target_class=None):
         """
         核心：全时车道保持 (LKA) + 自动变道 (ALC)
         """
@@ -32,7 +32,7 @@ class LanePlanner:
         curr_wp = self.map.get_waypoint(self.ego_vehicle.get_location())
         
         # 1. 障碍物触发变道
-        if not self.is_changing_lane and current_dist < trigger_dist and current_speed_kmh > 10 and current_time > self.cooldown_end_time and not is_following:
+        if not self.is_changing_lane and current_dist < trigger_dist and current_speed_kmh > 10 and current_time > self.cooldown_end_time and not is_following and target_class != "person":
             left_wp = curr_wp.get_left_lane()
             right_wp = curr_wp.get_right_lane()
             

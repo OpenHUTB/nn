@@ -14,6 +14,7 @@ CONFIG = {
     "time_step": 0.002,
     "gravity": (0.0, 0.0, -9.81),
     "target_fps": 60,
+    "print_interval": 1.0,  # 打印间隔(秒)
 }
 
 # ===================== 模型加载 =====================
@@ -58,13 +59,25 @@ def run_simulation(model: mujoco.MjModel, data: mujoco.MjData) -> None:
     """运行稳定帧率仿真"""
     print("✅ 仿真启动成功 | 关闭窗口退出")
     frame_interval = 1.0 / CONFIG["target_fps"]
+    print_timer = 0.0
+    sim_start_time = time.perf_counter()
 
     with mujoco.viewer.launch_passive(model, data) as viewer:
         while viewer.is_running():
             t_start = time.perf_counter()
+            current_sim_time = data.time
 
+            # 仿真步进
             mujoco.mj_step(model, data)
             viewer.sync()
+
+            # 定时打印仿真时长 + 关节角度
+            if current_sim_time - print_timer >= CONFIG["print_interval"]:
+                run_duration = time.perf_counter() - sim_start_time
+                print(f"【运行时长】{run_duration:.2f}s | 仿真时间: {current_sim_time:.2f}s")
+                joint_qpos = data.qpos[7:]  # 前7维为基座位姿，后续为关节
+                print(f"【关节角度】{joint_qpos[:6].round(3)}")
+                print_timer = current_sim_time
 
             # 帧率控制
             elapsed = time.perf_counter() - t_start
