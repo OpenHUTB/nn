@@ -72,10 +72,34 @@ The `make_env()` function prepares the environment for training and evaluation w
 
 - **Clip Observations**: You can clip observations to avoid outliers during training by setting `clip_obs` to a certain value (default: 10.0).
 
+- **CLI Runner**: Use `run.py` to train or evaluate models from the command line with support for normal/hardcore mode, video recording, and custom timesteps.
+
 ### Example Usage:
 
 ```python
 env = make_env(env_name="BipedalWalker-v3", hardcore=True, record_video=True, use_monitor=True)
+```
+
+### Command Line Usage
+
+Train a normal model:
+```bash
+python run.py --task train --mode normal --timesteps 100000 --model-name ppo_bipedalwalker
+```
+
+Train a hardcore model with video recording:
+```bash
+python run.py --task train --mode hardcore --timesteps 200000 --model-name ppo_bipedalwalker_hardcore --record-video
+```
+
+Evaluate a saved model:
+```bash
+python run.py --task eval --mode normal --model-path models/ppo_bipedalwalker.zip --eval-episodes 5
+```
+
+Evaluate and record video:
+```bash
+python run.py --task eval --mode normal --model-path models/ppo_bipedalwalker.zip --eval-episodes 3 --record-video
 ```
 
 ### 3.2 observe_model()

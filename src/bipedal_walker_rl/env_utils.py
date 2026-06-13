@@ -6,7 +6,7 @@ from datetime import datetime
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 
-def make_env(env_name="BipedalWalker-v3", hardcore=None, n_stack=4, clip_obs=10.0, render_mode=None, record_video=False, video_folder='videos', use_monitor=False, logs_dir='logs'):
+def make_env(env_name="BipedalWalker-v3", hardcore=None, n_stack=4, clip_obs=10.0, render_mode=None, record_video=False, video_folder='videos', use_monitor=False, logs_dir='logs', norm_obs=True, norm_reward=True):
     """
     Create and wrap the environment for BipedalWalker with optional hardcore mode,
     vectorized operations, normalization, frame stacking, rendering options, video recording, and monitoring.
@@ -20,6 +20,8 @@ def make_env(env_name="BipedalWalker-v3", hardcore=None, n_stack=4, clip_obs=10.
     - record_video (bool): Whether to record video during the environment execution. Default is False.
     - video_folder (str): Directory where video recordings will be saved. Default is 'videos'.
     - use_monitor (bool): Whether to wrap the environment with Monitor for logging. Default is False.
+    - norm_obs (bool): Whether to normalize observations. Default is True.
+    - norm_reward (bool): Whether to normalize rewards. Default is True.
     - logs_dir (str): Directory where monitor logs will be saved. Default is 'logs'.
     
     Returns:
@@ -57,7 +59,7 @@ def make_env(env_name="BipedalWalker-v3", hardcore=None, n_stack=4, clip_obs=10.
     env = DummyVecEnv([lambda: env])
     
     # Normalize observations and rewards in the environment
-    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=clip_obs)
+    env = VecNormalize(env, norm_obs=norm_obs, norm_reward=norm_reward, clip_obs=clip_obs)
     
     # Stack the last n_stack observations
     env = VecFrameStack(env, n_stack=n_stack)

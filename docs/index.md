@@ -67,6 +67,7 @@ title: 主页
 
 - [__基于自监督学习与PPO强化学习的自动驾驶仿真项目__](./autonomous_driving/README.md) - 基于CARLA的SSL+RL自动驾驶仿真系统
 - [__CARLA天气鲁棒性测试__](./carla_weather_robustness/README.md) - CARLA多天气条件下自动驾驶感知鲁棒性测试系统
+- [__CARLA 模拟器中的物体与碰撞检测系统__](./carla_collision_detect/carla_collision_detect.md) - 物体与碰撞检测
   
 ## 规划 <span id="planning"></span>
 
@@ -76,6 +77,7 @@ title: 主页
 - [__人形机器人自主行走__](./mujoco_hci_sim/README.md) - 基于PPO强化学习的Humanoid人形机器人自主行走仿真
 - [__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) - 基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
 - [__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
+- [__无人机路径学习__](./drone_path_learning/README.md) - 基于 AirSim + Gym + Stable-Baselines3 的无人机视觉导航强化学习项目
 - [__机器人仿真(MuJoCo)__](ant_robot/机器人仿真系统.md)
 - [__机械臂仿真系统__](arm_sim.md) - 基于MuJoCo的机械臂仿真与功能优化
 - [__CARLA自动驾驶系统__](carla_ad_gym_rl/carla_ad_gym_rl.md) - CARLA 仿真与强化学习的自动驾驶智能决策系统
