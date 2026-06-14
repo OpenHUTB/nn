@@ -10,6 +10,7 @@
   python main.py --no-warning              # 隐藏预警状态（关掉车道区域颜色变化）
   python main.py --no-fast                # 关闭快速搜索（视频模式下使用滑动窗口）
   python main.py --save-docs               # 将效果图写入 docs/lane_detection/images
+  python main.py --save-docs               # 将效果图写入 docs/lane_detection/images
 """
 import argparse
 

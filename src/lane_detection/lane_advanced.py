@@ -311,6 +311,19 @@ def draw_lane_on_original(original_img, binary_warped, Minv, left_fitx, right_fi
     if warning is not None and CONFIG["show_warning"]:
         lane_fill = warning["lane_color"]
 
+                         metrics=None):
+    """在鸟瞰图上绘制车道区域，再反透视变换叠加回原图。
+
+    Args:
+        metrics: 可选，由 compute_lane_metrics 返回的曲率与偏移信息字典。
+        warning: 可选，由 compute_warning_level 返回的预警信息字典，
+                 传入后车道区域颜色随预警级别变化（绿/黄/红）。
+    """
+    # 根据预警级别选择车道填充色，默认绿色
+    lane_fill = (0, 255, 0)  # 绿色
+    if warning is not None and CONFIG["show_warning"]:
+        lane_fill = warning["lane_color"]
+
     warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
@@ -348,6 +361,12 @@ def draw_lane_on_original(original_img, binary_warped, Minv, left_fitx, right_fi
 
 def draw_metrics_overlay(img, metrics, warning=None):
     """在图像左上角叠加曲率半径、偏移量与预警信息。"""
+    _, w = img.shape[:2]
+    # 计算面板高度（预警 + 指标）
+    panel_top = 10
+    panel_height = 160 if (warning is not None and CONFIG["show_warning"]) else 130
+def draw_metrics_overlay(img, metrics):
+    """在图像左上角叠加曲率半径与偏移量信息。"""
     _, w = img.shape[:2]
     # 计算面板高度（预警 + 指标）
     panel_top = 10
@@ -514,6 +533,7 @@ def process_frame(img, save_dir=None):
 
     result = draw_lane_on_original(img, binary_warped, Minv, left_fitx, right_fitx, ploty,
                                    metrics=metrics, warning=warning)
+                                   metrics=metrics)
 
     if save_dir:
         save_dir = str(save_dir)

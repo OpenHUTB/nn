@@ -28,6 +28,8 @@ The **Bipedal Walker** environment, based on the Box2D physics engine, simulates
 ## 1. Project Structure
 
 - **main.py**: Contains the training loop for both normal and hardcore modes.
+- **run.py**: Command-line entrypoint for training and evaluating PPO models.
+- **benchmark.py**: Benchmark evaluator for normal and hardcore models, generating CSV/Markdown reports.
 - **env_utils.py**: A utility script that configures the Bipedal Walker environment with optional features such as frame stacking, video recording, and reward normalization.
 - **logs/**: Directory for storing training logs.
 - **models/**: Directory for saving trained PPO models.
@@ -72,12 +74,46 @@ The `make_env()` function prepares the environment for training and evaluation w
 
 - **Clip Observations**: You can clip observations to avoid outliers during training by setting `clip_obs` to a certain value (default: 10.0).
 
+- **CLI Runner**: Use `run.py` to train or evaluate models from the command line with support for normal/hardcore mode, video recording, and custom timesteps.
+
 ### Example Usage:
 
 ```python
 env = make_env(env_name="BipedalWalker-v3", hardcore=True, record_video=True, use_monitor=True)
 ```
 
+### Command Line Usage
+
+Train a normal model:
+```bash
+python run.py --task train --mode normal --timesteps 100000 --model-name ppo_bipedalwalker
+```
+
+Train a hardcore model with video recording:
+```bash
+python run.py --task train --mode hardcore --timesteps 200000 --model-name ppo_bipedalwalker_hardcore --record-video
+```
+
+Evaluate a saved model:
+```bash
+python run.py --task eval --mode normal --model-path models/ppo_bipedalwalker.zip --eval-episodes 5
+```
+
+Evaluate and record video:
+```bash
+python run.py --task eval --mode normal --model-path models/ppo_bipedalwalker.zip --eval-episodes 3 --record-video
+```
+
+bipedal_walker_rl_run
+### Benchmark a pair of trained models
+```bash
+python benchmark.py --normal-model-path models/ppo_bipedalwalker --hardcore-model-path models/ppo_bipedalwalker_hardcore --eval-episodes 5
+```
+
+Benchmark 输出结果将保存到 `reports/benchmark_results.csv` 和 `reports/benchmark_report.md`，并且可选记录评估视频到 `reports/videos/`。
+
+=======
+main
 ### 3.2 observe_model()
 
 The observe_model() function loads a trained PPO model and evaluates it in the specified environment. It automatically checks if VecNormalize and VecFrameStack were used during training and applies them accordingly.

@@ -4,6 +4,7 @@ import os
 import threading
 import copy
 import cv2
+import argparse
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -11,6 +12,46 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 from console_dashboard import render_dashboard, enable_ansi_support
 # 数据记录器
 from data_logger import DataLogger
+
+# ==============================================================================
+# -- 命令行参数 ----------------------------------------------------------------
+# ==============================================================================
+
+def parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(
+        description="🚗 CARLA 交通标志检测与车辆控制仿真",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+  python main.py                          # 默认运行
+  python main.py --time 180               # 运行3分钟
+  python main.py --conf 0.6 --cars 15     # 高精度检测 + 更多车辆
+  python main.py --res 1280 960 --fov 120 # 高分辨率 + 广角
+  python main.py --no-display             # 仅控制台模式（不显示Pygame窗口）
+  python main.py --no-log                 # 不记录CSV日志
+        """
+    )
+
+    parser.add_argument('--time', '-t', type=int, default=120,
+                        help='仿真运行时长（秒），默认120')
+    parser.add_argument('--conf', '-c', type=float, default=0.5,
+                        help='YOLO检测置信度阈值，默认0.5')
+    parser.add_argument('--cars', '-n', type=int, default=10,
+                        help='生成的NPC车辆数量，默认10')
+    parser.add_argument('--no-display', action='store_true',
+                        help='不显示Pygame窗口（仅控制台模式）')
+    parser.add_argument('--res', type=int, nargs=2, default=[800, 600],
+                        metavar=('WIDTH', 'HEIGHT'),
+                        help='摄像头分辨率，默认800 600')
+    parser.add_argument('--fov', type=int, default=90,
+                        help='摄像头视场角，默认90')
+    parser.add_argument('--no-log', action='store_true',
+                        help='不记录CSV日志')
+    parser.add_argument('--max-speed', type=int, default=80,
+                        help='目标巡航速度上限 km/h，默认80')
+
+    return parser.parse_args()
 
 # ==============================================================================
 # -- find carla module ---------------------------------------------------------
@@ -84,8 +125,8 @@ def process_image(image):
 model = YOLO("yolov8n.pt")  # Use yolov8n.pt for fast inference
 
 # Run detection on RGB numpy image from CARLA camera
-def detect_traffic_signs(image_np):
-    results = model.predict(source=image_np, imgsz=640, conf=0.5, device='cuda' if torch.cuda.is_available() else 'cpu', verbose=False)
+def detect_traffic_signs(image_np, conf_threshold=0.5):
+    results = model.predict(source=image_np, imgsz=640, conf=conf_threshold, device='cuda' if torch.cuda.is_available() else 'cpu', verbose=False)
     detections = results[0].boxes.data.cpu().numpy()
     names = results[0].names
 
@@ -510,14 +551,32 @@ class SimulationStats:
 
 # Main function
 def main():
+    args = parse_args()
+
     actor_list = []
     max_speed = 0
 
     # 启用控制台 ANSI 支持（Windows 终端）
     enable_ansi_support()
 
+    # 打印配置信息
+    print(f"⚙️  Configuration:")
+    print(f"   Duration: {args.time}s | Confidence: {args.conf} | NPCs: {args.cars}")
+    print(f"   Resolution: {args.res[0]}x{args.res[1]} | FOV: {args.fov}°")
+    print(f"   Display: {'OFF' if args.no_display else 'ON'} | Log: {'OFF' if args.no_log else 'ON'}")
+    print()
+
     # 初始化数据记录器
-    logger = DataLogger()
+    if not args.no_log:
+        logger = DataLogger()
+    else:
+        logger = None
+
+    # 初始化速度平滑控制器（渐进式加减速）
+    speed_ctrl = SpeedController(ramp_rate=0.04)
+
+    # 仿真统计
+    stats = SimulationStats()
 
     # 初始化速度平滑控制器（渐进式加减速）
     speed_ctrl = SpeedController(ramp_rate=0.04)
@@ -549,6 +608,8 @@ def main():
 
         # Spawn NPC traffic
         npc_count = 0
+
+        for _ in range(args.cars):
         for _ in range(10):
             traffic_bp = random.choice(blueprint_library.filter('vehicle.*'))
             traffic_spawn = random.choice(map.get_spawn_points())
@@ -560,9 +621,9 @@ def main():
 
         # Camera
         camera_bp = blueprint_library.find("sensor.camera.rgb")
-        camera_bp.set_attribute("image_size_x", "800")
-        camera_bp.set_attribute("image_size_y", "600")
-        camera_bp.set_attribute("fov", "90")
+        camera_bp.set_attribute("image_size_x", str(args.res[0]))
+        camera_bp.set_attribute("image_size_y", str(args.res[1]))
+        camera_bp.set_attribute("fov", str(args.fov))
         # 修复画面裂纹：移除可能导致问题的后处理效果
         camera_bp.set_attribute("enable_postprocess_effects", "False")  # 关闭后处理
         camera_bp.set_attribute("motion_blur_intensity", "0.0")
@@ -572,11 +633,14 @@ def main():
         camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
         actor_list.append(camera)
 
-        # 初始化Pygame显示
-        display = pygame.display.set_mode((800, 600), pygame.HWSURFACE | pygame.DOUBLEBUF)
-        pygame.display.set_caption("Driver's View - CARLA Traffic Sign Detection")
-        display.fill((0, 0, 0))
-        pygame.display.flip()
+        # 初始化Pygame显示（可选）
+        if not args.no_display:
+            display = pygame.display.set_mode((args.res[0], args.res[1]), pygame.HWSURFACE | pygame.DOUBLEBUF)
+            pygame.display.set_caption("Driver's View - CARLA Traffic Sign Detection")
+            display.fill((0, 0, 0))
+            pygame.display.flip()
+        else:
+            display = None
 
         # 存储图像数据
         camera_surface = [None]
@@ -603,6 +667,22 @@ def main():
 
         clock = pygame.time.Clock()
         start_time = time.time()
+
+        # 天气自动切换
+        weather_presets = [
+            (carla.WeatherParameters.ClearNoon, "☀️ 晴天"),
+            (carla.WeatherParameters.CloudyNoon, "⛅ 多云"),
+            (carla.WeatherParameters.WetNoon, "🌧️ 雨天"),
+            (carla.WeatherParameters.SoftRainNoon, "🌦️ 细雨"),
+            (carla.WeatherParameters.ClearSunset, "🌅 黄昏"),
+            (carla.WeatherParameters.ClearNight, "🌙 夜晚"),
+        ]
+        weather_idx = 0
+        last_weather_change = 0
+
+        # 设置初始天气
+        world.set_weather(weather_presets[0][0])
+        print(f"🌤️  Weather: {weather_presets[0][1]}")
 
         while True:
             update_spectator()
@@ -639,6 +719,13 @@ def main():
             elapsed = time.time() - start_time
             m = int(elapsed // 60)
             s = int(elapsed % 60)
+
+            # 天气切换（每30秒）
+            if int(elapsed) - last_weather_change >= 30:
+                weather_idx = (weather_idx + 1) % len(weather_presets)
+                world.set_weather(weather_presets[weather_idx][0])
+                last_weather_change = int(elapsed)
+                print(f"🌤️  Weather changed: {weather_presets[weather_idx][1]}")
             vel = vehicle.get_velocity()
             speed = math.sqrt(vel.x**2 + vel.y**2 + vel.z**2) * 3.6
             if speed > max_speed:
@@ -653,8 +740,8 @@ def main():
                         surface_copy = camera_surface[0].copy()
                         array_copy = camera_array[0].copy()
 
-                    # YOLO 检测（使用副本）
-                    signs = detect_traffic_signs(array_copy)
+                    # YOLO 检测（使用副本和命令行参数配置的置信度）
+                    signs = detect_traffic_signs(array_copy, conf_threshold=args.conf)
 
                     # 更新统计
                     stats.record_frame(signs, is_emergency if 'is_emergency' in dir() else False,
@@ -695,67 +782,68 @@ def main():
                     except Exception:
                         pass
 
-                    # 双缓冲显示以减少画面撕裂
-                    display.fill((0, 0, 0))  # 先清除屏幕
-                    display.blit(surface_copy, (0, 0))
+                    # 双缓冲显示以减少画面撕裂（--no-display 时跳过）
+                    if not args.no_display and display:
+                        display.fill((0, 0, 0))  # 先清除屏幕
+                        display.blit(surface_copy, (0, 0))
 
-                    # ---- 增强HUD显示 ----
-                    try:
-                        # 使用更安全的字体加载方式
-                        font_large = pygame.font.Font(None, 26)
-                        font_small = pygame.font.Font(None, 20)
-                        font_warning = pygame.font.Font(None, 36)
-                    except:
-                        font_large = None
-                        font_small = None
-                        font_warning = None
+                        # ---- 增强HUD显示 ----
+                        try:
+                            # 使用更安全的字体加载方式
+                            font_large = pygame.font.Font(None, 26)
+                            font_small = pygame.font.Font(None, 20)
+                            font_warning = pygame.font.Font(None, 36)
+                        except:
+                            font_large = None
+                            font_small = None
+                            font_warning = None
 
-                    if font_large:
-                        # 基本信息（左上角）
-                        display.blit(font_large.render(f"Time: {m:02d}:{s:02d}", True, (0,255,0)), (10,10))
-                        display.blit(font_large.render(f"Speed: {speed:.1f} km/h", True, (255,255,0)), (10,40))
-                        display.blit(font_large.render(f"Max: {max_speed} km/h", True, (255,0,0)), (10,70))
+                        if font_large:
+                            # 基本信息（左上角）
+                            display.blit(font_large.render(f"Time: {m:02d}:{s:02d}", True, (0,255,0)), (10,10))
+                            display.blit(font_large.render(f"Speed: {speed:.1f} km/h", True, (255,255,0)), (10,40))
+                            display.blit(font_large.render(f"Max: {max_speed} km/h", True, (255,0,0)), (10,70))
 
-                    if font_small:
-                        # 检测统计信息（右上角）
-                        total_detected = len(signs)
-                        display.blit(font_small.render(f"Detected: {total_detected} objects", True, (200,200,200)), (600, 10))
+                        if font_small:
+                            # 检测统计信息（右上角）
+                            total_detected = len(signs)
+                            display.blit(font_small.render(f"Detected: {total_detected} objects", True, (200,200,200)), (600, 10))
 
-                        if total_detected > 0:
-                            # 按类别统计
-                            class_counts = {}
-                            for label, _, _ in signs:
-                                class_counts[label] = class_counts.get(label, 0) + 1
-                            y_offset = 30
-                            for cls_name, count in list(class_counts.items())[:5]:
-                                color = get_color_for_label(cls_name)
-                                display.blit(font_small.render(f"{cls_name}: {count}", True, color), (600, y_offset))
-                                y_offset += 20
+                            if total_detected > 0:
+                                # 按类别统计
+                                class_counts = {}
+                                for label, _, _ in signs:
+                                    class_counts[label] = class_counts.get(label, 0) + 1
+                                y_offset = 30
+                                for cls_name, count in list(class_counts.items())[:5]:
+                                    color = get_color_for_label(cls_name)
+                                    display.blit(font_small.render(f"{cls_name}: {count}", True, color), (600, y_offset))
+                                    y_offset += 20
 
-                        # 碰撞预警信息（屏幕中央底部）
-                        if warning_text:
-                            # 闪烁效果 (每0.5秒切换)
-                            blink = int(time.time() * 2) % 2 == 0
-                            if blink:
-                                if is_emergency or "EMERGENCY" in warning_text or "WARNING" in warning_text:
-                                    warn_render = font_warning.render(warning_text, True, (255, 0, 0))
-                                else:
-                                    warn_render = font_large.render(warning_text, True, (255, 200, 0))
-                                warn_rect = warn_render.get_rect(center=(400, 550))
-                                display.blit(warn_render, warn_rect)
+                            # 碰撞预警信息（屏幕中央底部）
+                            if warning_text:
+                                # 闪烁效果 (每0.5秒切换)
+                                blink = int(time.time() * 2) % 2 == 0
+                                if blink:
+                                    if is_emergency or "EMERGENCY" in warning_text or "WARNING" in warning_text:
+                                        warn_render = font_warning.render(warning_text, True, (255, 0, 0))
+                                    else:
+                                        warn_render = font_large.render(warning_text, True, (255, 200, 0))
+                                    warn_rect = warn_render.get_rect(center=(400, 550))
+                                    display.blit(warn_render, warn_rect)
 
-                        # 最近障碍物距离（右下角）
-                        if nearest_obs:
-                            label, conf, bbox, dist = nearest_obs
-                            color = get_color_for_label(label)
-                            dist_text = f"{label}: {dist:.1f}m"
-                            display.blit(font_small.render(dist_text, True, color), (600, 570))
+                            # 最近障碍物距离（右下角）
+                            if nearest_obs:
+                                label, conf, bbox, dist = nearest_obs
+                                color = get_color_for_label(label)
+                                dist_text = f"{label}: {dist:.1f}m"
+                                display.blit(font_small.render(dist_text, True, color), (600, 570))
 
-                        # 碰撞预警计时器状态（左下角）
-                        if is_emergency:
-                            display.blit(font_large.render("!!! EMERGENCY !!!", True, (255, 0, 0)), (10, 570))
+                            # 碰撞预警计时器状态（左下角）
+                            if is_emergency:
+                                display.blit(font_large.render("!!! EMERGENCY !!!", True, (255, 0, 0)), (10, 570))
 
-                    pygame.display.flip()  # 更新整个屏幕
+                        pygame.display.flip()  # 更新整个屏幕
 
                     # 控制台实时状态面板（不依赖Pygame）
                     render_dashboard(
@@ -778,7 +866,7 @@ def main():
 
             # 保持稳定的帧率
             clock.tick(30)  # 固定帧率到30 FPS
-            if elapsed > 120:
+            if elapsed > args.time:
                 break
 
     finally:
@@ -796,7 +884,14 @@ def main():
 
         # 输出数据记录报告
         try:
-            logger.close_and_report()
+            if logger:
+                logger.close_and_report()
+        except Exception:
+            pass
+
+        # 输出仿真统计报告
+        try:
+            stats.print_report(elapsed, npc_count + 1)  # +1 for ego vehicle
         except Exception:
             pass
 
@@ -807,4 +902,7 @@ def main():
             pass
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nSimulation stopped by user.")
