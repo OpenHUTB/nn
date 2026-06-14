@@ -231,6 +231,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_multisensor_platform/carla_multisensor_platform/</loc>
+         <lastmod>2026-06-14</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_native_assisted_driving_system/</loc>
          <lastmod>2026-06-14</lastmod>
          <changefreq>daily</changefreq>
