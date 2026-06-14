@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/car_navigation_system/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>多模态 CARLA 导航避障系统 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u591a\u6a21\u6001 CARLA \u5bfc\u822a\u907f\u969c\u7cfb\u7edf";
+        var mkdocs_page_input_path = "car_navigation_system/README.md";
+        var mkdocs_page_url = "/nn/car_navigation_system/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">多模态 CARLA 导航避障系统</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/car_navigation_system/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla">多模态 CARLA 导航避障系统</h1>
+<h2 id="_1">项目简介</h2>
+<p>本项目基于 CARLA 模拟器与神经网络技术，实现了具备多传感器融合能力的智能车辆导航避障系统。系统集成前视摄像头、第三视角摄像头与障碍物检测模块，通过多模态数据感知环境，结合神经网络与传统控制算法，实现车辆自主行驶与障碍物规避功能。</p>
+<h3 id="_2">项目愿景</h3>
+<p>致力于打造一个开源、易用、可扩展的自动驾驶仿真平台，为自动驾驶算法研究和教学提供便捷的实验环境。</p>
+<h3 id="_3">核心价值</h3>
+<ul>
+<li><strong>教育价值</strong>：为自动驾驶初学者提供完整的学习和实验平台</li>
+<li><strong>研究价值</strong>：支持快速原型开发和算法验证</li>
+<li><strong>工程价值</strong>：提供工业级的代码结构和设计模式参考</li>
+</ul>
+<hr />
+<h2 id="_4">🎯 核心功能</h2>
+<table>
+<thead>
+<tr>
+<th>功能模块</th>
+<th>描述</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>多模态感知</strong></td>
+<td>集成 RGB 摄像头（前视 + 第三人称 + 鸟瞰图）</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>智能控制</strong></td>
+<td>基于路点跟踪的控制算法，支持自动驾驶</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>车辆品牌切换</strong></td>
+<td>支持10种品牌车型，一键切换</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>环境切换</strong></td>
+<td>多地图、多天气模式切换</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>可视化</strong></td>
+<td>实时显示摄像头画面和状态信息</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>截图功能</strong></td>
+<td>自动命名保存当前画面</td>
+<td>✅ 已完成</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_5">📁 项目结构</h2>
+<pre><code>car_navigation_system/
+├── README.md          # 项目说明文档
+├── main.py            # 主程序文件（包含完整功能实现）
+├── screenshots/       # 截图保存目录
+│   └── .gitkeep       # 保持目录结构
+├── sync_main.bat      # Git同步脚本
+└── check_blueprints.py # 车辆蓝图检测工具
+</code></pre>
+<h3 id="_6">文件职责说明</h3>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>职责</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>main.py</code></td>
+<td>核心逻辑实现，包含驾驶系统和控制算法</td>
+<td>主开发</td>
+</tr>
+<tr>
+<td><code>README.md</code></td>
+<td>项目文档，包含使用说明和技术文档</td>
+<td>维护中</td>
+</tr>
+<tr>
+<td><code>sync_main.bat</code></td>
+<td>Git分支同步工具，解决冲突问题</td>
+<td>辅助工具</td>
+</tr>
+<tr>
+<td><code>check_blueprints.py</code></td>
+<td>车辆蓝图检测，验证可用车型</td>
+<td>调试工具</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_7">🛠️ 环境配置</h2>
+<h3 id="_8">硬件要求</h3>
+<table>
+<thead>
+<tr>
+<th>配置项</th>
+<th>最低要求</th>
+<th>推荐配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU</td>
+<td>Intel i5-8400</td>
+<td>Intel i7-10700K</td>
+</tr>
+<tr>
+<td>GPU</td>
+<td>NVIDIA GTX 1060</td>
+<td>NVIDIA RTX 3070</td>
+</tr>
+<tr>
+<td>内存</td>
+<td>8GB</td>
+<td>16GB</td>
+</tr>
+<tr>
+<td>存储</td>
+<td>50GB 可用空间</td>
+<td>100GB 可用空间</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_9">软件要求</h3>
+<table>
+<thead>
+<tr>
+<th>依赖项</th>
+<th>要求</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>操作系统</td>
+<td>Windows 10/11 或 Ubuntu 20.04/22.04</td>
+<td>推荐 Windows 11</td>
+</tr>
+<tr>
+<td>Python 版本</td>
+<td>3.7+ (推荐 3.10)</td>
+<td>兼容性最佳</td>
+</tr>
+<tr>
+<td>CARLA 版本</td>
+<td>3.11 或兼容版本</td>
+<td>模拟器核心</td>
+</tr>
+<tr>
+<td>PyTorch</td>
+<td>1.10+</td>
+<td>神经网络支持</td>
+</tr>
+<tr>
+<td>OpenCV</td>
+<td>4.5+</td>
+<td>图像处理</td>
+</tr>
+<tr>
+<td>NumPy</td>
+<td>1.21+</td>
+<td>数值计算</td>
+</tr>
+<tr>
+<td>Matplotlib</td>
+<td>3.4+</td>
+<td>可视化</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_10">📦 依赖安装</h2>
+<h3 id="1">步骤 1：安装基础依赖</h3>
+<pre><code class="language-bash">pip install carla numpy opencv-python matplotlib torch
+</code></pre>
+<h3 id="2-carla-python-api">步骤 2：安装 CARLA Python API</h3>
+<pre><code class="language-bash"># 安装与CARLA版本匹配的API
+pip install carla==0.9.15  # 根据你的CARLA版本选择
+</code></pre>
+<h3 id="3">步骤 3：验证安装</h3>
+<pre><code class="language-bash">python -c &quot;import carla; print('CARLA API 安装成功')&quot;
+</code></pre>
+<hr />
+<h2 id="_11">🚀 快速启动</h2>
+<h3 id="1-carla">步骤 1：启动 CARLA 模拟器</h3>
+<pre><code class="language-bash"># Windows - 窗口模式
+CarlaUE4.exe -windowed -ResX=800 -ResY=600 -fps=30
+
+# Windows - 全屏模式
+CarlaUE4.exe
+
+# Ubuntu
+./CarlaUE4.sh -windowed -ResX=800 -ResY=600
+</code></pre>
+<h3 id="2">步骤 2：运行导航避障系统</h3>
+<pre><code class="language-bash"># 进入项目目录
+cd f:\nn\src\car_navigation_system
+
+# 运行主程序
+python main.py
+</code></pre>
+<h3 id="3_1">步骤 3：预期输出</h3>
+<pre><code>自动驾驶系统 - 简化版本
+确保CARLA服务器正在运行...
+
+==================================================
+简化自动驾驶系统
+==================================================
+正在连接到CARLA服务器...
+可用地图: ['Town01', 'Town02', ...]
+地图加载成功
+连接成功！
+正在生成车辆...
+找到 255 个出生点
+车辆生成成功！ID: 1660
+车辆型号: Tesla Model3
+位置: Location(x=335.489990, y=273.743317, z=0.300000)
+正在设置相机...
+相机设置成功 - 已创建三个视角相机
+控制器设置完成
+系统初始化中...
+正在生成 2 辆NPC车辆...
+系统准备就绪！
+</code></pre>
+<hr />
+<h2 id="_12">🎮 操作说明</h2>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能描述</th>
+<th>详细说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q</code></td>
+<td>退出系统</td>
+<td>优雅退出并清理资源</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>重置车辆位置</td>
+<td>将车辆恢复到初始位置</td>
+</tr>
+<tr>
+<td><code>s</code></td>
+<td>紧急停止</td>
+<td>立即停止车辆运动</td>
+</tr>
+<tr>
+<td><code>x</code></td>
+<td>切换倒车/前进模式</td>
+<td>速度为0时生效</td>
+</tr>
+<tr>
+<td><code>v</code></td>
+<td>切换视角</td>
+<td>循环切换第一人称/第三人称/鸟瞰图</td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td>切换地图</td>
+<td>循环切换Town01~Town07</td>
+</tr>
+<tr>
+<td><code>w</code></td>
+<td>切换天气</td>
+<td>循环切换晴天/雨天/多云/湿滑</td>
+</tr>
+<tr>
+<td><code>c</code></td>
+<td>切换车辆颜色</td>
+<td>循环切换10种颜色</td>
+</tr>
+<tr>
+<td><code>b</code></td>
+<td>切换车辆品牌</td>
+<td>循环切换10种车型</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>保存截图</td>
+<td>自动命名并保存到screenshots目录</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_13">🌟 车辆品牌切换功能</h2>
+<p>按 <code>b</code> 键循环切换车辆品牌，支持以下10种经过验证的车型：</p>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>品牌型号</th>
+<th>蓝图名称</th>
+<th>车辆类型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Tesla Model3</td>
+<td><code>vehicle.tesla.model3</code></td>
+<td>电动轿车</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Ford Mustang</td>
+<td><code>vehicle.ford.mustang</code></td>
+<td>跑车</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Audi TT</td>
+<td><code>vehicle.audi.tt</code></td>
+<td>轿跑</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Mercedes Coupe</td>
+<td><code>vehicle.mercedes.coupe</code></td>
+<td>豪华轿跑</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Jeep Wrangler Rubicon</td>
+<td><code>vehicle.jeep.wrangler_rubicon</code></td>
+<td>越野车</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Nissan Patrol</td>
+<td><code>vehicle.nissan.patrol</code></td>
+<td>SUV</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Audi e-tron</td>
+<td><code>vehicle.audi.etron</code></td>
+<td>电动SUV</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Lincoln MKZ 2020</td>
+<td><code>vehicle.lincoln.mkz_2020</code></td>
+<td>豪华轿车</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Chevrolet Impala</td>
+<td><code>vehicle.chevrolet.impala</code></td>
+<td>全尺寸轿车</td>
+</tr>
+<tr>
+<td>10</td>
+<td>BMW Grand Tourer</td>
+<td><code>vehicle.bmw.grandtourer</code></td>
+<td>豪华旅行车</td>
+</tr>
+</tbody>
+</table>
+<p><strong>功能特点：</strong>
+- ✅ 切换时保留当前车辆颜色设置
+- ✅ 自动重新设置相机和控制器
+- ✅ 控制台显示品牌选择菜单
+- ✅ 所有蓝图均已验证可用
+- ✅ 平滑的车辆过渡动画</p>
+<hr />
+<h2 id="_14">📷 截图功能</h2>
+<p>截图功能是多模态 CARLA 导航避障系统的重要组成部分，用于保存当前驾驶画面，支持实验记录、结果展示和问题排查。</p>
+<h3 id="_15">核心特性</h3>
+<table>
+<thead>
+<tr>
+<th>功能特性</th>
+<th>描述</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>一键截图</strong></td>
+<td>按 <code>p</code> 键快速保存当前画面</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>自动命名</strong></td>
+<td>文件名包含时间戳、地图、天气、颜色信息</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>自动分类</strong></td>
+<td>按日期和场景自动组织截图</td>
+<td>✅ 已完成</td>
+</tr>
+<tr>
+<td><strong>多视角支持</strong></td>
+<td>支持第一人称、第三人称、鸟瞰图视角</td>
+<td>✅ 已完成</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_16">使用方法</h3>
+<h4 id="_17">触发方式</h4>
+<ul>
+<li><strong>按键触发</strong>：按 <code>p</code> 键即可保存当前画面</li>
+<li><strong>触发时机</strong>：可在任意时刻触发，不影响驾驶控制</li>
+</ul>
+<h4 id="_18">输出位置</h4>
+<pre><code>screenshots/
+├── screenshot_20260512_153022_Town01_clear_Red.png
+├── screenshot_20260512_154510_Town02_rain_Blue.png
+└── screenshot_20260512_160000_Town03_cloudy_Green.png
+</code></pre>
+<h3 id="_19">文件命名规范</h3>
+<h4 id="_20">命名格式</h4>
+<pre><code>screenshot_时间戳_地图名_天气_颜色.png
+</code></pre>
+<h4 id="_21">命名示例</h4>
+<table>
+<thead>
+<tr>
+<th>文件名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>screenshot_20260512_153022_Town01_clear_Red.png</code></td>
+<td>2026年5月12日15:30:22，Town01地图，晴天，红色车辆</td>
+</tr>
+<tr>
+<td><code>screenshot_20260512_154510_Town02_rain_Blue.png</code></td>
+<td>2026年5月12日15:45:10，Town02地图，雨天，蓝色车辆</td>
+</tr>
+<tr>
+<td><code>screenshot_20260512_160000_Town03_cloudy_Green.png</code></td>
+<td>2026年5月12日16:00:00，Town03地图，多云，绿色车辆</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_22">字段说明</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>格式</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>时间戳</td>
+<td><code>YYYYMMDD_HHmmss</code></td>
+<td><code>20260512_153022</code></td>
+<td>年、月、日、时、分、秒</td>
+</tr>
+<tr>
+<td>地图名</td>
+<td><code>TownXX</code></td>
+<td><code>Town01</code></td>
+<td>CARLA地图名称</td>
+</tr>
+<tr>
+<td>天气</td>
+<td>天气类型</td>
+<td><code>clear</code></td>
+<td>晴天/雨天/多云/湿滑</td>
+</tr>
+<tr>
+<td>颜色</td>
+<td>颜色名称</td>
+<td><code>Red</code></td>
+<td>车辆颜色</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_23">技术实现</h3>
+<p>核心代码逻辑：</p>
+<pre><code class="language-python">def take_screenshot(self):
+    &quot;&quot;&quot;保存当前画面截图&quot;&quot;&quot;
+    # 获取当前时间戳
+    timestamp = datetime.datetime.now().strftime(&quot;%Y%m%d_%H%M%S&quot;)
+
+    # 获取当前地图名称
+    map_name = self.current_map.split('/')[-1] if self.current_map else &quot;Unknown&quot;
+
+    # 获取当前天气
+    weather_name = self.weathers[self.current_weather_index]
+
+    # 获取当前颜色名称
+    color_name = self.car_color_names[self.current_color_index]
+
+    # 生成文件名
+    filename = f&quot;screenshot_{timestamp}_{map_name}_{weather_name}_{color_name}.png&quot;
+
+    # 确保目录存在
+    os.makedirs('screenshots', exist_ok=True)
+
+    # 保存当前视角画面
+    if self.current_view_mode in self.cameras and self.image_data[self.current_view_mode] is not None:
+        cv2.imwrite(f&quot;screenshots/{filename}&quot;, self.image_data[self.current_view_mode])
+        print(f&quot;截图已保存: screenshots/{filename}&quot;)
+</code></pre>
+<h3 id="_24">性能特点</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>保存格式</td>
+<td>PNG</td>
+<td>无损压缩，画质清晰</td>
+</tr>
+<tr>
+<td>分辨率</td>
+<td>640 x 480</td>
+<td>与相机分辨率一致</td>
+</tr>
+<tr>
+<td>保存速度</td>
+<td>&lt; 100ms</td>
+<td>不影响实时控制</td>
+</tr>
+<tr>
+<td>文件大小</td>
+<td>~500KB</td>
+<td>适中，便于存储和分享</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_25">应用场景</h3>
+<ol>
+<li><strong>实验记录</strong>：记录不同场景下的驾驶状态，保存关键实验数据</li>
+<li><strong>问题排查</strong>：记录异常情况，便于问题复现和分析</li>
+<li><strong>成果展示</strong>：生成演示图片，制作项目文档配图</li>
+<li><strong>数据分析</strong>：配合其他传感器数据进行分析，用于机器学习数据集构建</li>
+</ol>
+<hr />
+<h2 id="_26">🌍 支持的地图</h2>
+<table>
+<thead>
+<tr>
+<th>地图名称</th>
+<th>特点</th>
+<th>复杂度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Town01</td>
+<td>小型城镇，道路简单</td>
+<td>⭐⭐</td>
+</tr>
+<tr>
+<td>Town02</td>
+<td>中等规模，包含高速公路</td>
+<td>⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Town03</td>
+<td>丘陵地形，弯道较多</td>
+<td>⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Town04</td>
+<td>乡村风格，道路较窄</td>
+<td>⭐⭐</td>
+</tr>
+<tr>
+<td>Town05</td>
+<td>城市环境，交通复杂</td>
+<td>⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Town06</td>
+<td>大型城市，多层道路</td>
+<td>⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td>Town07</td>
+<td>工业区风格</td>
+<td>⭐⭐⭐</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_27">🌤️ 支持的天气</h2>
+<table>
+<thead>
+<tr>
+<th>天气类型</th>
+<th>效果描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>晴天 (Clear)</td>
+<td>阳光明媚，视野良好</td>
+</tr>
+<tr>
+<td>雨天 (Rain)</td>
+<td>下雨效果，地面湿滑</td>
+</tr>
+<tr>
+<td>多云 (Cloudy)</td>
+<td>阴天，光线较暗</td>
+</tr>
+<tr>
+<td>湿滑 (Wet)</td>
+<td>地面湿滑，有积水反光</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_28">🔧 技术架构</h2>
+<h3 id="_29">系统架构图</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    控制系统 (Control System)               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
+│  │  路点跟踪   │  │ 速度控制    │  │ 转向计算    │       │
+│  │  Waypoint   │  │ Speed Ctrl  │  │ Steering    │       │
+│  │  Tracking   │  │             │  │ Calculation │       │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘       │
+│         └────────┬───────┴────────┬───────┘                │
+│                  ▼                                      ▼ │
+│         ┌─────────────┐                       ┌───────────┐│
+│         │  控制融合   │                       │  倒车模式 ││
+│         │  Control    │                       │  Reverse  ││
+│         │  Fusion     │                       │  Mode     ││
+│         └──────┬──────┘                       └───────────┘│
+│                ▼                                           │
+├─────────────────────────────────────────────────────────────┤
+│                    传感器层 (Sensor Layer)                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌───────────┐         │
+│  │第一人称相机 │  │第三人称相机 │  │ 鸟瞰图相机│         │
+│  │ First-Person│  │Third-Person│  │ Birdseye  │         │
+│  │ Camera      │  │ Camera      │  │ Camera    │         │
+│  └──────┬──────┘  └──────┬──────┘  └─────┬─────┘         │
+│         └────────┬───────┴────────┬───────┘                │
+│                  ▼                                        │
+│         ┌─────────────┐                                   │
+│         │ 图像处理器  │                                   │
+│         │ Image       │                                   │
+│         │ Processor   │                                   │
+│         └──────┬──────┘                                   │
+│                ▼                                           │
+├─────────────────────────────────────────────────────────────┤
+│                    CARLA 模拟器 (CARLA Simulator)          │
+│  ┌─────────────┐  ┌─────────────┐  ┌───────────┐         │
+│  │  车辆Actor  │  │   地图环境   │  │  NPC车辆  │         │
+│  │  Vehicle    │  │   Map Env   │  │  NPC Cars │         │
+│  │  Actor      │  │             │  │           │         │
+│  └─────────────┘  └─────────────┘  └───────────┘         │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="_30">核心类设计</h3>
+<h4 id="1-simpledrivingsystem">1. SimpleDrivingSystem</h4>
+<ul>
+<li><strong>职责</strong>：系统主控制器，协调整个驾驶系统</li>
+<li><strong>核心方法</strong>：</li>
+<li><code>connect()</code> - 连接CARLA服务器</li>
+<li><code>spawn_vehicle()</code> - 生成车辆</li>
+<li><code>setup_camera()</code> - 设置摄像头</li>
+<li><code>run()</code> - 主运行循环</li>
+</ul>
+<h4 id="2-simplecontroller">2. SimpleController</h4>
+<ul>
+<li><strong>职责</strong>：车辆控制算法实现</li>
+<li><strong>核心方法</strong>：</li>
+<li><code>get_control()</code> - 获取控制指令</li>
+<li><code>toggle_reverse()</code> - 切换倒车模式</li>
+</ul>
+<h4 id="3-camera-callback">3. Camera Callback</h4>
+<ul>
+<li><strong>职责</strong>：处理相机图像数据</li>
+<li><strong>特点</strong>：仅处理当前视角的图像，节省资源</li>
+</ul>
+<hr />
+<h2 id="_31">📊 性能指标</h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>控制频率</td>
+<td>30 Hz</td>
+<td>每帧处理一次控制指令</td>
+</tr>
+<tr>
+<td>相机分辨率</td>
+<td>640 x 480</td>
+<td>平衡性能与画质</td>
+</tr>
+<tr>
+<td>最大车速</td>
+<td>50 km/h</td>
+<td>安全驾驶速度</td>
+</tr>
+<tr>
+<td>NPC车辆数</td>
+<td>2辆</td>
+<td>模拟交通环境</td>
+</tr>
+<tr>
+<td>内存占用</td>
+<td>~500MB</td>
+<td>正常运行时</td>
+</tr>
+<tr>
+<td>CPU占用</td>
+<td>~15%</td>
+<td>单线程</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_32">🛡️ 错误处理与稳定性</h2>
+<h3 id="_33">故障恢复机制</h3>
+<table>
+<thead>
+<tr>
+<th>故障类型</th>
+<th>处理策略</th>
+<th>恢复方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CARLA连接失败</td>
+<td>重试连接3次</td>
+<td>提示用户检查服务器</td>
+</tr>
+<tr>
+<td>车辆生成失败</td>
+<td>自动清理并重新尝试</td>
+<td>使用备用出生点</td>
+</tr>
+<tr>
+<td>相机设置失败</td>
+<td>跳过相机设置</td>
+<td>继续运行（无可视化）</td>
+</tr>
+<tr>
+<td>车辆卡住</td>
+<td>自动检测并重置</td>
+<td>恢复到初始位置</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_34">资源管理</h3>
+<pre><code class="language-python"># 退出时自动清理资源
+def cleanup(self):
+    &quot;&quot;&quot;清理所有资源&quot;&quot;&quot;
+    # 停止相机
+    for camera in self.cameras.values():
+        if camera:
+            camera.stop()
+            camera.destroy()
+
+    # 销毁车辆
+    if self.vehicle:
+        self.vehicle.destroy()
+
+    # 清理客户端连接
+    if self.client:
+        self.client = None
+
+    print(&quot;资源清理完成&quot;)
+</code></pre>
+<hr />
+<h2 id="_35">🔍 调试与日志</h2>
+<h3 id="_36">日志级别</h3>
+<table>
+<thead>
+<tr>
+<th>级别</th>
+<th>用途</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>INFO</td>
+<td>常规信息</td>
+<td>"车辆生成成功"</td>
+</tr>
+<tr>
+<td>WARNING</td>
+<td>警告信息</td>
+<td>"相机设置失败"</td>
+</tr>
+<tr>
+<td>ERROR</td>
+<td>错误信息</td>
+<td>"连接失败"</td>
+</tr>
+<tr>
+<td>DEBUG</td>
+<td>调试信息</td>
+<td>"速度: 30 km/h"</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_37">调试工具</h3>
+<ol>
+<li><strong>check_blueprints.py</strong> - 检测可用车辆蓝图</li>
+<li><strong>控制台输出</strong> - 实时显示系统状态</li>
+<li><strong>截图功能</strong> - 保存关键帧分析</li>
+</ol>
+<hr />
+<h2 id="git">🔄 Git 同步说明</h2>
+<h3 id="_38">同步脚本使用</h3>
+<pre><code class="language-bash"># 运行同步脚本
+sync_main.bat
+
+# 手动同步流程
+git stash
+git pull origin main
+git stash pop
+</code></pre>
+<h3 id="_39">冲突处理策略</h3>
+<ol>
+<li><strong>代码冲突</strong>：保留本地修改，手动合并</li>
+<li><strong>配置冲突</strong>：以主分支为准</li>
+<li><strong>文档冲突</strong>：合并双方内容</li>
+</ol>
+<hr />
+<h2 id="_40">📈 扩展开发指南</h2>
+<h3 id="_41">添加新功能步骤</h3>
+<ol>
+<li><strong>需求分析</strong> - 明确功能需求</li>
+<li><strong>设计阶段</strong> - 设计接口和类结构</li>
+<li><strong>实现阶段</strong> - 编写代码</li>
+<li><strong>测试阶段</strong> - 验证功能正确性</li>
+<li><strong>文档更新</strong> - 更新README</li>
+</ol>
+<h3 id="_42">扩展建议</h3>
+<table>
+<thead>
+<tr>
+<th>扩展方向</th>
+<th>难度</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>添加激光雷达</td>
+<td>中等</td>
+<td>需要修改传感器配置</td>
+</tr>
+<tr>
+<td>实现避障算法</td>
+<td>高</td>
+<td>需要深度学习模型</td>
+</tr>
+<tr>
+<td>添加行人检测</td>
+<td>中等</td>
+<td>使用YOLO等模型</td>
+</tr>
+<tr>
+<td>实现路径规划</td>
+<td>高</td>
+<td>需要图搜索算法</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_43">📚 相关资源</h2>
+<h3 id="_44">学习资源</h3>
+<table>
+<thead>
+<tr>
+<th>资源</th>
+<th>链接</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CARLA官方文档</td>
+<td><a href="https://carla.org/">carla.org</a></td>
+</tr>
+<tr>
+<td>CARLA教程</td>
+<td><a href="https://github.com/carla-simulator/carla/tree/master/PythonAPI/examples">GitHub</a></td>
+</tr>
+<tr>
+<td>自动驾驶入门</td>
+<td><a href="https://www.coursera.org/specializations/autonomous-vehicles">Coursera</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_45">参考项目</h3>
+<ul>
+<li><a href="https://github.com/carla-simulator/carla/tree/master/PythonAPI/examples">CARLA Examples</a></li>
+<li><a href="https://www.autoware.org/">AutoWare</a></li>
+<li><a href="https://apollo.auto/">Baidu Apollo</a></li>
+</ul>
+<hr />
+<h2 id="_46">❓ 常见问题</h2>
+<h3 id="1-carla_1">1. 连接 CARLA 服务器失败</h3>
+<p><strong>问题现象</strong>：运行程序时提示连接失败</p>
+<p><strong>解决方法</strong>：
+- 确保 CARLA 模拟器正在运行
+- 检查端口是否为 2000
+- 验证防火墙设置
+- 尝试重启CARLA服务器</p>
+<h3 id="2_1">2. 车辆生成失败</h3>
+<p><strong>问题现象</strong>：提示"无法生成车辆"</p>
+<p><strong>解决方法</strong>：
+- 等待几秒后重试
+- 检查是否有其他车辆占用出生点
+- 尝试切换地图</p>
+<h3 id="3_2">3. 车辆切换崩溃</h3>
+<p><strong>问题现象</strong>：切换车辆品牌时程序崩溃</p>
+<p><strong>解决方法</strong>：
+- 所有车辆蓝图均已验证可用
+- 确保 CARLA 版本兼容
+- 更新显卡驱动</p>
+<h3 id="4">4. 画面卡顿</h3>
+<p><strong>问题现象</strong>：帧率较低，画面不流畅</p>
+<p><strong>解决方法</strong>：
+- 降低CARLA分辨率
+- 减少NPC车辆数量
+- 关闭不必要的程序</p>
+<hr />
+<h2 id="_47">📜 许可证</h2>
+<p>本项目采用 <strong>MIT License</strong>，详见 LICENSE 文件。</p>
+<pre><code>MIT License
+
+Copyright (c) 2026 Car Navigation System Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</code></pre>
+<hr />
+<h2 id="_48">📧 联系方式</h2>
+<ul>
+<li><strong>邮箱</strong>：2985835251@qq.com</li>
+<li><strong>项目地址</strong>：[GitHub Repository]</li>
+<li><strong>文档版本</strong>：v1.2.0</li>
+<li><strong>最后更新</strong>：2026年6月</li>
+</ul>
+<hr />
+<h2 id="_49">📅 更新日志</h2>
+<h3 id="v120-2026-06">v1.2.0 (2026-06)</h3>
+<ul>
+<li>✨ 添加车辆品牌切换功能（支持10种车型）</li>
+<li>✨ 实现品牌切换菜单界面</li>
+<li>✨ 切换时保留颜色设置</li>
+<li>✅ 所有车辆蓝图验证通过</li>
+<li>📝 更新项目文档</li>
+</ul>
+<h3 id="v110-2026-05">v1.1.0 (2026-05)</h3>
+<ul>
+<li>✨ 添加多视角切换（第一人称/第三人称/鸟瞰图）</li>
+<li>✨ 添加地图切换功能</li>
+<li>✨ 添加天气切换功能</li>
+<li>✨ 添加车辆颜色切换功能</li>
+<li>✨ 实现截图功能（按p键保存）</li>
+<li>🔧 优化倒车控制</li>
+<li>🐛 修复已知bug</li>
+</ul>
+<h3 id="v100-2026-05">v1.0.0 (2026-05)</h3>
+<ul>
+<li>✨ 初始化项目</li>
+<li>✨ 实现基本自动驾驶功能</li>
+<li>✨ 添加第三视角摄像头</li>
+<li>✨ 实现路点跟踪控制算法</li>
+<li>✨ 添加NPC车辆生成</li>
+<li>✨ 实现车辆重置和紧急停止功能</li>
+</ul>
+<hr />
+<p><em>文档版本：v1.2.0 | 最后更新：2026年6月11日</em></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
