@@ -11,7 +11,8 @@ class Lane:
     """
 
     def __init__(self, height:int, width:int, save:bool=False,
-        save_folder:str=join('img', 'examples')) -> None:
+        save_folder:str=join('img', 'examples'), use_adaptive_threshold:bool=True,
+        use_edge_detection:bool=True, canny_low:int=50, canny_high:int=150) -> None:
         """Constructor
 
         Args:
@@ -21,6 +22,14 @@ class Lane:
                 generated during the process. Defaults to False.
             save_folder (str, optional): Folder to save the Images. This only
                 applies if save is true. Defaults to join('img', 'examples').
+            use_adaptive_threshold (bool, optional): Whether to use Otsu's adaptive
+                thresholding instead of fixed threshold. Defaults to True.
+            use_edge_detection (bool, optional): Whether to combine color detection
+                with edge detection for better robustness. Defaults to True.
+            canny_low (int, optional): Lower threshold for Canny edge detection.
+                Defaults to 50.
+            canny_high (int, optional): Upper threshold for Canny edge detection.
+                Defaults to 150.
         """
         self.save = save
         self.save_folder = save_folder
@@ -28,6 +37,12 @@ class Lane:
         self.img_width = width
         self.margin = int((1/12) * self.img_width)
         self.DEGREE = 2
+
+        # Adaptive thresholding settings
+        self.use_adaptive_threshold = use_adaptive_threshold
+        self.use_edge_detection = use_edge_detection
+        self.canny_low = canny_low
+        self.canny_high = canny_high
 
         # Variables to store for lines
         self.x_left = None
@@ -41,10 +56,18 @@ class Lane:
         self.y_left_fill = None
         self.y_right_fill = None
 
+        # State memory for lane detection
+        self.prev_left_line = None
+        self.prev_right_line = None
+        self.detection_confidence = 1.0
+        self.lane_lost_count = 0
+        self.MAX_LOST_FRAMES = 5
+
     def get_lines(self, img:np.ndarray) -> np.ndarray:
         """Get white Lines
 
-        Filters out lighter parts of the image.
+        Filters out lighter parts of the image using adaptive thresholding
+        and optionally combines with edge detection for better robustness.
 
         Args:
             img (np.ndarray): Image on which the changes are to be applied.
@@ -54,15 +77,28 @@ class Lane:
         """
         hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
 
-        # Create threshold matrix to differentiate black and white based on the
-        # lightness (of HSL).
-        _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
+        if self.use_adaptive_threshold:
+            _, binary = cv2.threshold(hls[:, :, 1], 0, 255, 
+                cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        else:
+            _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
+        
         binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
 
-        if self.save:
-            cv2.imwrite(join(self.save_folder, 'lines.jpg'), binary_blured)
+        if self.use_edge_detection:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            edges = cv2.Canny(gray, self.canny_low, self.canny_high)
+            edges_blured = cv2.GaussianBlur(edges, (3, 3), 0)
+            
+            combined = cv2.bitwise_or(binary_blured, edges_blured)
+            result = combined
+        else:
+            result = binary_blured
 
-        return binary_blured
+        if self.save:
+            cv2.imwrite(join(self.save_folder, 'lines.jpg'), result)
+
+        return result
 
     def extract_roi(self, img:np.ndarray, bottom:int=350, top:int=260,
         left:int=200, right:int=440) -> tuple[np.ndarray, np.ndarray]:
@@ -501,12 +537,75 @@ class Lane:
         img = self.get_lines(img)
         img, inverse_perspective_transform = self.extract_roi(img)
         _, max_left_idx, max_right_idx = self.get_hist(img)
-        left_line, right_line = self.get_line_fits(img.copy(),
-            max_right_idx, max_left_idx)
+        
+        try:
+            left_line, right_line = self.get_line_fits(img.copy(),
+                max_right_idx, max_left_idx)
+            
+            valid_detection = self._validate_lines(left_line, right_line)
+            
+            if valid_detection:
+                self.prev_left_line = left_line.copy()
+                self.prev_right_line = right_line.copy()
+                self.detection_confidence = min(1.0, self.detection_confidence + 0.1)
+                self.lane_lost_count = 0
+            else:
+                raise ValueError("Invalid lane detection")
+                
+        except Exception as e:
+            self.lane_lost_count += 1
+            self.detection_confidence = max(0.0, self.detection_confidence - 0.15)
+            
+            if self.prev_left_line is not None and self.prev_right_line is not None:
+                if self.lane_lost_count < self.MAX_LOST_FRAMES:
+                    left_line = self.prev_left_line.copy()
+                    right_line = self.prev_right_line.copy()
+                else:
+                    left_line = np.array([0, 0, 100])
+                    right_line = np.array([0, 0, 540])
+        
         left_fit_x, right_fit_x, y = self.get_search_window(img.copy(),
             left_line, right_line)
         img, detection_surface_area = self.show_lane(original_image,
             img.copy(), left_fit_x, right_fit_x, y,
             inverse_perspective_transform)
         img, error = self.get_car_position(img, left_line, right_line)
+        
         return img, error, detection_surface_area
+
+    def _validate_lines(self, left_line:np.ndarray, right_line:np.ndarray) -> bool:
+        """Validate detected lane lines for plausibility.
+
+        Args:
+            left_line (np.ndarray): Left lane line polynomial coefficients.
+            right_line (np.ndarray): Right lane line polynomial coefficients.
+
+        Returns:
+            bool: True if lines are valid, False otherwise.
+        """
+        if left_line is None or right_line is None:
+            return False
+        
+        bottom_left = left_line[0]*self.img_height**2 + \
+            left_line[1]*self.img_height + left_line[2]
+        bottom_right = right_line[0]*self.img_height**2 + \
+            right_line[1]*self.img_height + right_line[2]
+        
+        lane_width = bottom_right - bottom_left
+        
+        if lane_width < 200 or lane_width > 500:
+            return False
+        
+        if bottom_left < 0 or bottom_left > self.img_width:
+            return False
+        
+        if bottom_right < 0 or bottom_right > self.img_width:
+            return False
+        
+        top_left = left_line[0]*0 + left_line[1]*0 + left_line[2]
+        top_right = right_line[0]*0 + right_line[1]*0 + right_line[2]
+        
+        if abs(top_left - bottom_left) > 200 or abs(top_right - bottom_right) > 200:
+            return False
+        
+        return True

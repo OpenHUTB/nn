@@ -613,7 +613,25 @@ class IntegratedDroneSimulation:
         cv2.putText(enhanced_frame, f"Z: {pos[2]:.2f}m", 
                     (width + 20, y_offset),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 255, 150), 1)
-        y_offset += 30
+        y_offset += 15
+        
+        # 显示距原点距离
+        dist_from_home = np.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
+        dist_color = (0, 255, 0) if dist_from_home < 5 else (0, 255, 255) if dist_from_home < 10 else (0, 128, 255)
+        cv2.putText(enhanced_frame, f"HOME: {dist_from_home:.1f}m", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, dist_color, 1)
+        y_offset += 5
+
+        # 返航状态提示
+        if drone_state['mode'] == 'RETURN_HOME':
+            cv2.rectangle(enhanced_frame, (width + 15, y_offset), (width + 305, y_offset + 28), (0, 0, 200), -1)
+            cv2.putText(enhanced_frame, "⚠ RETURNING HOME...", 
+                        (width + 25, y_offset + 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
+            y_offset += 30
+
+        y_offset += 20
         
         # 显示统计面板或控制提示（V键切换）
         if self.show_stats_panel:
@@ -680,154 +698,7 @@ class IntegratedDroneSimulation:
             "Q/ESC: Exit",
             "C: Switch Camera",
             "I: Mirror On/Off",
-            "P: Record Trajectory",
-            "O: Save Recording",
-            "J: Replay Trajectory",
-            "D: Debug Info",
-            "H: Help",
-            "F: Fullscreen",
-            "M: Toggle Mode",
-            "[ : Lower Sensitivity",
-            "] : Raise Sensitivity",
-            "= : Reset Sensitivity",
-            "W: Add Waypoint",
-            "X: Clear Waypoints",
-            "1-7: Quick Waypoint"
-        ]
-        
-        for control in controls:
-            cv2.putText(frame, control, 
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
-            y_offset += 15
-        
-        return y_offset
-
-    def _draw_stats_panel(self, frame, x_start, y_start, frame_height):
-        """绘制飞行统计面板"""
-        y_offset = y_start
-        report = self.flight_stats.get_report()
-
-        # 标题
-        cv2.putText(frame, "FLIGHT STATISTICS", 
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
-        y_offset += 22
-
-        # 分隔线
-        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-        y_offset += 8
-
-        stats_lines = [
-            (f"Flight: {self.flight_stats.format_time(report['total_flight_time'])}", (255, 255, 255)),
-            (f"Distance: {report['total_distance']:.2f} m", (150, 255, 150)),
-            (f"Max Alt: {report['max_altitude']:.2f} m", (150, 255, 150)),
-            (f"Max Dist: {report['max_distance_from_home']:.2f} m", (150, 255, 150)),
-            (f"Max Speed: {report['max_speed']:.2f} m/s", (255, 200, 100)),
-            (f"Avg Speed: {report['avg_speed']:.2f} m/s", (255, 200, 100)),
-            (f"Takeoffs: {report['takeoff_count']}", (200, 200, 255)),
-            (f"Landings: {report['landing_count']}", (200, 200, 255)),
-        ]
-
-        for text, color in stats_lines:
-            cv2.putText(frame, text,
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
-            y_offset += 17
-
-        # 分隔线
-        y_offset += 3
-        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-        y_offset += 8
-
-        # 电池信息
-        battery = report['battery']
-        cv2.putText(frame, "BATTERY",
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-        y_offset += 16
-
-        bat_color = (0, 255, 0) if battery['current'] > 30 else (0, 255, 255) if battery['current'] > 10 else (0, 0, 255)
-        cv2.putText(frame, f"  Level: {battery['current']:.1f}%", (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, bat_color, 1)
-        y_offset += 14
-        cv2.putText(frame, f"  Drain: {battery['drain_per_minute']:.2f} %/min", (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1)
-        y_offset += 14
-        if battery['remaining_time'] > 0:
-            cv2.putText(frame, f"  Est. Remain: {self.flight_stats.format_time(battery['remaining_time'] * 60)}",
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 255), 1)
-            y_offset += 14
-
-        # 分隔线
-        y_offset += 2
-        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-        y_offset += 8
-
-        # 手势频率
-        cv2.putText(frame, f"GESTURES ({report['total_gestures']})",
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-        y_offset += 16
-
-        top_gestures = report['top_gestures'][:5]
-        if top_gestures:
-            max_count = max(c for _, c in top_gestures)
-            for gesture_name, count in top_gestures:
-                # 手势名称缩写
-                short_name = gesture_name.replace('_', ' ').title()[:14]
-                bar_width = int((count / max_count) * 100) if max_count > 0 else 0
-                cv2.putText(frame, f"  {short_name}", (x_start + 20, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 200), 1)
-                # 小进度条
-                bar_x = x_start + 150
-                cv2.rectangle(frame, (bar_x, y_offset - 8), (bar_x + 100, y_offset), (60, 60, 60), -1)
-                cv2.rectangle(frame, (bar_x, y_offset - 8), (bar_x + bar_width, y_offset), (0, 180, 0), -1)
-                cv2.putText(frame, str(count), (bar_x + 105, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (150, 150, 150), 1)
-                y_offset += 14
-        else:
-            cv2.putText(frame, "  No gestures yet", (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
-            y_offset += 14
-
-        # 命令频率（如果空间够的话）
-        if y_offset < frame_height - 50:
-            y_offset += 4
-            cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
-            y_offset += 8
-
-            cv2.putText(frame, f"COMMANDS ({report['total_commands']})",
-                        (x_start + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-            y_offset += 16
-
-            top_commands = report['top_commands'][:4]
-            if top_commands:
-                for cmd_name, count in top_commands:
-                    short_name = cmd_name.replace('_', ' ').title()[:14]
-                    cv2.putText(frame, f"  {short_name}: {count}", (x_start + 20, y_offset),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.35, (180, 180, 200), 1)
-                    y_offset += 14
-            else:
-                cv2.putText(frame, "  No commands yet", (x_start + 20, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
-                y_offset += 14
-
-    def _draw_controls_panel(self, frame, x_start, y_start):
-        """绘制控制提示面板"""
-        y_offset = y_start
-        
-        cv2.putText(frame, "CONTROLS", 
-                    (x_start + 20, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        y_offset += 25
-        
-        controls = [
-            "Q/ESC: Exit",
-            "C: Switch Camera",
-            "I: Mirror On/Off",
+            "B: Return Home (!)",
             "P: Record Trajectory",
             "O: Save Recording",
             "J: Replay Trajectory",
@@ -1012,6 +883,7 @@ class IntegratedDroneSimulation:
         print("  Q/ESC - 退出")
         print("  C - 切换摄像头")
         print("  I - 切换镜像模式")
+        print("  B - ⚠ 一键紧急返航")
         print("  P - 开始录制轨迹")
         print("  O - 停止录制并保存")
         print("  J - 加载并回放轨迹")
@@ -1031,6 +903,13 @@ class IntegratedDroneSimulation:
         print("  T - 手动起飞")
         print("  L - 手动降落")
         print("  S - 停止")
+        print("=" * 60)
+        print()
+        print("紧急返航说明:")
+        print("  键盘: 按 'B' 键")
+        print("  手势: 做出 '摇滚手势' (食指+小指) 或 '和平手势' (食指+中指)")
+        print("  效果: 无人机以1.5倍最大速度直线飞回起飞点(0,0,0)")
+        print("       到达后自动降落并解除武装")
         print("=" * 60)
         print()
         print("灵敏度说明:")
@@ -1236,11 +1115,14 @@ class IntegratedDroneSimulation:
                         gesture == self.last_processed_gesture and
                         current_time - getattr(self, 'last_processed_time', 0) < 2.0)
 
-        # 只处理置信度高于阈值的手势且不在冷却期
+        # 紧急返航手势特殊处理 - 跳过冷却时间限制
+        is_emergency_gesture = gesture in ("rock", "peace")
+
+        # 只处理置信度高于阈值的手势且不在冷却期（紧急手势除外）
         if (gesture not in ["no_hand", "hand_detected"] and
                 confidence > threshold and
-                not in_cooldown and
-                not same_gesture):
+                (not in_cooldown or is_emergency_gesture) and
+                (not same_gesture or is_emergency_gesture)):
 
             # 获取控制命令
             command = self.gesture_detector.get_command(gesture)
@@ -1321,6 +1203,7 @@ class IntegratedDroneSimulation:
         print("           按 'T' 键手动起飞")
         print("           按 'L' 键手动降落")
         print("           按 'H' 键悬停")
+        print("           按 'B' 键一键紧急返航")
         print("           按 'P' 键开始录制轨迹")
         print("           按 'O' 键停止录制并保存")
         print("           按 'J' 键加载并回放轨迹")
@@ -1395,6 +1278,16 @@ class IntegratedDroneSimulation:
                     print("[INFO] 键盘：停止")
                     self.drone_controller.send_command("stop")
                     self._last_key_press['s'] = current_time
+
+            # 检查紧急返航键 B
+            if keys[pygame.K_b]:
+                if ('b' not in self._last_key_press or
+                        current_time - self._last_key_press['b'] > 3.0):  # 3秒防抖，防止误触
+                    print("\n" + "=" * 60)
+                    print("  ⚠️  一键紧急返航（键盘触发）")
+                    print("=" * 60)
+                    self.drone_controller.send_command("return_home")
+                    self._last_key_press['b'] = current_time
 
             # ========== 轨迹录制/回放控制 ==========
             # 检查录制键 P
@@ -1633,6 +1526,7 @@ class IntegratedDroneSimulation:
         print("    G - 切换网格显示")
         print("    T - 切换轨迹显示")
         print("    A - 切换坐标轴显示")
+        print("    B - ⚠ 一键紧急返航")
         print("    ↑↓←→ - 旋转视角")
         print("    +/- - 缩放视角")
         print("    空格 - 重置视角")
@@ -1652,7 +1546,8 @@ class IntegratedDroneSimulation:
         print("  7. 按 '1-7' 数字键快速添加带标签的航点")
         print("  8. 航点会与轨迹一起保存，方便航线回放")
         print("  9. 按 'v' 键切换飞行统计面板（实时数据）")
-        print("  10. 退出时自动打印完整飞行统计报告")
+        print("  10. 按 'b' 键一键紧急返航到起飞点")
+        print("  11. 退出时自动打印完整飞行统计报告")
         print("=" * 60)
         print("系统启动中...")
 

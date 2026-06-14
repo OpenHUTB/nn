@@ -19,6 +19,14 @@ camera:
   x_offset: 2.5  # 摄像头相对车辆的位置
   z_offset: 0.7
 
+# Lane Detection Settings (鲁棒性优化)
+lane_detection:
+  use_adaptive_threshold: true  # 使用Otsu自适应阈值替代固定阈值
+  use_edge_detection: true      # 结合边缘检测提高鲁棒性
+  canny_low: 50                 # Canny边缘检测低阈值
+  canny_high: 150               # Canny边缘检测高阈值
+  max_lost_frames: 5            # 最大连续丢失帧数（使用历史数据预测）
+
 # Controller Settings (PID Parameters)
 controller:
   default_controller: "pid"  # simple, p, pd, pid

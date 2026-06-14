@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 
 from config import CONFIG, DEFAULT_IMAGE
+from lane_warning import compute_warning_level
 
 
 # ---- 透视变换 ----
@@ -99,6 +100,56 @@ def extract_lane_pixels(binary_warped):
     lefty = nonzeroy[left_lane_inds] if len(left_lane_inds) > 0 else np.array([])
     rightx = nonzerox[right_lane_inds] if len(right_lane_inds) > 0 else np.array([])
     righty = nonzeroy[right_lane_inds] if len(right_lane_inds) > 0 else np.array([])
+
+    return leftx, lefty, rightx, righty, out_img
+
+
+# ---- 快速搜索（带搜索，基于上一帧多项式曲线） ----
+
+def extract_lane_pixels_fast(binary_warped, prev_left_fit, prev_right_fit, margin=50):
+    """在上一帧拟合曲线附近搜索车道像素（带搜索），大幅减少计算量。
+
+    视频模式下，首帧使用滑动窗口，后续帧使用此函数。
+    若任一侧有效像素低于阈值，返回 None 表示需要回退到滑动窗口搜索。
+
+    Args:
+        binary_warped: 鸟瞰图二值化图像
+        prev_left_fit: 上一帧左车道线多项式系数 [A, B, C]
+        prev_right_fit: 上一帧右车道线多项式系数 [A, B, C]
+        margin: 搜索带宽度（像素），默认 50
+
+    Returns:
+        (left_x, left_y, right_x, right_y, out_img) 或 None（搜索失败）
+    """
+    if prev_left_fit is None or prev_right_fit is None:
+        return None
+
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+
+    # 计算上一帧曲线在当前帧的 x 坐标
+    left_fitx_prev = prev_left_fit[0] * nonzeroy ** 2 + prev_left_fit[1] * nonzeroy + prev_left_fit[2]
+    right_fitx_prev = prev_right_fit[0] * nonzeroy ** 2 + prev_right_fit[1] * nonzeroy + prev_right_fit[2]
+
+    # 在曲线 ±margin 范围内搜索像素
+    left_lane_inds = (nonzerox > (left_fitx_prev - margin)) & (nonzerox < (left_fitx_prev + margin))
+    right_lane_inds = (nonzerox > (right_fitx_prev - margin)) & (nonzerox < (right_fitx_prev + margin))
+
+    # 最少像素阈值
+    min_pixels = CONFIG["fast_search_min_pixels"]
+
+    leftx = nonzerox[left_lane_inds] if np.sum(left_lane_inds) >= min_pixels else np.array([])
+    lefty = nonzeroy[left_lane_inds] if np.sum(left_lane_inds) >= min_pixels else np.array([])
+    rightx = nonzerox[right_lane_inds] if np.sum(right_lane_inds) >= min_pixels else np.array([])
+    righty = nonzeroy[right_lane_inds] if np.sum(right_lane_inds) >= min_pixels else np.array([])
+
+    if len(leftx) < min_pixels or len(rightx) < min_pixels:
+        return None
+
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
+    out_img[lefty, leftx] = [255, 0, 0]
+    out_img[righty, rightx] = [0, 0, 255]
 
     return leftx, lefty, rightx, righty, out_img
 
@@ -239,19 +290,40 @@ def compute_lane_metrics(left_fit, right_fit, left_fitx, right_fitx, img_width):
         "offset": offset,
         "offset_direction": offset_direction,
         "curve_direction": curve_direction,
+        "left_fit": left_fit,
+        "right_fit": right_fit,
     }
 
 
 # ---- 反透视绘制 ----
 
 def draw_lane_on_original(original_img, binary_warped, Minv, left_fitx, right_fitx, ploty,
+                         metrics=None, warning=None):
+    """在鸟瞰图上绘制车道区域，再反透视变换叠加回原图。
+
+    Args:
+        metrics: 可选，由 compute_lane_metrics 返回的曲率与偏移信息字典。
+        warning: 可选，由 compute_warning_level 返回的预警信息字典，
+                 传入后车道区域颜色随预警级别变化（绿/黄/红）。
+    """
+    # 根据预警级别选择车道填充色，默认绿色
+    lane_fill = (0, 255, 0)  # 绿色
+    if warning is not None and CONFIG["show_warning"]:
+        lane_fill = warning["lane_color"]
+
                          metrics=None):
     """在鸟瞰图上绘制车道区域，再反透视变换叠加回原图。
 
     Args:
-        metrics: 可选，由 compute_lane_metrics 返回的曲率与偏移信息字典，
-                 传入后会在结果图左上角叠加文字信息。
+        metrics: 可选，由 compute_lane_metrics 返回的曲率与偏移信息字典。
+        warning: 可选，由 compute_warning_level 返回的预警信息字典，
+                 传入后车道区域颜色随预警级别变化（绿/黄/红）。
     """
+    # 根据预警级别选择车道填充色，默认绿色
+    lane_fill = (0, 255, 0)  # 绿色
+    if warning is not None and CONFIG["show_warning"]:
+        lane_fill = warning["lane_color"]
+
     warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
@@ -259,7 +331,7 @@ def draw_lane_on_original(original_img, binary_warped, Minv, left_fitx, right_fi
         pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
         pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
         pts = np.hstack((pts_left, pts_right))
-        cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+        cv2.fillPoly(color_warp, np.int_([pts]), lane_fill)
 
     newwarp = cv2.warpPerspective(color_warp, Minv, (original_img.shape[1], original_img.shape[0]))
     result = cv2.addWeighted(original_img, 1, newwarp, 0.3, 0)
@@ -281,17 +353,24 @@ def draw_lane_on_original(original_img, binary_warped, Minv, left_fitx, right_fi
 
     # ---- 叠加曲率与偏移信息 ----
     if metrics is not None and CONFIG["show_metrics"]:
+        draw_metrics_overlay(result, metrics, warning=warning)
         draw_metrics_overlay(result, metrics)
 
     return result
 
 
+def draw_metrics_overlay(img, metrics, warning=None):
+    """在图像左上角叠加曲率半径、偏移量与预警信息。"""
+    _, w = img.shape[:2]
+    # 计算面板高度（预警 + 指标）
+    panel_top = 10
+    panel_height = 160 if (warning is not None and CONFIG["show_warning"]) else 130
 def draw_metrics_overlay(img, metrics):
     """在图像左上角叠加曲率半径与偏移量信息。"""
     _, w = img.shape[:2]
-    # 半透明背景面板
+    # 计算面板高度（预警 + 指标）
     panel_top = 10
-    panel_height = 130
+    panel_height = 160 if (warning is not None and CONFIG["show_warning"]) else 130
     overlay = img.copy()
     cv2.rectangle(overlay, (10, panel_top), (min(380, w - 10), panel_top + panel_height),
                   (0, 0, 0), -1)
@@ -309,6 +388,17 @@ def draw_metrics_overlay(img, metrics):
     red = (0, 0, 255)
 
     y = panel_top + 20
+
+    # ---- 预警状态行（置顶） ----
+    if warning is not None and CONFIG["show_warning"]:
+        level_label = warning["label"]
+        level_color = warning["text_color"]
+        # 绘制预警标签背景条
+        cv2.rectangle(overlay, (20, y - 4), (150, y + 16), level_color, -1)
+        cv2.addWeighted(overlay, 0.6, img, 0.4, 0, dst=img)
+        cv2.putText(img, f"STATUS: {level_label}", (25, y + 12),
+                    font, 0.6, (255, 255, 255), 2)
+        y += line_h
 
     # 曲率半径
     avg_r = metrics.get("avg_curvature")
@@ -426,43 +516,6 @@ def process_frame(img, save_dir=None):
         "right_fitx": right_fitx,
         "ploty": ploty,
         "Minv": Minv,
-    }
-
-    if left_fitx is None and right_fitx is None:
-        return img, intermediates
-
-# ---- 主流水线 ----
-
-def process_frame(img, save_dir=None):
-    """对单帧图像（numpy 数组）执行完整的高级流水线，返回结果图和中间数据。
-
-    供图片模式和视频模式共用。
-
-    Returns:
-        result_img, intermediates dict 或 None
-        intermediates 包含: binary, binary_warped, sliding_window_img, poly_img,
-                          left_fit, right_fit, left_fitx, right_fitx, ploty
-    """
-    height, width = img.shape[:2]
-    M, Minv = compute_perspective_matrix(width, height)
-
-    binary = preprocess_for_advanced(img)
-    binary_warped = warp_to_birdseye(binary, M, width, height)
-    leftx, lefty, rightx, righty, sliding_window_img = extract_lane_pixels(binary_warped)
-    left_fit, right_fit, left_fitx, right_fitx, ploty, poly_img = \
-        fit_polynomial(binary_warped, leftx, lefty, rightx, righty)
-
-    intermediates = {
-        "binary": binary,
-        "binary_warped": binary_warped,
-        "sliding_window_img": sliding_window_img,
-        "poly_img": poly_img,
-        "left_fit": left_fit,
-        "right_fit": right_fit,
-        "left_fitx": left_fitx,
-        "right_fitx": right_fitx,
-        "ploty": ploty,
-        "Minv": Minv,
         "width": width,
         "height": height,
     }
@@ -471,10 +524,15 @@ def process_frame(img, save_dir=None):
     metrics = compute_lane_metrics(left_fit, right_fit, left_fitx, right_fitx, width)
     intermediates["metrics"] = metrics
 
+    # 计算车道偏离预警级别
+    warning = compute_warning_level(metrics)
+    intermediates["warning"] = warning
+
     if left_fitx is None and right_fitx is None:
         return img, intermediates
 
     result = draw_lane_on_original(img, binary_warped, Minv, left_fitx, right_fitx, ploty,
+                                   metrics=metrics, warning=warning)
                                    metrics=metrics)
 
     if save_dir:

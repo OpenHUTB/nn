@@ -3,6 +3,8 @@
 基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。
 
 **作者**：ultra223  
+**课题进度**：7/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警 + 步骤7 快速搜索优化）
+**课题进度**：6/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警）
 **课题进度**：5/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算）
 **课题进度**：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
 **课题进度**：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
@@ -17,8 +19,10 @@
 | `lane_preprocess.py` | 步骤1：灰度、Canny、ROI、霍夫 |
 | `lane_detect.py` | 步骤2：HSV 黄白线、双黄线中心轴、左右车道 |
 | `lane_advanced.py` | 步骤3 & 5：透视变换、滑动窗口、多项式拟合、曲率与偏移计算 |
+| `lane_video.py` | 步骤4 & 7：视频处理、帧间 EMA 平滑、快速搜索 |
 | `lane_advanced.py` | 步骤3：透视变换、滑动窗口、二次多项式拟合 |
 | `lane_video.py` | 步骤4：视频处理、帧间 EMA 平滑 |
+| `lane_warning.py` | 步骤6：车道偏离预警、三级风险判定 |
 | `carla_test.jpg` | 少量示例输入（运行依赖） |
 
 ## 开发环境
@@ -49,10 +53,6 @@ python main.py --mode advanced
 # 步骤4：视频模式（逐帧检测 + EMA 平滑）
 python main.py --mode video --video path/to/video.mp4
 
-# 重新生成文档配图（写入 docs/lane_detection/images）
-python main.py --save-docs --no-show
-python main.py --mode hsv --save-docs --no-show
-python main.py --mode advanced --save-docs --no-show
 # 重新生成文档配图（写入 docs/lane_detection/images）
 python main.py --save-docs --no-show
 python main.py --mode hsv --save-docs --no-show
@@ -190,6 +190,76 @@ python main.py --mode video --video path/to/video.mp4
 # 隐藏曲率信息
 python main.py --mode advanced --no-metrics
 python main.py --mode video --video path/to/video.mp4 --no-metrics
+```
+
+## 步骤6：车道偏离预警系统
+
+基于曲率半径和车辆偏移量，实时判定三级驾驶风险，并通过车道区域颜色变化和信息面板给出视觉预警。
+
+**三级预警**
+
+| 等级 | 颜色 | 触发条件 |
+| :--- | :--- | :--- |
+| 安全 | 绿色 | 偏移 < 0.15m 且曲率半径 > 500m 且双侧车道线正常 |
+| 注意 | 黄色 | 偏移 0.15~0.40m 或 曲率半径 200~500m |
+| 危险 | 红色 | 偏移 > 0.40m 或 曲率半径 < 200m 或 车道线丢失 |
+
+**视觉反馈**
+
+- 车道区域填充色随预警级别变化（绿/黄/红）
+- 左上角信息面板第一条显示 `STATUS: 安全/注意/危险`
+- 仪表盘风格：彩色背景条 + 白色标签文字
+
+**关键参数**
+
+| 参数 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `--no-warning` | 否 | 隐藏预警信息（车道区域恢复默认绿色） |
+| `warning_offset_caution` | 0.15m | 偏移超过此值触发注意 |
+| `warning_offset_danger` | 0.40m | 偏移超过此值触发危险 |
+| `warning_curve_caution` | 500m | 曲率低于此值触发注意 |
+| `warning_curve_danger` | 200m | 曲率低于此值触发危险 |
+
+**使用方式**
+
+```bash
+# 图片模式（自动显示预警状态）
+python main.py --mode advanced
+
+# 视频模式（每帧实时显示预警）
+python main.py --mode video --video path/to/video.mp4
+
+# 隐藏预警信息
+python main.py --mode advanced --no-warning
+python main.py --mode video --video path/to/video.mp4 --no-warning
+```
+
+## 步骤7：快速搜索优化（视频模式）
+
+视频模式下，首帧使用滑动窗口搜索，后续帧在上一帧多项式曲线 ±margin 范围内搜索车道像素（带搜索），大幅减少计算量。检测丢失时自动回退到滑动窗口。
+
+**搜索策略**
+
+| 帧 | 搜索方式 | 说明 |
+| :--- | :--- | :--- |
+| 第 1 帧 | 滑动窗口 | 从直方图定位基点，9 个窗口逐层搜索 |
+| 第 2+ 帧 | 带搜索（band search） | 在上一帧曲线 ±50px 范围内搜索像素 |
+| 搜索失败 | 回退滑动窗口 | 有效像素 < 30 时触发回退 |
+| 连续回退 ≥ 5 次 | 重新校准 | 强制用滑动窗口搜索，重新定位 |
+
+**视觉指示**
+
+- 视频左下角显示搜索模式：`BAND (fast)`（绿色）/ `SW (init)`（黄色）/ `SW (fallback xN)`（黄色）
+- 处理完成后输出统计：带搜索次数、滑动窗口次数、回退次数
+
+**使用方式**
+
+```bash
+# 默认启用快速搜索
+python main.py --mode video --video path/to/video.mp4
+
+# 关闭快速搜索（回退到纯滑动窗口）
+python main.py --mode video --video path/to/video.mp4 --no-fast
 ```
 
 ## 参考

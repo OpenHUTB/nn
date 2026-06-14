@@ -43,4 +43,20 @@ CONFIG = {
     "curvature_eval_ratio": 1.0,
     # 是否默认显示曲率与偏移信息（advanced / video 模式）
     "show_metrics": True,
+
+    # 步骤6：车道偏离预警
+    # 偏移阈值（米）
+    "warning_offset_caution": 0.15,   # 超过此值触发 注意
+    "warning_offset_danger": 0.40,    # 超过此值触发 危险
+    # 曲率半径阈值（米）
+    "warning_curve_caution": 500,     # 低于此值触发 注意
+    "warning_curve_danger": 200,      # 低于此值触发 危险
+    # 是否默认启用预警（advanced / video 模式）
+    "show_warning": True,
+
+    # 步骤7：快速搜索（视频模式）
+    "use_fast_search": True,          # 是否默认启用快速搜索
+    "fast_search_margin": 50,         # 带搜索宽度（像素）
+    "fast_search_min_pixels": 30,     # 最少有效像素数
+    "fast_max_consecutive_fallback": 5,  # 连续回退上限，超过后重新校准
 }

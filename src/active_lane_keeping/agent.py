@@ -8,7 +8,6 @@ from typing import Optional
 from data_logger import DataLogger
 
 
-
 class Agent():
     """Agent that outputs the desired behaviour given 
     """
@@ -92,28 +91,6 @@ class Agent():
             tau_d=self.tau_d,
             tau_i=self.tau_i,
             throttle=self.throttle
-        )
-
-    @classmethod
-    def from_config(cls, config: dict) -> 'Agent':
-        """Create an Agent instance from a configuration dictionary.
-
-        Args:
-            config (dict): Configuration dictionary containing controller settings.
-
-        Returns:
-            Agent: A new Agent instance configured according to the provided config.
-        """
-        ctrl = config.get('controller', {})
-        
-        return cls(
-            tau_p=ctrl.get('tau_p', 0.65),
-            tau_d=ctrl.get('tau_d', 0.034),
-            tau_i=ctrl.get('tau_i', 0.00000002),
-            throttle=ctrl.get('throttle', 0.3),
-            surface_lower_threshold=ctrl.get('surface_lower_threshold', 20000000.0),
-            surface_upper_threshold=ctrl.get('surface_upper_threshold', 30000000.0),
-            controller=ctrl.get('default_controller', 'pid')
         )
 
     def _select_controller_method(self, name:str) -> None:

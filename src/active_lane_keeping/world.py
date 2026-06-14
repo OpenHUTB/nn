@@ -15,7 +15,9 @@ class World():
     def __init__(self, server_ip:str='127.0.0.1', port:int=2000,
         timeout:float=10.0, map:str='Town05', image_height:int=480,
         image_width:int=640, fov:int=110,
-        time_difference:float=0.01, x_offset:float=2.5, z_offset:float=0.7) -> None:
+        time_difference:float=0.01, x_offset:float=2.5, z_offset:float=0.7,
+        use_adaptive_threshold:bool=True, use_edge_detection:bool=True,
+        canny_low:int=50, canny_high:int=150) -> None:
         """Constructor
 
         Args:
@@ -39,6 +41,14 @@ class World():
                 Defaults to 2.5.
             z_offset (float, optional): Camera offset in z direction relative to car.
                 Defaults to 0.7.
+            use_adaptive_threshold (bool, optional): Use Otsu's adaptive thresholding.
+                Defaults to True.
+            use_edge_detection (bool, optional): Combine color detection with edge detection.
+                Defaults to True.
+            canny_low (int, optional): Lower threshold for Canny edge detection.
+                Defaults to 50.
+            canny_high (int, optional): Upper threshold for Canny edge detection.
+                Defaults to 150.
         """
 
         self.image_height = image_height
@@ -46,7 +56,10 @@ class World():
         self.x_offset = x_offset
         self.z_offset = z_offset
 
-        self.lane = Lane(height=self.image_height, width=self.image_width)
+        self.lane = Lane(height=self.image_height, width=self.image_width,
+            use_adaptive_threshold=use_adaptive_threshold,
+            use_edge_detection=use_edge_detection,
+            canny_low=canny_low, canny_high=canny_high)
 
         self.fov = fov
         self.client = carla.Client(server_ip, port)
@@ -77,7 +90,7 @@ class World():
 
         Args:
             config (dict): Configuration dictionary containing connection,
-                simulation, and camera settings.
+                simulation, camera, and lane detection settings.
 
         Returns:
             World: A new World instance configured according to the provided config.
@@ -85,6 +98,7 @@ class World():
         conn = config.get('connection', {})
         sim = config.get('simulation', {})
         cam = config.get('camera', {})
+        lane_det = config.get('lane_detection', {})
 
         return cls(
             server_ip=conn.get('server_ip', '127.0.0.1'),
@@ -96,7 +110,11 @@ class World():
             image_width=cam.get('image_width', 640),
             fov=cam.get('fov', 110),
             x_offset=cam.get('x_offset', 2.5),
-            z_offset=cam.get('z_offset', 0.7)
+            z_offset=cam.get('z_offset', 0.7),
+            use_adaptive_threshold=lane_det.get('use_adaptive_threshold', True),
+            use_edge_detection=lane_det.get('use_edge_detection', True),
+            canny_low=lane_det.get('canny_low', 50),
+            canny_high=lane_det.get('canny_high', 150)
         )
 
     def close(self) -> None:

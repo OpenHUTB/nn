@@ -18,6 +18,12 @@ def main():
     print("===================================")
     choice = input("请输入选项 (1 或 2，默认按回车选 1): ").strip()
     target_type_name = "行人" if choice == '2' else "车辆"
+    has_side_car = False
+    if choice != '2':
+        print("\n  [1] 测试场景A：侧道无车")
+        print("  [2] 测试场景B：侧道有车")
+        scene_choice = input("请选择场景 (1 或 2，默认选 1): ").strip()
+        has_side_car = (scene_choice == '2')
     print("  [1] 障碍物靠左生成")
     print("  [2] 障碍物靠右生成")
     side_choice = input("请选择障碍物位置 (1 或 2，默认按回车选 1): ").strip()
@@ -143,6 +149,19 @@ def main():
             
             if dummy_target:
                 print(f"🎯 前方固定坐标静态测试靶标 [{target_type_name}] 已生成！准备进行测试。")
+                lead_start_loc = dummy_target.get_location() # 🌟 记录前车起点
+                side_dummy = None
+                if has_side_car:
+                    side_wp = target_waypoint.next(25.0)[0] 
+                    if spawn_side == "left" and side_wp.get_right_lane():
+                        side_wp = side_wp.get_right_lane()
+                    elif spawn_side == "right" and side_wp.get_left_lane():
+                        side_wp = side_wp.get_left_lane()
+                    side_transform = side_wp.transform
+                    side_transform.location.z += 0.5
+                    side_dummy = world.try_spawn_actor(bp_lib.find('vehicle.audi.etron'), side_transform)
+                    if side_dummy:
+                        print("🚙 [场景构建] 侧方盲区干扰车已部署")
             else:
                 print(f"⚠️ {target_type_name} 生成失败，前方空间可能受限。")
 
@@ -188,10 +207,30 @@ def main():
                         running = False
                 
                 if choice != '2':
-                    dummy_target.set_autopilot(True)
-                    tm = client.get_trafficmanager()
-                    tm.ignore_lights_percentage(dummy_target, 100)
-                    tm.vehicle_percentage_speed_difference(dummy_target, 50.0)
+                    if dummy_target is not None:
+                        lead_ctrl = carla.VehicleControl()
+                        if target_speed_kmh < 10.0:
+                            lead_ctrl.throttle = 0.0
+                            lead_ctrl.brake = 1.0
+                            dummy_target.set_light_state(carla.VehicleLightState.Brake)
+                            lead_start_loc = dummy_target.get_location() 
+                        else:
+                            dist_driven = dummy_target.get_location().distance(lead_start_loc)
+                            v_lead = dummy_target.get_velocity()
+                            lead_speed_kmh = math.sqrt(v_lead.x**2 + v_lead.y**2 + v_lead.z**2) * 3.6
+                            if dist_driven < 20.0:
+                                if lead_speed_kmh < 25.0:
+                                    lead_ctrl.throttle = 0.35
+                                else:
+                                    lead_ctrl.throttle = 0.0
+                                lead_ctrl.brake = 0.0
+                                dummy_target.set_light_state(carla.VehicleLightState.NONE)
+                            else:
+                                lead_ctrl.throttle = 0.0
+                                lead_ctrl.brake = 1.0
+                                dummy_target.set_light_state(carla.VehicleLightState.Brake)
+                                
+                        dummy_target.apply_control(lead_ctrl)
                 else:
                     # 必须确保行人成功生成了才给他下指令
                     if dummy_target is not None:
@@ -237,7 +276,7 @@ def main():
                 # 1. 获取当前主车车速
                 # ==========================================
                 v = ego_vehicle.get_velocity() 
-                speed_m_s = math.sqrt(v.x**2 + v.y**2 + v.z**2) 
+                speed_m_s = math.sqrt(v.x**2 + v.y**2) 
                 current_speed_kmh = speed_m_s * 3.6 
 
                 # ==========================================
@@ -249,7 +288,7 @@ def main():
                 is_following = False
 
                 if vision_system:
-                    _, min_dist, obstacle_side, target_class, target_x, aeb_dist = vision_system.process_and_render()
+                    _, min_dist, obstacle_side, target_class, target_x, aeb_dist, left_blocked, right_blocked = vision_system.process_and_render()
                     
                     active_target_speed = target_speed_kmh
                     
@@ -259,6 +298,8 @@ def main():
                             if hasattr(acc_sys, 'lead_speed_kmh') and acc_sys.lead_speed_kmh > 5.0:
                                 is_following = True
                         else:
+                            if min_dist < 15.0:
+                                active_target_speed = 0.0
                             is_following = False
 
                 # ==========================================
@@ -266,8 +307,10 @@ def main():
                 # ==========================================
                 if vision_system:
                     safe_dist = min_dist if min_dist != float('inf') else 100.0
-                    # 🌟 传入 is_following 标志位。如果是跟车，规划器会放弃变道，老老实实保持车道！
-                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh, obstacle_side, is_following, target_class)
+                    if has_side_car:
+                        left_blocked = True
+                        right_blocked = True                    
+                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh, obstacle_side, is_following, target_class, left_blocked, right_blocked)
                     
                     if not is_reverse and planner_steer is not None:
                         control.steer = planner_steer
@@ -297,11 +340,11 @@ def main():
                     error_sum = 0.0
 
                 if active_target_speed == 0.0:
-                    control.throttle, control.brake = 0.0, 0.2 if current_speed_kmh > 0.5 else 1.0
+                    control.throttle, control.brake = 0.0, 1.0
                 elif error > 0:
                     control.throttle, control.brake = min(max((error * Kp) + (error_sum * Ki), 0.0), 0.75), 0.0
                 else:
-                    control.throttle, control.brake = 0.0, min(max((-error * Kp) - (error_sum * Ki), 0.0), 0.5)
+                    control.throttle, control.brake = 0.0, min(max((-error * Kp * 2.5) - (error_sum * Ki), 0.0), 1.0)
 
                 # ==========================================
                 # 6. 紧急制动 AEB
@@ -311,8 +354,8 @@ def main():
                     vru_aeb_triggered = vru_aeb_sys.evaluate(aeb_dist, target_class, target_x, lane_planner.is_changing_lane)
 
                 if min_dist != float('inf'):
-                    braking_dist = (speed_m_s ** 2) / (2 * 6.0) + 3.0
-                    if min_dist < braking_dist and not lane_planner.is_changing_lane and not is_following:
+                    braking_dist = (speed_m_s ** 2) / (2 * 10.0) + 0.5
+                    if min_dist < braking_dist and not lane_planner.is_changing_lane:
                         vision_aeb_active = True
                         
                 if vru_aeb_triggered or vision_aeb_active:
@@ -370,6 +413,8 @@ def main():
     except KeyboardInterrupt:
         print("\n👋 停止程序")
     finally:
+        settings.synchronous_mode = False
+        world.apply_settings(settings)
         keyboard.unhook_all()
         if vision_system:
             vision_system.destroy()
@@ -379,9 +424,9 @@ def main():
             dummy_target.destroy()
         if ego_vehicle:
             ego_vehicle.destroy()
+        if 'side_dummy' in locals() and side_dummy:
+            side_dummy.destroy()
             
-        settings.synchronous_mode = False
-        world.apply_settings(settings)
         pygame.quit() 
         print("🧹 环境已清理。")
 
