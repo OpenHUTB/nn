@@ -65,6 +65,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#6">步骤6：车道偏离预警系统</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#7">步骤7：快速搜索优化（视频模式）</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#_4">参考</a>
     </li>
     </ul>
@@ -129,6 +131,7 @@
                 <h1 id="lane_detection">车道线检测（lane_detection）</h1>
 <p>基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。</p>
 <p><strong>作者</strong>：ultra223<br />
+<strong>课题进度</strong>：7/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警 + 步骤7 快速搜索优化）
 <strong>课题进度</strong>：6/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警）
 <strong>课题进度</strong>：5/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算）
 <strong>课题进度</strong>：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
@@ -162,6 +165,10 @@
 <tr>
 <td style="text-align: left;"><code>lane_advanced.py</code></td>
 <td style="text-align: left;">步骤3 &amp; 5：透视变换、滑动窗口、多项式拟合、曲率与偏移计算</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lane_video.py</code></td>
+<td style="text-align: left;">步骤4 &amp; 7：视频处理、帧间 EMA 平滑、快速搜索</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>lane_advanced.py</code></td>
@@ -438,6 +445,52 @@ python main.py --mode video --video path/to/video.mp4
 # 隐藏预警信息
 python main.py --mode advanced --no-warning
 python main.py --mode video --video path/to/video.mp4 --no-warning
+</code></pre>
+<h2 id="7">步骤7：快速搜索优化（视频模式）</h2>
+<p>视频模式下，首帧使用滑动窗口搜索，后续帧在上一帧多项式曲线 ±margin 范围内搜索车道像素（带搜索），大幅减少计算量。检测丢失时自动回退到滑动窗口。</p>
+<p><strong>搜索策略</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">帧</th>
+<th style="text-align: left;">搜索方式</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">第 1 帧</td>
+<td style="text-align: left;">滑动窗口</td>
+<td style="text-align: left;">从直方图定位基点，9 个窗口逐层搜索</td>
+</tr>
+<tr>
+<td style="text-align: left;">第 2+ 帧</td>
+<td style="text-align: left;">带搜索（band search）</td>
+<td style="text-align: left;">在上一帧曲线 ±50px 范围内搜索像素</td>
+</tr>
+<tr>
+<td style="text-align: left;">搜索失败</td>
+<td style="text-align: left;">回退滑动窗口</td>
+<td style="text-align: left;">有效像素 &lt; 30 时触发回退</td>
+</tr>
+<tr>
+<td style="text-align: left;">连续回退 ≥ 5 次</td>
+<td style="text-align: left;">重新校准</td>
+<td style="text-align: left;">强制用滑动窗口搜索，重新定位</td>
+</tr>
+</tbody>
+</table>
+<p><strong>视觉指示</strong></p>
+<ul>
+<li>视频左下角显示搜索模式：<code>BAND (fast)</code>（绿色）/ <code>SW (init)</code>（黄色）/ <code>SW (fallback xN)</code>（黄色）</li>
+<li>处理完成后输出统计：带搜索次数、滑动窗口次数、回退次数</li>
+</ul>
+<p><strong>使用方式</strong></p>
+<pre><code class="language-bash"># 默认启用快速搜索
+python main.py --mode video --video path/to/video.mp4
+
+# 关闭快速搜索（回退到纯滑动窗口）
+python main.py --mode video --video path/to/video.mp4 --no-fast
 </code></pre>
 <h2 id="_4">参考</h2>
 <ul>
