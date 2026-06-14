@@ -55,6 +55,7 @@ nav:
 - 人形机器人项目: mujoco_hci_sim/README.md
 - RL-ACC: 'rl_acc/README.md'
 - CARLA天气鲁棒性测试: 'carla_weather_robustness/README.md'
+- CARLA多传感器自动驾驶仿真平台: 'carla_multisensor_platform/carla_multisensor_platform.md'
 
 # - mdx_math 用于行内公式显示
 markdown_extensions:

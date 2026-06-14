@@ -69,6 +69,7 @@ title: 主页
 - [__CARLA天气鲁棒性测试__](./carla_weather_robustness/README.md) - CARLA多天气条件下自动驾驶感知鲁棒性测试系统
 - [__CARLA 模拟器中的物体与碰撞检测系统__](./carla_collision_detect/carla_collision_detect.md) - 物体与碰撞检测
 - [__car_navigation_system__](./car_navigation_system/README.md) - 多模态CARLA导航避障系统
+- [__CARLA 多传感器自动驾驶仿真平台__](./carla_multisensor_platform/carla_multisensor_platform.md) - 基于CARLA 0.9.15构建的多传感器融合自动驾驶仿真与数据采集平台
 
 ## 规划 <span id="planning"></span>
 
