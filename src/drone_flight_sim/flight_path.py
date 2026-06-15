@@ -89,6 +89,23 @@ class FlightPath:
         ]
     
     @staticmethod
+    def circle_path(radius: float = 10, height: float = -3, points: int = 20):
+        """生成圆形飞行路径"""
+
+        import math
+
+        waypoints = []
+
+        for i in range(points):
+            angle = 2 * math.pi * i / points
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+            z = height
+            waypoints.append((x, y, z))
+
+        return waypoints
+
+    @staticmethod
     def custom_path(waypoints: List[Tuple[float, float, float]]) -> List[Tuple[float, float, float]]:
         """自定义飞行路径
 
@@ -104,7 +121,7 @@ class FlightPath:
         # 直接返回用户传入的航点列表
         return waypoints
     
-
+ 
 
     @staticmethod
     def print_path(waypoints: List[Tuple[float, float, float]]):

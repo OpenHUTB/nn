@@ -40,8 +40,8 @@ def auto_flight_mode(drone):
 
     time.sleep(1)
 
-   # 使用 FlightPath 中定义的三角形路径
-    waypoints = FlightPath.triangle_path(size=15, height=-5)
+   # 使用 FlightPath 中定义的圆形路径
+    waypoints = FlightPath.circle_path(radius=15, height=-5, points=24)
 
     # 打印飞行路径信息
     FlightPath.print_path(waypoints)
