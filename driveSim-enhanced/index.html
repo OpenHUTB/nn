@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/driveSim-enhanced/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>🚗 DriveSim-Enhanced：自动驾驶车道检测与路径规划仿真平台 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\ud83d\ude97 DriveSim-Enhanced\uff1a\u81ea\u52a8\u9a7e\u9a76\u8f66\u9053\u68c0\u6d4b\u4e0e\u8def\u5f84\u89c4\u5212\u4eff\u771f\u5e73\u53f0";
+        var mkdocs_page_input_path = "driveSim-enhanced/README.md";
+        var mkdocs_page_url = "/nn/driveSim-enhanced/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">🚗 DriveSim-Enhanced：自动驾驶车道检测与路径规划仿真平台</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/driveSim-enhanced/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="drivesim-enhanced">🚗 DriveSim-Enhanced：自动驾驶车道检测与路径规划仿真平台</h1>
+<p><a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-blue.svg" /></a> <a href="https://www.python.org/"><img alt="Python 3.7+" src="https://img.shields.io/badge/Python-3.7%2B-green.svg" /></a> <a href="https://carla.org/"><img alt="CARLA 0.9.15" src="https://img.shields.io/badge/CARLA-0.9.15-orange.svg" /></a></p>
+<h2 id="_1">📑 目录</h2>
+<ol>
+<li><a href="#1-产品概述">产品概述</a></li>
+<li><a href="#2-核心特性">核心特性</a></li>
+<li><a href="#3-仿真平台支持">仿真平台支持</a></li>
+<li><a href="#4-环境准备与快速部署">环境准备与快速部署</a></li>
+<li><a href="#5-系统模块架构">系统模块架构</a></li>
+<li><a href="#6-常见问题-faq">常见问题 (FAQ)</a></li>
+<li><a href="#7-演进路线图">演进路线图</a></li>
+<li><a href="#8-致谢与许可">致谢与许可</a></li>
+</ol>
+<hr />
+<h2 id="1">1. 产品概述</h2>
+<p><strong>DriveSim-Enhanced</strong> 是一套为自动驾驶算法研究与快速原型验证而设计的综合仿真平台方案。本项目集成了基于深度学习的车道线检测、交通信号灯识别与智能路径规划模块，旨在帮助研究人员和开发者在虚拟环境中安全、低成本地验证自动驾驶算法。</p>
+<p>本项目在 <a href="https://github.com/littlemountainman/modeld">modeld</a> 的基础上进行了深度演进，打通了 comma.ai 的 openpilot 算法与多种仿真引擎的连接。</p>
+<p><strong>🎯 适用人群：</strong> 自动驾驶算法工程师、具身智能研究者、高校学术团队及极客开发者。</p>
+<hr />
+<h2 id="2">2. 核心特性</h2>
+<ul>
+<li><strong>🧠 深度学习视觉感知：</strong> 实时处理摄像头输入，实现高精度的车道线提取与跟踪。</li>
+<li><strong>🚦 智能交通交互：</strong> 支持对红、黄、绿交通信号灯状态的精准检测与响应。</li>
+<li><strong>🗺️ 全局与局部路径规划：</strong> 动态计算最优行驶路线，支持复杂路况下的自主决策。</li>
+<li><strong>📊 实时数据遥测屏：</strong> 仪表盘式可视化界面，毫秒级同步显示车速、档位、转向角等关键车辆动力学参数。</li>
+<li><strong>🎮 多模态视角交互：</strong> 提供第一人称（沉浸式驾驶）、第三人称及俯视全局等多视角无缝切换体验。</li>
+<li><strong>⚡ 极简自动化部署：</strong> 提供开箱即用的自动化部署脚本，消除繁琐的环境配置烦恼。</li>
+</ul>
+<hr />
+<h2 id="3">3. 仿真平台支持</h2>
+<p>为满足不同维度的研发需求，本项目提供两种仿真引擎支持方案：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">平台特性</th>
+<th style="text-align: left;">🎮 GTAV + OpenPilot 联合仿真</th>
+<th style="text-align: left;">🏢 CARLA 专业仿真器 (推荐)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>定位与场景</strong></td>
+<td style="text-align: left;">侧重视觉逼真度，适合端到端视觉算法的快速原型验证</td>
+<td style="text-align: left;">侧重物理规则与传感真实性，适合严谨的学术研究与算法评估</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>核心优势</strong></td>
+<td style="text-align: left;">光影渲染极其逼真，天气系统丰富，NPC 行为具有高随机性</td>
+<td style="text-align: left;">提供专业的 Python API 控制，支持激光雷达等多种传感器模拟，符合行业标准</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>系统要求</strong></td>
+<td style="text-align: left;">需要安装 GTA5 游戏本体，资源消耗中等</td>
+<td style="text-align: left;">需要下载并部署 CARLA 引擎，对显卡性能要求较高</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4">4. 环境准备与快速部署</h2>
+<h3 id="a-carla">方案 A：在 CARLA 模拟器上运行（专业研究推荐）</h3>
+<p><strong>环境依赖：</strong> Windows 10/11，Python 3.7 - 3.9，<a href="https://github.com/carla-simulator/carla/releases/tag/0.9.15">CARLA 0.9.15 客户端</a>。</p>
+<h4 id="1_1">1. 环境初始化</h4>
+<p>请确保将 CARLA 解压至本地磁盘（例如 <code>H:\carla0.9.15\</code>），并安装 Python 依赖库与 CARLA API 包：</p>
+<pre><code class="language-bash"># 安装基础依赖
+pip install -r requirements.txt
+
+# 进入 CARLA Python API 目录并安装 whl 文件（以 Python 3.8 为例）
+cd H:\carla0.9.15\WindowsNoEditor\PythonAPI\carla\dist
+pip install carla-0.9.15-cp38-cp38-win_amd64.whl
+</code></pre>
+<h4 id="2-one-click-start">2. 🚀 极简启动（One-Click Start）</h4>
+<p>为了提供最佳的用户体验，我们封装了 <code>start_carla.bat</code> 批处理脚本。您只需<strong>双击运行</strong>该脚本，系统将自动化完成以下编排：
+*   ✅ 环境预检（定位 <code>CarlaUE4.exe</code>）
+*   ✅ 启动仿真引擎（默认注入 <code>-quality-level=Low</code> 以保障帧率）
+*   ✅ 服务就绪检测（等待 15 秒同步时间）
+*   ✅ 自动挂载并拉起核心驾驶算法模块</p>
+<p><em>如果您希望手动启动，请依次执行 <code>CarlaUE4.exe</code> 并新开终端运行 <code>python src/driveSim-enhanced/automatic_control.py</code>。</em></p>
+<h3 id="b-gtav-openpilot">方案 B：在 GTAV 上运行 OpenPilot（视觉感知推荐）</h3>
+<ol>
+<li>安装依赖：<code>pip install -r requirements.txt</code></li>
+<li>资源下载：获取 <a href="https://github.com/aitorzip/VPilot">VPilot</a>、<a href="https://www.dev-c.com/gtav/scripthookv/">ScriptHookV</a> 与 <a href="https://github.com/aitorzip/DeepGTAV">DeepGTAV</a>。</li>
+<li>引擎注入：将 <code>ScriptHookV.dll</code>、<code>dinput8.dll</code>、<code>NativeTrainer.asi</code> 及 <code>DeepGTAV/bin/Release/</code> 内的文件放置于 <code>GTA5.exe</code> 同级目录。</li>
+<li>启动服务：在游戏运行状态下，执行 <code>python main.py</code>。</li>
+</ol>
+<hr />
+<h2 id="5">5. 系统模块架构</h2>
+<p>项目采用模块化设计，高内聚低耦合，核心代码结构如下：</p>
+<pre><code class="language-text">openhutb/
+└── src/
+    └── driveSim-enhanced/
+        ├── main.py                # 系统主入口，负责模块初始化与生命周期管理
+        ├── automatic_control.py   # 核心业务逻辑：自动驾驶策略控制中心
+        ├── drive.py               # 车辆底盘与动力学控制接口适配
+        ├── rl_agent.py            # 强化学习/决策代理模块（强化学习训练入口）
+        └── map_swithcer.py        # 仿真环境地图管理与动态切换模块
+</code></pre>
+<hr />
+<h2 id="6-faq">6. 常见问题 (FAQ)</h2>
+<p><strong>Q: 连接 CARLA 时，终端抛出 <code>carla</code> 模块导入错误或版本不匹配？</strong></p>
+<blockquote>
+<p><strong>A:</strong> 这通常是由于环境 Python API 与仿真器服务端版本脱节导致。请通过命令 <code>python -c "import carla; print(carla.__version__)"</code> 验证版本。若不为 <code>0.9.15</code>，请返回部署步骤重新安装对应的 <code>.whl</code> 文件。</p>
+</blockquote>
+<p><strong>Q: 运行 <code>start_carla.bat</code> 出现中文乱码或闪退现象？</strong></p>
+<blockquote>
+<p><strong>A:</strong> 请使用文本编辑器（如 VS Code）打开 <code>.bat</code> 文件，确保其编码格式保存为 <strong>UTF-8 with BOM</strong> 或系统默认的 <strong>ANSI</strong> 编码。</p>
+</blockquote>
+<p><strong>Q: CARLA 模拟器运行中画面帧率极低，导致算法控制延迟？</strong></p>
+<blockquote>
+<p><strong>A:</strong> 仿真引擎对 GPU 算力要求较高。系统默认已加入 <code>-quality-level=Low</code> 进行降级优化。若仍卡顿，建议：1) 在 CARLA 内部设置降低渲染分辨率；2) 确保显卡驱动已更新且后台无高负载图形应用。</p>
+</blockquote>
+<hr />
+<h2 id="7">7. 演进路线图</h2>
+<ul>
+<li>[x] 完成 GTAV 环境与 OpenPilot 的基础对接</li>
+<li>[x] 引入 CARLA 仿真引擎支持与 API 封装</li>
+<li>[x] 开发一键启动与部署脚本</li>
+<li>[ ] <strong>Next:</strong> 引入基于强化学习（RL）的跟车模型</li>
+<li>[ ] <strong>Next:</strong> 支持自定义交通流与极端天气测试场景生成</li>
+<li>[ ] <strong>Next:</strong> 完善数据采集脚本，支持自动生成训练数据集</li>
+</ul>
+<hr />
+<h2 id="8">8. 致谢与许可</h2>
+<p>本产品的诞生离不开开源社区的伟大贡献，特别鸣谢以下项目及团队：
+*   <a href="https://github.com/littlemountainman/modeld">littlemountainman/modeld</a> - 核心框架参考
+*   <a href="https://github.com/aitorzip/DeepGTAV">aitorzip/DeepGTAV</a> &amp; <a href="https://github.com/aitorzip/VPilot">VPilot</a> - GTAV 环境插件
+*   <a href="https://carla.org/">CARLA Simulator</a> - 卓越的开源自动驾驶仿真器
+*   <a href="https://github.com/commaai/openpilot">comma.ai/openpilot</a> - 开源智驾先驱</p>
+<p><strong>许可证：</strong> 本项目代码遵循原项目的开源许可证协议。请在商业用途前仔细核对相关依赖包的授权条款。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
