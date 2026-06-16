@@ -69,7 +69,7 @@ def run(run_id:str, path:str, world:World, agent:Agent, steps:int = 1000,
             [0]: Sum of errors as returned by the world.
             [1]: Number of steps taken.
     """
-    error, detection_surface_area, _, _ = world.reset()
+    error, detection_surface_area, _, _, _ = world.reset()
 
     if save:
         recorder = Recorder(folder=path)
@@ -77,7 +77,7 @@ def run(run_id:str, path:str, world:World, agent:Agent, steps:int = 1000,
 
     for i in range(steps):
         steer, throttle = agent.get_actions(detection_surface_area, error)
-        error, detection_surface_area, img, collision_detected = world.step(
+        error, detection_surface_area, img, collision_detected, speed = world.step(
             steer=steer, throttle=throttle)
         agent.show_error()
 
@@ -276,6 +276,26 @@ def no_adapt(run_id:str, path:str, config: dict, steps:int=1000,
 
         save = config.get('run', {}).get('save_video', True)
         run(run_id=run_id, path=path, world=world, agent=agent, steps=steps, save=save)
+        
+        # Print performance stats if profiling was enabled
+        perf = config.get('performance', {})
+        if perf.get('enable_profiling', False):
+            stats = world.lane.get_performance_stats()
+            print("\n=== Performance Statistics ===")
+            print(f"Total Frames: {stats.get('frame_count', 0)}")
+            print(f"Average FPS: {stats.get('avg_fps', 0):.2f}")
+            print(f"Current FPS: {stats.get('current_fps', 0):.2f}")
+            print(f"GPU Enabled: {stats.get('gpu_enabled', False)}")
+            print(f"Parallel Enabled: {stats.get('parallel_enabled', True)}")
+            print(f"Time Budget Exceeded: {stats.get('time_budget_exceeded', 0)} frames")
+            print("\n=== Step Timing (ms) ===")
+            for name in ['get_lines', 'extract_roi', 'get_hist', 'get_line_fits', 
+                         'get_search_window', 'show_lane', 'get_car_position', 'total']:
+                avg_key = f'{name}_avg_ms'
+                max_key = f'{name}_max_ms'
+                if avg_key in stats:
+                    print(f"{name}: avg={stats[avg_key]:.2f}ms, max={stats[max_key]:.2f}ms")
+            print("==============================\n")
     finally:
         if world is not None:
             world.close()
@@ -312,8 +332,10 @@ if __name__ == '__main__':
     parser.add_argument('-id', '--identifier', type=str, help=('Unique '
         'identifier used to identify the run.'), dest='id', required=True)
     parser.add_argument('-c', '--controller', default=None, type=str,
-        choices=['simple', 'p', 'pd', 'pid'], help=('The method used to '
-        'control the car. If not specified, uses default from config.'), dest='controller')
+        choices=['simple', 'p', 'pd', 'pid', 'pid_gs', 'mpc'], help=('The method used to '
+        'control the car. If not specified, uses default from config. '
+        'Options: simple, p, pd, pid, pid_gs (gain scheduling), mpc (model predictive control)'),
+        dest='controller')
     parser.add_argument('-s', '--steps', type=int, help=('The '
         'number of steps that the agent controls the car. This does not '
         'include the inital setup driving to the fourth lane.'), dest='steps')
@@ -329,11 +351,27 @@ if __name__ == '__main__':
     parser.add_argument('-cfg', '--config', default='config.yaml', type=str,
         help=('Path to the configuration file. Defaults to \'config.yaml\'.'),
         dest='config')
+    # Performance optimization arguments
+    parser.add_argument('--gpu', action='store_true',
+        help=('Enable GPU acceleration via OpenCV CUDA.'), dest='use_gpu')
+    parser.add_argument('--profile', action='store_true',
+        help=('Enable performance profiling (FPS, timing stats).'), dest='enable_profiling')
+    parser.add_argument('--time-budget', default=40.0, type=float,
+        help=('Maximum time per frame in milliseconds. Defaults to 40.0 (25 FPS).'),
+        dest='time_budget_ms')
     args = parser.parse_args()
 
     config = load_config(args.config)
 
     run_steps = args.steps if args.steps else config.get('run', {}).get('default_steps', 1000)
+
+    # Update config with command-line performance arguments
+    if args.use_gpu:
+        config['performance']['use_gpu'] = True
+    if args.enable_profiling:
+        config['performance']['enable_profiling'] = True
+    if args.time_budget_ms:
+        config['performance']['time_budget_ms'] = args.time_budget_ms
 
     path = make_path(folder='data', run_id=args.id)
 

@@ -22,6 +22,7 @@ from lane_advanced import (
     extract_lane_pixels, extract_lane_pixels_fast, fit_polynomial,
     preprocess_for_advanced, warp_to_birdseye, compute_perspective_matrix,
 )
+from lane_advanced import process_frame, draw_lane_on_original, compute_lane_metrics
 from lane_warning import compute_warning_level
 
 
@@ -77,6 +78,10 @@ def run_video_pipeline(video_path, save_dir=None, alpha=0.3, show=False,
 
     writer = None
     out_path = None
+    if save_dir:
+        save_dir = str(save_dir)
+        base_name = os.path.splitext(os.path.basename(video_path))[0]
+        out_path = f"{save_dir}/step04_{base_name}_output.avi"
     if save_dir:
         save_dir = str(save_dir)
         base_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -170,6 +175,15 @@ def run_video_pipeline(video_path, save_dir=None, alpha=0.3, show=False,
             metrics = compute_lane_metrics(smooth_left, smooth_right,
                                            left_fitx, right_fitx, width)
             warning = compute_warning_level(metrics)
+            display = draw_lane_on_original(frame, binary_warped, Minv,
+                                            left_fitx, right_fitx, ploty,
+            display = draw_lane_on_original(frame, binary_warped, Minv,
+                                            left_fitx, right_fitx, ploty,
+            # 计算车道偏离预警级别
+            warning = compute_warning_level(metrics)
+            display = draw_lane_on_original(frame, binary_warped, Minv,
+                                            left_fitx, right_fitx, ploty,
+                                            metrics=metrics)
             display = draw_lane_on_original(frame, binary_warped, Minv,
                                             left_fitx, right_fitx, ploty,
                                             metrics=metrics, warning=warning)

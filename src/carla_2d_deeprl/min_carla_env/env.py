@@ -108,22 +108,59 @@ class CarlaEnv(gym.Env):
                 raise RuntimeError("CarlaEnv初始化失败，且重连客户端失败")
 
     def spawn_actors(self):
-        """Spawns agent car and sensors."""
+        """Spawns agent car and sensors（含自动重试，防止 Carla streaming token 残留导致崩溃）。"""
         self.vehicle = self.mw.spawn_vehicle()
 
-        self.rgb_sensor = self.mw.spawn_sensor('sensor.camera.rgb',
-                                               self.vehicle,
-                                               carla.Location(x=2.5, z=0.7))
-        self.rgb_sensor.listen(lambda image: self.process_img(image))
-        self.semantic_sensor = self.mw.spawn_sensor(
-            'sensor.camera.semantic_segmentation',
-            self.vehicle, carla.Location(x=2.5, z=0.7))
-        self.semantic_sensor.listen(lambda image: self.process_semantic(image))
-        self.col_sensor = self.mw.spawn_collision_sensor(
-            self.vehicle, carla.Location(x=2.5, z=0.7))
-        self.col_sensor.listen(lambda event: self.collision_data(event))
-        self.lane_sensor = self.mw.spawn_lane_sensor(self.vehicle)
-        self.lane_sensor.listen(lambda event: self.lane_data(event))
+        sensors = []  # 追踪本次已创建的 sensor，失败时统一回滚
+        try:
+            # 每个 sensor 独立重试，容忍 Carla 流连接残留
+            for sensor_type, args in [
+                ('rgb',      ('sensor.camera.rgb',                  self.vehicle, carla.Location(x=2.5, z=0.7))),
+                ('semantic', ('sensor.camera.semantic_segmentation', self.vehicle, carla.Location(x=2.5, z=0.7))),
+                ('collision', None),   # 碰撞传感器走专用方法
+                ('lane',      None),   # 车道传感器走专用方法
+            ]:
+                for retry in range(3):
+                    try:
+                        if sensor_type == 'rgb':
+                            actor = self.mw.spawn_sensor(*args)
+                            actor.listen(lambda image: self.process_img(image))
+                            self.rgb_sensor = actor
+                        elif sensor_type == 'semantic':
+                            actor = self.mw.spawn_sensor(*args)
+                            actor.listen(lambda image: self.process_semantic(image))
+                            self.semantic_sensor = actor
+                        elif sensor_type == 'collision':
+                            actor = self.mw.spawn_collision_sensor(self.vehicle, carla.Location(x=2.5, z=0.7))
+                            actor.listen(lambda event: self.collision_data(event))
+                            self.col_sensor = actor
+                        elif sensor_type == 'lane':
+                            actor = self.mw.spawn_lane_sensor(self.vehicle)
+                            actor.listen(lambda event: self.lane_data(event))
+                            self.lane_sensor = actor
+                        sensors.append(actor)
+                        break
+                    except RuntimeError as e:
+                        logger.warning(f"sensor {sensor_type} 创建失败 (retry {retry + 1}/3): {e}")
+                        if self.mw.world:
+                            try:
+                                self.mw.world.tick()
+                            except Exception:
+                                pass
+                        time.sleep(0.3)
+                        if retry == 2:
+                            raise RuntimeError(f"sensor {sensor_type} 创建失败，已重试 3 次")
+        except Exception:
+            # 回滚已创建的 sensor
+            for actor in sensors:
+                try:
+                    if hasattr(actor, 'is_listening') and actor.is_listening:
+                        actor.stop()
+                    if actor.is_alive:
+                        actor.destroy()
+                except Exception:
+                    pass
+            raise
 
     def collision_data(self, event):
         self.collision_hist.append(event)
@@ -232,7 +269,6 @@ class CarlaEnv(gym.Env):
         self.crossed_lane_hist = []
         self.hist_wp = None
         self.stuck_count = 0
-        self.update_spectator_follow()  # 重置时立刻设置视角，不等待
 
         try:
             self.mw.clean_world()
@@ -273,7 +309,17 @@ class CarlaEnv(gym.Env):
                     raise RuntimeError("Actor生成失败，且重连客户端失败")
 
             self.measurements = {"kmh": 0.0, "prev_loc": None}
-            time.sleep(1)
+            # 轮询等待传感器数据就绪（替代固定 sleep，最多等 5 秒）
+            for wait_i in range(50):
+                if self.semantic_data is not None:
+                    break
+                time.sleep(0.1)
+            if self.semantic_data is None:
+                logger.warning(f"语义传感器数据未就绪（等待 5 秒后超时），返回默认观测")
+                # 返回全零矩阵作为 fallback，避免下游 assert 或训练崩溃
+                h, w = self.config["height"], self.config["width"]
+                self.semantic_data = np.zeros((h, w), dtype=np.uint8)
+
             self.update_spectator_follow()  # 车辆已生成，设置俯视视角
             return self.semantic_data
         except Exception as e:
@@ -412,6 +458,13 @@ class CarlaEnv(gym.Env):
             # 再清理MatrixWorld资源
             if self.mw:
                 self.mw.clean_world()
+                # 清理后执行一次 world tick，让 Carla 服务端释放 streaming token
+                if self.mw.world:
+                    try:
+                        self.mw.world.tick()
+                    except Exception:
+                        pass
+                time.sleep(0.1)  # 短暂等待流状态完全释放
             logger.info("CarlaEnv环境关闭成功")
         except Exception as e:
             logger.error(f"关闭CarlaEnv环境失败: {e}")

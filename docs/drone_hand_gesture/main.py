@@ -39,6 +39,7 @@ except (ImportError, AttributeError) as e:
 from drone_controller import DroneController
 from simulation_3d import Drone3DViewer
 from flight_statistics import FlightStatistics
+from flight_scorer import FlightScorer
 
 # 注意：physics_engine.py 是可选的，如果没有可以先注释掉
 try:
@@ -130,13 +131,35 @@ class IntegratedDroneSimulation:
             self.gesture_detector = GestureDetector()
 
         print("正在初始化无人机控制器...")
-        self.drone_controller = DroneController(simulation_mode=True)
+        # 检查是否启用多无人机模式
+        self.multi_drone_enabled = self.config.get('multi_drone_enabled', False)
+        self.num_drones = self.config.get('num_drones', 2)
+
+        if self.multi_drone_enabled:
+            print(f"[OK] 启用多无人机模式: {self.num_drones} 架无人机")
+            self.multi_drone_controller = MultiDroneController(
+                num_drones=self.num_drones,
+                config=None,
+                simulation_mode=True
+            )
+            self.formation = DroneFormation(self.multi_drone_controller)
+            # 默认使用 dual 控制模式
+            self.multi_drone_controller.set_control_mode("dual")
+            self.drone_controller = self.multi_drone_controller.get_drone(0)  # 保持兼容性
+        else:
+            self.multi_drone_controller = None
+            self.formation = None
+            self.drone_controller = DroneController(simulation_mode=True)
 
         print("正在初始化3D仿真显示...")
         self.viewer = Drone3DViewer(
             width=self.config.get('window_width', 1024),
             height=self.config.get('window_height', 768)
         )
+
+        # 设置多无人机渲染模式
+        if self.multi_drone_enabled:
+            self.viewer.set_multi_drone_mode(True)
 
         # 初始化物理引擎（可选）
         if HAS_PHYSICS_ENGINE:
@@ -210,6 +233,10 @@ class IntegratedDroneSimulation:
         # 飞行统计
         self.flight_stats = FlightStatistics()
         self.show_stats_panel = False  # V键切换统计面板
+
+        # 飞行评分
+        self.flight_scorer = FlightScorer()
+        self.show_scorer_panel = False  # N键切换评分面板
 
         print("无人机初始化完成，等待手势指令...")
 
@@ -591,17 +618,44 @@ class IntegratedDroneSimulation:
         cv2.putText(enhanced_frame, f"Z: {pos[2]:.2f}m", 
                     (width + 20, y_offset),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 255, 150), 1)
-        y_offset += 30
+        y_offset += 15
         
-        # 显示统计面板或控制提示（V键切换）
-        if self.show_stats_panel:
+        # 显示距原点距离
+        dist_from_home = np.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
+        dist_color = (0, 255, 0) if dist_from_home < 5 else (0, 255, 255) if dist_from_home < 10 else (0, 128, 255)
+        cv2.putText(enhanced_frame, f"HOME: {dist_from_home:.1f}m", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, dist_color, 1)
+        y_offset += 5
+
+        # 返航状态提示
+        if drone_state['mode'] == 'RETURN_HOME':
+            cv2.rectangle(enhanced_frame, (width + 15, y_offset), (width + 305, y_offset + 28), (0, 0, 200), -1)
+            cv2.putText(enhanced_frame, "⚠ RETURNING HOME...", 
+                        (width + 25, y_offset + 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
+            y_offset += 30
+
+        y_offset += 20
+        
+        # 显示评分面板 / 统计面板 / 控制提示（N键评分, V键统计）
+        if self.show_scorer_panel:
+            self._draw_scorer_panel(enhanced_frame, width, y_offset, height)
+        elif self.show_stats_panel:
             self._draw_stats_panel(enhanced_frame, width, y_offset, height)
         else:
             y_offset = self._draw_controls_panel(enhanced_frame, width, y_offset)
         
-        # 显示统计面板切换提示
-        hint_text = "V: Stats Panel" if not self.show_stats_panel else "V: Controls Panel"
-        hint_color = (100, 100, 100) if not self.show_stats_panel else (0, 255, 255)
+        # 显示面板切换提示
+        if self.show_scorer_panel:
+            hint_text = "N/V: Switch Panel"
+            hint_color = (0, 255, 255)
+        elif self.show_stats_panel:
+            hint_text = "N: Scorer | V: Controls"
+            hint_color = (0, 255, 255)
+        else:
+            hint_text = "N: Scorer | V: Stats"
+            hint_color = (100, 100, 100)
         cv2.putText(enhanced_frame, hint_text,
                     (width + 20, height - 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, hint_color, 1)
@@ -658,6 +712,9 @@ class IntegratedDroneSimulation:
             "Q/ESC: Exit",
             "C: Switch Camera",
             "I: Mirror On/Off",
+            "N: Flight Scorer",
+            "V: Flight Stats",
+            "B: Return Home (!)",
             "P: Record Trajectory",
             "O: Save Recording",
             "J: Replay Trajectory",
@@ -793,6 +850,104 @@ class IntegratedDroneSimulation:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
                 y_offset += 14
 
+    def _draw_scorer_panel(self, frame, x_start, y_start, frame_height):
+        """绘制飞行评分面板"""
+        y_offset = y_start
+        score_data = self.flight_scorer.get_realtime_score()
+
+        # 标题
+        cv2.putText(frame, "FLIGHT SCORER",
+                    (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
+        y_offset += 25
+
+        # 总分和等级
+        total = score_data['total']
+        grade = score_data['grade']
+        grade_colors = {'S': (255, 215, 0), 'A': (0, 255, 0), 'B': (0, 200, 255),
+                        'C': (0, 165, 255), 'D': (0, 0, 255)}
+
+        # 等级徽章
+        grade_color = grade_colors.get(grade, (255, 255, 255))
+        cv2.rectangle(frame, (x_start + 15, y_offset - 18),
+                     (x_start + 305, y_offset + 52), grade_color, 2)
+        cv2.putText(frame, f"{grade}",
+                    (x_start + 35, y_offset + 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.8, grade_color, 3)
+        cv2.putText(frame, f"{total:.0f}/100",
+                    (x_start + 100, y_offset + 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        y_offset += 45
+
+        # 分隔线
+        y_offset += 5
+        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
+        y_offset += 10
+
+        # 各维度进度条
+        dims = [
+            ("Stability", score_data['stability'], (255, 150, 50)),
+            ("Accuracy", score_data['accuracy'], (50, 200, 255)),
+            ("Smoothness", score_data['smoothness'], (150, 255, 100)),
+        ]
+
+        for dim_name, dim_score, dim_color in dims:
+            cv2.putText(frame, dim_name,
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+            cv2.putText(frame, f"{dim_score:.0f}",
+                        (x_start + 240, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, dim_color, 1)
+
+            y_offset += 12
+            bar_width = int(dim_score / 100 * 120)
+            bar_color = dim_color if dim_score >= 50 else (0, 0, 255)
+            cv2.rectangle(frame, (x_start + 20, y_offset),
+                         (x_start + 140, y_offset + 8), (60, 60, 60), -1)
+            cv2.rectangle(frame, (x_start + 20, y_offset),
+                         (x_start + 20 + bar_width, y_offset + 8), bar_color, -1)
+            y_offset += 14
+
+        y_offset += 8
+        cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
+        y_offset += 10
+
+        # 等级说明
+        cv2.putText(frame, "RATING SCALE",
+                    (x_start + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        y_offset += 15
+
+        grades_info = [
+            ("S", "90-100  Master", (255, 215, 0)),
+            ("A", "80-89   Excellent", (0, 255, 0)),
+            ("B", "65-79   Good", (0, 200, 255)),
+            ("C", "50-64   Fair", (0, 165, 255)),
+            ("D", "0-49    Needs Work", (0, 0, 255)),
+        ]
+
+        for g, desc, g_color in grades_info:
+            highlight = g == grade
+            prefix = "> " if highlight else "  "
+            cv2.putText(frame, f"{prefix}{g}  {desc}",
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.33, g_color if highlight else (150, 150, 150),
+                        2 if highlight else 1)
+            y_offset += 13
+
+        # 提示
+        if y_offset < frame_height - 50:
+            y_offset += 10
+            cv2.line(frame, (x_start + 15, y_offset), (x_start + 305, y_offset), (80, 80, 80), 1)
+            y_offset += 10
+            cv2.putText(frame, "Score updates in real-time",
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
+            y_offset += 13
+            cv2.putText(frame, "Final report on exit",
+                        (x_start + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (120, 120, 120), 1)
+
     def _show_help(self):
         """显示帮助信息"""
         print("=" * 60)
@@ -842,6 +997,9 @@ class IntegratedDroneSimulation:
         print("  Q/ESC - 退出")
         print("  C - 切换摄像头")
         print("  I - 切换镜像模式")
+        print("  N - 🏆 飞行评分面板")
+        print("  V - 飞行统计面板")
+        print("  B - ⚠ 一键紧急返航")
         print("  P - 开始录制轨迹")
         print("  O - 停止录制并保存")
         print("  J - 加载并回放轨迹")
@@ -861,6 +1019,13 @@ class IntegratedDroneSimulation:
         print("  T - 手动起飞")
         print("  L - 手动降落")
         print("  S - 停止")
+        print("=" * 60)
+        print()
+        print("紧急返航说明:")
+        print("  键盘: 按 'B' 键")
+        print("  手势: 做出 '摇滚手势' (食指+小指) 或 '和平手势' (食指+中指)")
+        print("  效果: 无人机以1.5倍最大速度直线飞回起飞点(0,0,0)")
+        print("       到达后自动降落并解除武装")
         print("=" * 60)
         print()
         print("灵敏度说明:")
@@ -1066,11 +1231,14 @@ class IntegratedDroneSimulation:
                         gesture == self.last_processed_gesture and
                         current_time - getattr(self, 'last_processed_time', 0) < 2.0)
 
-        # 只处理置信度高于阈值的手势且不在冷却期
+        # 紧急返航手势特殊处理 - 跳过冷却时间限制
+        is_emergency_gesture = gesture in ("rock", "peace")
+
+        # 只处理置信度高于阈值的手势且不在冷却期（紧急手势除外）
         if (gesture not in ["no_hand", "hand_detected"] and
                 confidence > threshold and
-                not in_cooldown and
-                not same_gesture):
+                (not in_cooldown or is_emergency_gesture) and
+                (not same_gesture or is_emergency_gesture)):
 
             # 获取控制命令
             command = self.gesture_detector.get_command(gesture)
@@ -1151,6 +1319,7 @@ class IntegratedDroneSimulation:
         print("           按 'T' 键手动起飞")
         print("           按 'L' 键手动降落")
         print("           按 'H' 键悬停")
+        print("           按 'B' 键一键紧急返航")
         print("           按 'P' 键开始录制轨迹")
         print("           按 'O' 键停止录制并保存")
         print("           按 'J' 键加载并回放轨迹")
@@ -1226,6 +1395,16 @@ class IntegratedDroneSimulation:
                     self.drone_controller.send_command("stop")
                     self._last_key_press['s'] = current_time
 
+            # 检查紧急返航键 B
+            if keys[pygame.K_b]:
+                if ('b' not in self._last_key_press or
+                        current_time - self._last_key_press['b'] > 3.0):  # 3秒防抖，防止误触
+                    print("\n" + "=" * 60)
+                    print("  ⚠️  一键紧急返航（键盘触发）")
+                    print("=" * 60)
+                    self.drone_controller.send_command("return_home")
+                    self._last_key_press['b'] = current_time
+
             # ========== 轨迹录制/回放控制 ==========
             # 检查录制键 P
             if keys[pygame.K_p]:
@@ -1279,11 +1458,24 @@ class IntegratedDroneSimulation:
                         print(f"[INFO] 回放速度: {self.drone_controller.replay_speed}x")
                         self._last_key_press['-'] = current_time
 
+            # 检查评分面板切换键 N
+            if keys[pygame.K_n]:
+                if ('n' not in self._last_key_press or
+                        current_time - self._last_key_press['n'] > 0.5):
+                    self.show_scorer_panel = not self.show_scorer_panel
+                    if self.show_scorer_panel:
+                        self.show_stats_panel = False
+                    status = "开启" if self.show_scorer_panel else "关闭"
+                    print(f"[INFO] 飞行评分面板: {status}")
+                    self._last_key_press['n'] = current_time
+
             # 检查统计面板切换键 V
             if keys[pygame.K_v]:
                 if ('v' not in self._last_key_press or
                         current_time - self._last_key_press['v'] > 0.5):
                     self.show_stats_panel = not self.show_stats_panel
+                    if self.show_stats_panel:
+                        self.show_scorer_panel = False
                     status = "开启" if self.show_stats_panel else "关闭"
                     print(f"[INFO] 飞行统计面板: {status}")
                     self._last_key_press['v'] = current_time
@@ -1302,6 +1494,15 @@ class IntegratedDroneSimulation:
                 drone_state=drone_state,
                 current_gesture=self.current_gesture,
                 current_command=getattr(self, 'current_command', None),
+                dt=dt
+            )
+
+            # 更新飞行评分
+            command_executed = getattr(self, 'current_command', None) not in (None, 'none')
+            self.flight_scorer.update(
+                drone_state=drone_state,
+                gesture_confidence=self.gesture_confidence,
+                command_executed=command_executed,
                 dt=dt
             )
 
@@ -1463,6 +1664,7 @@ class IntegratedDroneSimulation:
         print("    G - 切换网格显示")
         print("    T - 切换轨迹显示")
         print("    A - 切换坐标轴显示")
+        print("    B - ⚠ 一键紧急返航")
         print("    ↑↓←→ - 旋转视角")
         print("    +/- - 缩放视角")
         print("    空格 - 重置视角")
@@ -1482,7 +1684,9 @@ class IntegratedDroneSimulation:
         print("  7. 按 '1-7' 数字键快速添加带标签的航点")
         print("  8. 航点会与轨迹一起保存，方便航线回放")
         print("  9. 按 'v' 键切换飞行统计面板（实时数据）")
-        print("  10. 退出时自动打印完整飞行统计报告")
+        print("  10. 按 'n' 键切换飞行评分面板（实时评分）")
+        print("  11. 按 'b' 键一键紧急返航到起飞点")
+        print("  12. 退出时自动打印完整飞行统计与评分报告")
         print("=" * 60)
         print("系统启动中...")
 
@@ -1529,6 +1733,9 @@ class IntegratedDroneSimulation:
             # 打印飞行统计报告
             self.flight_stats.finalize()
             self.flight_stats.print_report()
+
+            # 打印飞行评分报告
+            self.flight_scorer.print_report()
 
             print("无人机仿真系统已安全关闭 [OK]")
 

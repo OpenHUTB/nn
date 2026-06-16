@@ -505,10 +505,21 @@ class AutoCollisionCollector:
 
     def get_stats(self):
         """获取采集统计"""
+        total = self.safe_samples + self.danger_samples
+
+        danger_ratio = 0
+        safe_ratio = 0
+
+        if total > 0:
+            danger_ratio = self.danger_samples / total * 100
+            safe_ratio = self.safe_samples / total * 100
+
         return {
             'safe': self.safe_samples,
             'danger': self.danger_samples,
-            'total': self.safe_samples + self.danger_samples
+            'total': total,
+            'safe_ratio': safe_ratio,
+            'danger_ratio': danger_ratio
         }
 
 
@@ -605,6 +616,8 @@ def main():
         print(f"   安全样本: {stats['safe']}")
         print(f"   危险样本: {stats['danger']}")
         print(f"   总计: {stats['total']}")
+        print(f"   安全样本占比: {stats['safe_ratio']:.1f}%")
+        print(f"   危险样本占比: {stats['danger_ratio']:.1f}%")
         print(f"   数据保存: {collector.labels_file}")
         print("=" * 50)
 

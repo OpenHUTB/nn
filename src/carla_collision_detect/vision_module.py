@@ -45,7 +45,7 @@ class VisionSystem:
         self.image_queue.put(image)
 
     def process_and_render(self):
-        """处理图像，并返回：(图像帧, 当前正前方的最短障碍物距离)"""
+        """处理图像，并返回：(图像帧, 当前正前方的最短障碍物距离等)"""
         if not self.image_queue.empty():
             image = self.image_queue.get()
             
@@ -65,7 +65,9 @@ class VisionSystem:
             roi_right = 440
             
             radar_max_range = 40.0
-            
+            left_blocked = False
+            right_blocked = False
+
             for box in results[0].boxes:
                 cls_id = int(box.cls[0])
                 cls_name = self.yolo_model.names[cls_id]
@@ -85,7 +87,13 @@ class VisionSystem:
                 if cls_name in ["car", "person"]:
                     real_height = 1.7 if cls_name == "person" else 1.5
                     distance = (self.focal_length * real_height) / max(1.0, box_height)
-                    
+
+                    if cls_name != "person" and distance < 80.0:
+                        if box_center_x < dynamic_roi_left:
+                            left_blocked = True
+                        elif box_center_x > dynamic_roi_right:
+                            right_blocked = True
+
                     if wide_roi_left < box_center_x < wide_roi_right:
                         if distance < aeb_min_distance:
                             aeb_min_distance = distance
@@ -126,8 +134,7 @@ class VisionSystem:
 
                     self.last_seen_time[target_type] = current_time
             
-            annotated_frame = results[0].plot()
-            
+            annotated_frame = results[0].plot()                    
             pt_horizon = (320, 240)      # 远方的地平线中心 (灭点)
             pt_bottom_left = (100, 480)  # 本车道左下角
             pt_bottom_right = (540, 480) # 本车道右下角
@@ -148,13 +155,13 @@ class VisionSystem:
             speed_kmh = 3.6 * (v.x**2 + v.y**2 + v.z**2)**0.5
             cv2.putText(annotated_frame, f"Ego Speed: {speed_kmh:.1f} km/h", (20, 40), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2, cv2.LINE_AA)
-
+            
             cv2.imshow("CARLA YOLOv8 Vision", annotated_frame)
             cv2.waitKey(1)
             
-            return annotated_frame, min_distance, detected_side, closest_target_class, closest_center_x, aeb_min_distance
+            return annotated_frame, min_distance, detected_side, closest_target_class, closest_center_x, aeb_min_distance, left_blocked, right_blocked
             
-        return None, float('inf'), None, None, None, float('inf')
+        return None, float('inf'), None, None, None, float('inf'), False, False
 
     def destroy(self):
         if self.camera_sensor:

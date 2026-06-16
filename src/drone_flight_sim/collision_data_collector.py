@@ -30,7 +30,7 @@ class CollisionDataCollector:
         # 如果 labels.csv 不存在，则创建并写入表头
         if not os.path.exists(self.labels_file):
             with open(self.labels_file, 'w') as f:
-                f.write("filename,label,risk,min_depth,mean_depth,x,y,z\n")
+                f.write("filename,label,risk,min_depth,mean_depth,x,y,z,timestamp\n")
 
         
         
@@ -81,9 +81,12 @@ class CollisionDataCollector:
             # 保存标签
             risk_name = "safe" if self.current_label == 0 else "danger"
             with open(self.labels_file, 'a') as f:
-                f.write(f"{filename},{self.current_label},{risk_name},"
+                    f.write(
+                        f"{filename},{self.current_label},{risk_name},"
                         f"{min_depth:.2f},{mean_depth:.2f},"
-                        f"{pos.x_val:.1f},{pos.y_val:.1f},{pos.z_val:.1f}\n")
+                        f"{pos.x_val:.1f},{pos.y_val:.1f},{pos.z_val:.1f},"
+                        f"{timestamp}\n"
+                    )
             self.sample_count += 1
             print(f"✅ 样本 {self.sample_count}: {filename} (深度:{min_depth:.1f}m)")
             return True

@@ -32,7 +32,7 @@ sys.path.append(str(carla_api_full_path))
 # ========== 第三方库导入 ==========
 try:
     import pygame
-    from pygame.locals import KMOD_CTRL, K_ESCAPE, K_q, K_r, K_h
+    from pygame.locals import KMOD_CTRL, K_ESCAPE, K_q, K_r, K_h, K_f  # 新增：F键常量
 except ImportError:
     raise RuntimeError("请安装pygame: pip install pygame")
 
@@ -179,6 +179,81 @@ class TrajectoryLogger:
         self.trajectory_data["metadata"]["end_time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         self._save_to_file()
         logger.info(f"轨迹日志已最终化，共记录 {self.trajectory_data['metadata']['total_frames']} 帧")
+
+# ========== 新增：车辆状态快照记录器【核心新增功能】 ==========
+class StateSnapshotLogger:
+    """手动触发保存车辆状态快照（按F键）"""
+    def __init__(self):
+        self.log_dir = Path(LOG_SAVE_DIR) / "snapshots"  # 快照单独文件夹
+        self.log_dir.mkdir(exist_ok=True, parents=True)
+        self.snapshot_count = 0  # 快照计数器
+
+    def save_snapshot(self, world, target_count):
+        """保存单次车辆状态快照"""
+        self.snapshot_count += 1
+        # 构建快照数据
+        transform = world.player.get_transform()
+        vel = world.player.get_velocity()
+        acc = world.player.get_acceleration()
+        control = world.player.get_control()
+        speed = 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
+        
+        # 碰撞判断
+        collision_hist = world.collision_sensor.get_collision_history()
+        current_frame = world.hud.frame
+        is_collision = 1 if current_frame in collision_hist else 0
+
+        # 构造快照数据
+        snapshot_data = {
+            "snapshot_id": self.snapshot_count,
+            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+            "frame_id": current_frame,
+            "location": {
+                "x": round(transform.location.x, 2),
+                "y": round(transform.location.y, 2),
+                "z": round(transform.location.z, 2)
+            },
+            "rotation": {
+                "pitch": round(transform.rotation.pitch, 2),
+                "yaw": round(transform.rotation.yaw, 2),
+                "roll": round(transform.rotation.roll, 2)
+            },
+            "motion": {
+                "speed_kmh": round(speed, 1),
+                "velocity": {
+                    "x": round(vel.x, 2),
+                    "y": round(vel.y, 2),
+                    "z": round(vel.z, 2)
+                },
+                "acceleration": {
+                    "x": round(acc.x, 2),
+                    "y": round(acc.y, 2),
+                    "z": round(acc.z, 2)
+                }
+            },
+            "control": {
+                "throttle": round(control.throttle, 2),
+                "steer": round(control.steer, 2),
+                "brake": round(control.brake, 2),
+                "reverse": control.reverse,
+                "hand_brake": control.hand_brake,
+                "gear": control.gear
+            },
+            "status": {
+                "is_collision": is_collision,
+                "target_reached_count": target_count,
+                "server_fps": round(world.hud.server_fps, 1),
+                "client_fps": round(pygame.time.Clock().get_fps(), 1)
+            }
+        }
+
+        # 保存快照文件
+        time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        snap_file = self.log_dir / f"vehicle_snapshot_{time_str}_{self.snapshot_count}.json"
+        with open(snap_file, "w", encoding="utf-8") as f:
+            json.dump(snapshot_data, f, ensure_ascii=False, indent=2)
+        
+        return str(snap_file), self.snapshot_count
 
 # ========== 工具函数 ==========
 def get_random_destination(current_loc, spawn_points):
@@ -344,7 +419,9 @@ class KeyboardControl(object):
     def __init__(self, world):
         self.world = world
         self.hud = world.hud
-        self.hud.notification("按R重置车辆 | 按H查看帮助 | 按ESC退出", seconds=4.0)
+        # 新增：更新提示信息，加入F键说明
+        self.hud.notification("按R重置车辆 | 按H查看帮助 | 按F保存状态快照 | 按ESC退出", seconds=4.0)
+        self.snapshot_triggered = False  # 快照触发标记
 
     def parse_events(self):
         for event in pygame.event.get():
@@ -359,6 +436,9 @@ class KeyboardControl(object):
                 # H键切换帮助
                 if event.key == K_h:
                     self.hud.help.toggle()
+                # 新增：F键保存车辆状态快照
+                if event.key == K_f:
+                    self.snapshot_triggered = True
         return False
 
     @staticmethod
@@ -377,6 +457,7 @@ class HUD(object):
         mono = pygame.font.match_font(mono)
         self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
         self._notifications = FadingText(font, (width, 40), (0, height - 40))
+        # 新增：更新帮助文本，加入F键说明
         self.help = HelpText(pygame.font.Font(mono, 24), width, height)
         self.server_fps = 0
         self.frame = 0
@@ -526,6 +607,7 @@ class FadingText(object):
 
 class HelpText(object):
     def __init__(self, font, width, height):
+        # 新增：帮助文本加入F键说明
         lines = [
             "CARLA 自动控制客户端",
             "",
@@ -533,6 +615,7 @@ class HelpText(object):
             "ESC / Ctrl+Q - 退出程序",
             "R - 重置车辆到最近生成点",
             "H - 显示/隐藏本帮助",
+            "F - 保存当前车辆状态快照（JSON格式）",  # 新增
             "",
             "启动参数：",
             "-l / --loop - 到达目标后自动设置新目的地",
@@ -734,7 +817,8 @@ def game_loop(args):
     pygame.font.init()
     world = None
     driving_logger = None
-    trajectory_logger = None  # 新增：轨迹日志器
+    trajectory_logger = None
+    snapshot_logger = None  # 新增：快照日志器
     tot_target_reached = 0
 
     try:
@@ -749,13 +833,15 @@ def game_loop(args):
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
 
-        # 初始化行驶日志和轨迹日志
+        # 初始化各类日志器
         driving_logger = DrivingLogger()
-        trajectory_logger = TrajectoryLogger()  # 新增：初始化轨迹日志
+        trajectory_logger = TrajectoryLogger()
+        snapshot_logger = StateSnapshotLogger()  # 新增：初始化快照日志器
         logger.info(f"行驶日志已创建: {driving_logger.get_file_path()}")
         logger.info(f"轨迹日志已创建: {trajectory_logger.get_file_path()}")
+        logger.info(f"状态快照将保存至: {Path(LOG_SAVE_DIR)/'snapshots'}")
 
-        # 初始化智能体（只保留你用的BehaviorAgent和BasicAgent）
+        # 初始化智能体
         if args.agent == "Basic":
             agent = BasicAgent(world.player)
             spawn_point = world.map.get_spawn_points()[0]
@@ -777,6 +863,13 @@ def game_loop(args):
             if controller.parse_events():
                 return
 
+            # 新增：处理F键触发的快照保存
+            if controller.snapshot_triggered:
+                snap_path, snap_id = snapshot_logger.save_snapshot(world, tot_target_reached)
+                world.hud.notification(f"已保存快照 #{snap_id}: {os.path.basename(snap_path)}", seconds=3.0)
+                logger.info(f"保存车辆状态快照 #{snap_id}: {snap_path}")
+                controller.snapshot_triggered = False  # 重置触发标记
+
             if not world.world.wait_for_tick(10.0):
                 continue
 
@@ -784,16 +877,16 @@ def game_loop(args):
             world.render(display)
             pygame.display.flip()
 
-            # 记录行驶日志和轨迹日志
+            # 记录常规日志
             driving_logger.record_frame(world, tot_target_reached)
-            trajectory_logger.record_frame(world, tot_target_reached)  # 新增：记录轨迹
+            trajectory_logger.record_frame(world, tot_target_reached)
 
+            # 智能体逻辑
             if args.agent == "Basic":
                 control = agent.run_step()
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
             else:
-                # 判断是否需要设置新目的地
                 if len(agent.get_local_planner()._waypoints_queue) < MIN_WAYPOINTS_QUEUE:
                     if args.loop:
                         spawn_points = world.map.get_spawn_points()
@@ -822,9 +915,11 @@ def game_loop(args):
         # 保存日志
         if driving_logger:
             logger.info(f"行驶日志已保存至: {driving_logger.get_file_path()}")
-        if trajectory_logger:  # 新增：最终化并保存轨迹日志
+        if trajectory_logger:
             trajectory_logger.finalize()
             logger.info(f"轨迹日志已保存至: {trajectory_logger.get_file_path()}")
+        if snapshot_logger:  # 新增：快照日志器收尾
+            logger.info(f"共保存 {snapshot_logger.snapshot_count} 个车辆状态快照")
 
 # ========== 主函数 ==========
 def main():
@@ -858,6 +953,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-    

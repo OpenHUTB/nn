@@ -16,7 +16,7 @@ import subprocess
 MODES = {
     "demo":  "python -m models.run --path models/model/base-model.pt",
     "train": "python -m models.train --episodes 20000 --save models/model/trained",
-    "test":  "python -m pytest tests/ -v",
+    "test":  "python -m tests.test_all",
 }
 
 
@@ -28,10 +28,10 @@ def main():
         print()
         print("  demo  运行预训练模型演示")
         print("  train 训练新 DQN 模型")
-        print("  test  运行自动化测试")
+        print("  test  运行自动化测试（需 Carla 服务器）")
         print()
         print("示例:")
-        print("  python main.py test     # 运行所有测试（无需 Carla）")
+        print("  python main.py test     # 运行所有测试（需 Carla 服务器运行中）")
         print("  python main.py demo     # 需要 Carla 服务器运行中")
         return
 

@@ -11,6 +11,7 @@
   python main.py --no-warning              # 隐藏预警状态（关掉车道区域颜色变化）
   python main.py --no-fast                # 关闭快速搜索（视频模式下使用滑动窗口）
   python main.py --save-docs               # 将效果图写入 docs/lane_detection/images
+  python main.py --save-docs               # 将效果图写入 docs/lane_detection/images
 """
 import argparse
 
@@ -31,6 +32,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         choices=["basic", "hsv", "advanced", "video", "compare"],
+        choices=["basic", "hsv", "advanced", "video"],
         default="basic",
         help="basic=灰度+Canny+霍夫；hsv=黄白线提取+多车道拟合；"
              "advanced=透视变换+滑动窗口+多项式拟合；"

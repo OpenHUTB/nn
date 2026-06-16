@@ -553,7 +553,14 @@ def main():
                     control.throttle = 0.12
                     control.brake = 0.0
 
+
                 vehicle.apply_control(control)
+                # ===== 全自动前照灯控制（程序自主完成，无需人工操作）=====
+                sun_alt = world.get_weather().sun_altitude_angle
+                if sun_alt < 15:
+                    vehicle.set_light_state(carla.VehicleLightState.LowBeam)
+                elif sun_alt > 20:
+                    vehicle.set_light_state(carla.VehicleLightState.NONE)
 
             # Render
             if image_surface[0] is not None:

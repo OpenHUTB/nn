@@ -1,18 +1,19 @@
 """
-test_env.py — 第6次提交完整测试脚本
-===============================
+tests/test_all.py — Carla 2D DeepRL 完整测试套件
+=============================================
 测试覆盖：
-  1) 独立配置文件导入验证
-  2) 不同观测尺寸（动态修改）
-  3) 天气预设切换
-  4) 地图切换
-  5) 渲染/fast/debug 开关分离
-  6) 奖励系数配置验证
-  7) 自定义 reward_config 传入
-  8) 环境 reset/step/close 完整流程
+  0) 独立配置文件导入验证
+  1) 不同观测尺寸（动态修改）
+  2) 天气预设切换
+  3) 地图切换
+  4) 渲染/fast/debug 开关分离
+  5) 奖励系数配置验证
+  6) 自定义 reward_config 传入
+  7) 环境 reset/step/close 完整流程
 
 运行方式：
-  python test_env.py
+  python -m tests.test_all          # 正式运行
+  python main.py test               # 通过主入口运行
 
 前提条件：
   - Carla 服务器正在运行（localhost:2000）
@@ -22,11 +23,12 @@ test_env.py — 第6次提交完整测试脚本
 import carla
 import sys
 import copy
+import time
 import logging
 
-# 设置日志级别
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
+
 
 # ============================================================
 # 测试 0：配置导入验证
@@ -84,6 +86,7 @@ def test_obs_size(client):
             f"{size['name']}: 期望 {expected_shape}, 实际 {obs.shape}"
 
         env.close()
+        time.sleep(0.2)  # 让 Carla 释放 streaming 资源
         logger.info(f"✅ 观测尺寸 {size['name']} 正常")
 
 
@@ -105,11 +108,11 @@ def test_weather_presets(client):
             "weather": WEATHER_PRESETS[wname]
         }, debug=False)
 
-        # 验证天气设置生效
         env.reset()
         world_weather = env.mw.world.get_weather()
         logger.info(f"  天气 {wname}: sun_altitude={world_weather.sun_altitude_angle:.1f}")
         env.close()
+        time.sleep(0.2)
         logger.info(f"✅ 天气 {wname} 设置正常")
 
 
@@ -150,7 +153,6 @@ def test_switches(client):
     # 4a) render=False + fast=True + debug=False（训练模式）
     cfg_train = copy.deepcopy(CONFIG)
     cfg_train["render"] = False
-    cfg_train["fast"] = True
     env_train = CarlaEnv(client, cfg_train, world_config={
         "render": False, "fast": True, "town": "Town02"
     }, debug=False)
@@ -158,6 +160,7 @@ def test_switches(client):
     assert obs is not None
     logger.info("✅ 训练模式 (render=False, fast=True, debug=False) 正常")
     env_train.close()
+    time.sleep(0.2)
 
     # 4b) render=True + fast=False + debug=True（调试模式）
     cfg_debug = copy.deepcopy(CONFIG)
@@ -169,6 +172,7 @@ def test_switches(client):
     assert obs is not None
     logger.info("✅ 调试模式 (render=True, fast=False, debug=True) 正常")
     env_debug.close()
+    time.sleep(0.2)
 
     # 4c) render=False + fast=False + debug=False（离线基准）
     cfg_offline = copy.deepcopy(CONFIG)
@@ -196,12 +200,14 @@ def test_reward_config(client):
     }, debug=False)
     assert env_default.reward_config == REWARD_CONFIG
     logger.info("✅ 默认奖励配置加载正常")
+    env_default.close()
+    time.sleep(0.2)
 
     # 5b) 自定义奖励配置
     custom_reward = copy.deepcopy(REWARD_CONFIG)
-    custom_reward["lane_center_reward"] = 1.0   # 加强车道中心奖励
-    custom_reward["speed_reward_scale"] = 0.05   # 提高速度奖励
-    custom_reward["stuck_penalty"] = 200.0        # 加重卡住惩罚
+    custom_reward["lane_center_reward"] = 1.0
+    custom_reward["speed_reward_scale"] = 0.05
+    custom_reward["stuck_penalty"] = 200.0
 
     env_custom = CarlaEnv(client, CONFIG, reward_config=custom_reward, world_config={
         "render": False, "fast": True, "town": "Town02"
@@ -209,9 +215,6 @@ def test_reward_config(client):
     assert env_custom.reward_config["lane_center_reward"] == 1.0
     assert env_custom.reward_config["stuck_penalty"] == 200.0
     logger.info("✅ 自定义奖励配置传入正常")
-
-    # 清理
-    env_default.close()
     env_custom.close()
 
 
@@ -226,17 +229,16 @@ def test_full_workflow(client):
         "render": False, "fast": True, "town": "Town02"
     }, debug=False)
 
-    # 重置
     obs = env.reset()
     assert obs is not None, "Reset 返回 None"
 
-    # 执行 20 步
     total_reward = 0.0
     for step_idx in range(20):
-        action = step_idx % 3  # 轮换 0/1/2 动作
+        action = step_idx % 3
         obs, reward, done, info = env.step(action)
         total_reward += reward
-        logger.debug(f"  Step {step_idx + 1}: action={action}, reward={reward:.4f}, done={done}")
+        if (step_idx + 1) % 5 == 0:
+            logger.info(f"  Step {step_idx + 1}/20, total_reward={total_reward:.2f}")
         if done:
             logger.info(f"  第 {step_idx + 1} 步结束 (reward={total_reward:.2f})")
             break
@@ -252,7 +254,7 @@ def test_full_workflow(client):
 # ============================================================
 def run_all_tests():
     print("=" * 60)
-    print("  min-carla-env 第6次提交 · 完整测试")
+    print("  min-carla-env 完整测试")
     print("=" * 60)
     print()
 

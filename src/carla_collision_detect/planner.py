@@ -23,14 +23,19 @@ class LanePlanner:
         self.Ki = 0.02  
         self.Kd = 0.2   
 
-    def get_lateral_control(self, current_dist, current_speed_kmh, obstacle_side=None, is_following=False, target_class=None):
+    def get_lateral_control(self, current_dist, current_speed_kmh, obstacle_side=None, is_following=False, target_class=None, left_blocked=False, right_blocked=False):
         """
         核心：全时车道保持 (LKA) + 自动变道 (ALC)
         """
         trigger_dist = 35.0
         current_time = time.time()
         curr_wp = self.map.get_waypoint(self.ego_vehicle.get_location())
-        
+        if self.is_changing_lane:
+            if (self.target_lane_dir == 'right' and right_blocked) or \
+               (self.target_lane_dir == 'left' and left_blocked):
+                self.is_changing_lane = False
+                self.cooldown_end_time = current_time + 2.0
+
         # 1. 障碍物触发变道
         if not self.is_changing_lane and current_dist < trigger_dist and current_speed_kmh > 10 and current_time > self.cooldown_end_time and not is_following and target_class != "person":
             left_wp = curr_wp.get_left_lane()
@@ -39,25 +44,40 @@ class LanePlanner:
             can_change_right = curr_wp.lane_change in [carla.LaneChange.Right, carla.LaneChange.Both]
             can_change_left = curr_wp.lane_change in [carla.LaneChange.Left, carla.LaneChange.Both]
             
-            can_go_right = right_wp and right_wp.lane_type == carla.LaneType.Driving and can_change_right
-            can_go_left = left_wp and left_wp.lane_type == carla.LaneType.Driving and can_change_left
+            can_go_right = right_wp and right_wp.lane_type == carla.LaneType.Driving and can_change_right and not right_blocked
+            can_go_left = left_wp and left_wp.lane_type == carla.LaneType.Driving and can_change_left and not left_blocked
             
             # 核心逻辑：障碍物在左侧，优先往右躲；障碍物在右侧，优先往左躲
             first_choice = 'right' if obstacle_side == 'left' else 'left'
             
             if first_choice == 'right' and can_go_right:
-                print("\033[92m🚀执行【向右】变道避让...\033[0m")
+                print("\033[92m🚀 执行【向右】变道避让...\033[0m")
                 self.is_changing_lane = True
                 self.target_lane_id = right_wp.lane_id
                 self.target_lane_dir = 'right'
             elif first_choice == 'left' and can_go_left:
-                print("\033[92m🚀执行【向左】变道避让...\033[0m")
+                print("\033[92m🚀 执行【向左】变道避让...\033[0m")
                 self.is_changing_lane = True
                 self.target_lane_id = left_wp.lane_id
                 self.target_lane_dir = 'left'
-                
+            elif can_go_right: # 首选向左但被封，退而求其次向右
+                print("\033[93m⚠️ 左侧封锁，改为【向右】变道...\033[0m")
+                self.is_changing_lane = True
+                self.target_lane_id = right_wp.lane_id
+                self.target_lane_dir = 'right'
+            elif can_go_left: # 首选向右但被封，退而求其次向左
+                print("\033[93m⚠️ 右侧封锁，改为【向左】变道...\033[0m")
+                self.is_changing_lane = True
+                self.target_lane_id = left_wp.lane_id
+                self.target_lane_dir = 'left'
+            else:
+                if not getattr(self, 'print_block_warning', False):
+                    print("\033[91m🚨 侧方被封锁，无法变道！准备紧急制动！\033[0m")
+                    self.print_block_warning = True    
+
             if self.is_changing_lane:
                 self.lat_error_sum = 0.0  # 清空历史误差
+                self.print_block_warning = False
                 
         return self._calculate_steer(curr_wp)
 
