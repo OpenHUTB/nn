@@ -85,8 +85,7 @@ def main(args):
 
         traffic_manager = client.get_trafficmanager()
         traffic_manager.set_synchronous_mode(True)
-        # 新增：全局提速指令。负数表示超过限速的百分比（-30.0 = 提速 30%）
-        traffic_manager.global_percentage_speed_difference(-30.0)
+
         # Reset simulation if car is stuck
         # Reset simulation if car is stuck
         def reset():
@@ -107,8 +106,7 @@ def main(args):
                     actor_list_local, walkers_list_local, all_id = world_utils.spawn_actors(client, world, args.num_vehicles, args.num_walkers)
                     vehicle = actor_list_local[0]
             
-                    # 新增：动态传入 args.camera_mode 
-                    sensor_list_local, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle, camera_mode=args.camera_mode)
+                    sensor_list_local, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle)
                     camera = sensor_list_local[0]
             
                     spawn_success = True # 全部成功才退出循环
@@ -312,23 +310,17 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_vehicles',
         type=int,
-        default=35,
+        default=70,
         help="Number of vehicles spawned in simulation"
     )
 
     parser.add_argument(
         '--num_walkers',
         type=int,
-        default=60,
+        default=150,
         help="Number of pedestrians spawned in simulation"
     )
-    parser.add_argument(
-        '--camera_mode',
-        type=str,
-        default='front',
-        choices=['front', 'bev'],
-        help="Camera viewpoint mode: 'front' for dashcam view, 'bev' for Bird's-Eye View (drone perspective)"
-    )
+
     parser.add_argument(
         '--constant_weather',
         action='store_true',

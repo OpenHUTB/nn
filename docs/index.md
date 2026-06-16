@@ -95,17 +95,7 @@ title: 主页
 
 [__机械臂仿真系统__](arm_sim.md) - 基于MuJoCo的机械臂仿真与功能优化
 
-<<<<<<< HEAD
 [__自动驾驶系统__](./auto_drive_system/auto_drive_system_README) - 基于强化学习的自动驾驶系统
-=======
-[__CARLA自动驾驶多场景仿真项目__](./DeFIX/docs/index.md)
-
-[__自动驾驶系统__](./auto_drive_system/auto_drive_system_README) - 基于强化学习的自动驾驶系统
-
-[__carla_2d_deeprl__](./carla_2d_deeprl/README.md) - 基于 CARLA 的极简 2D 深度强化学习自动驾驶环境。
-
-
->>>>>>> a5a22248cdfe7cc50f7bc1c7f2151be66c6f7644
 
 ## 控制  <span id="control"></span>
 
