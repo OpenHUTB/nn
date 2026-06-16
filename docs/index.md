@@ -73,6 +73,8 @@ title: 主页
 
 [__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
 
+[__YOLO数据生成器__](./carla-yolo-dataset-generator/README.md)
+
 [__基于自监督学习与PPO强化学习的自动驾驶仿真项目__](./autonomous_driving/README.md) - 基于CARLA的SSL+RL自动驾驶仿真系统
 
 [__YOLO数据生成器__](./carla-yolo-dataset-generator/README.md)
