@@ -74,7 +74,7 @@ def spawn_actors(client, world, num_vehicles, num_walkers):
     for i in range(num_walkers):
         spawn_point = carla.Transform()
         loc = world.get_random_location_from_navigation()
-        if (loc != None):
+        if loc is not None:
             spawn_point.location = loc
             spawn_points.append(spawn_point)
     # 2. we spawn the walker object
