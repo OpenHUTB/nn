@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 
 # NOTE: Modify this to the appropriate Carla server launch command depending on your method of installation
 # 优先读取环境变量，若未设置则回退到默认的 D 盘路径
+
 LAUNCH_STRING = os.getenv("CARLA_SERVER_PATH", r"D:\WindowsNoEditor\CarlaUE4.exe")
 
 def stop_carla_server():
