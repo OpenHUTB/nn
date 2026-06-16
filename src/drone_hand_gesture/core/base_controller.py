@@ -64,6 +64,11 @@ class BaseDroneController(ABC):
     def move_by_velocity(self, vx: float, vy: float, vz: float, duration: float = 0.5):
         pass
 
+    @abstractmethod
+    def return_home(self):
+        """一键紧急返航 - 立即飞回起飞点 (0, 0, 0) 并降落"""
+        pass
+
     def send_command(self, command: str, intensity: float = 1.0):
         self.logger.info(f"收到命令: {command}, 强度: {intensity}")
 
@@ -91,6 +96,8 @@ class BaseDroneController(ABC):
         elif command == "down":
             speed = self.config.get("drone.max_speed", 2.0) * intensity
             self.move_by_velocity(0, 0, speed)
+        elif command == "return_home":
+            self.return_home()
         elif command == "stop":
             self.move_by_velocity(0, 0, 0)
             self.state['armed'] = False

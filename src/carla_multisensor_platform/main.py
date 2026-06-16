@@ -98,7 +98,9 @@ def main():
    # test_connection.run()
     colorama.init()
     InfoLogger = Logger()
-    
+    # 添加自动驾驶模式开关（放在这里，其他初始化之前）
+    autopilot_enabled = False
+    print("控制说明：WASD/方向键 | C:定速巡航 | P:自动驾驶 | R:录制 | ESC:退出")
     # Initialize environment
     CarlaEnv = CarlaEnvironment(world_map='Town10HD', timeout=10.0)
     world, traffic_manager = CarlaEnv.setup_carla_environment()
@@ -200,11 +202,30 @@ def main():
                     elif event.key == pygame.K_s:  # Show recording status with 'S' key
                         status = data_recorder.get_recording_status()
                         print(f'\nRecording Status: {status}')
-
+                    elif event.key == pygame.K_p:  # 自动驾驶模式（新增）
+                        autopilot_enabled = not autopilot_enabled
+                        ego_vehicle.set_autopilot(autopilot_enabled)
+                        if autopilot_enabled:
+                          # 自动驾驶模式下手动控制无效
+                          ego_control.controller.throttle = 0.0
+                          ego_control.controller.steer = 0.0
+                          ego_control.controller.brake = 0.0
+                          ego_vehicle.apply_control(ego_control.controller)
+                        print(f"自动驾驶模式 {'开启' if autopilot_enabled else '关闭'}")
             # Update ego vehicle control
+            if not autopilot_enabled:
+                 # 手动模式：使用你的控制器
+                 ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
+            else:
+                 # 自动驾驶模式：CARLA 自动控制，无需额外操作
+                 pass
             # 更新 ego vehicle control（传入障碍物距离）
-            ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
-            
+            if not autopilot_enabled:
+                # 手动模式：使用你的控制器
+                ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
+            else:
+                # 自动驾驶模式：CARLA 自动控制，无需额外操作
+                pass
             # Update data recorder with current vehicle state
             data_recorder.update_vehicle_state(ego_vehicle)
             data_recorder.update_control_signals(

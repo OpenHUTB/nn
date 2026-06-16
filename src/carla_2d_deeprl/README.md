@@ -1,4 +1,5 @@
 # carla_2d_deeprl
+
 A minimal 2D CARLA environment for deep reinforcement learning research.
 
 ## 项目简介
@@ -13,3 +14,7 @@ A minimal 2D CARLA environment for deep reinforcement learning research.
 
 ## 参考
 参考项目：[mcemilg/min-carla-env](https://github.com/mcemilg/min-carla-env)
+
+## 文档
+
+完整文档查看 [/docs/carla_2d_deeprl/README.md](/docs/carla_2d_deeprl/README.md) 
