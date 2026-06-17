@@ -32,7 +32,7 @@ params = {
     'lidar_max_range': 50.0,  # Maximum LIDAR perception range (meters)
     'max_nearby_vehicles': 5,  # Maximum number of nearby vehicles to observe
 }
- 
+
 # Create the environment
 env = gym.make('carla-v0', params=params)
 obs = env.reset()
