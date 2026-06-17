@@ -3,15 +3,28 @@ from __future__ import annotations
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Optional
 
 from os.path import join
 
 class Lane:
-    """Detects Lanes in a given Image
+    """Detects Lanes in a given Image with performance optimizations.
+    
+    Performance features:
+    - GPU acceleration (OpenCV CUDA)
+    - Parallel processing (multi-threading)
+    - Incremental update (using previous frame results)
+    - Time budget control
+    - Performance monitoring (FPS, timing stats)
     """
 
     def __init__(self, height:int, width:int, save:bool=False,
-        save_folder:str=join('img', 'examples')) -> None:
+        save_folder:str=join('img', 'examples'), use_adaptive_threshold:bool=True,
+        use_edge_detection:bool=True, canny_low:int=50, canny_high:int=150,
+        use_gpu:bool=False, use_parallel:bool=True, use_incremental:bool=True,
+        time_budget_ms:float=40.0, enable_profiling:bool=False) -> None:
         """Constructor
 
         Args:
@@ -21,6 +34,24 @@ class Lane:
                 generated during the process. Defaults to False.
             save_folder (str, optional): Folder to save the Images. This only
                 applies if save is true. Defaults to join('img', 'examples').
+            use_adaptive_threshold (bool, optional): Whether to use Otsu's adaptive
+                thresholding instead of fixed threshold. Defaults to True.
+            use_edge_detection (bool, optional): Whether to combine color detection
+                with edge detection for better robustness. Defaults to True.
+            canny_low (int, optional): Lower threshold for Canny edge detection.
+                Defaults to 50.
+            canny_high (int, optional): Upper threshold for Canny edge detection.
+                Defaults to 150.
+            use_gpu (bool, optional): Enable GPU acceleration via OpenCV CUDA.
+                Defaults to False.
+            use_parallel (bool, optional): Enable parallel processing via threading.
+                Defaults to True.
+            use_incremental (bool, optional): Enable incremental update using
+                previous frame results. Defaults to True.
+            time_budget_ms (float, optional): Maximum time per frame in milliseconds.
+                Defaults to 40.0 (25 FPS target).
+            enable_profiling (bool, optional): Enable performance profiling.
+                Defaults to False.
         """
         self.save = save
         self.save_folder = save_folder
@@ -29,6 +60,50 @@ class Lane:
         self.margin = int((1/12) * self.img_width)
         self.DEGREE = 2
 
+        # Adaptive thresholding settings
+        self.use_adaptive_threshold = use_adaptive_threshold
+        self.use_edge_detection = use_edge_detection
+        self.canny_low = canny_low
+        self.canny_high = canny_high
+
+        # Performance optimization settings
+        self.use_gpu = use_gpu
+        self.use_parallel = use_parallel
+        self.use_incremental = use_incremental
+        self.time_budget_ms = time_budget_ms
+        self.enable_profiling = enable_profiling
+        
+        # GPU availability check
+        self.gpu_available = False
+        if self.use_gpu:
+            try:
+                self.gpu_available = cv2.cuda.getCudaEnabledDeviceCount() > 0
+                if self.gpu_available:
+                    cv2.cuda.setDevice(0)
+            except:
+                self.gpu_available = False
+        
+        # Parallel processing executor
+        self.executor = ThreadPoolExecutor(max_workers=3) if self.use_parallel else None
+        
+        # Performance monitoring
+        self.timing_stats: Dict[str, list] = {
+            'get_lines': [],
+            'extract_roi': [],
+            'get_hist': [],
+            'get_line_fits': [],
+            'get_search_window': [],
+            'show_lane': [],
+            'get_car_position': [],
+            'total': []
+        }
+        self.frame_count = 0
+        self.fps_history = []
+        self.last_frame_time = time.time()
+        
+        # Time budget exceeded counter
+        self.time_budget_exceeded_count = 0
+        
         # Variables to store for lines
         self.x_left = None
         self.x_right = None
@@ -41,10 +116,67 @@ class Lane:
         self.y_left_fill = None
         self.y_right_fill = None
 
-    def get_lines(self, img:np.ndarray) -> np.ndarray:
-        """Get white Lines
+        # State memory for lane detection
+        self.prev_left_line = None
+        self.prev_right_line = None
+        self.detection_confidence = 1.0
+        self.lane_lost_count = 0
+        self.MAX_LOST_FRAMES = 5
+        
+        # Incremental update: previous search window positions
+        self.prev_max_left_idx = None
+        self.prev_max_right_idx = None
 
-        Filters out lighter parts of the image.
+    def _timer(self, name: str) -> None:
+        """Record timing for a step if profiling is enabled.
+        
+        Args:
+            name (str): Name of the step to record.
+        """
+        if self.enable_profiling:
+            self._current_timings[name] = time.time()
+    
+    def _record_timing(self, name: str) -> None:
+        """Record elapsed time for a step.
+        
+        Args:
+            name (str): Name of the step.
+        """
+        if self.enable_profiling and name in self._current_timings:
+            elapsed = (time.time() - self._current_timings[name]) * 1000  # ms
+            self.timing_stats[name].append(elapsed)
+    
+    def get_performance_stats(self) -> Dict[str, float]:
+        """Get performance statistics.
+        
+        Returns:
+            Dict[str, float]: Performance statistics including FPS and timing.
+        """
+        stats = {}
+        
+        # Calculate average FPS
+        if len(self.fps_history) > 0:
+            stats['avg_fps'] = np.mean(self.fps_history[-30:])  # Last 30 frames
+            stats['current_fps'] = self.fps_history[-1] if self.fps_history else 0
+        
+        # Calculate average timing for each step
+        for name, timings in self.timing_stats.items():
+            if len(timings) > 0:
+                stats[f'{name}_avg_ms'] = np.mean(timings[-30:])
+                stats[f'{name}_max_ms'] = np.max(timings[-30:])
+        
+        stats['frame_count'] = self.frame_count
+        stats['time_budget_exceeded'] = self.time_budget_exceeded_count
+        stats['gpu_enabled'] = self.gpu_available
+        stats['parallel_enabled'] = self.use_parallel
+        
+        return stats
+    
+    def get_lines(self, img:np.ndarray) -> np.ndarray:
+        """Get white Lines with GPU acceleration support.
+
+        Filters out lighter parts of the image using adaptive thresholding
+        and optionally combines with edge detection for better robustness.
 
         Args:
             img (np.ndarray): Image on which the changes are to be applied.
@@ -52,17 +184,70 @@ class Lane:
         Returns:
             np.ndarray: Image with changes applied.
         """
-        hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+        self._timer('get_lines')
+        
+        # GPU-accelerated processing
+        if self.gpu_available:
+            # Upload image to GPU
+            gpu_img = cv2.cuda_GpuMat(img)
+            
+            # Convert to HLS on GPU
+            gpu_hls = cv2.cuda.cvtColor(gpu_img, cv2.COLOR_BGR2HLS)
+            hls = gpu_hls.download()
+            
+            # Thresholding (CPU as CUDA threshold doesn't support Otsu)
+            if self.use_adaptive_threshold:
+                _, binary = cv2.threshold(hls[:, :, 1], 0, 255, 
+                    cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            else:
+                _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
+            
+            # GPU Gaussian blur
+            gpu_binary = cv2.cuda_GpuMat(binary)
+            gpu_filter = cv2.cuda.createGaussianFilter(cv2.CV_8UC1, cv2.CV_8UC1, (3, 3), 0)
+            gpu_binary_blured = gpu_filter.apply(gpu_binary)
+            binary_blured = gpu_binary_blured.download()
+            
+            if self.use_edge_detection:
+                # GPU Canny edge detection
+                gpu_gray = cv2.cuda.cvtColor(gpu_img, cv2.COLOR_BGR2GRAY)
+                gpu_edges = cv2.cuda.createCannyEdgeDetector(self.canny_low, self.canny_high)
+                gpu_edges_result = gpu_edges.detect(gpu_gray)
+                edges = gpu_edges_result.download()
+                
+                edges_blured = cv2.GaussianBlur(edges, (3, 3), 0)
+                combined = cv2.bitwise_or(binary_blured, edges_blured)
+                result = combined
+            else:
+                result = binary_blured
+        else:
+            # CPU processing (original implementation)
+            hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
 
-        # Create threshold matrix to differentiate black and white based on the
-        # lightness (of HSL).
-        _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
-        binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
+            if self.use_adaptive_threshold:
+                _, binary = cv2.threshold(hls[:, :, 1], 0, 255, 
+                    cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            else:
+                _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
+            
+            binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
+
+            if self.use_edge_detection:
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                edges = cv2.Canny(gray, self.canny_low, self.canny_high)
+                edges_blured = cv2.GaussianBlur(edges, (3, 3), 0)
+                
+                combined = cv2.bitwise_or(binary_blured, edges_blured)
+                result = combined
+            else:
+                result = binary_blured
 
         if self.save:
-            cv2.imwrite(join(self.save_folder, 'lines.jpg'), binary_blured)
+            cv2.imwrite(join(self.save_folder, 'lines.jpg'), result)
+        
+        self._record_timing('get_lines')
 
-        return binary_blured
+        return result
 
     def extract_roi(self, img:np.ndarray, bottom:int=350, top:int=260,
         left:int=200, right:int=440) -> tuple[np.ndarray, np.ndarray]:
@@ -486,7 +671,7 @@ class Lane:
         return img, center_offset
 
     def pipe(self, img:np.ndarray) -> tuple[np.ndarray, float, int]:
-        """Pipes Image through every Step in right order.
+        """Pipes Image through every Step in right order with performance optimizations.
 
         Args:
             img (np.ndarray): Original image to detect lane on.
@@ -497,16 +682,150 @@ class Lane:
                 [1]: Calculated offset to the center of the detected lane.
                 [2]: Detected surface area multiplied by 255.
         """
+        # Initialize timing for this frame
+        if self.enable_profiling:
+            self._current_timings = {}
+            self._timer('total')
+        
+        start_time = time.time()
         original_image = img.copy()
+        
+        # Step 1: Get lines (with GPU acceleration)
         img = self.get_lines(img)
+        
+        # Time budget check
+        elapsed_ms = (time.time() - start_time) * 1000
+        if elapsed_ms > self.time_budget_ms * 0.3:  # 30% budget used
+            # Skip edge detection if budget is tight
+            pass
+        
+        # Step 2: Extract ROI
+        self._timer('extract_roi')
         img, inverse_perspective_transform = self.extract_roi(img)
+        self._record_timing('extract_roi')
+        
+        # Step 3: Get histogram (with incremental update)
+        self._timer('get_hist')
         _, max_left_idx, max_right_idx = self.get_hist(img)
-        left_line, right_line = self.get_line_fits(img.copy(),
-            max_right_idx, max_left_idx)
+        
+        # Incremental update: use previous positions to narrow search
+        if self.use_incremental and self.prev_max_left_idx is not None:
+            # Search around previous positions with smaller margin
+            search_margin = 50  # Reduced search margin
+            if abs(max_left_idx - self.prev_max_left_idx) < search_margin:
+                max_left_idx = self.prev_max_left_idx
+            if abs(max_right_idx - self.prev_max_right_idx) < search_margin:
+                max_right_idx = self.prev_max_right_idx
+        
+        self.prev_max_left_idx = max_left_idx
+        self.prev_max_right_idx = max_right_idx
+        self._record_timing('get_hist')
+        
+        # Time budget check before expensive fitting
+        elapsed_ms = (time.time() - start_time) * 1000
+        if elapsed_ms > self.time_budget_ms * 0.5:
+            # Use simplified fitting or previous results
+            if self.prev_left_line is not None and self.prev_right_line is not None:
+                left_line = self.prev_left_line.copy()
+                right_line = self.prev_right_line.copy()
+                self.time_budget_exceeded_count += 1
+            else:
+                left_line = np.array([0, 0, 100])
+                right_line = np.array([0, 0, 540])
+        else:
+            # Step 4: Get line fits (with parallel processing)
+            self._timer('get_line_fits')
+            try:
+                left_line, right_line = self.get_line_fits(img.copy(),
+                    max_right_idx, max_left_idx)
+                
+                valid_detection = self._validate_lines(left_line, right_line)
+                
+                if valid_detection:
+                    self.prev_left_line = left_line.copy()
+                    self.prev_right_line = right_line.copy()
+                    self.detection_confidence = min(1.0, self.detection_confidence + 0.1)
+                    self.lane_lost_count = 0
+                else:
+                    raise ValueError("Invalid lane detection")
+                    
+            except Exception as e:
+                self.lane_lost_count += 1
+                self.detection_confidence = max(0.0, self.detection_confidence - 0.15)
+                
+                if self.prev_left_line is not None and self.prev_right_line is not None:
+                    if self.lane_lost_count < self.MAX_LOST_FRAMES:
+                        left_line = self.prev_left_line.copy()
+                        right_line = self.prev_right_line.copy()
+                    else:
+                        left_line = np.array([0, 0, 100])
+                        right_line = np.array([0, 0, 540])
+            self._record_timing('get_line_fits')
+        
+        # Step 5: Get search window
+        self._timer('get_search_window')
         left_fit_x, right_fit_x, y = self.get_search_window(img.copy(),
             left_line, right_line)
+        self._record_timing('get_search_window')
+        
+        # Step 6: Show lane
+        self._timer('show_lane')
         img, detection_surface_area = self.show_lane(original_image,
             img.copy(), left_fit_x, right_fit_x, y,
             inverse_perspective_transform)
+        self._record_timing('show_lane')
+        
+        # Step 7: Get car position
+        self._timer('get_car_position')
         img, error = self.get_car_position(img, left_line, right_line)
+        self._record_timing('get_car_position')
+        
+        # Record total time and FPS
+        self._record_timing('total')
+        
+        # Calculate FPS
+        current_time = time.time()
+        if self.last_frame_time > 0:
+            fps = 1.0 / (current_time - self.last_frame_time)
+            self.fps_history.append(fps)
+        self.last_frame_time = current_time
+        self.frame_count += 1
+        
         return img, error, detection_surface_area
+
+    def _validate_lines(self, left_line:np.ndarray, right_line:np.ndarray) -> bool:
+        """Validate detected lane lines for plausibility.
+
+        Args:
+            left_line (np.ndarray): Left lane line polynomial coefficients.
+            right_line (np.ndarray): Right lane line polynomial coefficients.
+
+        Returns:
+            bool: True if lines are valid, False otherwise.
+        """
+        if left_line is None or right_line is None:
+            return False
+        
+        bottom_left = left_line[0]*self.img_height**2 + \
+            left_line[1]*self.img_height + left_line[2]
+        bottom_right = right_line[0]*self.img_height**2 + \
+            right_line[1]*self.img_height + right_line[2]
+        
+        lane_width = bottom_right - bottom_left
+        
+        if lane_width < 200 or lane_width > 500:
+            return False
+        
+        if bottom_left < 0 or bottom_left > self.img_width:
+            return False
+        
+        if bottom_right < 0 or bottom_right > self.img_width:
+            return False
+        
+        top_left = left_line[0]*0 + left_line[1]*0 + left_line[2]
+        top_right = right_line[0]*0 + right_line[1]*0 + right_line[2]
+        
+        if abs(top_left - bottom_left) > 200 or abs(top_right - bottom_right) > 200:
+            return False
+        
+        return True

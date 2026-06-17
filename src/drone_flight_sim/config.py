@@ -17,7 +17,7 @@ class FlightConfig:
 
     # ==================== 飞行参数 ====================
     # 起飞高度（负值表示向上，AirSim 中 Z 轴向下为正）
-    TAKEOFF_HEIGHT = -5
+    TAKEOFF_HEIGHT = -10
     # 飞行速度，单位：米/秒
     FLIGHT_VELOCITY = 4
     # 最大飞行时间，单位：秒，超过此时间将强制结束飞行

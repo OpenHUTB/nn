@@ -11,6 +11,7 @@ from pynput import keyboard
 import threading
 # 导入时间模块
 import time
+import numpy as np
 
 # 全局变量，用于控制监听循环
 listener_running = True
@@ -192,6 +193,12 @@ class KeyboardController:
                 self.drone.emergency_stop()
                 listener_running = False
                 return False
+            
+             # ===== 新增：Y 键显示遥测面板 =====
+            key_char = key.char if hasattr(key, 'char') else None
+            if key_char == 'y' or key_char == 'Y':
+                self._show_telemetry_panel()
+                return
 
             # 空格键：悬停（停止当前移动并总结）
             if key == keyboard.Key.space:
@@ -342,6 +349,60 @@ class KeyboardController:
         self.drone.hover()
         print("✅ 环绕完成")
 
+    def _show_telemetry_panel(self):
+        """显示实时遥测面板"""
+        pos = self.drone.get_position()
+        state = self.drone.client.getMultirotorState()
+        vel = state.kinematics_estimated.linear_velocity
+        orientation = state.kinematics_estimated.orientation
+    
+        # 计算速度
+        speed = (vel.x_val**2 + vel.y_val**2 + vel.z_val**2) ** 0.5
+    
+        # 计算姿态角
+        pitch, roll, yaw = self._quaternion_to_euler(orientation)
+        yaw_deg = round(yaw * 180 / 3.14159, 1)
+        pitch_deg = round(pitch * 180 / 3.14159, 1)
+        roll_deg = round(roll * 180 / 3.14159, 1)
+    
+        # 获取碰撞状态
+        collision_info = self.drone.client.simGetCollisionInfo()
+    
+        # 速度档位名称
+        speed_names = ['慢', '中', '快', '很快', '极速']
+    
+        print("\n" + "─" * 50)
+        print("📊 实时遥测面板")
+        print("─" * 50)
+        print(f"  位置: X={pos.x_val:6.1f}m  Y={pos.y_val:6.1f}m  Z={pos.z_val:6.1f}m")
+        print(f"  高度: {abs(pos.z_val):5.1f}m")
+        print(f"  速度: {speed:5.1f} m/s  |  档位: {speed_names[self.speed_level]}")
+        print(f"  姿态: 俯仰={pitch_deg:+4.1f}°  滚转={roll_deg:+4.1f}°  偏航={yaw_deg:+4.1f}°")
+        print(f"  碰撞: {'⚠️ 是' if collision_info.has_collided else '✅ 否'}")
+        print(f"  当前移动: {self.current_movement or '悬停'}")
+        print("─" * 50 + "\n")
+
+    def _quaternion_to_euler(self, q):
+        """四元数转欧拉角"""
+        # 滚转 (roll)
+        sinr_cosp = 2 * (q.w_val * q.x_val + q.y_val * q.z_val)
+        cosr_cosp = 1 - 2 * (q.x_val * q.x_val + q.y_val * q.y_val)
+        roll = np.arctan2(sinr_cosp, cosr_cosp)
+    
+        # 俯仰 (pitch)
+        sinp = 2 * (q.w_val * q.y_val - q.z_val * q.x_val)
+        if abs(sinp) >= 1:
+            pitch = np.sign(sinp) * np.pi / 2
+        else:
+            pitch = np.arcsin(sinp)
+    
+        # 偏航 (yaw)
+        siny_cosp = 2 * (q.w_val * q.z_val + q.x_val * q.y_val)
+        cosy_cosp = 1 - 2 * (q.y_val * q.y_val + q.z_val * q.z_val)
+        yaw = np.arctan2(siny_cosp, cosy_cosp)
+    
+        return pitch, roll, yaw
+
     def start(self):
         """启动键盘监听
 
@@ -375,6 +436,7 @@ def print_control_help():
   🎮 功能键:
      空格      : 悬停（停止移动）
      1-5       : 切换速度档位（慢/中/快/很快/极速）
+     Y         : 显示实时遥测面板
      R         : 一键返航
      P         : 拍照
      T         : 拍摄所有图像(RGB+深度+分割)

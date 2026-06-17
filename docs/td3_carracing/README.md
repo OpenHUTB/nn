@@ -1,215 +1,377 @@
-# 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
+# 基于 TD3 + CNN 的强化学习自动驾驶系统
+
+本项目使用 TD3（Twin Delayed Deep Deterministic Policy Gradient）算法训练自动驾驶智能体，支持两类仿真环境：
+
+1. **Gymnasium CarRacing-v3**：轻量级二维赛车环境，适合快速验证 TD3 + CNN 视觉控制流程；
+2. **Carla 模拟器**：面向自动驾驶研究的三维高保真仿真环境，支持车辆传感器、地图、碰撞检测、车道入侵检测和多天气场景。
+
+项目代码采用模块化结构，将环境封装、视觉预处理、帧堆叠、动作平滑、奖励塑造、TD3 智能体、Actor/Critic 网络和训练入口拆分为独立文件，便于后续扩展到更复杂的自动驾驶任务。
+
+---
+
 ## 1 项目背景与研究动机
+
 ### 1.1 行业发展现状
-随着智能驾驶技术的发展，高维连续动作空间下的车辆控制策略优化成为核心问题。传统基于规则的方法在复杂环境下适应性不足，难以应对多变的道路场景和实时决策需求。因此，本项目旨在通过强化学习框架，构建一个可在仿真环境下自动学习驾驶策略的实验平台，为后续车辆自主决策、车路协同等研究提供基础支持。
+
+随着智能驾驶技术的发展，高维连续动作空间下的车辆控制策略优化成为核心问题。传统基于规则的方法在复杂环境下适应性不足，难以应对多变的道路场景和实时决策需求。因此，本项目旨在通过强化学习框架，构建一个可在仿真环境下自动学习驾驶策略的实验平台，为后续车辆自主决策、车路协同、多传感器融合等研究提供基础支持。
 
 ### 1.2 研究动机与目标
-强化学习（RL）凭借“试错-反馈-优化”的自主学习特性，成为解决连续动作空间控制问题的关键技术。本项目以 OpenAI Gymnasium 的 CarRacing-v2 仿真环境为载体，构建基于 TD3（Twin Delayed Deep Deterministic Policy Gradient）+ CNN 的自动驾驶强化学习系统，核心目标包括：
-- 突破传统规则驱动方法的局限性，实现复杂场景下的自适应驾驶策略；
-- 优化高维视觉输入（游戏画面）到连续动作输出的端到端映射，提升策略收敛速度与泛化能力；
-- 搭建模块化、可扩展的仿真实验平台，支持算法迭代、多场景测试与性能量化评估；
-- 为后续真实车辆的低层级控制（转向/油门/刹车）、多智能体交互、车路协同等研究提供可复用的技术框架。
 
-## 2 原有方案问题与不足
-传统规则驱动的驾驶控制方法和单策略强化学习在复杂环境中存在以下问题：
+强化学习（RL）凭借“试错—反馈—优化”的自主学习特性，适合解决连续动作空间控制问题。本项目以 `CarRacing-v3` 和 `Carla` 为实验环境，构建基于 TD3 + CNN 的自动驾驶强化学习系统，核心目标包括：
 
-| 问题类别 | 描述 |
-|----------|------|
-| **适应性差** | 规则驱动方法在非标准道路或动态环境下策略失效。 |
-| **训练收敛慢** | 单网络强化学习在高维状态空间下训练周期长。 |
-| **泛化能力弱** | 模型对未见场景或极端情况适应性不足。 |
-| **可扩展性有限** | 难以快速整合多模态信息或升级优化算法。 |
+- 实现从视觉输入到连续动作输出的端到端驾驶控制；
+- 使用 TD3 的双 Critic、目标策略平滑、延迟策略更新和软更新机制提升训练稳定性；
+- 将轻量级 CarRacing 环境中的训练流程迁移到 Carla 中，验证环境接口抽象和算法模块的复用性；
+- 为后续真实车辆低层级控制、多场景测试、多智能体交互和车路协同研究提供可扩展框架。
 
-本项目通过**分层模块化设计**、**算法改进**、**工程化优化**三大维度解决上述问题，提升系统的稳定性、效率与可扩展性。
+---
+
+## 2 项目代码结构
+
+```text
+src/td3_carracing/
+├── README.md
+├── requirements.txt
+├── main.py                         # Gymnasium CarRacing-v3 训练入口
+├── env_wrappers.py                 # CarRacing 环境封装：跳帧、图像预处理、帧堆叠、动作平滑、奖励塑造
+├── td3_agent.py                    # CarRacing 版本 TD3 智能体与经验回放
+├── td3_models.py                   # CarRacing 版本 Actor / Critic 网络
+├── run.png
+└── carla/
+    ├── README.md
+    ├── __init__.py
+    ├── main.py                     # Carla 训练 / 测试入口
+    ├── carla_env.py                # Carla Gym 风格环境适配器
+    ├── env_wrappers.py             # Carla 环境封装：跳帧、预处理、帧堆叠、动作平滑、奖励塑造
+    ├── td3_agent.py                # Carla 版本 TD3 智能体与经验回放
+    ├── td3_models.py               # Carla 版本 Actor / Critic 网络
+    └── weather_examples.py         # Carla 天气示例
+```
+
+---
 
 ## 3 整体技术架构
-系统采用“四层两总线”架构，层间通过标准化接口通信，总线负责数据流转与模块调度，具体分层如下：
 
-| 层级 | 核心功能 | 关键子模块 | 技术要点 |
-|------|----------|------------|----------|
-| **环境接口层** | 仿真环境封装、状态预处理、奖励工程、交互协议标准化 | 环境封装模块、状态预处理模块、奖励优化模块、交互接口模块 | 帧堆叠（Frame Stacking）、图像归一化、奖励加权平滑、环境重置/步进接口标准化 |
-| **智能体层** | 强化学习核心逻辑，包含策略生成、价值评估、经验管理 | TD3 策略网络、双价值网络、经验回放池、探索噪声生成模块 | CNN 特征提取、延迟策略更新（τ=0.005）、目标网络软更新、Ornstein-Uhlenbeck 噪声 |
-| **训练与推理层** | 训练流程控制、策略更新、模型管理、推理调度 | 训练循环模块、参数优化器、模型 checkpoint 管理、推理执行模块 | 批量采样、学习率衰减、早停机制、模型加载/保存标准化 |
-| **可视化与评估层** | 实时监控、日志记录、性能量化、结果可视化 | 实时渲染模块、日志采集模块、指标计算模块、可视化面板 | 奖励曲线实时绘制、动作分布热力图、episode 完成率统计、TensorBoard 集成 |
+系统采用“环境接口层—智能体层—训练与推理层—评估与扩展层”的分层设计。
+
+| 层级 | 核心功能 | 对应代码 |
+|---|---|---|
+| 环境接口层 | 将 Gymnasium / Carla 环境统一为 `reset()`、`step(action)`、`observation_space`、`action_space` 接口 | [env_wrappers.py](../../src/td3_carracing/env_wrappers.py)、[carla/carla_env.py](../../src/td3_carracing/carla/carla_env.py)、[carla/env_wrappers.py](../../src/td3_carracing/carla/env_wrappers.py) |
+| 智能体层 | 策略生成、价值评估、经验回放、目标网络更新 | [td3_agent.py](../../src/td3_carracing/td3_agent.py)、[carla/td3_agent.py](../../src/td3_carracing/carla/td3_agent.py) |
+| 网络模型层 | CNN 图像编码、Actor 连续动作输出、双 Critic Q 值估计 | [td3_models.py](../../src/td3_carracing/td3_models.py)、[carla/td3_models.py](../../src/td3_carracing/carla/td3_models.py) |
+| 训练与推理层 | episode 循环、探索噪声、模型保存 / 加载、训练和测试切换 | [main.py](../../src/td3_carracing/main.py)、[carla/main.py](../../src/td3_carracing/carla/main.py) |
+| 扩展层 | Carla 地图、天气、传感器、碰撞和车道入侵信息扩展 | [carla/carla_env.py](../../src/td3_carracing/carla/carla_env.py)、[carla/weather_examples.py](../../src/td3_carracing/carla/weather_examples.py) |
+
+项目整体执行流程如下：
+<p float="left">
+   <img src="0.png" width="60%" />
+</p>
+
+---
 
 ## 4 核心理论基础
+
 ### 4.1 TD3 算法核心原理
-TD3 是 DDPG 的改进版，针对“价值过估计”和“训练不稳定”问题优化，核心机制包括：
-- **双价值网络**：构建两个独立的 Q 网络（Q1、Q2），取最小值计算目标 Q 值，降低过估计风险；
-- **延迟策略更新**：价值网络每步更新，策略网络每 2 步更新，减少策略震荡；
-- **目标动作噪声**：在目标动作上添加小幅度噪声并裁剪，提升策略鲁棒性；
-- **目标网络软更新**：采用软更新（τ=0.005）替代硬更新，避免参数突变。
 
-### 4.2 CNN 用于视觉状态特征提取
-CarRacing 环境的原始输入是 96×96×3 的 RGB 图像，通过 CNN 提取空间特征：
-- 卷积层：3 层卷积（64×64→32×32→16×16→8×8），提取边缘、纹理、车道线等关键特征；
-- 池化层：最大池化（2×2），降低参数维度；
-- 全连接层：将卷积特征映射为 256 维向量，作为策略/价值网络的输入。
+TD3 是 DDPG 的改进版本，主要用于连续动作空间控制任务。项目中的 TD3 智能体主要包括以下机制：
 
-### 4.3 经验回放机制优化
-采用**优先级经验回放（PER）** 替代随机采样：
-- 基于 TD 误差为经验分配优先级，误差越大的经验（学习价值越高）采样概率越高；
-- 引入β参数（从 0.4 线性增长到 1.0）平衡采样偏差，保证训练稳定性。
+- **双 Critic 网络**：分别估计 `Q1(s,a)` 和 `Q2(s,a)`，训练目标取较小值，缓解 Q 值过估计问题；
+- **延迟 Actor 更新**：Critic 更新更频繁，Actor 每隔若干次 Critic 更新后再更新，降低策略震荡；
+- **目标策略平滑**：计算目标动作时加入裁剪后的噪声，提升策略对动作扰动的鲁棒性；
+- **目标网络软更新**：使用 `tau` 对 Actor / Critic 的目标网络进行指数滑动更新。
 
-### 4.4 奖励工程理论
-原始奖励仅反映“前进距离”，通过以下规则优化：
-- 正向奖励：前进距离（基础）+ 车道中心偏移量（越小奖励越高）+ 匀速行驶（速度稳定奖励加成）；
-- 惩罚项：碰撞边界（大幅扣减）+ 频繁转向（小幅扣减）+ 刹车滥用（小幅扣减）；
-- 奖励归一化：将奖励缩放到 [-1, 1] 区间，避免梯度爆炸。
+实现位置：
 
-## 5 整体设计思路
-系统设计遵循**模块化、可扩展、高性能、可解释**四大原则，具体思路如下：
+- CarRacing 版本 TD3 训练逻辑：[td3_agent.py](../../src/td3_carracing/td3_agent.py)
+- Carla 版本 TD3 训练逻辑：[carla/td3_agent.py](../../src/td3_carracing/carla/td3_agent.py)
 
-### 5.1 状态表示优化
-- **多粒度特征融合**：同时输入原始图像（CNN 提取）和手工特征（车速、车道偏移量），兼顾端到端学习和先验知识；
-- **状态归一化**：图像像素归一化到 [0,1]，手工特征归一化到 [-1,1]，提升网络收敛速度；
-- **帧堆叠**：拼接连续 4 帧图像，捕捉车速、转向等时序信息，解决单帧图像无运动信息的问题。
+### 4.2 CNN 视觉状态特征提取
 
-### 5.2 策略训练优化
-- **算法改进**：TD3 基础上引入 PER、动态噪声（训练初期噪声大，后期逐步减小）；
-- **训练调度**：采用“预热+正式训练”阶段，预热阶段（前 1000 步）随机采样动作填充经验池，正式训练阶段启用策略网络；
-- **超参数自适应**：学习率随训练步数衰减（初始 1e-3，每 1000 episode 衰减 10%），批量大小动态调整（根据 GPU 显存自动选择 64/128）。
+原始环境观测为图像输入。项目先通过环境封装完成灰度化、缩放、归一化和帧堆叠，再送入 Actor / Critic 中的 CNN 编码器提取视觉特征。
 
-### 5.3 训练效率优化
-- **硬件加速**：基于 PyTorch 实现 GPU 加速，支持多卡并行训练；
-- **经验池优化**：采用环形缓冲区存储经验，避免内存碎片，支持离线加载/保存经验池；
-- **早停机制**：当连续 100 episode 平均奖励达到阈值（如 900），自动终止训练，减少无效迭代。
+实现位置：
 
-### 5.4 系统可解释性与可视化
-- **动作可视化**：实时绘制转向、油门、刹车的数值曲线，分析策略决策逻辑；
-- **特征可视化**：通过 Grad-CAM 可视化 CNN 关注的图像区域（如车道线、边界），解释网络决策依据；
-- **性能量化**：定义核心指标（episode 完成率、平均奖励、碰撞次数、车道偏移均值），生成量化报告。
+- CarRacing 图像预处理与帧堆叠：[env_wrappers.py](../../src/td3_carracing/env_wrappers.py)
+- Carla 图像预处理与帧堆叠：[carla/env_wrappers.py](../../src/td3_carracing/carla/env_wrappers.py)
+- Actor / Critic CNN 网络：[td3_models.py](../../src/td3_carracing/td3_models.py)、[carla/td3_models.py](../../src/td3_carracing/carla/td3_models.py)
 
-## 6 详细方案设计
-### 6.1 网络结构设计
-| 网络类型 | 结构细节 | 激活函数 | 优化器 | 学习率 |
-|----------|----------|----------|--------|--------|
-| 策略网络（Actor） | CNN 部分：Conv2d(3→32, 3×3, 2) → Conv2d(32→64, 3×3, 2) → Conv2d(64→128, 3×3, 2)；<br>全连接部分：Flatten → Linear(128×8×8→256) → Linear(256→128) → Linear(128→3)（转向/油门/刹车） | ReLU + Tanh（输出层） | AdamW | 1e-3 |
-| 价值网络（Critic） | 输入：状态特征 + 动作向量；<br>结构：Linear(256+3→256) → Linear(256→128) → Linear(128→1) | ReLU | AdamW | 1e-3 |
+### 4.3 经验回放机制
 
-### 6.2 经验回放池
-- 存储结构：字典格式 `{state: np.array, action: np.array, reward: float, next_state: np.array, done: bool}`；
-- 容量：默认 100000 条经验，支持配置；
-- 采样方式：优先级经验回放（PER），α=0.6（优先级权重），β=0.4~1.0（补偿系数）；
-- 批量大小：默认 128，支持根据硬件自动调整。
+当前代码使用环形经验回放缓冲区存储 `(state, action, reward, next_state, done)`，训练时从缓冲区随机采样 batch，以降低样本相关性、提升数据利用率。
 
-### 6.3 探索噪声生成
-- 训练阶段：Ornstein-Uhlenbeck 噪声（均值回归噪声，更贴合车辆运动特性）+ 高斯噪声（小幅）；
-- 噪声参数：θ=0.15，σ=0.2（训练初期）→ σ=0.05（训练后期）；
-- 推理阶段：无噪声，直接输出策略网络结果。
+实现位置：
 
-### 6.4 超参数配置
-| 参数名称 | 默认值 | 说明 |
-|----------|--------|------|
-| max_episodes | 5000 | 最大训练轮数 |
-| max_steps | 1000 | 单轮最大步数 |
-| stack_frames | 4 | 帧堆叠数量 |
-| batch_size | 128 | 批量采样大小 |
-| memory_capacity | 100000 | 经验回放池容量 |
-| lr_actor | 1e-3 | 策略网络学习率 |
-| lr_critic | 1e-3 | 价值网络学习率 |
-| gamma | 0.99 | 折扣因子 |
-| tau | 0.005 | 目标网络软更新系数 |
-| policy_delay | 2 | 策略网络更新延迟步数 |
-| noise_theta | 0.15 | OU噪声参数 |
-| noise_sigma | 0.2 | OU噪声初始标准差 |
-| save_interval | 100 | 模型保存间隔（episode） |
-| target_reward | 900 | 早停奖励阈值（连续100episode平均） |
+- CarRacing 经验回放：[td3_agent.py](../../src/td3_carracing/td3_agent.py)
+- Carla 经验回放：[carla/td3_agent.py](../../src/td3_carracing/carla/td3_agent.py)
+
+> 说明：当前代码实现的是普通随机经验回放，不是优先级经验回放（PER）。如需加入 PER，可在 `ReplayBuffer` 中增加 priority、importance sampling weight 和 TD error 更新逻辑。
+
+### 4.4 奖励工程
+
+项目在原始环境奖励基础上增加奖励塑造，用于鼓励平稳驾驶、速度控制和减少异常动作。
+
+CarRacing 版本中，奖励塑造结合速度、转向幅度、转向抖动、赛道 / 草地区域检测等信息；Carla 版本中，奖励塑造结合速度、碰撞、车道入侵、连续大转角、方向盘抖动等信息。
+
+实现位置：
+
+- CarRacing 奖励塑造：[env_wrappers.py](../../src/td3_carracing/env_wrappers.py)
+- Carla 奖励塑造：[carla/env_wrappers.py](../../src/td3_carracing/carla/env_wrappers.py)
+- Carla 基础奖励、碰撞和车道入侵信息：[carla/carla_env.py](../../src/td3_carracing/carla/carla_env.py)
+
+---
+
+## 5 具体实现说明
+
+### 5.1 Gymnasium CarRacing-v3 训练流程
+
+CarRacing 训练入口位于 [main.py](../../src/td3_carracing/main.py)，主要流程如下：
+
+1. 使用 `gym.make("CarRacing-v3", render_mode="human")` 创建环境；
+2. 调用 [wrap_env](../../src/td3_carracing/env_wrappers.py) 完成跳帧、灰度化、缩放、归一化、帧堆叠、动作平滑和奖励塑造；
+3. 根据环境的 `observation_space` 和 `action_space` 初始化 [TD3Agent](../../src/td3_carracing/td3_agent.py)；
+4. 训练循环中使用 `agent.select_action(state, smooth=True)` 生成动作，并叠加分通道探索噪声；
+5. 将交互样本写入 `ReplayBuffer`，调用 `agent.train()` 更新 Critic 和 Actor；
+6. 每当产生更高 episode reward 时保存最佳模型，每 100 个 episode 保存一次阶段模型。
+
+### 5.2 CarRacing 环境封装
+
+CarRacing 环境封装位于 [env_wrappers.py](../../src/td3_carracing/env_wrappers.py)，包括：
+
+- `SkipFrame`：重复执行同一个动作并累计奖励，提高训练效率；
+- `PreProcessObs`：RGB 图像转灰度、缩放到 `84x84`、归一化到 `[0,1]`；
+- `StackFrames`：堆叠连续 4 帧，并调整为 CNN 输入格式；
+- `SmoothActionWrapper`：对连续动作做指数平滑，限制相邻时刻方向盘变化；
+- `TrackDetectionWrapper`：根据图像底部区域的颜色比例估计车辆是否在赛道 / 草地上；
+- `RewardShapingWrapper`：综合速度、转向、赛道检测和动作平滑性调整奖励。
+
+### 5.3 TD3 智能体
+
+TD3 智能体实现位于 [td3_agent.py](../../src/td3_carracing/td3_agent.py) 和 [carla/td3_agent.py](../../src/td3_carracing/carla/td3_agent.py)，包含：
+
+- `ReplayBuffer`：环形缓冲区，存储交互样本并随机采样 batch；
+- `select_action()`：使用 Actor 输出连续动作，并对方向盘、油门、刹车做范围裁剪；
+- `train()`：计算目标 Q 值、更新双 Critic、延迟更新 Actor、软更新目标网络；
+- `save()` / `load()`：分别保存和加载 Actor、Critic1、Critic2 参数。
+
+### 5.4 Actor / Critic 网络
+
+Actor / Critic 网络定义位于 [td3_models.py](../../src/td3_carracing/td3_models.py) 和 [carla/td3_models.py](../../src/td3_carracing/carla/td3_models.py)。
+
+- **Actor**：输入堆叠后的图像状态，经 CNN 提取特征后输出连续动作 `[steer, throttle, brake]`；
+- **Critic**：输入状态特征和动作向量，输出 Q 值；
+- **双 Critic 结构**：TD3 训练时使用两个 Critic 网络降低过估计风险。
+
+### 5.5 适配到 Carla 模拟器
+
+Carla 适配代码位于 [src/td3_carracing/carla/](../../src/td3_carracing/carla/)，其中核心是 [carla_env.py](../../src/td3_carracing/carla/carla_env.py)。该文件将 Carla 封装成类似 Gymnasium 的环境，使 TD3 训练代码可以复用 `reset()`、`step(action)`、`action_space`、`observation_space` 等接口。
+
+Carla 适配内容包括：
+
+1. **连接 Carla Server**  
+   `CarlaEnv` 通过 `carla.Client('localhost', 2000)` 连接本地 Carla 服务，并设置超时时间。
+
+2. **地图与车辆初始化**  
+   默认使用 `Town03`，通过 Carla blueprint 生成 `vehicle.tesla.model3`，并关闭 autopilot，由 TD3 智能体控制车辆。
+
+3. **动作空间映射**  
+   Carla 版本动作空间为三维连续控制量：
+
+   | 动作 | 范围 | 含义 |
+   |---|---:|---|
+   | `steer` | `[-1.0, 1.0]` | 方向盘转角，负数向左，正数向右 |
+   | `throttle` | `[0.0, 1.0]` | 油门 |
+   | `brake` | `[0.0, 1.0]` | 刹车 |
+
+   在 [carla_env.py](../../src/td3_carracing/carla/carla_env.py) 的 `step(action)` 中，动作会被转换为 `carla.VehicleControl` 并作用到车辆上。
+
+4. **观察空间适配**  
+   Carla 车辆挂载 RGB 摄像头，图像尺寸先由传感器采集，再在 `process_image()` 中缩放到 `84x84`。随后通过 [carla/env_wrappers.py](../../src/td3_carracing/carla/env_wrappers.py) 转为灰度图并堆叠 4 帧，作为 CNN 输入。
+
+5. **传感器接入**  
+   Carla 环境接入了：
+
+   - RGB 摄像头：提供视觉状态；
+   - 碰撞传感器：用于终止 episode 和奖励惩罚；
+   - 车道入侵传感器：用于判断是否压线 / 偏离车道并施加惩罚。
+
+6. **奖励函数适配**  
+   Carla 基础奖励位于 [carla_env.py](../../src/td3_carracing/carla/carla_env.py)，综合速度奖励、碰撞惩罚、车道入侵惩罚和每步基础奖励。进一步的奖励塑造位于 [carla/env_wrappers.py](../../src/td3_carracing/carla/env_wrappers.py)，包括方向盘大转角惩罚、抖动惩罚、高速平稳驾驶奖励和低速惩罚。
+
+7. **天气与场景扩展**  
+   Carla 版本支持 `clear`、`rainy`、`foggy`、`cloudy`、`wet`、`random` 等天气模式，可通过 [carla/main.py](../../src/td3_carracing/carla/main.py) 的命令行参数传入，也可参考 [carla/weather_examples.py](../../src/td3_carracing/carla/weather_examples.py) 扩展天气测试。
+
+8. **训练 / 测试自动切换**  
+   [carla/main.py](../../src/td3_carracing/carla/main.py) 会检测 `models/td3_carla_best_actor.pth` 和 `models/td3_carla_best_critic1.pth` 是否存在：如果存在则进入测试模式，否则进入训练模式。
+
+---
+
+## 6 超参数与训练配置
+
+### 6.1 CarRacing-v3 默认配置
+
+| 参数 | 当前代码默认值 | 说明 |
+|---|---:|---|
+| `max_episodes` | 2500 | 最大训练回合数 |
+| `max_timesteps` | 1200 | 每回合最大步数 |
+| `warmup_episodes` | 80 | 预热回合数 |
+| `expl_noise_steer` | 0.12 | 初始转向探索噪声 |
+| `expl_noise_throttle` | 0.12 | 初始油门探索噪声 |
+| `expl_noise_brake` | 0.05 | 初始刹车探索噪声 |
+| 模型保存间隔 | 100 episodes | 阶段性保存模型 |
+| 最佳模型路径 | `models/td3_car_best_*` | 保存最高奖励模型 |
+
+配置位置：[main.py](../../src/td3_carracing/main.py)
+
+### 6.2 Carla 默认配置
+
+| 参数 | 当前代码默认值 | 说明 |
+|---|---:|---|
+| `town` | `Town03` | Carla 地图 |
+| `weather` | `clear` | 天气模式 |
+| `max_episodes` | 2000 | 最大训练回合数 |
+| `max_timesteps` | 1000 | 每回合最大步数 |
+| `warmup_episodes` | 50 | 预热回合数 |
+| `expl_noise_steer` | 0.1 | 初始转向探索噪声 |
+| `expl_noise_throttle` | 0.15 | 初始油门探索噪声 |
+| `expl_noise_brake` | 0.08 | 初始刹车探索噪声 |
+| 最佳模型路径 | `models/td3_carla_best_*` | 保存最高奖励模型 |
+
+配置位置：[carla/main.py](../../src/td3_carracing/carla/main.py)
+
+---
 
 ## 7 运行环境与部署步骤
-### 7.1 环境依赖
-- Python 3.8+
-- PyTorch
-- Gymnasium
-- OpenCV-Python
-- NumPy
 
-### 7.2 部署步骤
-#### 7.2.1 环境搭建
+### 7.1 CarRacing-v3 环境依赖
+
 ```bash
-# 1. 创建虚拟环境
-conda create -n car_racing python=3.8
-conda activate car_racing
-
-# 2. 安装PyTorch（根据CUDA版本调整）
-pip3 install torch torchvision torchaudio --index-url https://download.p.org/whl/cu117
-
-# 3. 安装其他依赖
 pip install -r requirements.txt
 ```
 
-#### 7.2.2 训练启动
-```bash
-# 基础训练（使用默认配置）
-python main.py --mode train
+主要依赖包括：
 
-# 自定义配置训练（指定最大轮数、保存路径等）
-python main.py --mode train \
-  --max_episodes 8000 \
-  --save_dir ./checkpoints \
-  --log_dir ./logs \
-  --target_reward 950
+- Python 3.8+
+- PyTorch
+- Gymnasium / Box2D
+- OpenCV-Python
+- NumPy
+
+依赖文件：[requirements.txt](../../src/td3_carracing/requirements.txt)
+
+### 7.2 运行 CarRacing-v3 训练
+
+```bash
+cd src/td3_carracing
+python main.py
 ```
 
-#### 7.2.3 推理测试
+训练过程中会使用 `render_mode="human"` 显示游戏窗口，并自动在 `models/` 目录下保存模型。
+
+### 7.3 Carla 环境依赖
+
+运行 Carla 版本前，需要先安装 Carla 模拟器和 Carla Python API。
+
 ```bash
-# 加载指定模型推理
-python main.py --mode inference \
-  --model_path ./checkpoints/final.pth \
-  --inference_episodes 10 \
-  --render_mode human
+# 安装基础 Python 依赖
+pip install torch numpy opencv-python gymnasium
+
+# 安装 Carla Python API，文件位于 Carla 安装目录中
+pip install PythonAPI/carla/dist/carla-<version>-py3-none-any.whl
 ```
 
-#### 7.2.4 可视化查看
+### 7.4 启动 Carla Server
+
+Linux：
+
 ```bash
-# 启动TensorBoard
-tensorboard --logdir ./logs
-# 访问 http://localhost:6006 查看训练曲线
+./CarlaUE4.sh
 ```
+
+Windows：
+
+```bash
+CarlaUE4.exe
+```
+
+### 7.5 运行 Carla 训练 / 测试
+
+```bash
+cd src/td3_carracing/carla
+python main.py
+```
+
+指定地图和天气：
+
+```bash
+python main.py --town Town03 --weather clear
+python main.py --town Town05 --weather rainy
+python main.py --town Town03 --weather random
+```
+
+如果 `models/td3_carla_best_actor.pth` 和相关 Critic 模型存在，程序会自动进入测试模式；否则进入训练模式。
+
+---
 
 ## 8 功能效果与运行说明
-### 8.1 训练模式
-- **渲染模式**：支持 `human`（实时显示游戏画面）、`rgb_array`（静默模式，仅保存图像）、`none`（无渲染，最快训练速度）；
-- **训练监控**：
-  - 实时打印每 episode 的总奖励、步数、损失值；
-  - TensorBoard 实时展示奖励曲线、损失曲线、动作分布；
-  - 每 100 episode 生成一次阶段性评估报告。
 
-### 8.2 推理模式
-- **运行效果**：智能体可稳定完成多轮驾驶任务，无碰撞、少偏离车道，平均车速稳定在 0.5~0.8（最大 1.0）；
-- **输出内容**：
-  - 每 episode 的总奖励、完成步数、碰撞次数；
-  - 动作时序图（转向/油门/刹车）、奖励变化图；
-  - 关键帧截图（如弯道转向、避障）。
+### 8.1 CarRacing-v3 模式
+
+- 输入：`84x84` 灰度图，连续 4 帧堆叠；
+- 输出：连续动作 `[steer, throttle, brake]`；
+- 训练：每步与环境交互、写入经验回放、更新 TD3 网络；
+- 保存：最佳模型和每 100 回合 checkpoint；
+- 适合用途：快速调试 TD3、奖励函数、动作平滑和图像预处理流程。
+- 运行效果：
+    <p float="left">
+      <img src="1.png" width="45%" />
+      <img src="2.png" width="45%" />
+    </p>
+
+### 8.2 Carla 模式
+
+- 输入：车载 RGB 摄像头图像，经预处理后作为 CNN 输入；
+- 输出：Carla `VehicleControl` 中的方向盘、油门、刹车；
+- 传感器：RGB camera、collision sensor、lane invasion sensor；
+- 场景：支持地图和天气切换；
+- 适合用途：更接近真实自动驾驶任务的仿真验证。
+- 运行效果：
+    <p float="left">
+      <img src="3.png" width="90%" />
+    </p>
 
 ### 8.3 常见问题与解决
+
 | 问题现象 | 可能原因 | 解决方法 |
-|----------|----------|----------|
-| 训练奖励始终低于 500 | 经验池采样效率低、噪声过大 | 启用 PER、降低噪声σ值、调整奖励权重 |
-| 模型加载失败 | 版本不兼容、路径错误 | 检查 PyTorch 版本、确认模型路径、重新保存 checkpoint |
-| 训练速度慢（<10 episode/分钟） | 未启用 GPU、批量大小过大 | 确认 CUDA 可用、减小批量大小（如 64）、关闭实时渲染 |
-| 推理阶段频繁碰撞 | 过拟合、推理无噪声 | 增加训练数据多样性、添加极小噪声（σ=0.01）、调整策略网络输出裁剪范围 |
+|---|---|---|
+| `CarRacing-v3` 无法创建 | Box2D 未安装 | 使用 `pip install "gymnasium[box2d]"` 或安装项目 `requirements.txt` |
+| 训练窗口无法显示 | 无图形界面或 SDL 问题 | 可在服务器环境中启用虚拟显示，或修改 `main.py` 中的 SDL 配置 |
+| Carla 连接失败 | Carla Server 未启动或端口不对 | 先启动 `CarlaUE4.sh` / `CarlaUE4.exe`，确认端口为 `2000` |
+| Carla Python API 导入失败 | 未安装 Carla wheel | 安装 `PythonAPI/carla/dist/carla-<version>-py3-none-any.whl` |
+| Carla 训练速度慢 | 高保真仿真消耗大 | 降低画面质量、减少渲染、缩短 episode、使用 GPU |
+| 车辆频繁碰撞或打转 | 奖励函数、噪声或动作平滑参数不合适 | 调整 [carla/env_wrappers.py](../../src/td3_carracing/carla/env_wrappers.py) 和 [carla/main.py](../../src/td3_carracing/carla/main.py) 中的奖励权重与噪声参数 |
 
-### 8.4 运行效果
-<p float="left">
-  <img src="1.png" width="45%" />
-  <img src="2.png" width="45%" />
-</p>
+---
 
-## 9 后续拓展方向与迭代规划
-1. **算法融合优化**：
-   - 集成 SAC、PPO 算法，对比不同算法在 CarRacing 场景的性能；
-   - 引入注意力机制（CBAM）到 CNN，提升关键区域特征提取能力。
-2. **多模态信息融合**：
-   - 新增虚拟雷达、GPS、车速传感器数据输入；
-   - 设计多模态特征融合网络（Cross-Attention），融合视觉+数值特征。
-3. **多智能体交互**：
-   - 构建多车交互场景，实现跟车、超车、避障等协同策略；
-   - 基于 MADDPG 实现多智能体训练框架。
-4. **轻量化部署**：
-   - 模型量化（INT8）、剪枝，降低推理时延；
-   - 适配边缘设备（如 NVIDIA Jetson Nano），实现端侧推理。
+## 9 后续拓展方向
 
-5. **安全机制增强**：
-   - 引入安全约束（如最大转向角、最小刹车距离），避免危险动作；
-   - 设计故障恢复策略，应对传感器失效、网络延迟等异常情况。
+1. **算法扩展**
+   - 集成 SAC、PPO、DrQ-v2 等算法，与 TD3 进行对比；
+   - 在 CNN 中加入注意力机制或更强视觉 backbone；
+   - 将普通经验回放升级为优先级经验回放（PER）。
+
+2. **Carla 场景扩展**
+   - 增加多地图、多天气、多交通流训练；
+   - 引入红绿灯、行人、动态车辆等复杂交通要素；
+   - 使用 Carla 同步模式提升传感器和仿真步进的一致性。
+
+3. **多模态传感器融合**
+   - 接入激光雷达、深度相机、IMU、GNSS、速度等信息；
+   - 设计视觉 + 数值状态的多模态融合网络。
+
+4. **安全与可解释性**
+   - 加入动作安全约束，如最大转角变化率、最小制动距离；
+   - 使用可视化方法分析 CNN 关注区域和策略决策依据。
+
+5. **部署优化**
+   - 模型量化、剪枝和 TensorRT 加速；
+   - 适配 NVIDIA Jetson 等边缘计算设备。
