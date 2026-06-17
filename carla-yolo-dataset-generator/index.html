@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla-yolo-dataset-generator/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>基于 CARLA 的 YOLOv8 多类目标定位数据集生成与训练管线 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u57fa\u4e8e CARLA \u7684 YOLOv8 \u591a\u7c7b\u76ee\u6807\u5b9a\u4f4d\u6570\u636e\u96c6\u751f\u6210\u4e0e\u8bad\u7ec3\u7ba1\u7ebf";
+        var mkdocs_page_input_path = "carla-yolo-dataset-generator/README.md";
+        var mkdocs_page_url = "/nn/carla-yolo-dataset-generator/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">基于 CARLA 的 YOLOv8 多类目标定位数据集生成与训练管线</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla-yolo-dataset-generator/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla-yolov8">基于 CARLA 的 YOLOv8 多类目标定位数据集生成与训练管线</h1>
+<p>本项目是一个自动化、工业级稳定的自动驾驶感知数据采集与模型训练工具链。系统基于 CARLA 模拟器（v0.9.15）构建，打通了从自动驾驶仿真场景配置、多模态传感器数据同步采集、高精度 2D 边界框自动标注，到数据集智能切分、Ultralytics YOLOv8 模型一键训练及带目标追踪（Object Tracking）推理的完整闭环。</p>
+<hr />
+<h2 id="_1">目录</h2>
+<ul>
+<li><a href="#项目架构">项目架构</a></li>
+<li><a href="#核心功能模块深度解析">核心功能模块深度解析</a></li>
+<li><a href="#模块一仿真世界与生命周期引擎">模块一：仿真世界与生命周期引擎</a></li>
+<li><a href="#模块二多传感器同步与数据采集">模块二：多传感器同步与数据采集</a></li>
+<li><a href="#模块三高精度目标标注与遮挡剔除算法">模块三：高精度目标标注与遮挡剔除算法</a></li>
+<li><a href="#模块四数据集自动化构建与模型管线">模块四：数据集自动化构建与模型管线</a></li>
+<li><a href="#模块五闭环推理与动态目标追踪">模块五：闭环推理与动态目标追踪</a></li>
+<li><a href="#环境搭配说明">环境搭配说明</a></li>
+<li><a href="#配置-carla-仿真环境">配置 CARLA 仿真环境</a></li>
+<li><a href="#python-依赖环境安装">Python 依赖环境安装</a></li>
+<li><a href="#本地关联配置">本地关联配置</a></li>
+<li><a href="#运行说明">运行说明</a></li>
+<li><a href="#模式一全自动一键流水线">模式一：全自动一键流水线</a></li>
+<li><a href="#模式二分步独立控制">模式二：分步独立控制</a></li>
+<li><a href="#鸣谢">鸣谢</a></li>
+</ul>
+<hr />
+<h2 id="_2">项目架构</h2>
+<p>项目采用模块化设计，核心代码及工具链结构如下：</p>
+<pre><code class="language-text">carla-yolo-dataset-generator/
+├── carla.yaml                  # YOLOv8 训练数据集配置文件（定义路径与类别映射）
+├── collect_data.sh             # 地图轮询采集脚本（自动化遍历 Town01-Town05）
+├── collect_data_and_train.sh   # 全自动一键流水线脚本（采集 -&gt; 转换 -&gt; 训练）
+├── collect_yolo_data.py        # 核心数据采集程序（处理仿真生命周期与传感器同步）
+├── convert_dataset.py          # 数据集质检、清洗与 Train/Val/Test 智能切分程序
+├── train_yolo.py               # YOLOv8 模型训练与导出脚本
+├── yolo_realtime_inference.py  # 实时推理程序（集成 YOLOv8 动态目标追踪功能）
+├── environment.yml             # Conda 虚拟环境依赖配置文件
+├── requirements.txt            # Pip 包管理器依赖列表
+└── utils/                      # 核心工具库模块
+    ├── bbox_utils.py           # 2D 边界框计算核心算法（基于多传感器几何投影）
+    ├── cva_utils.py            # 视场角过滤、距离截断、遮挡剔除与图像存盘工具
+    ├── img_utils.py            # 相机内参矩阵构建与 3D 点至 2D 像素平面投影计算
+    ├── server_utils.py         # CARLA 服务端自动启停与多平台进程防冲突管理
+    └── world_utils.py          # 仿真世界配置、NPC 车辆/行人流生成与传感器动态挂载
+
+</code></pre>
+<hr />
+<h2 id="_3">核心功能模块深度解析</h2>
+<p>为了实现高质量的自动驾驶数据集采集，本项目并非单纯的截图工具，而是底层深度耦合了 CARLA 物理引擎与传感器系统的复合架构。以下为本系统的 5 大核心模块机制：</p>
+<h3 id="_4">模块一：仿真世界与生命周期引擎</h3>
+<p>该模块负责建立稳定的仿真环境，解决开源工具链中常见的“开局死锁”与“内存泄漏”问题。</p>
+<ul>
+<li><strong>物理级同步模式约束</strong>：系统强制仿真器进入同步模式（<code>synchronous_mode=True</code>），以固定的时间步长（<code>delta_seconds=0.03</code>）推进时钟，确保客户端逻辑与服务端渲染严格对齐，彻底根除了由于时钟脱节导致的车辆撞墙和穿模。</li>
+<li><strong>自适应交通流调优</strong>：通过 <code>TrafficManager</code> 自动管理全局 NPC 车辆与行人。为避免传统仿真中小地图生成的全城死锁情况，系统强制下发了 <code>-30.0</code> 的速度差限制（即全局提速 30%），维持了高动态的有效采样场景。</li>
+<li><strong>无泄漏重置机制</strong>：引入了极度健壮的场景重置（<code>reset</code>）逻辑。在发生车辆卡死或需要重置地图时，系统会采用 <code>DestroyActor</code> 执行批量同步销毁，并主动推进一帧空闲物理时钟供服务端回收垃圾内存，支持脚本长期挂机运行而无显存溢出风险。</li>
+</ul>
+<h3 id="_5">模块二：多传感器同步与数据采集</h3>
+<p>系统支持高维度的多模态传感器组合采集与时空对齐。</p>
+<ul>
+<li><strong>多模态传感器阵列</strong>：动态挂载包括 RGB 相机、深度相机（Depth）、语义分割相机（Semantic Segmentation）和光线投射雷达（LiDAR）在内的传感器矩阵。</li>
+<li><strong>时序队列绝对对齐</strong>：由于 CARLA 传感器数据的回传存在网络延迟差异，模块使用 <code>Queue</code> 和 <code>retrieve_data</code> 函数对帧号（<code>frame</code>）进行严格校验。任何一帧内若缺失任意一种传感器数据，整帧将被直接丢弃，确保入库数据的绝对多模态一致性。</li>
+<li><strong>前沿视角支持（BEV）</strong>：内置 <code>--camera_mode</code> 控制器。通过计算动态变换矩阵，不仅支持传统的行车前视（Dashcam）坐标挂载，还支持一键切换至位于车顶 15 米正上方的无人机俯视（Bird's-Eye View, BEV）视角。</li>
+</ul>
+<h3 id="_6">模块三：高精度目标标注与遮挡剔除算法</h3>
+<p>这是本项目的核心算法模块。通过将 3D 世界坐标投影至 2D 像素平面，并解决复杂的“遮挡误判”问题，系统目前支持四大目标类别标注：<code>vehicle</code>, <code>pedestrian</code>, <code>traffic_light</code>, <code>traffic_sign</code>。</p>
+<ul>
+<li><strong>基于相机内参的几何投影</strong>：通过提取虚拟相机的 FOV 和分辨率参数构建内参矩阵（$K$），提取 3D Bounding Box 的 8 个顶点，计算从世界坐标系到传感器坐标系再到 2D 像素坐标系的严格矩阵乘法投影，得出精确的 2D 检测框。</li>
+<li><strong>多维度遮挡剔除（Occlusion Culling）技术</strong>：</li>
+<li><strong>视场与距离截断</strong>：通过最大探测距离（如车辆 40 米，标志牌 25 米）和点积方向计算，剔除相机背后的目标。</li>
+<li><strong>深度与语义双重校验</strong>：对于投影在画面内的目标，算法会提取目标框内对应的深度图（Depth Map）<strong>与</strong>语义分割图（Semantic Map）像素。只有当目标框内满足预设的语义阈值（<code>semantic_threshold</code>，即目标没有被墙壁或其他大型车辆完全遮挡）和深度距离约束时，该边界框才会被判定为有效标注。</li>
+</ul>
+<h3 id="_7">模块四：数据集自动化构建与模型管线</h3>
+<p>该模块实现了从原始仿真截图到标准深度学习框架的自动化转换。</p>
+<ul>
+<li><strong>智能质检与切分</strong>：<code>convert_dataset.py</code> 会自动扫描采集目录，剔除不包含任何有效目标的无效图片。随后按照 80/20 等灵活比例，结合具体的地图名称（如将 Town05 专门隔离为测试集），将数据重构为标准的 Ultralytics YOLO 数据集目录格式。</li>
+<li><strong>原生训练引擎接入</strong>：提供标准的 <code>carla.yaml</code> 映射文件，通过 <code>train_yolo.py</code> 脚本零延迟拉起 PyTorch 深度学习引擎，以最优配置启动模型训练与权重导出。</li>
+</ul>
+<h3 id="_8">模块五：闭环推理与动态目标追踪</h3>
+<p>验证模型效果的端到端推理模块，强化了时间序列维度的分析能力。</p>
+<ul>
+<li><strong>动态目标追踪</strong>：代码层面集成了 YOLOv8 的原生追踪器特性（<code>model.track()</code>）。系统不仅在单帧内执行目标检测，还会利用 ByteTrack 或 BoT-SORT 等关联算法，为视频流中连续出现的物体分配跨帧稳定的唯一 ID，实现自动驾驶场景下的行为追踪模拟。</li>
+<li><strong>动态进度与视频渲染</strong>：摒弃传统终端刷屏输出，采用专业 <code>tqdm</code> 进度条监控实时推理性能。支持在弹出窗口中实时绘制高亮边界框和分类标签，并在推理结束时自动合成导出高清预测视频（MP4）。</li>
+</ul>
+<hr />
+<h2 id="_9">环境搭配说明</h2>
+<p>本工具链需要配置两个核心组件：<strong>CARLA 仿真器服务端</strong> 和 <strong>Python 深度学习运行环境</strong>。</p>
+<h3 id="carla">配置 CARLA 仿真环境</h3>
+<ol>
+<li>前往 <a href="https://github.com/carla-simulator/carla/releases">CARLA GitHub Releases</a> 下载官方编译好的 <strong>CARLA 0.9.15</strong> 压缩包。</li>
+<li>解压到本地非中文路径下（例如 Windows 下解压至 <code>D:\Carla0915\</code>，Linux 下解压至 <code>~/carla/</code>）。</li>
+<li>测试运行：进入解压目录，运行 <code>CarlaUE4.exe</code> (Windows) 或 <code>./CarlaUE4.sh</code> (Linux)。若能成功进入 Unreal 仿真世界大厅，说明服务端正常。</li>
+</ol>
+<h3 id="python">Python 依赖环境安装</h3>
+<p>推荐使用 Conda 虚拟环境配置，项目提供了完整的依赖配置文件 <code>environment.yml</code>，可自动处理 Python 3.10 基础包及复杂的 CUDA 工具链映射：</p>
+<pre><code class="language-bash"># 基于配置文件创建名为 carla 的专属虚拟环境
+conda env create -f environment.yml
+
+# 激活该环境
+conda activate carla
+
+</code></pre>
+<p>如果您习惯使用原生环境，可直接基于 <code>requirements.txt</code> 进行全自动安装：</p>
+<pre><code class="language-bash">pip install -r requirements.txt
+
+</code></pre>
+<h3 id="_10">本地关联配置</h3>
+<ol>
+<li>打开项目根目录下的 <code>utils/server_utils.py</code> 文件。</li>
+<li>定位到顶部的 <code>LAUNCH_STRING</code> 变量。</li>
+<li>将其修改为您<strong>本地仿真器可执行文件的绝对物理路径</strong>：</li>
+<li><strong>Windows 示例</strong>: <code>LAUNCH_STRING = r"D:\Carla0915\WindowsNoEditor\CarlaUE4.exe"</code></li>
+<li><strong>Linux 示例</strong>: <code>LAUNCH_STRING = "/home/user/carla/CarlaUE4.sh"</code></li>
+</ol>
+<hr />
+<h2 id="_11">运行说明</h2>
+<p>本工具链支持“一键闭环运行”与“分步定制运行”两种执行模式。</p>
+<h3 id="_12">模式一：全自动一键流水线</h3>
+<p>如果您想直接查看最终的训练效果，可以直接运行封装好的单条 Shell 脚本。该脚本会自动轮询 5 张不同的地图，采集 1250 张高质量样本，清洗并切分数据集，最后自动拉起 PyTorch 深度学习引擎训练 YOLOv8 模型：</p>
+<pre><code class="language-bash">bash collect_data_and_train.sh
+
+</code></pre>
+<h3 id="_13">模式二：分步独立控制</h3>
+<h4 id="1">步骤 1：自定义数据集采集</h4>
+<p>启动 <code>collect_yolo_data.py</code> 脚本，传入定制化参数进行精细化采集：</p>
+<pre><code class="language-bash">python collect_yolo_data.py \
+    --map Town03 \                 # 指定在 Town03 地图上运行
+    --camera_mode bev \            # 采集视角：可选 'front' (前视) 或 'bev' (俯视)
+    --save \                       # 允许将图像与 labels 文本保存至磁盘
+    --num_save 300 \               # 当前地图达到保存 300 张合格样本后自动停止退出
+    --num_detections_save 3 \      # 质检过滤：单张图至少包含 3 个有效标注框才被保留
+    --num_vehicles 40 \            # 设置该场景生成的交通工具总数
+    --num_walkers 80               # 设置该场景生成的行人总数
+
+</code></pre>
+<h4 id="2">步骤 2：数据集质检与格式转换</h4>
+<p>采集完成后，原始数据将暂存在 <code>carla_data</code> 文件夹内。运行转换脚本，对其进行智能切分并搬运到 <code>datasets</code> 统一目录：</p>
+<pre><code class="language-bash">python convert_dataset.py --val_split 0.8 --test_town Town05
+
+</code></pre>
+<h4 id="3-yolov8">步骤 3：启动 YOLOv8 模型训练</h4>
+<p>运行训练脚本，系统将基于标准 YOLO 格式的 <code>carla.yaml</code> 读取数据集，默认迭代 200 轮并在结束后自动导出权重：</p>
+<pre><code class="language-bash">python train_yolo.py
+
+</code></pre>
+<h4 id="4">步骤 4：运行带目标追踪的实时推理</h4>
+<p>使用训练好的最优模型权重进行动态闭环感知测试。脚本将触发 YOLOv8 追踪模型，并在弹出的窗口中展示实时检测效果与跨帧追踪 ID：</p>
+<pre><code class="language-bash">python yolo_realtime_inference.py \
+    --model runs/detect/train/weights/best.pt \  # 模型权重路径
+    --map Town05 \                                # 执行实时测试的地图
+    --num_steps 800 \                             # 推理物理帧数 (-1 为无限期挂机)
+    --show \                                      # 激活屏幕实时弹窗渲染
+    --save_video                                  # 追踪与推理的可视化过程保存为 mp4
+
+</code></pre>
+<hr />
+<h2 id="_14">鸣谢</h2>
+<p>本项目的几何投影算子及边界框数据清洗逻辑，深受开源社区以下优秀工作的启发，在此表示诚挚的谢意：</p>
+<ul>
+<li>CARLA-2DDBBox</li>
+<li>CARLA-Automatic-Dataset-Collector</li>
+<li>CARLA 官方三维边界框投影与传感器队列对齐教程</li>
+</ul>
+<pre><code>
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
