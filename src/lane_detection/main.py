@@ -6,6 +6,7 @@
   python main.py --mode hsv          # 步骤2 HSV 多车道检测
   python main.py --mode advanced     # 步骤3 透视变换 + 滑动窗口 + 多项式拟合
   python main.py --mode video --video path/to/video.mp4  # 步骤4 视频模式
+  python main.py --mode compare            # 步骤8 预处理方法对比评估
   python main.py --no-metrics              # 隐藏曲率与偏移信息
   python main.py --no-warning              # 隐藏预警状态（关掉车道区域颜色变化）
   python main.py --no-fast                # 关闭快速搜索（视频模式下使用滑动窗口）
@@ -18,6 +19,7 @@ import cv2
 
 from config import CONFIG, DEFAULT_IMAGE, MODULE_DIR
 from lane_advanced import run_advanced_pipeline
+from lane_compare import run_compare_pipeline
 from lane_detect import run_hsv_pipeline
 from lane_preprocess import run_basic_pipeline
 from lane_video import run_video_pipeline
@@ -29,6 +31,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="车道线检测（Carla 场景）")
     parser.add_argument(
         "--mode",
+        choices=["basic", "hsv", "advanced", "video", "compare"],
         choices=["basic", "hsv", "advanced", "video"],
         default="basic",
         help="basic=灰度+Canny+霍夫；hsv=黄白线提取+多车道拟合；"
@@ -105,7 +108,12 @@ def main():
 
     CONFIG["img_path"] = args.image
 
-    if args.mode == "basic":
+    if args.mode == "compare":
+        display = run_compare_pipeline(args.image, save_dir=save_dir)
+        if display is None:
+            return 1
+        window = "Lane Detection Step8 (Preprocessing Comparison)"
+    elif args.mode == "basic":
         outputs = run_basic_pipeline(args.image, save_dir=save_dir)
         if outputs is None:
             return 1

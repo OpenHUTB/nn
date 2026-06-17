@@ -553,14 +553,24 @@ def main():
                     control.throttle = 0.12
                     control.brake = 0.0
 
-
                 vehicle.apply_control(control)
-                # ===== 全自动前照灯控制（程序自主完成，无需人工操作）=====
+                # ===== 全自动灯光控制（近光灯+雾灯，程序自主完成，无需人工操作）=====
                 sun_alt = world.get_weather().sun_altitude_angle
-                if sun_alt < 15:
-                    vehicle.set_light_state(carla.VehicleLightState.LowBeam)
-                elif sun_alt > 20:
-                    vehicle.set_light_state(carla.VehicleLightState.NONE)
+                fog_density = world.get_weather().fog_density
+
+                # 判断灯光开关条件
+                low_beam_on = sun_alt < 15
+                fog_light_on = fog_density > 30
+
+                # 从空状态开始构建，每次运算后转回枚举类型，避免int类型报错
+                light_val = carla.VehicleLightState.NONE
+                if low_beam_on:
+                    light_val = carla.VehicleLightState(light_val | carla.VehicleLightState.LowBeam)
+                if fog_light_on:
+                    light_val = carla.VehicleLightState(light_val | carla.VehicleLightState.Fog)
+
+                # 传入枚举类型参数，匹配函数签名
+                vehicle.set_light_state(light_val)
 
             # Render
             if image_surface[0] is not None:
@@ -600,12 +610,14 @@ def main():
 
             clock.tick(CONFIG["PYGAME_FPS"])
 
+
     except Exception as e:
         log(f"Error: {e}")
     finally:
         log("Cleaning up...")
         if log_file:
-            log_file.close()
+            log("Program ended")  # 先写结束日志
+            log_file.close()  # 再关闭文件
         for actor in actor_list:
             if actor and 'sensor' in actor.type_id:
                 try:
@@ -613,15 +625,15 @@ def main():
                 except:
                     pass
         time.sleep(1.5)
+
+
         for actor in actor_list:
             if actor:
                 try:
                     actor.destroy()
                 except:
                     pass
+
         pygame.quit()
-        log("Program ended")
-
-
 if __name__ == "__main__":
     main()

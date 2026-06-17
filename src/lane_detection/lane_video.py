@@ -177,6 +177,8 @@ def run_video_pipeline(video_path, save_dir=None, alpha=0.3, show=False,
             warning = compute_warning_level(metrics)
             display = draw_lane_on_original(frame, binary_warped, Minv,
                                             left_fitx, right_fitx, ploty,
+            display = draw_lane_on_original(frame, binary_warped, Minv,
+                                            left_fitx, right_fitx, ploty,
             # 计算车道偏离预警级别
             warning = compute_warning_level(metrics)
             display = draw_lane_on_original(frame, binary_warped, Minv,

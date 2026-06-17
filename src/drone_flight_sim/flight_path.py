@@ -80,13 +80,15 @@ class FlightPath:
     
     @staticmethod
     def triangle_path(size: float = 10, height: float = -3) -> List[Tuple[float, float, float]]:
-        """生成三角形飞行路径"""
-
-        return [
-            (0, 0, height),          # 起点
-            (size, 0, height),       # 右下角
-            (size / 2, size, height) # 顶点
-        ]
+        """生成五边形飞行路径"""
+        import math
+        points = []
+        for i in range(5):
+            angle = math.radians(90 + i * 72)  # 五边形，72度间隔
+            x = size / 2 + size * 0.6 * math.cos(angle)
+            y = size / 2 + size * 0.6 * math.sin(angle)
+            points.append((x, y, height))
+        return points
     
     @staticmethod
     def custom_path(waypoints: List[Tuple[float, float, float]]) -> List[Tuple[float, float, float]]:

@@ -136,3 +136,5 @@ title: 主页
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
 
 [__carla自动驾驶系统辅助监视器__](./autonomous_vehicle_monitor/monitor.md) -carla自动驾驶系统辅助器
+
+[__CARLA 多车辆跟踪系统__](./carla_multi_tracking/README.md) -CARLA 多车辆跟踪系统

@@ -234,6 +234,25 @@ python compare_models.py --model-paths models/ppo_bipedalwalker models/ppo_biped
 - `comparison_reports/comparison_report.md`
 - `comparison_reports/comparison_plot.png`
 
+ bipedal_walker_rl_run
+## 8.5 Batch Evaluation Boxplot
+
+新增 `batch_eval_boxplot.py` 工具，用于对多个已训练模型进行重复评估并绘制每个模型的奖励分布箱线图。
+
+### 用法示例
+
+```bash
+python batch_eval_boxplot.py --model-paths models/ppo_bipedalwalker models/ppo_bipedalwalker_hardcore --labels normal hardcore --mode normal --eval-episodes 5 --trials 10
+```
+
+### 输出内容
+
+- `comparison_reports/batch_boxplot_results.csv` (每一行为 label, model_path, reward)
+- `comparison_reports/batch_boxplot.png` (箱线图)
+
+
+=======
+ main
 ## 9. Credits
 
 This project is based on the work of Oleg Klimov, adapted for PPO training using Stable Baselines3.
