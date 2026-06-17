@@ -53,6 +53,7 @@ title: 主页
 [机器人仿真(MuJoCo)](ant_robot/机器人仿真系统.md)
 
 ---
+
 ## 感知 <span id="perception"></span>
 
 [__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
@@ -61,7 +62,7 @@ title: 主页
 
 [__目标检测__](./test/object_detection.md) - 目标检测与危险评估
 [__图像目标检测__](./image_object_detection/image_object_detection.md) - 多功能图像目标检测系统
-[__跟踪__](#tracking) 
+[__跟踪__](#tracking)
 [__路径追踪__](./test.md)
 
 [__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
@@ -75,6 +76,8 @@ title: 主页
 [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
 
 [__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) -  基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
+
+[__汽车自动驾驶__](./carla_black_tesla/README.md) - CARLA Black Tesla 自动驾驶控制系统
 
 [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
 
