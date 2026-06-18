@@ -328,15 +328,15 @@ class WeatherManager:
         return self.set_weather(weather_list[next_index])
     
     def get_weather_name(self, weather_key):
-        """获取天气中文名"""
+        """获取天气英文名"""
         names = {
-            'sunny': '晴天',
-            'cloudy': '多云',
-            'rainy': '雨天',
-            'stormy': '暴风雨',
-            'snowy': '雪天',
-            'foggy': '雾天',
-            'night': '夜晚'
+            'sunny': 'Sunny',
+            'cloudy': 'Cloudy',
+            'rainy': 'Rainy',
+            'stormy': 'Stormy',
+            'snowy': 'Snowy',
+            'foggy': 'Foggy',
+            'night': 'Night'
         }
         return names.get(weather_key, weather_key)
     
@@ -436,6 +436,10 @@ class SimpleDrivingSystem:
         self.current_view = 'third_person'  # 当前视角模式：'first_person', 'third_person', 'birdseye'
         self.weather_manager = None  # 天气管理器
         self.lidar_manager = None  # LiDAR传感器管理器
+        # 碰撞检测相关
+        self.collision_detected = False  # 是否检测到碰撞
+        self.collision_count = 0  # 碰撞次数
+        self.last_collision_time = 0  # 上次碰撞时间
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -635,6 +639,60 @@ class SimpleDrivingSystem:
         self.controller = SimpleController(self.world, self.vehicle)
         print("控制器设置完成")
 
+    def _setup_collision_sensor(self):
+        """设置碰撞传感器"""
+        print("正在设置碰撞传感器...")
+        
+        try:
+            blueprint_library = self.world.get_blueprint_library()
+            collision_bp = blueprint_library.find('sensor.other.collision')
+            
+            # 在车辆中心位置安装碰撞传感器
+            collision_transform = carla.Transform(carla.Location(x=0, z=0.5))
+            
+            self.collision_sensor = self.world.spawn_actor(
+                collision_bp, collision_transform, attach_to=self.vehicle
+            )
+            
+            self.collision_sensor.listen(lambda event: self._on_collision(event))
+            
+            print("碰撞传感器已启用")
+        except Exception as e:
+            print(f"设置碰撞传感器失败: {e}")
+
+    def _on_collision(self, event):
+        """碰撞事件处理"""
+        current_time = time.time()
+        
+        # 避免重复检测（1秒内的碰撞只记录一次）
+        if current_time - self.last_collision_time < 1.0:
+            return
+        
+        self.collision_detected = True
+        self.collision_count += 1
+        self.last_collision_time = current_time
+        
+        print(f"⚠️ 碰撞检测！碰撞次数: {self.collision_count}")
+        
+        # 紧急停车
+        self.vehicle.apply_control(carla.VehicleControl(
+            throttle=0.0, brake=1.0, hand_brake=True
+        ))
+        
+        # 3秒后恢复
+        self._schedule_recovery()
+
+    def _schedule_recovery(self):
+        """调度恢复"""
+        def recover():
+            self.collision_detected = False
+            print("恢复行驶...")
+        
+        # 使用定时器在3秒后恢复
+        import threading
+        timer = threading.Timer(3.0, recover)
+        timer.start()
+
     def run(self):
         """主运行循环"""
         print("\n" + "=" * 50)
@@ -676,6 +734,9 @@ class SimpleDrivingSystem:
         # 初始化LiDAR传感器
         self.lidar_manager = LiDARManager(self.world, self.vehicle)
 
+        # 初始化碰撞传感器
+        self._setup_collision_sensor()
+
         # 生成一些NPC车辆
         self.spawn_npc_vehicles(2)
 
@@ -686,7 +747,7 @@ class SimpleDrivingSystem:
         print("  s - 紧急停止")
         print("  x - 切换倒车/前进模式（速度为0时生效）")
         print("  v - 切换视角（第一人称/第三人称/鸟瞰图）")
-        print("  w - 切换天气（晴天/多云/雨天/暴风雨/雪天/雾天/夜晚）")
+        print("  p - 切换天气（晴天/多云/雨天/暴风雨/雪天/雾天/夜晚）")
         print("  + - 增加速度限制")
         print("  - - 减少速度限制")
         print("  t - 重置行程里程")
@@ -808,6 +869,16 @@ class SimpleDrivingSystem:
                                 (20, 400), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (255, 0, 255), 2)  # 粉色显示
                     
+                    # 显示碰撞检测状态
+                    if self.collision_detected:
+                        cv2.putText(display_img, f"⚠️ COLLISION! Count: {self.collision_count}",
+                                    (20, 440), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8, (0, 0, 255), 2)  # 红色显示
+                    else:
+                        cv2.putText(display_img, f"Collisions: {self.collision_count}",
+                                    (20, 440), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8, (0, 255, 0), 2)  # 绿色显示
+                    
                     # 显示LiDAR距离和警告
                     if self.lidar_manager:
                         min_dist = self.lidar_manager.get_min_distance()
@@ -854,7 +925,7 @@ class SimpleDrivingSystem:
                     next_index = (current_index + 1) % len(view_modes)
                     self.current_view = view_modes[next_index]
                     self.update_camera_view()
-                elif key == ord('w'):
+                elif key == ord('p'):
                     # 切换天气模式
                     if self.weather_manager:
                         self.weather_manager.cycle_weather()
@@ -959,6 +1030,15 @@ class SimpleDrivingSystem:
         if self.lidar_manager:
             try:
                 self.lidar_manager.destroy()
+            except:
+                pass
+
+        # 清理碰撞传感器
+        if hasattr(self, 'collision_sensor') and self.collision_sensor:
+            try:
+                self.collision_sensor.stop()
+                self.collision_sensor.destroy()
+                print("碰撞传感器已销毁")
             except:
                 pass
 
