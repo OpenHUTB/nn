@@ -1,6 +1,12 @@
 # Autonomous Vehicle Navigation Using Deep Learning
+<<<<<<< HEAD
 基于深度学习的自动驾驶汽车导航系统，支持CARLA仿真环境。
 ## 🚀 快速开始
+=======
+基于深度学习的自动驾驶汽车导航系统，支持 CARLA 仿真环境。
+
+## 快速开始
+>>>>>>> upstream/main
 
 ### 环境要求
 - Ubuntu 20.04

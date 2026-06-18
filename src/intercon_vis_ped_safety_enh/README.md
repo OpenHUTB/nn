@@ -5,8 +5,14 @@ CVIPS (Connected Vision for Increased Pedestrian Safety) 是一个致力于通�
 1. 遮挡处理: 解决“鬼探头”等高危场景下的行人检测问题。
 2. 全天候鲁棒性: 在雨天、夜间等极端光照和天气下的感知性能。
 3. 本仓库包含 CVIPS 的核心仿真场景生成工具、数据集采集脚本以及协同感知算法实现。
+<<<<<<< HEAD
 # 安装与依赖 (Prerequisites & Installation)
 # 系统要求
+=======
+## 安装与依赖 (Prerequisites & Installation)
+
+### 系统要求
+>>>>>>> upstream/main
 - Ubuntu 20.04 / Windows 10+
 - NVIDIA GPU (推荐 8GB+ 显存)
 - CARLA Simulator 0.9.14
@@ -87,11 +93,24 @@ CVIPS (Connected Vision for Increased Pedestrian Safety) 是一个致力于通�
    ```
 ### 二、不同密度场景命令
 1. Town01 + 低密度 (10 辆车，50 个行人)
+<<<<<<< HEAD
    ```shell
    python cvips_generation.py --town Town01 --num_vehicles 10 --num_pedestrians 50
 2. Town01 + 中密度 (25 辆车，150 个行人)
    ```shell
    python cvips_generation.py --town Town01 --num_vehicles 25 --num_pedestrians 150
+=======
+
+   ```shell
+   python cvips_generation.py --town Town01 --num_vehicles 10 --num_pedestrians 50
+   ```
+
+2. Town01 + 中密度 (25 辆车，150 个行人)
+
+   ```shell
+   python cvips_generation.py --town Town01 --num_vehicles 25 --num_pedestrians 150
+   ```
+>>>>>>> upstream/main
 ### 三、随机种子与场景复现命令
 
 1. Town01 + 种子 123 (可复现)

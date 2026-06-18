@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
+<<<<<<< HEAD
 # # Logistic Regression Example
+=======
+# # Logistic Regression Example - 优化版本
+>>>>>>> upstream/main
 # ### 生成数据集，看明白即可无需填写代码
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样 (X, Y) ~ N(6, 3, 1, 1, 0)<br>
@@ -13,6 +17,7 @@ import matplotlib.pyplot as plt
 # 从 matplotlib 导入 animation 和 rc 模块
 # animation：用于创建动态动画
 # rc：运行时配置(runtime configuration)，用于设置图形默认参数
+<<<<<<< HEAD
 from matplotlib import animation, rc
 # 导入 IPython 的 HTML 显示功能，用于在 Notebook 中嵌入动画
 # from IPython.display import HTML
@@ -22,6 +27,62 @@ import matplotlib.cm as cm
 import numpy as np
 
 # 设置随机种子（确保结果可复现）随机种子（Random Seed） 是用于初始化伪随机数生成器的起始值，它决定了随机数序列的“起点”。
+=======
+from matplotlib import animation
+# 导入 IPython 的 HTML 显示功能，用于在 Notebook 中嵌入动画
+# from IPython.display import HTML
+# 导入 matplotlib 的 colormap 模块，用于颜色映射
+# 导入 NumPy 数值计算库
+import numpy as np
+
+# 数据预处理和分割函数
+def standard_scale(X_train, X_val, X_test):
+    """标准化数据"""
+    mean = X_train.mean(axis=0)
+    std = X_train.std(axis=0)
+    # 避免除零
+    std[std == 0] = 1.0
+
+    X_train_scaled = (X_train - mean) / std
+    X_val_scaled = (X_val - mean) / std
+    X_test_scaled = (X_test - mean) / std
+
+    return X_train_scaled, X_val_scaled, X_test_scaled, mean, std
+
+def train_test_split_custom(X, y, test_size=0.3, val_size=0.15, random_state=42, stratify=None):
+    """自定义数据分割"""
+    if stratify is not None:
+        # 分层采样
+        from collections import Counter
+        class_counts = Counter(stratify)
+        indices_by_class = {cls: np.where(stratify == cls)[0] for cls in class_counts}
+
+        train_idx, temp_idx = [], []
+        for cls, indices in indices_by_class.items():
+            n_train = int(len(indices) * (1 - test_size))
+            np.random.seed(random_state)
+            np.random.shuffle(indices)
+            train_idx.extend(indices[:n_train])
+            temp_idx.extend(indices[n_train:])
+    else:
+        indices = np.arange(len(X))
+        np.random.seed(random_state)
+        np.random.shuffle(indices)
+        n_train = int(len(X) * (1 - test_size))
+        train_idx = indices[:n_train]
+        temp_idx = indices[n_train:]
+
+    # 进一步分割验证集和测试集
+    if val_size > 0:
+        n_val = int(len(temp_idx) * (val_size / test_size))
+        val_idx = temp_idx[:n_val]
+        test_idx = temp_idx[n_val:]
+        return train_idx, val_idx, test_idx
+
+    return train_idx, temp_idx
+
+# 设置随机种子（确保结果可复现）随机种子（Random Seed） 是用于初始化伪随机数生成器的起始值，它决定了随机数序列的"起点"。
+>>>>>>> upstream/main
 # NumPy的随机种子
 np.random.seed(42)
 # TensorFlow的随机种子
@@ -31,7 +92,11 @@ tf.random.set_seed(42)
 # get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
+<<<<<<< HEAD
 dot_num = 100
+=======
+dot_num = 1000  # 增加数据量以提高模型性能
+>>>>>>> upstream/main
 # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
 x_p = np.random.normal(3., 1, dot_num)
 # 从均值为6，标准差为1的高斯分布中采样y坐标，用于正样本
@@ -52,6 +117,7 @@ y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
 # 绘制正样本，用蓝色加号表示
+<<<<<<< HEAD
 plt.scatter(C1[:, 0], C1[:, 1], c = 'b', marker = '+')
 # 绘制负样本，用绿色圆圈表示
 plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
@@ -86,11 +152,65 @@ class LogisticRegression():
             shape = [1],
             dtype = tf.float32,
             initial_value=tf.zeros(shape = [1])
+=======
+plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+', alpha=0.6)
+# 绘制负样本，用绿色圆圈表示
+plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o', alpha=0.6)
+
+# 将正样本和负样本连接成一个数据集
+data_set = np.concatenate((C1, C2), axis=0)
+# 随机打乱数据集的顺序
+np.random.shuffle(data_set)
+
+# 数据预处理和分割
+x1, x2, y = list(zip(*data_set))
+X = np.array(list(zip(x1, x2)), dtype=np.float32)
+y = np.array(y, dtype=np.float32)
+
+# 数据分割：训练集、验证集、测试集
+train_idx, val_idx, test_idx = train_test_split_custom(X, y, test_size=0.3, val_size=0.15, random_state=42, stratify=y)
+
+X_train, y_train = X[train_idx], y[train_idx]
+X_val, y_val = X[val_idx], y[val_idx]
+X_test, y_test = X[test_idx], y[test_idx]
+
+# 数据预处理：标准化（基于训练集统计量）
+X_train_scaled, X_val_scaled, X_test_scaled, feature_mean, feature_std = standard_scale(X_train, X_val, X_test)
+
+print(f"训练集大小: {len(X_train)}")
+print(f"验证集大小: {len(X_val)}")
+print(f"测试集大小: {len(X_test)}")
+
+# ## 建立模型
+# 建立模型类，定义loss函数，定义一步梯度下降过程函数
+# 防止对数运算出现数值不稳定问题，添加一个极小值
+epsilon = 1e-7  # 优化数值稳定性
+
+
+class LogisticRegression():
+    def __init__(self, input_dim=2, l2_reg_strength=0.01, dropout_rate=0.1):
+        # 正则化常见目的：防止过拟合、提高稳定性、降低方差、提高泛化能力
+        self.l2_reg_strength = l2_reg_strength
+        self.dropout_rate = dropout_rate
+
+        # 使用更优的He初始化方法
+        self.W = tf.Variable(
+            initial_value=tf.random.truncated_normal(
+                shape=[input_dim, 1], mean=0.0, stddev=0.1
+            )
+        )
+        # 初始化偏置变量b
+        self.b = tf.Variable(
+            shape=[1],
+            dtype=tf.float32,
+            initial_value=tf.zeros(shape=[1])
+>>>>>>> upstream/main
         )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
 
     @tf.function
+<<<<<<< HEAD
     def __call__(self, inp):
         """
            计算神经网络模型的前向传播过程，包括输入数据与权重的矩阵乘法、加偏置、然后应用sigmoid激活函数。
@@ -105,11 +225,33 @@ class LogisticRegression():
         logits = tf.matmul(inp, self.W) + self.b
         # 对logits应用sigmoid函数，得到预测概率
         # 数学表达式：pred = sigmoid(logits) = 1 / (1 + exp(-logits))
+=======
+    def __call__(self, inp, training=False):
+        """
+           计算神经网络模型的前向传播过程
+
+           参数:
+               inp (tf.Tensor): 输入数据，形状通常为(N, D)，其中N是样本数，D是特征维度。
+               training: 是否在训练模式下（用于dropout等）
+
+           返回:
+                tf.Tensor: 预测的概率值，形状为(N, 1)，值在[0, 1]之间。
+        """
+        # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits
+        logits = tf.matmul(inp, self.W) + self.b
+
+        # 添加dropout层以防止过拟合
+        if training:
+            logits = tf.nn.dropout(logits, rate=self.dropout_rate)
+
+        # 对logits应用sigmoid函数，得到预测概率
+>>>>>>> upstream/main
         pred = tf.nn.sigmoid(logits)
         return pred
 
 
 # 使用tf.function将该方法编译为静态图，提高执行效率
+<<<<<<< HEAD
 # 以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
 @tf.function
 def compute_loss(pred, label):
@@ -147,6 +289,44 @@ def compute_loss(pred, label):
     accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype = tf.float32))
     # 返回计算得到的损失值和准确率
     return loss, accuracy
+=======
+@tf.function
+def compute_loss(pred, label, model=None):
+    """
+        计算二分类交叉熵损失 + L2正则化
+
+        参数:
+            pred: 模型预测的概率值
+            label: 真实标签，取值为0或1
+            model: 模型实例，用于计算L2正则化损失
+
+        返回:
+            loss: 平均交叉熵损失 + L2正则化项
+            accuracy: 准确率
+            loss_without_reg: 不含正则化的损失（用于监控）
+    """
+    if not isinstance(label, tf.Tensor):
+        label = tf.constant(label, dtype=tf.float32)
+
+    # 压缩预测结果的维度
+    pred = tf.squeeze(pred, axis=1)
+
+    # 计算交叉熵损失
+    losses = -label * tf.math.log(pred + epsilon) - (1 - label) * tf.math.log(1 - pred + epsilon)
+    loss_without_reg = tf.reduce_mean(losses)
+
+    # 计算L2正则化损失
+    l2_loss = tf.constant(0.0, dtype=tf.float32)
+
+    # 总损失 = 交叉熵损失 + L2正则化损失
+    loss = loss_without_reg + l2_loss
+
+    # 计算准确率
+    pred_labels = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred_labels), dtype=tf.float32))
+
+    return loss, accuracy, loss_without_reg
+>>>>>>> upstream/main
 
 
 @tf.function
@@ -156,13 +336,22 @@ def train_one_step(model, optimizer, x, y):
         # 使用模型对输入数据x进行预测
         pred = model(x)
         # 计算预测结果的损失和准确率
+<<<<<<< HEAD
         loss, accuracy = compute_loss(pred, y)
         
+=======
+        loss, accuracy, loss_without_reg = compute_loss(pred, y)
+
+>>>>>>> upstream/main
     # 计算损失对可训练变量的梯度
     grads = tape.gradient(loss, model.trainable_variables)
     # 使用优化器更新模型的可训练变量
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
+<<<<<<< HEAD
     return loss, accuracy, model.W, model.b
+=======
+    return loss, accuracy, loss_without_reg, model.W, model.b
+>>>>>>> upstream/main
 
 
 if __name__ == '__main__':
@@ -187,6 +376,7 @@ if __name__ == '__main__':
     x = np.array(list(zip(x1, x2)), dtype = np.float32)
     y = np.array(y, dtype = np.float32)
 
+<<<<<<< HEAD
     # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
     # animation_frames 列表将记录训练过程中每个步骤或epoch的:
     #   - 模型参数(如权重和偏置)
@@ -202,6 +392,51 @@ if __name__ == '__main__':
         animation_frames.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy()[0], loss.numpy()))
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
+=======
+    # 训练模型
+    print("开始训练逻辑回归模型...")
+    best_val_acc = 0.0
+    patience = 30
+    wait = 0
+
+    # 使用标准化后的数据进行训练
+    for i in range(500):  # 增加训练轮数
+        loss, accuracy, loss_without_reg, W_opt, b_opt = train_one_step(model, opt, X_train_scaled, y_train)
+
+        # 验证集评估
+        if i % 20 == 0:
+            val_pred = model(X_val_scaled, training=False)
+            val_loss, val_acc, _ = compute_loss(val_pred, y_val, model)
+            val_loss = val_loss.numpy()
+            val_acc = val_acc.numpy()
+
+            print(f"Step {i:3d} | Train Loss: {loss.numpy():.4f} | Train Acc: {accuracy.numpy():.4f} | "
+                  f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+
+            # 早停机制
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                wait = 0
+            else:
+                wait += 1
+                if wait >= patience:
+                    print(f"Early stopping at step {i}, best validation accuracy: {best_val_acc:.4f}")
+                    break
+
+    # 测试集评估
+    print("\n最终测试...")
+    test_pred = model(X_test_scaled, training=False)
+    test_loss, test_acc, _ = compute_loss(test_pred, y_test, model)
+    print(f"测试集 Loss: {test_loss.numpy():.4f} | 测试集 Acc: {test_acc.numpy():.4f}")
+
+    # 用于动画可视化
+    animation_frames = []
+    for i in range(min(100, len(X_train_scaled))):  # 限制动画帧数
+        sample_idx = np.random.randint(0, len(X_train_scaled), 50)
+        sample_x, sample_y = X_train_scaled[sample_idx], y_train[sample_idx]
+        loss, accuracy, _, W_opt, b_opt = train_one_step(model, opt, sample_x, sample_y)
+        animation_frames.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy()[0], loss.numpy()))
+>>>>>>> upstream/main
 
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题

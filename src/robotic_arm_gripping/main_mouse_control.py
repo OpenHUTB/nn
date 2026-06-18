@@ -65,11 +65,19 @@ def main():
             shoulder_error = shoulder_target - data.qpos[shoulder_joint_id]
             shoulder_vel = data.qvel[shoulder_joint_id]
             data.ctrl[shoulder_act_id] = kp * shoulder_error - kd * shoulder_vel
+<<<<<<< HEAD
 
+=======
+            data.ctrl[shoulder_act_id] = np.clip(data.ctrl[shoulder_act_id], -500, 500) 
+>>>>>>> upstream/main
             # 肘关节控制
             elbow_error = elbow_target - data.qpos[elbow_joint_id]
             elbow_vel = data.qvel[elbow_joint_id]
             data.ctrl[elbow_act_id] = kp * elbow_error - kd * elbow_vel
+<<<<<<< HEAD
+=======
+            data.ctrl[elbow_act_id] = np.clip(data.ctrl[elbow_act_id], -800, 800)
+>>>>>>> upstream/main
 
             # 夹爪保持张开状态
             data.ctrl[model.actuator("left").id] = 0.0
@@ -91,4 +99,8 @@ if __name__ == "__main__":
     except ImportError:
         print("请先安装mujoco：pip install mujoco numpy")
     else:
+<<<<<<< HEAD
         main()
+=======
+        main()
+>>>>>>> upstream/main

@@ -1,4 +1,8 @@
 import argparse
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> upstream/main
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -86,7 +90,22 @@ def _run_entry(mode: str, forwarded_args: list[str]) -> None:
     print(f"脚本路径: {rel_path}")
 
     cmd = [sys.executable, str(target.script), *forwarded_args]
+<<<<<<< HEAD
     subprocess.run(cmd, cwd=str(PROJECT_ROOT), check=True)
+=======
+
+    env = os.environ.copy()
+    pythonpath_items = [
+        str(PROJECT_ROOT),
+        str(PROJECT_ROOT / "gym_env"),
+    ]
+    existing_pythonpath = env.get("PYTHONPATH")
+    if existing_pythonpath:
+        pythonpath_items.append(existing_pythonpath)
+    env["PYTHONPATH"] = os.pathsep.join(pythonpath_items)
+
+    subprocess.run(cmd, cwd=str(PROJECT_ROOT), env=env, check=True)
+>>>>>>> upstream/main
 
 
 def main() -> None:

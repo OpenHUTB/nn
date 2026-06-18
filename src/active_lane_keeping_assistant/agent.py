@@ -119,19 +119,33 @@ class Agent():
         file_name = os.path.join(path, f'{id}_error.jpg')
         plt.savefig(file_name)
 
+<<<<<<< HEAD
 def get_actions(self, detection_surface_area:float,
         error:float) -> tuple[float, float]:
         
+=======
+    def get_actions(self, detection_surface_area:float,
+        error:float) -> tuple[float, float]:
+
+>>>>>>> upstream/main
         # [Perception] Sensor Data Analysis
         # Normalize the detection area to calculate "Sensor Confidence"
         # Assuming typical good lane area is around 300,000 (30e4) to 30,000,000 (30e6) depending on resolution
         # Let's use the threshold defined in init or a dynamic ratio
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> upstream/main
         # 1. Calculate Sensor Confidence (0.0 to 1.0)
         # More white pixels (Surface Area) = Higher Confidence = Better Visibility
         ref_area = 30e6 # Reference max area
         sensor_confidence = min(1.0, detection_surface_area / ref_area)
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> upstream/main
         # 2. Compute Steering (Lateral Control)
         # Keep track of error history for Integral/Derivative terms
         if self.check_surface_area(detection_surface_area):
@@ -151,12 +165,21 @@ def get_actions(self, detection_surface_area:float,
         # Strategy: Throttle is determined by Sensor Confidence AND Curvature
         # If sensor sees less lane (low confidence), slow down.
         # If steering angle is high (high curvature), slow down.
+<<<<<<< HEAD
         
         base_throttle = self.throttle
         
         # Formula: Base * Confidence - Curvature_Penalty
         target_throttle = (base_throttle * (0.5 + 0.5 * sensor_confidence)) - (abs(steer) * 0.6)
         
+=======
+
+        base_throttle = self.throttle
+
+        # Formula: Base * Confidence - Curvature_Penalty
+        target_throttle = (base_throttle * (0.5 + 0.5 * sensor_confidence)) - (abs(steer) * 0.6)
+
+>>>>>>> upstream/main
         # Clamp output to safe range [0.15, Base]
         dynamic_throttle = max(0.15, min(base_throttle, target_throttle))
 

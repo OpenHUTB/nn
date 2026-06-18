@@ -3,9 +3,18 @@
 """SVM 改进实现，支持线性和核方法。"""  # 模块级文档字符串，描述脚本功能
 import numpy as np  # 导入 NumPy 库，用于高效的数值计算和数组操作
 import os  # 导入 OS 库，用于处理文件路径和系统操作
+<<<<<<< HEAD
 # import matplotlib.pyplot as plt  # 导入 Matplotlib 的绘图接口，用于数据可视化
 from sklearn import svm as sk_svm  # 导入 Scikit-learn 的 SVM 模块，作为性能对比基准
 from sklearn.preprocessing import StandardScaler  # 导入标准化工具，用于特征缩放
+=======
+import sys  # 新增：用于处理命令行参数
+import time  # 新增：用于计时
+# import matplotlib.pyplot as plt  # 导入 Matplotlib 的绘图接口，用于数据可视化
+from sklearn import svm as sk_svm  # 导入 Scikit-learn 的 SVM 模块，作为性能对比基准
+from sklearn.preprocessing import StandardScaler  # 导入标准化工具，用于特征缩放
+from sklearn.model_selection import train_test_split  # 新增：用于划分数据集
+>>>>>>> upstream/main
 # from matplotlib import rcParams  # 导入 Matplotlib 的参数配置对象
 
 # 设置中文字体支持
@@ -40,18 +49,31 @@ def eval_acc(label, pred):  # 定义评估准确率的函数，接收真实标�
 class SVMWithKernel:  # 定义支持核方法的 SVM 类
     """支持核方法的SVM模型。"""  # 类文档字符串
     
+<<<<<<< HEAD
     def __init__(self, kernel='rbf', C=1.0, gamma='auto', degree=3, learning_rate=0.01, max_iter=2000):  # 构造函数，初始化超参数
+=======
+    def __init__(self, kernel='rbf', C=1.0, gamma='auto', degree=3, learning_rate=0.01, max_iter=2000, normalize=False):  # 构造函数，初始化超参数
+>>>>>>> upstream/main
         self.kernel = kernel  # 指定使用的核函数类型（如 'rbf', 'linear'）
         self.C = C  # 正则化参数，控制对误分类的惩罚程度
         self.gamma = gamma  # RBF/Poly/Sigmoid 核函数的系数
         self.degree = degree  # 多项式核函数的阶数
         self.learning_rate = learning_rate  # 学习率（虽然此 SMO 实现中主要用于逻辑，但在梯度下降中更常用）
         self.max_iter = max_iter  # 最大迭代次数
+<<<<<<< HEAD
+=======
+        self.normalize = normalize  # 标准化开关
+>>>>>>> upstream/main
         self.alpha = None  # 拉格朗日乘子向量，初始化为 None
         self.b = None  # 偏置项，初始化为 None
         self.support_vectors = None  # 支持向量，训练后存储
         self.support_vector_labels = None  # 支持向量对应的标签
         self.support_vector_indices = None  # 支持向量在原数据集中的索引
+<<<<<<< HEAD
+=======
+        self.mean_ = None  # 新增：存储训练集均值（用于标准化）
+        self.std_ = None   # 新增：存储训练集标准差（用于标准化）
+>>>>>>> upstream/main
         
     def _compute_kernel(self, X, Z):  # 私有方法，计算核矩阵或核映射
         if self.kernel == 'linear':  # 如果核函数是线性的
@@ -76,6 +98,21 @@ class SVMWithKernel:  # 定义支持核方法的 SVM 类
         y = np.where(y == 0, -1, y)  # 将标签 0 转换为 -1，以符合 SVM 的公式要求
         if not np.all(np.isin(y, [-1, 1])):  # 检查转换后的标签是否全为 -1 或 1
             raise ValueError('标签必须是 0/1 或 -1/1')  # 若不符合则抛出异常
+<<<<<<< HEAD
+=======
+        
+        # ========== 新增：数据标准化 ==========
+        if self.normalize:
+            self.mean_ = np.mean(X, axis=0)          # 每个特征的均值
+            self.std_ = np.std(X, axis=0)            # 每个特征的标准差
+            self.std_[self.std_ == 0] = 1e-8         # 防止除以零
+            X = (X - self.mean_) / self.std_         # Z-score 标准化
+        else:
+            self.mean_ = None
+            self.std_ = None
+        # ==================================
+        
+>>>>>>> upstream/main
         m, n = X.shape  # 获取训练样本的数量 m 和特征维度 n
 
         self.alpha = np.zeros(m)  # 初始化拉格朗日乘子 alpha 为全零向量
@@ -137,6 +174,15 @@ class SVMWithKernel:  # 定义支持核方法的 SVM 类
         
         预测公式: f(x) = sum(alpha_i * y_i * K(x, x_i)) + b
         """  # 函数文档字符串，说明预测原理
+<<<<<<< HEAD
+=======
+        
+        # ========== 新增：对输入应用相同的标准化 ==========
+        if self.normalize and self.mean_ is not None and self.std_ is not None:
+            x = (x - self.mean_) / self.std_
+        # =================================================
+        
+>>>>>>> upstream/main
         K = self._compute_kernel(x, self.X_train)  # 计算输入样本 x 与所有训练样本之间的核矩阵
         score = np.sum(self.alpha * self.y_train * K, axis=1) + self.b  # 计算加权求和后的决策得分
         return np.where(score >= 0, 1, -1).astype(np.int32)  # 根据得分符号判定类别（1 或 -1）并转为整数
@@ -146,11 +192,21 @@ class SVMWithKernel:  # 定义支持核方法的 SVM 类
         
         返回: f(x) = sum(alpha_i * y_i * K(x, x_i)) + b
         """  # 函数文档字符串
+<<<<<<< HEAD
+=======
+        
+        # ========== 新增：对输入应用相同的标准化 ==========
+        if self.normalize and self.mean_ is not None and self.std_ is not None:
+            x = (x - self.mean_) / self.std_
+        # =================================================
+        
+>>>>>>> upstream/main
         K = self._compute_kernel(x, self.X_train)  # 计算核映射矩阵
         return np.sum(self.alpha * self.y_train * K, axis=1) + self.b  # 返回原始决策得分（不进行分类转换）
 
 
 # ============================================================
+<<<<<<< HEAD
 # 可视化函数
 # ============================================================
 def plot_decision_boundary(X, y, model, title, filename=None):  # 定义绘制决策边界的函数
@@ -202,6 +258,81 @@ def plot_decision_boundary(X, y, model, title, filename=None):  # 定义绘制�
         print(f"OK 图表已保存: {filename}")  # 在控制台输出保存成功的提示
     
     plt.show()  # 在窗口中显示绘制好的图表
+=======
+# 可视化函数（已注释，无需改动）
+# ============================================================
+# def plot_decision_boundary(...): ...
+
+
+# ============================================================
+# 新增：对比实验函数
+# ============================================================
+def run_comparison():
+    """对比有无标准化的性能，并输出报告"""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 使用非线性数据集进行对比（因为核函数对标准化敏感）
+    train_file = os.path.join(base_dir, 'data', 'train_kernel.txt')
+    test_file = os.path.join(base_dir, 'data', 'test_kernel.txt')
+    
+    if not os.path.exists(train_file):
+        print("[ERROR] 未找到 data/train_kernel.txt，请确保数据文件存在。")
+        return
+    
+    data_train = load_data(train_file)
+    data_test = load_data(test_file)
+    
+    X_train = data_train[:, :2]
+    y_train = data_train[:, 2]
+    X_test = data_test[:, :2]
+    y_test = data_test[:, 2]
+    
+    # 将标签 0 转换为 -1
+    y_train = np.where(y_train == 0, -1, y_train)
+    y_test = np.where(y_test == 0, -1, y_test)
+    
+    print("\n🚀 实验 1: 不使用数据标准化")
+    print("=" * 40)
+    start = time.time()
+    svm_no = SVMWithKernel(kernel='rbf', C=10.0, gamma=0.5, max_iter=10000, normalize=False)
+    # 注意：train 方法接受 (n_samples, 3) 的数据，需要重新组合特征和标签
+    data_train_combined = np.column_stack((X_train, y_train))
+    svm_no.train(data_train_combined)
+    time_no = time.time() - start
+    
+    pred_train_no = svm_no.predict(X_train)
+    pred_test_no = svm_no.predict(X_test)
+    acc_train_no = eval_acc(y_train, pred_train_no)
+    acc_test_no = eval_acc(y_test, pred_test_no)
+    
+    print(f"训练耗时: {time_no:.4f} 秒")
+    print(f"训练准确率: {acc_train_no*100:.2f}%")
+    print(f"测试准确率: {acc_test_no*100:.2f}%")
+    
+    print("\n🚀 实验 2: 使用 Z-score 标准化")
+    print("=" * 40)
+    start = time.time()
+    svm_norm = SVMWithKernel(kernel='rbf', C=10.0, gamma=0.5, max_iter=10000, normalize=True)
+    svm_norm.train(data_train_combined)  # 注意：标准化在 train 内部自动完成
+    time_norm = time.time() - start
+    
+    pred_train_norm = svm_norm.predict(X_train)
+    pred_test_norm = svm_norm.predict(X_test)
+    acc_train_norm = eval_acc(y_train, pred_train_norm)
+    acc_test_norm = eval_acc(y_test, pred_test_norm)
+    
+    print(f"训练耗时: {time_norm:.4f} 秒")
+    print(f"训练准确率: {acc_train_norm*100:.2f}%")
+    print(f"测试准确率: {acc_test_norm*100:.2f}%")
+    
+    print("\n📊 标准化效果对比报告")
+    print("=" * 40)
+    print(f"测试准确率变化: {acc_test_no*100:.2f}% → {acc_test_norm*100:.2f}% (提升 {(acc_test_norm-acc_test_no)*100:.2f}%)")
+    print(f"训练耗时变化: {time_no:.4f}s → {time_norm:.4f}s")
+    if acc_test_norm > acc_test_no:
+        print("✅ 标准化有利于本次SVM模型的分类效果。")
+    else:
+        print("⚠️ 标准化未带来提升，可能数据本身量纲相近或模型参数需要调整。")
+>>>>>>> upstream/main
 
 
 # ============================================================
@@ -322,4 +453,11 @@ def main():  # 定义主入口函数
 
 
 if __name__ == '__main__':  # 如果该脚本被直接运行而非作为模块导入
+<<<<<<< HEAD
     main()  # 执行主入口函数
+=======
+    if len(sys.argv) > 1 and sys.argv[1] == "--compare":
+        run_comparison()
+    else:
+        main()  # 执行主入口函数
+>>>>>>> upstream/main

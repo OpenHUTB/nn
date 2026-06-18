@@ -62,6 +62,7 @@ class Recorder():
             raise Exception('No video initialized.')
         self.video.release()
 
+<<<<<<< HEAD
         def __enter__(self):
             """Context manager entry point"""
             return self
@@ -70,3 +71,13 @@ class Recorder():
             """Context manager exit point - ensures video is closed"""
             if self.video is not None:
                 self.close_recording()
+=======
+    def __enter__(self):
+        """Context manager entry point"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit point - ensures video is closed"""
+        if self.video is not None:
+            self.close_recording()
+>>>>>>> upstream/main

@@ -1,0 +1,8 @@
+path: C:/CARLA_0.9.14/WindowsNoEditor/carladataset/carla
+train: images/train
+val: images/valid
+
+nc: 4
+names: ['bike', 'motobike', 'person', 'vehicle']
+
+

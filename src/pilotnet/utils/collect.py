@@ -4,6 +4,10 @@
 from utils.screen import clear, message, warn
 from utils.piloterror import PilotError
 from utils.visualizer import CarlaVisualizer
+<<<<<<< HEAD
+=======
+from utils.logger import logger
+>>>>>>> upstream/main
 import datetime
 import os
 import carla
@@ -18,6 +22,10 @@ class Collector:
         self.visualizer = None
 
         self.directory = f'recordings/{datetime.datetime.now().strftime("%Y-%m-%d@%H.%M.%S" if os.name == "nt" else "%Y-%m-%d@%H:%M:%S")}'
+<<<<<<< HEAD
+=======
+        logger.info(f'Created data collection directory: {self.directory}')
+>>>>>>> upstream/main
         self.start(time)
 
     def record(self, image):
@@ -58,15 +66,29 @@ class Collector:
             spawn_points = self.world.get_map().get_spawn_points()
             self.vehicle = self.world.spawn_actor(vehicle_blueprints[0], spawn_points[0])
             message('OK')
+<<<<<<< HEAD
         except Exception as e:
+=======
+            logger.info('Vehicle spawned successfully')
+        except Exception as e:
+            logger.error(f'Failed to spawn vehicle: {e}')
+>>>>>>> upstream/main
             raise PilotError(f'Failed to spawn vehicle: {e}')
 
         # 获取 spectator 相机用于镜头跟随
         self.spectator = self.world.get_spectator()
+<<<<<<< HEAD
+=======
+        logger.info('Spectator camera initialized for follow mode')
+>>>>>>> upstream/main
 
         if self.enable_visualization:
             self.visualizer = CarlaVisualizer(self.world, self.vehicle)
             message('Visualization enabled')
+<<<<<<< HEAD
+=======
+            logger.info('Visualization system initialized')
+>>>>>>> upstream/main
 
         try:
             message('Spawning camera and attaching to vehicle')
@@ -76,12 +98,22 @@ class Collector:
             camera_blueprint.set_attribute('image_size_y', '500')
             camera_blueprint.set_attribute('fov', '110')
             message('OK')
+<<<<<<< HEAD
         except Exception as e:
+=======
+            logger.info('Camera blueprint configured: 950x500 resolution, 110 FOV')
+        except Exception as e:
+            logger.error(f'Failed to configure camera: {e}')
+>>>>>>> upstream/main
             raise PilotError(f'Failed to attach camera to vehicle: {e}')
 
         self.camera = self.world.spawn_actor(camera_blueprint, camera_init_trans, attach_to=self.vehicle)
         self.camera.listen(lambda image: self.record(image))
         self.vehicle.set_autopilot(True)
+<<<<<<< HEAD
+=======
+        logger.info('Camera attached and autopilot enabled')
+>>>>>>> upstream/main
 
         try:
             elapsed = 0
@@ -132,6 +164,7 @@ class Collector:
 
     def stop(self):
         message('Quitting recorder')
+<<<<<<< HEAD
         try:
             self.camera.stop()
             self.vehicle.destroy()
@@ -139,11 +172,29 @@ class Collector:
             pass
         message("Vehicle destroyed")
         
+=======
+        logger.info('Stopping data collection')
+        try:
+            self.camera.stop()
+            self.vehicle.destroy()
+            logger.info('Camera stopped and vehicle destroyed')
+        except Exception as e:
+            logger.warning(f'Error during cleanup: {e}')
+        message("Vehicle destroyed")
+        
+        total_time = int((datetime.datetime.now() - self.start_time).total_seconds())
+        logger.info(f'Data collection completed - total time: {total_time} seconds')
+        
+>>>>>>> upstream/main
         if self.enable_visualization and self.visualizer:
             stats = self.visualizer.get_statistics()
             if stats:
                 message(f'\n=== 录制统计报告 ===')
+<<<<<<< HEAD
                 message(f'总录制时间: {int((datetime.datetime.now() - self.start_time).total_seconds())} 秒')
+=======
+                message(f'总录制时间: {total_time} 秒')
+>>>>>>> upstream/main
                 message(f'平均速度: {stats["avg_speed"]:.1f} km/h')
                 message(f'最高速度: {stats["max_speed"]:.1f} km/h')
                 message(f'平均转向角度: {stats["avg_steer"]:.3f}')
@@ -151,4 +202,10 @@ class Collector:
                 message(f'平均刹车压力: {stats["avg_brake"]:.3f}')
                 message(f'总录制帧数: {stats["total_frames"]}')
                 message(f'轨迹点数量: {len(self.visualizer.trajectory_points)}')
+<<<<<<< HEAD
                 message(f'数据保存目录: {self.directory}')
+=======
+                message(f'数据保存目录: {self.directory}')
+                
+                logger.info(f'Recording statistics - avg_speed: {stats["avg_speed"]:.1f} km/h, max_speed: {stats["max_speed"]:.1f} km/h, total_frames: {stats["total_frames"]}')
+>>>>>>> upstream/main

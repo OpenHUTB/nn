@@ -1,2 +1,7 @@
+<<<<<<< HEAD
 mkdocs
 python-markdown-math
+=======
+mkdocs
+python-markdown-math
+>>>>>>> upstream/main

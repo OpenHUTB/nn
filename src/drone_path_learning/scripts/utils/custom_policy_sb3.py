@@ -1,12 +1,20 @@
+<<<<<<< HEAD
 from tracemalloc import start
+=======
+>>>>>>> upstream/main
 import gym
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch.nn as nn
 import torch as th
+<<<<<<< HEAD
 from torch.nn.modules.linear import Linear
 
 import torchvision.models as pre_models
 import numpy as np
+=======
+
+import torchvision.models as pre_models
+>>>>>>> upstream/main
 import torch.nn.functional as F
 
 """
@@ -16,6 +24,7 @@ import torch.nn.functional as F
     不使用CNN层
     仅用最大池化层生成25个特征
 
+<<<<<<< HEAD
 2. CNN_GAP
     3层CNN
     以AvgPool2d结束
@@ -26,13 +35,29 @@ import torch.nn.functional as F
     以AvgPool2d结束
 
 4. CNN_FC
+=======
+2. CNN_GAP_BN
+    3层CNN，并在每层CNN后使用BN
+    以AvgPool2d结束
+
+3. CNN_FC
+>>>>>>> upstream/main
     3层CNN
     以Flatten结束
     通过FC得到CNN特征 (960 100 25)
 
+<<<<<<< HEAD
 5. CNN_MobileNet
     使用预训练MobileNet作为特征生成器
     以Flatten结束 (576 -> 25)
+=======
+4. CNN_MobileNet
+    使用预训练MobileNet作为特征生成器
+    以Flatten结束 (576 -> 25)
+
+5. CNN_GAP_new
+    当前 policy_name = CNN_GAP 时实际使用的轻量CNN
+>>>>>>> upstream/main
 """
 
 
@@ -85,6 +110,7 @@ class No_CNN(BaseFeaturesExtractor):
         return x
 
 
+<<<<<<< HEAD
 class CNN_GAP(BaseFeaturesExtractor):
     """
     :param observation_space: (gym.Space)
@@ -172,6 +198,8 @@ class CNN_GAP(BaseFeaturesExtractor):
         return x
 
 
+=======
+>>>>>>> upstream/main
 class CNN_GAP_BN(BaseFeaturesExtractor):
     """
     :param observation_space: (gym.Space)
@@ -244,6 +272,7 @@ class CNN_GAP_BN(BaseFeaturesExtractor):
         return x
 
 
+<<<<<<< HEAD
 class CustomNoCNN(BaseFeaturesExtractor):
     """
     :param observation_space: (gym.Space)
@@ -287,6 +316,8 @@ class CustomNoCNN(BaseFeaturesExtractor):
         return x
 
 
+=======
+>>>>>>> upstream/main
 class CNN_FC(BaseFeaturesExtractor):
     """
     :param observation_space: (gym.Space)
@@ -491,3 +522,10 @@ class CNN_GAP_new(BaseFeaturesExtractor):
         self.feature_all = x  # use  to update feature before FC
 
         return x
+<<<<<<< HEAD
+=======
+
+
+# Backward-compatible name for older scripts; policy_name="CNN_GAP" uses CNN_GAP_new.
+CNN_GAP = CNN_GAP_new
+>>>>>>> upstream/main

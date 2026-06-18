@@ -22,7 +22,11 @@ import os
 import sys
 import traceback
 import math
+<<<<<<< HEAD
 
+=======
+# 将自定义模块路径添加到系统路径，以便导入
+>>>>>>> upstream/main
 sys.path.append('./visualizer')
 sys.path.append('./carlacomms')
 
@@ -31,6 +35,10 @@ import parameters
 from gui_CAM import gui_CAM
 
 try:
+<<<<<<< HEAD
+=======
+    # 查找并添加 CARLA 的 Python API 库 (.egg 文件)
+>>>>>>> upstream/main
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
@@ -45,6 +53,10 @@ import time
 import numpy as np
 import pygame
 
+<<<<<<< HEAD
+=======
+# 自定义计时器类，用于计算传感器处理延迟
+>>>>>>> upstream/main
 class CustomTimer:
     def __init__(self):
         try:
@@ -54,11 +66,19 @@ class CustomTimer:
 
     def time(self):
         return self.timer()
+<<<<<<< HEAD
 
+=======
+# 界面显示管理器：负责 Pygame 窗口的初始化、多网格布局及渲染
+>>>>>>> upstream/main
 class DisplayManager:
     def __init__(self, grid_size, window_size):
         pygame.init()
         pygame.font.init()
+<<<<<<< HEAD
+=======
+        # 初始化显示窗口，使用硬件加速和双缓冲
+>>>>>>> upstream/main
         self.display = pygame.display.set_mode(window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         try:
             roc_functions.blip_logo(self.display, parameters.carla_logo)
@@ -70,10 +90,17 @@ class DisplayManager:
 
     def get_window_size(self):
         return [int(self.window_size[0]), int(self.window_size[1])]
+<<<<<<< HEAD
 
     def get_display_size(self):
         return [int(self.window_size[0]/self.grid_size[1]), int(self.window_size[1]/self.grid_size[0])]
 
+=======
+    # 计算单个网格单元的大小
+    def get_display_size(self):
+        return [int(self.window_size[0]/self.grid_size[1]), int(self.window_size[1]/self.grid_size[0])]
+    # 根据网格坐标计算在窗口中的像素偏移量
+>>>>>>> upstream/main
     def get_display_offset(self, gridPos):
         dis_size = self.get_display_size()
         return [int(gridPos[1] * dis_size[0]), int(gridPos[0] * dis_size[1])]
@@ -83,7 +110,11 @@ class DisplayManager:
 
     def get_sensor_list(self):
         return self.sensor_list
+<<<<<<< HEAD
 
+=======
+    # 循环渲染所有传感器的画面并刷新屏幕
+>>>>>>> upstream/main
     def render(self):
         if not self.render_enabled():
             return
@@ -100,7 +131,11 @@ class DisplayManager:
     
     def get_display(self):
         return self.display
+<<<<<<< HEAD
     
+=======
+    # 根据点击位置选择主传感器（仅限 RGB 相机）
+>>>>>>> upstream/main
     def select_main_sensor(self, location):
         for s in self.sensor_list:
             if s.is_clicked(location):
@@ -109,10 +144,17 @@ class DisplayManager:
                     return s
                 else:
                     print(f'the sensor selected is {s.sensor_type}, please select a compatible sensor [RGBCamera]')
+<<<<<<< HEAD
 
 class SensorManager:
     def __init__(self, world, display_man, sensor_type, transform, attached, sensor_options, display_pos):
         self.surface = None
+=======
+# 传感器管理器：负责传感器的创建、数据监听、预处理及渲染准备
+class SensorManager:
+    def __init__(self, world, display_man, sensor_type, transform, attached, sensor_options, display_pos):
+        self.surface = None   # 用于存储准备渲染到 Pygame 的表面
+>>>>>>> upstream/main
         self.world = world
         self.display_man = display_man
         self.display_pos = display_pos 
@@ -128,6 +170,10 @@ class SensorManager:
 
         self.display_man.add_sensor(self)
 
+<<<<<<< HEAD
+=======
+    # 初始化不同类型的传感器（RGB、LiDAR、语义LiDAR、雷达）
+>>>>>>> upstream/main
     def init_sensor(self, sensor_type, transform, attached, sensor_options):
         if sensor_type == 'RGBCamera':
             camera_bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
@@ -180,7 +226,11 @@ class SensorManager:
 
     def get_sensor(self):
         return self.sensor
+<<<<<<< HEAD
 
+=======
+    # 处理 RGB 图像数据并转换为 Pygame Surface 
+>>>>>>> upstream/main
     def save_rgb_image(self, image, return_image = False):
         t_start = self.timer.time()
 
@@ -199,7 +249,11 @@ class SensorManager:
         
         if return_image:
             return image
+<<<<<<< HEAD
 
+=======
+    # 处理 LiDAR 点云并投影为 2D 俯视图图像
+>>>>>>> upstream/main
     def save_lidar_image(self, image):
         t_start = self.timer.time()
 
@@ -216,7 +270,11 @@ class SensorManager:
         lidar_data = np.reshape(lidar_data, (-1, 2))
         lidar_img_size = (disp_size[0], disp_size[1], 3)
         lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
+<<<<<<< HEAD
 
+=======
+        # 在黑色背景上绘制白色点
+>>>>>>> upstream/main
         lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
 
         if self.display_man.render_enabled():
@@ -225,7 +283,11 @@ class SensorManager:
         t_end = self.timer.time()
         self.time_processing += (t_end-t_start)
         self.tics_processing += 1
+<<<<<<< HEAD
 
+=======
+    # 处理语义 LiDAR 数据
+>>>>>>> upstream/main
     def save_semanticlidar_image(self, image):
         t_start = self.timer.time()
 
@@ -251,7 +313,11 @@ class SensorManager:
         t_end = self.timer.time()
         self.time_processing += (t_end-t_start)
         self.tics_processing += 1
+<<<<<<< HEAD
 
+=======
+    # 处理雷达数据
+>>>>>>> upstream/main
     def save_radar_image(self, radar_data):
         t_start = self.timer.time()
         points = np.frombuffer(radar_data.raw_data, dtype=np.dtype('f4'))
@@ -260,7 +326,11 @@ class SensorManager:
         t_end = self.timer.time()
         self.time_processing += (t_end-t_start)
         self.tics_processing += 1
+<<<<<<< HEAD
 
+=======
+    # 将生成的 Surface 绘制到窗口对应位置
+>>>>>>> upstream/main
     def render(self):
         if self.surface is not None:
             offset = self.display_man.get_display_offset(self.display_pos)
@@ -272,7 +342,11 @@ class SensorManager:
     def return_surface(self):
         if self.surface is not None:
             return self.surface
+<<<<<<< HEAD
     
+=======
+    # 检查鼠标点击是否在该传感器的显示区域内
+>>>>>>> upstream/main
     def is_clicked(self, location):
         if ((self.display_offset[0]<location[0]<self.display_offset[0]+self.display_size[0]) and
             (self.display_offset[1]<location[1]<self.display_offset[1]+self.display_size[1])):

@@ -33,7 +33,11 @@ REM 检查是否需要下载
 if not exist "%MUJOCO_ZIP%" (
     echo [INFO] Downloading MuJoCo %MUJOCO_VERSION%...
     echo [INFO] URL: %MUJOCO_REPO%
+<<<<<<< HEAD
     powershell -Command "(New-Object System.Net.WebClient).DownloadFile('%MUJOCO_REPO%', '%MUJOCO_ZIP%')"
+=======
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%MUJOCO_REPO%' -OutFile '%MUJOCO_ZIP%' -UseBasicParsing"
+>>>>>>> upstream/main
     if !errorlevel! neq 0 (
         echo [ERROR] Download failed! Please check network connection.
         exit /b 1
@@ -70,4 +74,8 @@ if !errorlevel! neq 0 (
 )
 
 echo [INFO] MuJoCo closed.
+<<<<<<< HEAD
 exit /b 0
+=======
+exit /b 0
+>>>>>>> upstream/main

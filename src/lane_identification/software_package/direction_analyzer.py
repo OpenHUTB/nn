@@ -80,15 +80,24 @@ class DirectionAnalyzer:
             # 只打印错误，不生成日志文件
             print(f"方向分析失败: {e}")
             return self._create_default_result()
+<<<<<<< HEAD
     
     def _extract_features(self, road_features, lane_info):
         """提取特征"""
         features = {}
         
+=======
+
+    def _extract_features(self, road_features, lane_info):
+        """提取特征"""
+        features = {}
+
+>>>>>>> upstream/main
         # 1. 道路质心特征
         if 'centroid' in road_features and road_features['centroid'] is not None:
             try:
                 cx, cy = road_features['centroid']
+<<<<<<< HEAD
                 centroid_offset = (cx - 400) / 400
                 features['centroid_offset'] = max(-1.0, min(1.0, centroid_offset))
             except:
@@ -106,11 +115,33 @@ class DirectionAnalyzer:
         left_lane = lane_info.get('left_lane')
         right_lane = lane_info.get('right_lane')
         
+=======
+                # 从road_features中获取图像宽度，或使用默认值
+                image_width = road_features.get('image_width', 800)
+                centroid_offset = (cx - image_width / 2) / (image_width / 2)
+                features['centroid_offset'] = max(-1.0, min(1.0, centroid_offset))
+            except:
+                pass
+
+        # 2. 道路坚实度特征
+        if 'solidity' in road_features:
+            features['road_solidity'] = road_features['solidity']
+
+        # 3. 道路面积特征
+        if 'area' in road_features:
+            features['road_area'] = road_features['area']
+
+        # 4. 车道线特征
+        left_lane = lane_info.get('left_lane')
+        right_lane = lane_info.get('right_lane')
+
+>>>>>>> upstream/main
         if left_lane and right_lane:
             try:
                 # 车道收敛度
                 convergence = self._calculate_lane_convergence_safe(left_lane, right_lane)
                 features['lane_convergence'] = convergence
+<<<<<<< HEAD
                 
                 # 车道对称性
                 symmetry = self._calculate_lane_symmetry_safe(left_lane, right_lane)
@@ -124,6 +155,21 @@ class DirectionAnalyzer:
                 # 只打印错误，不生成日志文件
                 pass
         
+=======
+
+                # 车道对称性
+                symmetry = self._calculate_lane_symmetry_safe(left_lane, right_lane)
+                features['lane_symmetry'] = symmetry
+
+                # 车道平衡性
+                balance = self._calculate_lane_balance(left_lane, right_lane)
+                features['lane_balance'] = balance
+
+            except Exception as e:
+                # 只打印错误，不生成日志文件
+                pass
+
+>>>>>>> upstream/main
         # 5. 路径特征
         future_path = lane_info.get('future_path')
         if future_path and 'center_path' in future_path:
@@ -135,37 +181,68 @@ class DirectionAnalyzer:
             except Exception as e:
                 # 只打印错误，不生成日志文件
                 pass
+<<<<<<< HEAD
         
         # 6. 检测质量
         detection_quality = lane_info.get('detection_quality', 0.0)
         features['detection_quality'] = detection_quality
         
+=======
+
+        # 6. 检测质量
+        detection_quality = lane_info.get('detection_quality', 0.0)
+        features['detection_quality'] = detection_quality
+
+>>>>>>> upstream/main
         # 7. 历史一致性
         if self.direction_history:
             consistency = self._calculate_historical_consistency()
             features['historical_consistency'] = consistency
+<<<<<<< HEAD
         
         return features
     
+=======
+
+        return features
+
+>>>>>>> upstream/main
     def _calculate_lane_convergence_safe(self, left_lane, right_lane):
         """安全计算车道线收敛度"""
         try:
             left_func = left_lane.get('func')
             right_func = right_lane.get('func')
+<<<<<<< HEAD
             
             if left_func and right_func:
                 y_bottom = 600
                 y_top = 240
                 
+=======
+
+            if left_func and right_func:
+                # 使用相对位置而非硬编码值
+                # 假设标准高度为600，底部为100%高度，顶部为40%高度
+                y_bottom = 600
+                y_top = int(y_bottom * 0.4)
+
+>>>>>>> upstream/main
                 try:
                     left_bottom = float(left_func(y_bottom))
                     right_bottom = float(right_func(y_bottom))
                     left_top = float(left_func(y_top))
                     right_top = float(right_func(y_top))
+<<<<<<< HEAD
                     
                     width_bottom = right_bottom - left_bottom
                     width_top = right_top - left_top
                     
+=======
+
+                    width_bottom = right_bottom - left_bottom
+                    width_top = right_top - left_top
+
+>>>>>>> upstream/main
                     if width_bottom > 0:
                         convergence = width_top / width_bottom
                         return max(0.3, min(3.0, convergence))
@@ -173,14 +250,21 @@ class DirectionAnalyzer:
                     pass
         except:
             pass
+<<<<<<< HEAD
         
         return 1.0
     
+=======
+
+        return 1.0
+
+>>>>>>> upstream/main
     def _calculate_lane_symmetry_safe(self, left_lane, right_lane):
         """安全计算车道对称性"""
         try:
             left_func = left_lane.get('func')
             right_func = right_lane.get('func')
+<<<<<<< HEAD
             
             if left_func and right_func:
                 y = 450
@@ -194,6 +278,23 @@ class DirectionAnalyzer:
                     left_dist = center - left_x
                     right_dist = right_x - center
                     
+=======
+
+            if left_func and right_func:
+                # 使用相对位置计算对称性
+                y = 450  # 在75%高度处检查
+
+                try:
+                    left_x = float(left_func(y))
+                    right_x = float(right_func(y))
+
+                    # 计算左右车道到中心的距离
+                    center = (left_x + right_x) / 2  # 使用实际车道中心
+
+                    left_dist = center - left_x
+                    right_dist = right_x - center
+
+>>>>>>> upstream/main
                     if left_dist + right_dist > 0:
                         symmetry = 1 - abs(left_dist - right_dist) / (left_dist + right_dist)
                         return max(0, min(1, symmetry))
@@ -201,8 +302,13 @@ class DirectionAnalyzer:
                     pass
         except:
             pass
+<<<<<<< HEAD
         
         return 0.5
+=======
+
+        return 0.5  # 默认中等对称性
+>>>>>>> upstream/main
     
     def _calculate_lane_balance(self, left_lane, right_lane):
         """计算车道平衡性"""

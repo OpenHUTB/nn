@@ -6,6 +6,19 @@ import matplotlib.animation as animation
 
 
 class RoboticArmWithGripper:
+<<<<<<< HEAD
+=======
+    # 关节角度范围限制（弧度）
+    JOINT_LIMITS = [
+        (-np.pi, np.pi),        # Joint 1: 底座旋转
+        (-np.pi / 2, np.pi / 2),  # Joint 2: 肩关节
+        (-np.pi / 2, np.pi / 2),  # Joint 3: 肘关节
+        (-np.pi, np.pi),        # Joint 4: 腕关节
+    ]
+    GRIPPER_OPENING_RANGE = (0.0, 0.4)
+    GRIPPER_ANGLE_RANGE = (-np.pi, np.pi)
+
+>>>>>>> upstream/main
     def __init__(self):
         # 机械臂参数
         self.link_lengths = [2.0, 1.5, 1.0, 0.5]  # 四个连杆长度
@@ -17,6 +30,12 @@ class RoboticArmWithGripper:
         self.gripper_opening = 0.2  # 夹爪开口大小
         self.gripper_angle = 0.0  # 夹爪旋转角度
 
+<<<<<<< HEAD
+=======
+        # 动画状态
+        self._animating = False
+
+>>>>>>> upstream/main
         # DH参数
         self.update_dh_params()
 
@@ -24,6 +43,25 @@ class RoboticArmWithGripper:
         self.fig = plt.figure(figsize=(14, 8))
         self.setup_plot()
 
+<<<<<<< HEAD
+=======
+    @staticmethod
+    def _clamp(value, lower, upper):
+        """将值限制在指定范围内"""
+        return max(lower, min(upper, value))
+
+    def validate_angles(self, angles):
+        """验证并修正关节角度，确保在合法范围内"""
+        if len(angles) != len(self.JOINT_LIMITS):
+            raise ValueError(
+                f"关节角度数量错误：期望 {len(self.JOINT_LIMITS)} 个，实际 {len(angles)} 个"
+            )
+        return [
+            self._clamp(a, lo, hi)
+            for a, (lo, hi) in zip(angles, self.JOINT_LIMITS)
+        ]
+
+>>>>>>> upstream/main
     def update_dh_params(self):
         """更新DH参数"""
         self.dh_params = [
@@ -226,14 +264,31 @@ class RoboticArmWithGripper:
 
     def update_from_slider(self, val):
         """更新关节角度"""
+<<<<<<< HEAD
         self.joint_angles = [s.val for s in self.sliders]
+=======
+        self.joint_angles = self.validate_angles([s.val for s in self.sliders])
+>>>>>>> upstream/main
         self.update_dh_params()
         self.update_plot()
 
     def update_gripper(self, val):
         """更新夹爪参数"""
+<<<<<<< HEAD
         self.gripper_opening = self.slider_gripper_open.val
         self.gripper_angle = self.slider_gripper_rotate.val
+=======
+        self.gripper_opening = self._clamp(
+            self.slider_gripper_open.val,
+            self.GRIPPER_OPENING_RANGE[0],
+            self.GRIPPER_OPENING_RANGE[1]
+        )
+        self.gripper_angle = self._clamp(
+            self.slider_gripper_rotate.val,
+            self.GRIPPER_ANGLE_RANGE[0],
+            self.GRIPPER_ANGLE_RANGE[1]
+        )
+>>>>>>> upstream/main
         self.update_plot()
 
     def reset_all(self, event):
@@ -246,13 +301,31 @@ class RoboticArmWithGripper:
         self.slider_gripper_open.set_val(0.2)
         self.slider_gripper_rotate.set_val(0.0)
 
+<<<<<<< HEAD
     def grasp_demo(self, event):
         """抓取演示动画"""
         # 保存原始开口大小
+=======
+    def _safe_pause(self, seconds):
+        """带中断检查的暂停，窗口关闭时提前返回"""
+        if not self._animating:
+            return False
+        try:
+            plt.pause(seconds)
+            return True
+        except Exception:
+            self._animating = False
+            return False
+
+    def grasp_demo(self, event):
+        """抓取演示动画"""
+        self._animating = True
+>>>>>>> upstream/main
         original_opening = self.gripper_opening
 
         # 闭合夹爪
         for i in range(20):
+<<<<<<< HEAD
             self.gripper_opening = original_opening * (1 - i / 20)
             self.slider_gripper_open.set_val(self.gripper_opening)
             self.update_plot()
@@ -274,11 +347,43 @@ class RoboticArmWithGripper:
 
         # 定义动画路径
         path = [
+=======
+            if not self._animating:
+                break
+            self.gripper_opening = original_opening * (1 - i / 20)
+            self.slider_gripper_open.set_val(self.gripper_opening)
+            self.update_plot()
+            if not self._safe_pause(0.05):
+                break
+
+        self._safe_pause(0.5)
+
+        # 打开夹爪
+        for i in range(20):
+            if not self._animating:
+                break
+            self.gripper_opening = original_opening * (i / 20)
+            self.slider_gripper_open.set_val(self.gripper_opening)
+            self.update_plot()
+            if not self._safe_pause(0.05):
+                break
+
+        self._animating = False
+
+    def animate_movement(self, event):
+        """动画演示"""
+        self._animating = True
+        original_angles = self.joint_angles.copy()
+
+        # 定义动画路径（每条路径都经过验证）
+        raw_path = [
+>>>>>>> upstream/main
             [0.5, 0.3, -0.2, 0.1],
             [-0.3, 0.6, -0.4, 0.2],
             [0.8, -0.2, 0.5, -0.3],
             original_angles
         ]
+<<<<<<< HEAD
 
         for target_angles in path:
             # 平滑移动到目标角度
@@ -302,6 +407,43 @@ class RoboticArmWithGripper:
             self.update_dh_params()
             self.update_plot()
             plt.pause(0.03)
+=======
+        path = [self.validate_angles(p) for p in raw_path]
+
+        try:
+            for target_angles in path:
+                if not self._animating:
+                    break
+                for i in range(20):
+                    if not self._animating:
+                        break
+                    for j in range(4):
+                        current = self.joint_angles[j]
+                        target = target_angles[j]
+                        self.joint_angles[j] = current + (target - current) * (i + 1) / 20
+                    self.update_dh_params()
+                    self.update_plot()
+                    if not self._safe_pause(0.03):
+                        break
+
+                if not self._safe_pause(0.5):
+                    break
+
+            # 恢复原始角度
+            for i in range(20):
+                if not self._animating:
+                    break
+                for j in range(4):
+                    current = self.joint_angles[j]
+                    target = original_angles[j]
+                    self.joint_angles[j] = current + (target - current) * (i + 1) / 20
+                self.update_dh_params()
+                self.update_plot()
+                if not self._safe_pause(0.03):
+                    break
+        finally:
+            self._animating = False
+>>>>>>> upstream/main
 
     def update_plot(self):
         """更新所有图形"""

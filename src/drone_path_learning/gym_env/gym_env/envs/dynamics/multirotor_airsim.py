@@ -45,6 +45,10 @@ class MultirotorDynamicsAirsim:
         self.v_xy_sp = 0
         self.v_z_sp = 0
         self.yaw_rate_sp = 0
+<<<<<<< HEAD
+=======
+        self.yaw_sp = 0
+>>>>>>> upstream/main
 
         # 动作空间
         self.acc_xy_max = cfg.getfloat("multirotor", "acc_xy_max")
@@ -54,6 +58,18 @@ class MultirotorDynamicsAirsim:
         self.yaw_rate_max_deg = cfg.getfloat("multirotor", "yaw_rate_max_deg")
         self.yaw_rate_max_rad = math.radians(self.yaw_rate_max_deg)
         self.max_vertical_difference = 5
+<<<<<<< HEAD
+=======
+        self.action_smoothing_alpha = cfg.getfloat(
+            "multirotor", "action_smoothing_alpha", fallback=0.25
+        )
+        self.action_smoothing_alpha = float(
+            np.clip(self.action_smoothing_alpha, 0.0, 1.0)
+        )
+        self.yaw_rate_change_max_rad = math.radians(
+            cfg.getfloat("multirotor", "yaw_rate_change_max_deg", fallback=5.0)
+        )
+>>>>>>> upstream/main
 
         if self.navigation_3d:
             if self.using_velocity_state:
@@ -78,6 +94,12 @@ class MultirotorDynamicsAirsim:
 
     def reset(self):
         self.client.reset()
+<<<<<<< HEAD
+=======
+        self.v_xy_sp = 0
+        self.v_z_sp = 0
+        self.yaw_rate_sp = 0
+>>>>>>> upstream/main
         # 重置目标
         self.update_goal_pose()
 
@@ -102,12 +124,43 @@ class MultirotorDynamicsAirsim:
 
     def set_action(self, action):
 
+<<<<<<< HEAD
         self.v_xy_sp = action[0] * 0.7
         self.yaw_rate_sp = action[-1] * 2
         if self.navigation_3d:
             self.v_z_sp = float(action[1])
         else:
             self.v_z_sp = 0
+=======
+        v_xy_target = float(np.clip(action[0], self.v_xy_min, self.v_xy_max))
+        yaw_rate_target = float(
+            np.clip(action[-1], -self.yaw_rate_max_rad, self.yaw_rate_max_rad)
+        )
+        if self.navigation_3d:
+            v_z_target = float(np.clip(action[1], -self.v_z_max, self.v_z_max))
+        else:
+            v_z_target = 0
+
+        alpha = self.action_smoothing_alpha
+        v_xy_smoothed = self.v_xy_sp + alpha * (v_xy_target - self.v_xy_sp)
+        v_z_smoothed = self.v_z_sp + alpha * (v_z_target - self.v_z_sp)
+        yaw_rate_smoothed = self.yaw_rate_sp + alpha * (
+            yaw_rate_target - self.yaw_rate_sp
+        )
+
+        v_xy_delta_max = self.acc_xy_max * self.dt
+        self.v_xy_sp += float(
+            np.clip(v_xy_smoothed - self.v_xy_sp, -v_xy_delta_max, v_xy_delta_max)
+        )
+        self.v_z_sp = float(np.clip(v_z_smoothed, -self.v_z_max, self.v_z_max))
+        self.yaw_rate_sp += float(
+            np.clip(
+                yaw_rate_smoothed - self.yaw_rate_sp,
+                -self.yaw_rate_change_max_rad,
+                self.yaw_rate_change_max_rad,
+            )
+        )
+>>>>>>> upstream/main
 
         self.yaw = self.get_attitude()[2]
         self.yaw_sp = self.yaw + self.yaw_rate_sp * self.dt
@@ -132,9 +185,12 @@ class MultirotorDynamicsAirsim:
                     is_rate=True, yaw_or_rate=math.degrees(self.yaw_rate_sp)
                 ),
             ).join()
+<<<<<<< HEAD
             # self.client.moveByVelocityZAsync(vx_local_sp, vy_local_sp, -self.start_position[2], self.dt,
             #                                 drivetrain=airsim.DrivetrainType.ForwardOnly,
             #                                 yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=math.degrees(0))).join()
+=======
+>>>>>>> upstream/main
         elif len(action) == 3:
             self.client.moveByVelocityAsync(
                 vx_local_sp,
@@ -165,7 +221,10 @@ class MultirotorDynamicsAirsim:
         self.goal_position[0] = goal_x
         self.goal_position[1] = goal_y
         self.goal_position[2] = self.start_position[2]
+<<<<<<< HEAD
         # print('New goal pose: ', self.goal_position)
+=======
+>>>>>>> upstream/main
 
     def set_start(self, position, random_angle):
         self.start_position = position
@@ -182,10 +241,15 @@ class MultirotorDynamicsAirsim:
         rect = rect_set
         random_angle = random_angle_set
         noise = np.random.random()
+<<<<<<< HEAD
         angle = random_angle * noise - math.pi  # -pi~pi
         rect = [-128, -128, 128, 128]
         # goal_x = 100*math.sin(angle)
         # goal_y = 100*math.cos(angle)
+=======
+        angle = random_angle * noise - math.pi
+        rect = [-128, -128, 128, 128]
+>>>>>>> upstream/main
 
         if abs(angle) == math.pi / 2:
             goal_x = 0
@@ -214,6 +278,7 @@ class MultirotorDynamicsAirsim:
         @description: 更新并获取当前无人机状态及state_norm
         @param {type}
         @return: state_norm
+<<<<<<< HEAD
                     归一化状态范围 0-255
         """
 
@@ -222,6 +287,16 @@ class MultirotorDynamicsAirsim:
         relative_pose_z = (
             self.get_position()[2] - self.goal_position[2]
         )  # 当前位置z为正值
+=======
+        归一化状态范围 0-255
+        """
+
+        distance = self.get_distance_to_goal_2d()
+        relative_yaw = self._get_relative_yaw()
+        relative_pose_z = (
+            self.get_position()[2] - self.goal_position[2]
+        )
+>>>>>>> upstream/main
         vertical_distance_norm = (
             relative_pose_z / self.max_vertical_difference / 2 + 0.5
         ) * 255

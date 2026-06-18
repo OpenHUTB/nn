@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+<<<<<<< HEAD
 import numpy as np # 导入NumPy库。NumPy（Numerical Python）是 Python 中最基础、最强大的科学计算库之一
 
 # 条件导入 matplotlib，增强兼容性
@@ -15,6 +16,10 @@ except ImportError:
         def title(self, *args, **kwargs): pass
         def legend(self, *args, **kwargs): pass
     plt = DummyPlt()
+=======
+import numpy as np
+import matplotlib.pyplot as plt
+>>>>>>> upstream/main
 
 # 用于创建各种静态、交互式和动画可视化图表
 
@@ -281,6 +286,7 @@ if __name__ == "__main__":
     # w_lsq: 通过最小二乘法得到的权重向量
     # w_gd: 通过梯度下降法得到的权重向量
     f, w_lsq, w_gd = main(x_train, y_train)
+<<<<<<< HEAD
     y_pred = f(x_test)
     mse = np.mean((y_test - y_pred) ** 2)
     print(f"均方误差(MSE): {mse:.4f}")
@@ -341,4 +347,15 @@ if __name__ == "__main__":
     print("预测值与真实值的标准差：{:.1f}".format(std))
 
     # 使用封装的绘图函数
+=======
+
+    y_train_pred = f(x_train)
+    std = evaluate(y_train, y_train_pred)
+    print("训练集预测值与真实值的标准差：{:.1f}".format(std))
+
+    y_test_pred = f(x_test)
+    std = evaluate(y_test, y_test_pred)
+    print("预测值与真实值的标准差：{:.1f}".format(std))
+
+>>>>>>> upstream/main
     plot_results(x_train, y_train, x_test, y_test, y_test_pred)

@@ -13,6 +13,11 @@
 ================================================================================
 """
 import os
+<<<<<<< HEAD
+=======
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+import warnings
+>>>>>>> upstream/main
 import torch
 import numpy as np
 import csv
@@ -59,7 +64,11 @@ class SkipFrame(gym.Wrapper):
         for _ in range(self._skip):
             state, reward, terminated, truncated, info = self.env.step(action)
             total_reward += reward
+<<<<<<< HEAD
             if terminated:
+=======
+            if terminated or truncated:
+>>>>>>> upstream/main
                 break
         return state, total_reward, terminated, truncated, info
 
@@ -88,7 +97,11 @@ class BaseDQNNetwork(nn.Module):
         in_dim: 输入维度，通常是 (通道数, 高度, 宽度)
         out_dim: 输出维度，即动作空间大小（CarRacing是5）
     """
+<<<<<<< HEAD
     def __init__(self, in_dim, out_dim):
+=======
+    def __init__(self, in_dim, out_dim, dueling: bool = False):
+>>>>>>> upstream/main
         super().__init__()
         channel_n, height, width = in_dim
 
@@ -96,6 +109,7 @@ class BaseDQNNetwork(nn.Module):
         if height != 84 or width != 84:
             raise ValueError(f"网络要求输入尺寸为 (84, 84)，但收到 ({height}, {width})")
 
+<<<<<<< HEAD
         self.net = nn.Sequential(
             # 第一层卷积: 提取低级特征（边缘、纹理）
             nn.Conv2d(in_channels=channel_n, out_channels=16, kernel_size=8, stride=4),
@@ -119,6 +133,42 @@ class BaseDQNNetwork(nn.Module):
     def forward(self, x):
         """前向传播"""
         return self.net(x)
+=======
+        self.dueling = bool(dueling)
+        self.features = nn.Sequential(
+            nn.Conv2d(in_channels=channel_n, out_channels=16, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+        if self.dueling:
+            self.advantage = nn.Sequential(
+                nn.Linear(2592, 256),
+                nn.ReLU(),
+                nn.Linear(256, out_dim),
+            )
+            self.value = nn.Sequential(
+                nn.Linear(2592, 256),
+                nn.ReLU(),
+                nn.Linear(256, 1),
+            )
+        else:
+            self.head = nn.Sequential(
+                nn.Linear(2592, 256),
+                nn.ReLU(),
+                nn.Linear(256, out_dim),
+            )
+
+    def forward(self, x):
+        """前向传播"""
+        feats = self.features(x)
+        if self.dueling:
+            advantage = self.advantage(feats)
+            value = self.value(feats)
+            return value + advantage - advantage.mean(dim=1, keepdim=True)
+        return self.head(feats)
+>>>>>>> upstream/main
 
 
 # ================================================================================
@@ -142,7 +192,11 @@ class BaseAgent:
     """
     
     def __init__(self, state_space_shape, action_n, config=None, config_path=None,
+<<<<<<< HEAD
                  load_state=False, load_model=None):
+=======
+                 load_state=False, load_model=None, hyperparameter_overrides=None):
+>>>>>>> upstream/main
         """
         初始化智能体
         
@@ -171,6 +225,12 @@ class BaseAgent:
         
         # 2. 提取超参数
         self.hyperparameters = self.config.get('hyperparameters', {})
+<<<<<<< HEAD
+=======
+        if hyperparameter_overrides:
+            self.hyperparameters = dict(self.hyperparameters)
+            self.hyperparameters.update(hyperparameter_overrides)
+>>>>>>> upstream/main
         
         # 折扣因子 gamma: 未来奖励的重要性，越接近1越重视长期收益
         self.gamma = self.hyperparameters.get('gamma', 0.99)
@@ -185,7 +245,33 @@ class BaseAgent:
         self.epsilon_min = self.hyperparameters.get('epsilon_min', 0.05)
         
         # 3. 设置设备（GPU或CPU）
+<<<<<<< HEAD
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+=======
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            cuda_available = torch.cuda.is_available()
+        self.device = "cuda" if cuda_available else "cpu"
+        if self.device == "cuda":
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+
+        self.normalize_obs = bool(self.hyperparameters.get('normalize_obs', True))
+        self.reward_scale = float(self.hyperparameters.get("reward_scale", 1.0))
+        reward_clip = self.hyperparameters.get("reward_clip", None)
+        try:
+            reward_clip_f = None if reward_clip is None else float(reward_clip)
+        except (TypeError, ValueError):
+            reward_clip_f = None
+        self.reward_clip = reward_clip_f if (reward_clip_f is not None and reward_clip_f > 0) else None
+        self.use_amp = bool(self.hyperparameters.get('amp', True)) and self.device == "cuda"
+        if self.use_amp:
+            from torch.cuda.amp import GradScaler
+            self.scaler = GradScaler()
+        else:
+            self.scaler = None
+>>>>>>> upstream/main
         
         # 4. 构建神经网络
         self.policy_net = None
@@ -227,13 +313,23 @@ class BaseAgent:
         策略网络 (Policy Net): 负责选择动作，不断更新
         目标网络 (Target Net): 提供稳定的目标Q值
         """
+<<<<<<< HEAD
         self.policy_net = BaseDQNNetwork(self.state_shape, self.action_n).float()
         self.frozen_net = BaseDQNNetwork(self.state_shape, self.action_n).float()
+=======
+        dueling = bool(self.hyperparameters.get('dueling', True))
+        self.policy_net = BaseDQNNetwork(self.state_shape, self.action_n, dueling=dueling).float()
+        self.frozen_net = BaseDQNNetwork(self.state_shape, self.action_n, dueling=dueling).float()
+>>>>>>> upstream/main
         self.frozen_net.load_state_dict(self.policy_net.state_dict())
         self.policy_net = self.policy_net.to(self.device)
         self.frozen_net = self.frozen_net.to(self.device)
 
+<<<<<<< HEAD
     def store(self, state, action, reward, new_state, terminated):
+=======
+    def store(self, state, action, reward, new_state, terminated, truncated=None):
+>>>>>>> upstream/main
         """
         将经验存储到回放缓冲区
         
@@ -242,6 +338,7 @@ class BaseAgent:
         - action: 执行的动作
         - reward: 获得的奖励
         - new_state: 下一个状态
+<<<<<<< HEAD
         - terminated: 是否结束
         """
         self.buffer.add(TensorDict({
@@ -250,10 +347,30 @@ class BaseAgent:
             "reward": torch.tensor(reward),
             "new_state": torch.tensor(new_state),
             "terminated": torch.tensor(terminated)
+=======
+        - terminated: 环境终止（到达终止状态）
+        - truncated: 时间截断/外部截断（如 time limit）
+        """
+        state_arr = np.asarray(state)
+        new_state_arr = np.asarray(new_state)
+        reward_f = float(reward) * self.reward_scale
+        if self.reward_clip is not None:
+            reward_f = float(np.clip(reward_f, -self.reward_clip, self.reward_clip))
+        if truncated is None:
+            truncated = False
+        self.buffer.add(TensorDict({
+            "state": torch.as_tensor(state_arr),
+            "action": torch.as_tensor(action, dtype=torch.int64),
+            "reward": torch.as_tensor(reward_f, dtype=torch.float32),
+            "new_state": torch.as_tensor(new_state_arr),
+            "terminated": torch.as_tensor(terminated, dtype=torch.bool),
+            "truncated": torch.as_tensor(truncated, dtype=torch.bool),
+>>>>>>> upstream/main
         }, batch_size=[]))
 
     def get_samples(self, batch_size):
         """从回放缓冲区随机采样一批经验"""
+<<<<<<< HEAD
         batch = self.buffer.sample(batch_size)
         states = batch.get('state').float().to(self.device)
         new_states = batch.get('new_state').float().to(self.device)
@@ -261,6 +378,29 @@ class BaseAgent:
         rewards = batch.get('reward').squeeze().to(self.device)
         terminateds = batch.get('terminated').squeeze().to(self.device)
         return states, actions, rewards, new_states, terminateds
+=======
+        batch = self.buffer.sample(batch_size).to(self.device)
+        states_t = batch.get('state')
+        new_states_t = batch.get('new_state')
+        if self.normalize_obs and states_t.dtype == torch.uint8:
+            states = states_t.to(dtype=torch.float32).mul_(1.0 / 255.0)
+        else:
+            states = states_t.to(dtype=torch.float32)
+        if self.normalize_obs and new_states_t.dtype == torch.uint8:
+            new_states = new_states_t.to(dtype=torch.float32).mul_(1.0 / 255.0)
+        else:
+            new_states = new_states_t.to(dtype=torch.float32)
+        actions = batch.get('action').to(dtype=torch.int64).view(-1)
+        rewards = batch.get('reward').to(dtype=torch.float32).view(-1)
+        terminateds = batch.get('terminated').to(dtype=torch.bool).view(-1)
+        if 'truncated' in batch.keys():
+            truncateds = batch.get('truncated').to(dtype=torch.bool).view(-1)
+        else:
+            truncateds = torch.zeros_like(terminateds)
+        treat_truncated_as_terminal = bool(self.hyperparameters.get('treat_truncated_as_terminal', True))
+        dones = terminateds | (truncateds if treat_truncated_as_terminal else False)
+        return states, actions, rewards, new_states, dones
+>>>>>>> upstream/main
 
     def take_action(self, state):
         """
@@ -273,6 +413,7 @@ class BaseAgent:
         if np.random.rand() < self.epsilon:
             action_idx = np.random.randint(self.action_n)
         else:
+<<<<<<< HEAD
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             with torch.no_grad():
                 action_values = self.policy_net(state)
@@ -283,6 +424,23 @@ class BaseAgent:
             self.epsilon *= self.epsilon_decay
         else:
             self.epsilon = self.epsilon_min
+=======
+            state_arr = np.asarray(state)
+            state_tensor = torch.as_tensor(state_arr, device=self.device)
+            if state_tensor.dtype != torch.float32:
+                state_tensor = state_tensor.to(dtype=torch.float32)
+            if self.normalize_obs and state_arr.dtype == np.uint8:
+                state_tensor = state_tensor.mul_(1.0 / 255.0)
+            state_tensor = state_tensor.unsqueeze(0)
+            with torch.inference_mode():
+                action_idx = int(self.policy_net(state_tensor).argmax(dim=1).item())
+        
+        if self.epsilon != 0:
+            if self.epsilon > self.epsilon_min:
+                self.epsilon *= self.epsilon_decay
+            else:
+                self.epsilon = self.epsilon_min
+>>>>>>> upstream/main
             
         self.act_taken += 1
         return action_idx
@@ -299,6 +457,14 @@ class BaseAgent:
         """同步目标网络 - 将策略网络的权重复制到目标网络"""
         self.frozen_net.load_state_dict(self.policy_net.state_dict())
 
+<<<<<<< HEAD
+=======
+    def soft_update_target_net(self, tau: float):
+        tau_f = float(tau)
+        for target_param, policy_param in zip(self.frozen_net.parameters(), self.policy_net.parameters()):
+            target_param.data.mul_(1.0 - tau_f).add_(policy_param.data, alpha=tau_f)
+
+>>>>>>> upstream/main
     def save(self, save_dir, filename):
         """保存模型到文件"""
         os.makedirs(save_dir, exist_ok=True)
@@ -324,8 +490,13 @@ class BaseAgent:
         self.n_updates = checkpoint['n_updates']
         print(f"模型已从 {path} 加载")
 
+<<<<<<< HEAD
     def write_log(self, date_list, time_list, reward_list, length_list, 
                   loss_list, epsilon_list, log_filename='log.csv'):
+=======
+    def write_log(self, date_list, time_list, reward_list, length_list,
+                  loss_list, epsilon_list, log_filename='log.csv', extra_rows=None):
+>>>>>>> upstream/main
         """将训练日志写入CSV文件"""
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir, exist_ok=True)
@@ -337,6 +508,12 @@ class BaseAgent:
             ['loss'] + loss_list,
             ['epsilon'] + epsilon_list
         ]
+<<<<<<< HEAD
+=======
+        if extra_rows:
+            for key, values in extra_rows.items():
+                rows.append([str(key)] + list(values))
+>>>>>>> upstream/main
         with open(os.path.join(self.log_dir, log_filename), 'w') as f:
             csv.writer(f).writerows(rows)
 

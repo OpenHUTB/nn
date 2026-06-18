@@ -30,6 +30,10 @@ import gc
 
 class gui_CAM:
     def __init__(self, display, use_cuda = True, display_manager = None):
+<<<<<<< HEAD
+=======
+        # 默认加载预训练的 ResNet34 模型
+>>>>>>> upstream/main
         self.model = resnet34(pretrained=True)
         self.model_gradient_compatible = True
         self.display_manager = display_manager
@@ -558,6 +562,17 @@ class gui_CAM:
         self.cam = None
     
     def run_menu_no_loop(self, event, call_exit, input_image, offset):
+<<<<<<< HEAD
+=======
+        """
+        Pygame 主事件处理函数。
+        按键映射：
+        - SPACE: 暂停并运行 CAM 分析
+        - M: 选择/对比 CAM 算法
+        - N: 切换模型
+        - T: 获取 Top Detections
+        """
+>>>>>>> upstream/main
         if not self.main_location:
             self.main_location = offset
         if parameters.paused == True:

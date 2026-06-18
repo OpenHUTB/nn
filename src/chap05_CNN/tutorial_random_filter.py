@@ -5,6 +5,10 @@
 # In[191]:
 # 导入必要的库
 import os # 提供操作系统相关功能，如文件路径操作
+<<<<<<< HEAD
+=======
+import json
+>>>>>>> upstream/main
 import tensorflow as tf
 from tensorflow import keras # 引入Keras高级API接口
 from tensorflow.keras import layers, optimizers, datasets
@@ -13,6 +17,20 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 import pylab # Matplotlib的绘图接口
 from PIL import Image
 import numpy as np # 数值计算库
+<<<<<<< HEAD
+=======
+from pathlib import Path
+
+# 运行参数（支持环境变量覆盖）
+RANDOM_FILTER_SEED = int(os.getenv("RANDOM_FILTER_SEED", "42"))
+RANDOM_FILTER_IMAGE = os.getenv("RANDOM_FILTER_IMAGE", "corgi.jpg")
+RANDOM_FILTER_OUT_DIR = os.getenv("RANDOM_FILTER_OUT_DIR", "outputs")
+RANDOM_FILTER_SHOW = os.getenv("RANDOM_FILTER_SHOW", "1") == "1"
+
+# 固定随机种子，保证结果可复现
+np.random.seed(RANDOM_FILTER_SEED)
+tf.random.set_seed(RANDOM_FILTER_SEED)
+>>>>>>> upstream/main
 
 # 定义一个简单的卷积模型
 class MyConvModel(keras.Model): # 定义一个继承自Keras模型基类的自定义卷积神经网络模型
@@ -29,9 +47,22 @@ class MyConvModel(keras.Model): # 定义一个继承自Keras模型基类的自�
 # In[192]:
 random_conv = MyConvModel()# 实例化一个新的卷积神经网络模型
 
+<<<<<<< HEAD
 # 打开一张尺寸为 639x516 的随机图片
 # 使用Pillow库以二进制模式打开图片文件
 img = Image.open(open('corgi.jpg', 'rb')).convert('RGB')  # 返回PIL.Image对象
+=======
+# 解析输入图片路径
+script_dir = Path(__file__).resolve().parent
+image_path = Path(RANDOM_FILTER_IMAGE)
+if not image_path.is_absolute():
+    image_path = script_dir / image_path
+if not image_path.exists():
+    raise FileNotFoundError(f"未找到输入图片: {image_path}")
+
+# 打开图片并转换为RGB
+img = Image.open(open(image_path, 'rb')).convert('RGB')  # 返回PIL.Image对象
+>>>>>>> upstream/main
 
 # 将PIL图像转换为numpy数组，并指定数据类型为float64
 img = np.asarray(img, dtype='float32') / 255.0  # 归一化到0-1范围，使用float32更高效
@@ -50,4 +81,39 @@ pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img[0, :, :, :])        
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])    # 第二个子图：显示输出图像的第一个通道（feature map）
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])    # 第三个子图：显示输出图像的第二个通道（feature map）
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])    # 第四个子图：显示输出图像的第三个通道（feature map）
+<<<<<<< HEAD
 pylab.show()                                                                    # 显示所有绘制的图像
+=======
+
+# 保存图像与统计报告
+output_dir = Path(RANDOM_FILTER_OUT_DIR)
+if not output_dir.is_absolute():
+    output_dir = script_dir / output_dir
+output_dir.mkdir(parents=True, exist_ok=True)
+
+figure_path = output_dir / "random_filter_result.png"
+report_path = output_dir / "random_filter_report.json"
+
+pylab.tight_layout()
+pylab.savefig(figure_path, dpi=140, bbox_inches='tight')
+if RANDOM_FILTER_SHOW:
+    pylab.show()  # 显示所有绘制的图像
+else:
+    pylab.close()
+
+report = {
+    "seed": RANDOM_FILTER_SEED,
+    "input_image": str(image_path),
+    "output_figure": str(figure_path),
+    "input_shape": list(img.shape),
+    "output_shape": list(img_out.shape),
+    "output_min": float(tf.reduce_min(img_out).numpy()),
+    "output_max": float(tf.reduce_max(img_out).numpy()),
+    "output_mean": float(tf.reduce_mean(img_out).numpy()),
+}
+with report_path.open("w", encoding="utf-8") as f:
+    json.dump(report, f, ensure_ascii=False, indent=2)
+
+print("输出图像已保存:", figure_path.resolve())
+print("统计报告已保存:", report_path.resolve())
+>>>>>>> upstream/main

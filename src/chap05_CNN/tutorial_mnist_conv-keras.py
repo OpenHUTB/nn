@@ -108,6 +108,7 @@ class MyConvModel(keras.Model):
 
     @tf.function
     def call(self, x):
+<<<<<<< HEAD
     """
     前向传播函数（定义模型的数据流向）。
     Args:
@@ -146,6 +147,23 @@ class MyConvModel(keras.Model):
     probs = tf.nn.softmax(logits, axis=-1)
     
     return logits
+=======
+        """
+        前向传播函数（定义模型的数据流向）。
+        Args:
+            x: 输入数据张量，形状通常为 [batch_size, height, width, channels]
+        Returns:
+            logits: 输出张量，形状为 [batch_size, num_classes]
+        """
+        h1 = self.l1_conv(x)
+        h1_pool = self.pool(h1)
+        h2 = self.l2_conv(h1_pool)
+        h2_pool = self.pool(h2)
+        flat_h = self.flat(h2_pool)
+        dense1 = self.dense1(flat_h)
+        logits = self.dense2(dense1)
+        return logits
+>>>>>>> upstream/main
 # 创建一个神经网络模型的实例
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法

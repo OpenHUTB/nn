@@ -23,6 +23,10 @@ DQN 训练脚本
 """
 import os
 import sys
+<<<<<<< HEAD
+=======
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+>>>>>>> upstream/main
 
 import matplotlib
 import torch
@@ -33,6 +37,12 @@ import gymnasium as gym
 import gymnasium.wrappers as gym_wrap
 import matplotlib.pyplot as plt
 import numpy as np
+<<<<<<< HEAD
+=======
+import argparse
+import time
+from pathlib import Path
+>>>>>>> upstream/main
 
 # 添加路径以导入自定义模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -52,7 +62,38 @@ if is_ipython:
     from IPython import display
 
 # 开启交互式绘图
+<<<<<<< HEAD
 plt.ion()
+=======
+def _parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--episodes", type=int, default=2000)
+    parser.add_argument("--max-timesteps", type=int, default=0)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--report", type=str, default="text", choices=["plot", "text", "none"])
+    parser.add_argument("--log-every", type=int, default=10)
+    parser.add_argument("--log-filename", type=str, default="DQN_log.csv")
+    parser.add_argument("--eval-episodes", type=int, default=5)
+    parser.add_argument("--render-eval", action="store_true")
+    parser.add_argument("--skip-eval", action="store_true")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--dueling", type=int, default=1, choices=[0, 1])
+    parser.add_argument("--amp", type=int, default=1, choices=[0, 1])
+    parser.add_argument("--normalize-obs", type=int, default=1, choices=[0, 1])
+    parser.add_argument("--double-q", type=int, default=-1, choices=[-1, 0, 1])
+    parser.add_argument("--treat-truncated-as-terminal", type=int, default=-1, choices=[-1, 0, 1])
+    parser.add_argument("--learn-start", type=int, default=-1)
+    parser.add_argument("--torch-compile", type=int, default=0, choices=[0, 1])
+    return parser.parse_args()
+
+
+args = _parse_args()
+
+if args.report == "plot":
+    plt.ion()
+else:
+    plt.ioff()
+>>>>>>> upstream/main
 
 
 # ================================================================================
@@ -62,27 +103,51 @@ print("=" * 50)
 print("正在初始化环境...")
 print("=" * 50)
 
+<<<<<<< HEAD
 # 创建 CarRacing 环境
 # continuous=False: 使用离散动作空间 (5个动作: 左/右/加速/刹车/空)
 env = gym.make("CarRacing-v3", continuous=False)
+=======
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+
+# 创建 CarRacing 环境
+# continuous=False: 使用离散动作空间 (5个动作: 左/右/加速/刹车/空)
+env = gym.make("CarRacing-v2", continuous=False)
+>>>>>>> upstream/main
 
 # 应用环境预处理 wrapper
 env = SkipFrame(env, skip=4)  # 每4步执行一次相同动作
 
+<<<<<<< HEAD
 from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation
 
 # 灰度化处理: RGB -> 灰度，减少信息量加速训练
 env = GrayscaleObservation(env)
+=======
+from gymnasium.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
+
+# 灰度化处理: RGB -> 灰度，减少信息量加速训练
+env = GrayScaleObservation(env)
+>>>>>>> upstream/main
 
 # 缩放到 (84, 84): 标准 Atari 游戏预处理尺寸
 env = ResizeObservation(env, (84, 84))
 
 # 帧堆叠: 将连续4帧组合在一起，提供时序信息
 # 这样网络可以看到小车的运动方向
+<<<<<<< HEAD
 env = FrameStackObservation(env, stack_size=4)
 
 # 重置环境，获取初始状态
 state, info = env.reset()
+=======
+env = FrameStack(env, num_stack=4)
+
+# 重置环境，获取初始状态
+env.action_space.seed(args.seed)
+state, info = env.reset(seed=args.seed)
+>>>>>>> upstream/main
 
 # 获取动作空间大小
 action_n = env.action_space.n
@@ -97,6 +162,7 @@ print("=" * 50)
 # ================================================================================
 print("\n正在创建智能体...")
 
+<<<<<<< HEAD
 driver = Agent(
     state_space_shape=state.shape,
     action_n=action_n,
@@ -104,22 +170,58 @@ driver = Agent(
 )
 
 print(f"使用设备: {driver.device}")
+=======
+config_path = Path(__file__).resolve().parent.parent / "configs" / "dqn.yaml"
+
+driver = Agent(
+    state_space_shape=state.shape,
+    action_n=action_n,
+    config_path=config_path,
+    hyperparameter_overrides={
+        "dueling": bool(args.dueling),
+        "amp": bool(args.amp),
+        "normalize_obs": bool(args.normalize_obs),
+        **({} if args.double_q < 0 else {"double_q": bool(args.double_q)}),
+        **({} if args.treat_truncated_as_terminal < 0 else {"treat_truncated_as_terminal": bool(args.treat_truncated_as_terminal)}),
+    }
+)
+
+print(f"使用设备: {driver.device}")
+if hasattr(torch, "set_float32_matmul_precision"):
+    torch.set_float32_matmul_precision("high")
+>>>>>>> upstream/main
 print(f"折扣因子 (gamma): {driver.gamma}")
 print(f"初始探索率 (epsilon): {driver.epsilon}")
 print(f"探索率衰减: {driver.epsilon_decay}")
 print(f"最小探索率: {driver.epsilon_min}")
 print("智能体创建完成！")
 
+<<<<<<< HEAD
+=======
+if args.torch_compile == 1 and hasattr(torch, "compile"):
+    try:
+        driver.policy_net = torch.compile(driver.policy_net)
+    except Exception:
+        pass
+
+>>>>>>> upstream/main
 
 # ================================================================================
 # 3. 训练参数设置
 # ================================================================================
 
 # 批大小: 每次从回放缓冲区采样32条经验
+<<<<<<< HEAD
 batch_n = 32
 
 # 训练 episode 总数
 play_n_episodes = 2000
+=======
+batch_n = args.batch_size
+
+# 训练 episode 总数
+play_n_episodes = args.episodes
+>>>>>>> upstream/main
 
 # 用于记录训练过程的列表
 episode_reward_list = []      # 每个 episode 的总奖励
@@ -128,12 +230,18 @@ episode_loss_list = []        # 每个 episode 的平均损失
 episode_epsilon_list = []     # 每个 episode 结束时的探索率
 episode_date_list = []        # 日期
 episode_time_list = []        # 时间
+<<<<<<< HEAD
+=======
+episode_steps_per_sec_list = []
+episode_updates_per_sec_list = []
+>>>>>>> upstream/main
 
 # 训练统计
 episode = 0                   # 当前 episode 编号
 timestep_n = 0               # 总步数
 
 # 控制训练频率的参数
+<<<<<<< HEAD
 when2learn = 4               # 每隔几步学习一次
 when2sync = 5000             # 每隔几步同步目标网络
 when2save = 100000           # 每隔几步保存模型
@@ -141,6 +249,19 @@ when2log = 10                # 每隔几个 episode 写入日志
 
 # 报告类型: 'plot' 显示实时曲线, 'text' 打印文字, None 静默
 report_type = 'plot'
+=======
+when2learn = int(driver.hyperparameters.get("train_freq", 4))               # 每隔几步学习一次
+when2sync = int(driver.hyperparameters.get("target_update", 5000))             # 每隔几步同步目标网络
+when2save = 100000           # 每隔几步保存模型
+when2log = args.log_every                # 每隔几个 episode 写入日志
+learn_start = int(driver.hyperparameters.get("warmup_steps", 0))
+if args.learn_start is not None and args.learn_start >= 0:
+    learn_start = int(args.learn_start)
+
+# 报告类型: 'plot' 显示实时曲线, 'text' 打印文字, None 静默
+report_type = None if args.report == "none" else args.report
+max_timesteps = args.max_timesteps if args.max_timesteps and args.max_timesteps > 0 else None
+>>>>>>> upstream/main
 
 
 # ================================================================================
@@ -150,15 +271,28 @@ print("\n" + "=" * 50)
 print("开始训练！")
 print("=" * 50)
 
+<<<<<<< HEAD
 while episode < play_n_episodes:
+=======
+while episode < play_n_episodes and (max_timesteps is None or timestep_n < max_timesteps):
+>>>>>>> upstream/main
     episode += 1
     episode_reward = 0        # 当前 episode 的累积奖励
     episode_length = 0        # 当前 episode 的步数
     loss_list = []           # 当前 episode 的损失列表
+<<<<<<< HEAD
     episode_epsilon_list.append(driver.epsilon)
     
     # 重置环境，开始新的 episode
     state, info = env.reset()
+=======
+    update_count = 0
+    episode_epsilon_list.append(driver.epsilon)
+    
+    # 重置环境，开始新的 episode
+    state, info = env.reset(seed=args.seed + episode)
+    ep_start_t = time.perf_counter()
+>>>>>>> upstream/main
     
     # episode 主循环
     done = False
@@ -176,15 +310,28 @@ while episode < play_n_episodes:
         # -------------------------------------------------
         new_state, reward, terminated, truncated, info = env.step(action)
         episode_reward += reward
+<<<<<<< HEAD
+=======
+        done = terminated or truncated
+>>>>>>> upstream/main
         
         # -------------------------------------------------
         # 4.3 存储经验到回放缓冲区
         # -------------------------------------------------
+<<<<<<< HEAD
         driver.store(state, action, reward, new_state, terminated)
         
         # 更新状态
         state = new_state
         done = terminated or truncated
+=======
+        driver.store(state, action, reward, new_state, terminated, truncated)
+        
+        # 更新状态
+        state = new_state
+        if max_timesteps is not None and timestep_n >= max_timesteps:
+            break
+>>>>>>> upstream/main
         
         # -------------------------------------------------
         # 4.4 定期同步目标网络 (硬更新)
@@ -203,9 +350,16 @@ while episode < play_n_episodes:
         # 4.6 定期训练网络
         # -------------------------------------------------
         # 条件: 达到学习频率 且 回放缓冲区有足够样本
+<<<<<<< HEAD
         if timestep_n % when2learn == 0 and len(driver.buffer) >= batch_n:
             q_value, loss = driver.update_net(batch_n)
             loss_list.append(loss)
+=======
+        if timestep_n >= learn_start and timestep_n % when2learn == 0 and len(driver.buffer) >= batch_n:
+            q_value, loss = driver.update_net(batch_n)
+            loss_list.append(loss)
+            update_count += 1
+>>>>>>> upstream/main
         
         # -------------------------------------------------
         # 4.7 定期打印报告
@@ -219,9 +373,19 @@ while episode < play_n_episodes:
     # -------------------------------------------------
     # 5. 记录 episode 结果
     # -------------------------------------------------
+<<<<<<< HEAD
     episode_reward_list.append(episode_reward)
     episode_length_list.append(episode_length)
     episode_loss_list.append(np.mean(loss_list) if loss_list else 0)
+=======
+    ep_end_t = time.perf_counter()
+    ep_dt = max(ep_end_t - ep_start_t, 1e-9)
+    episode_reward_list.append(episode_reward)
+    episode_length_list.append(episode_length)
+    episode_loss_list.append(np.mean(loss_list) if loss_list else 0)
+    episode_steps_per_sec_list.append(episode_length / ep_dt)
+    episode_updates_per_sec_list.append(update_count / ep_dt)
+>>>>>>> upstream/main
     
     now_time = datetime.datetime.now()
     episode_date_list.append(now_time.date().isoformat())
@@ -244,7 +408,15 @@ while episode < play_n_episodes:
             episode_length_list,
             episode_loss_list,
             episode_epsilon_list,
+<<<<<<< HEAD
             log_filename='DQN_log.csv'
+=======
+            log_filename=args.log_filename,
+            extra_rows={
+                "steps_per_sec": episode_steps_per_sec_list,
+                "updates_per_sec": episode_updates_per_sec_list,
+            }
+>>>>>>> upstream/main
         )
     
     # -------------------------------------------------
@@ -257,7 +429,13 @@ while episode < play_n_episodes:
               f"Reward: {episode_reward:.1f} | "
               f"Mean(10): {mean_reward:.1f} | "
               f"Steps: {episode_length} | "
+<<<<<<< HEAD
               f"Epsilon: {driver.epsilon:.4f}")
+=======
+              f"Epsilon: {driver.epsilon:.4f} | "
+              f"SPS: {episode_steps_per_sec_list[-1]:.1f} | "
+              f"UPS: {episode_updates_per_sec_list[-1]:.1f}")
+>>>>>>> upstream/main
 
 
 # ================================================================================
@@ -278,11 +456,19 @@ def evaluate_agent(agent, num_episodes=5, render=False):
     """
     # 创建评估环境
     render_mode = "human" if render else "rgb_array"
+<<<<<<< HEAD
     eval_env = gym.make("CarRacing-v3", continuous=False, render_mode=render_mode)
     eval_env = SkipFrame(eval_env, skip=4)
     eval_env = GrayscaleObservation(eval_env)
     eval_env = ResizeObservation(eval_env, (84, 84))
     eval_env = FrameStackObservation(eval_env, stack_size=4)
+=======
+    eval_env = gym.make("CarRacing-v2", continuous=False, render_mode=render_mode)
+    eval_env = SkipFrame(eval_env, skip=4)
+    eval_env = GrayScaleObservation(eval_env)
+    eval_env = ResizeObservation(eval_env, (84, 84))
+    eval_env = FrameStack(eval_env, num_stack=4)
+>>>>>>> upstream/main
     
     # 评估时关闭探索
     agent.epsilon = 0
@@ -307,6 +493,7 @@ def evaluate_agent(agent, num_episodes=5, render=False):
 
 
 # 运行评估
+<<<<<<< HEAD
 avg_score = evaluate_agent(driver, num_episodes=5, render=True)
 
 print("=" * 50)
@@ -319,6 +506,25 @@ elif avg_score >= 400:
     print("📈 一般，需要更多训练")
 else:
     print("⚠️ 表现不佳，建议继续训练或调整超参数")
+=======
+avg_score = None
+if not args.skip_eval:
+    avg_score = evaluate_agent(driver, num_episodes=args.eval_episodes, render=args.render_eval)
+
+print("=" * 50)
+if avg_score is not None:
+    print(f"评估完成！平均得分: {avg_score:.1f}")
+    if avg_score >= 900:
+        print("🎉 优秀！智能体已完全掌握赛道！")
+    elif avg_score >= 700:
+        print("👍 良好！智能体可以完成比赛")
+    elif avg_score >= 400:
+        print("📈 一般，需要更多训练")
+    else:
+        print("⚠️ 表现不佳，建议继续训练或调整超参数")
+else:
+    print("已跳过评估")
+>>>>>>> upstream/main
 print("=" * 50)
 
 
@@ -334,7 +540,15 @@ driver.write_log(
     episode_length_list,
     episode_loss_list,
     episode_epsilon_list,
+<<<<<<< HEAD
     log_filename='DQN_log.csv'
+=======
+    log_filename=args.log_filename,
+    extra_rows={
+        "steps_per_sec": episode_steps_per_sec_list,
+        "updates_per_sec": episode_updates_per_sec_list,
+    }
+>>>>>>> upstream/main
 )
 
 env.close()

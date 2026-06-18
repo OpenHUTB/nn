@@ -10,4 +10,19 @@ __pycache__/
 # IDE
 .idea/
 # 构建/文档站点
+<<<<<<< HEAD
 site/
+=======
+site/
+
+# 配置文件（本地配置，不提交）
+config.json
+
+# 日志文件
+logs/
+flight_log.json
+*.log
+
+# 数据集
+dataset/
+>>>>>>> upstream/main

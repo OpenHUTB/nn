@@ -82,4 +82,8 @@ class KeyboardInputHandler(threading.Thread):
         elif key in ['1', '2', '3', '4']:
             gait_map = {'1': 'SLOW', '2': 'NORMAL', '3': 'TROT', '4': 'STEP_IN_PLACE'}
             self.stabilizer.set_gait_mode(gait_map[key])
+<<<<<<< HEAD
             print(f"[指令] 切换为{self.stabilizer.gait_mode}模式")
+=======
+            print(f"[指令] 切换为{self.stabilizer.gait_mode}模式")
+>>>>>>> upstream/main

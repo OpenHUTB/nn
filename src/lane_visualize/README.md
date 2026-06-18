@@ -35,4 +35,9 @@ V3.0 版本不仅实现了对车道和车辆的**感知**，还加入了**决策
 ### 2. 安装依赖
 本项目已移除沉重的 TensorFlow 依赖，仅需轻量级库：
 ```bash
+<<<<<<< HEAD
 pip install -r requirements.txt
+=======
+pip install -r requirements.txt
+```
+>>>>>>> upstream/main

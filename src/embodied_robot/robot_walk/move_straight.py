@@ -28,7 +28,11 @@ random.seed(42)
 
 
 class StablePatrolController:
+<<<<<<< HEAD
     def __init__(self, model_path):
+=======
+    def __init__(self, model_path,args=None):
+>>>>>>> upstream/main
         """Initialize robot controller with enhanced balance control and distance-priority target selection"""
         # Load MuJoCo model and data
         self.model = mujoco.MjModel.from_xml_path(model_path)
@@ -63,7 +67,11 @@ class StablePatrolController:
         self.patrol_body_ids = {}
         self.last_target_update = {i: 0.0 for i in range(len(self.patrol_points))}
         self.target_movement_range = {"x": [-1.0, 9.0], "y": [-3.0, 3.0]}
+<<<<<<< HEAD
         self.target_move_speed = 0.2  # Slow target movement for stability
+=======
+        self.target_move_speed = args.target_move_speed if args else 0.2  # 动态目标移动速度  # Slow target movement for stability
+>>>>>>> upstream/main
 
         # -------------------------- Obstacle Avoidance Parameters --------------------------
         self.valid_wall_names = ["wall1", "wall2", "wall3", "wall4"]
@@ -89,6 +97,7 @@ class StablePatrolController:
         self.gait_period = 3.0  # Longer gait period for stability
         self.swing_gain = 0.3
         self.stance_gain = 0.4
+<<<<<<< HEAD
         self.forward_speed = 0.05  # Reduced speed to prevent flying (fix disappearing issue)
         self.heading_kp = 40.0
         self.balance_kp = 60.0
@@ -97,6 +106,21 @@ class StablePatrolController:
         self.torso_roll_target = 0.0
         self.max_joint_velocity = 0.5  # Limit joint speed to prevent falling
         self.max_ctrl_amplitude = 0.8  # Max control command amplitude (core fix for disappearing)
+=======
+        self.forward_speed = args.forward_speed if args else 0.05  # 机器人前进速度  # Reduced speed to prevent flying (fix disappearing issue)
+        print("\n" + "✨" * 20)
+        print("📥 【系统确认】底层已成功接收到外部参数：")
+        print(f"   🏃 机器人设定的前进速度: {self.forward_speed}")
+        print(f"   🎯 巡逻目标点的移动速度: {self.target_move_speed}")
+        print("✨" * 20 + "\n")
+        self.heading_kp = 40.0
+        self.balance_kp = 40.0        # 增强平衡控制器的刚度，让腰板挺直
+        self.balance_kd = 10.0
+        self.torso_pitch_target = 0.05  # Slight forward tilt for balance
+        self.torso_roll_target = 0.0
+        self.max_joint_velocity = 2.0  # 放宽关节限速
+        self.max_ctrl_amplitude = 100.0  # ✨ 核心修复：把电机最大输出拉高，给它支撑体重的力气！
+>>>>>>> upstream/main
 
         # Balance assist parameters
         self.center_of_mass_target = np.array([0.0, 0.0, 0.8])
@@ -220,6 +244,7 @@ class StablePatrolController:
             self.wall_pos_history[wall_name] = deque(maxlen=10)
 
     def _set_initial_pose(self):
+<<<<<<< HEAD
         """强制固定机器人初始位置到视野中心，彻底解决消失问题（核心最终修复）"""
         # 1. 重置仿真数据（清空所有异常状态）
         mujoco.mj_resetData(self.model, self.data)
@@ -268,6 +293,25 @@ class StablePatrolController:
 
         # 5. 强制设置机器人初始速度为0（无移动、无旋转，彻底杜绝初始漂移）
         self.data.qvel[:] = 0.0
+=======
+        # 1. 彻底重置所有数据状态
+        mujoco.mj_resetData(self.model, self.data)
+
+        # 2. 设置躯干（root）位置
+        root_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "root")
+        if root_id != -1:
+            qpos_adr = self.model.jnt_qposadr[root_id]
+            # 抬高初始高度到 1.5米，确保它是从空中平稳下落，而不是半截埋在土里
+            self.data.qpos[qpos_adr + 0:qpos_adr + 3] = [0, 0, 1.5]
+            self.data.qpos[qpos_adr + 3:qpos_adr + 7] = [1, 0, 0, 0]  # 保持姿态竖直
+
+            # 3. 速度彻底清零（防止上一帧的残余能量）
+            qvel_adr = self.model.jnt_dofadr[root_id]
+            self.data.qvel[qvel_adr:qvel_adr + 6] = 0.0
+
+        # 4. 重要：立即进行一次前向动力学计算，更新几何体位置
+        mujoco.mj_forward(self.model, self.data)
+>>>>>>> upstream/main
 
     def _clip_control_command(self, cmd):
         """Clip control command to max amplitude to prevent joint over-drive (core fix)"""
@@ -501,7 +545,16 @@ class StablePatrolController:
     def _get_joint_vel_id(self, joint_name):
         """Get joint velocity ID for a given joint name"""
         mapped_name = self.joint_name_mapping.get(joint_name, joint_name)
+<<<<<<< HEAD
         return mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, mapped_name)
+=======
+        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, mapped_name)
+        if joint_id != -1:
+            # ✨ 史诗级底层修复：绝对不能直接返回 joint_id！
+            # 必须通过 jnt_dofadr 查询该关节在 qvel 数组中真正的内存地址！
+            return self.model.jnt_dofadr[joint_id]
+        return -1
+>>>>>>> upstream/main
 
     def _limit_joint_velocity(self, joint_name, cmd):
         """Limit joint velocity to prevent unstable movement"""
@@ -638,12 +691,36 @@ class StablePatrolController:
 
         # Step 5: Initial stabilization phase (no movement, only balance)
         if elapsed_time < self.stabilization_phase:
+<<<<<<< HEAD
             self._maintain_balance(elapsed_time)
             # Clip all control commands during stabilization
+=======
+            # ✨ 终极时空锁死
+            root_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "root")
+            if root_id != -1:
+                qpos_adr = self.model.jnt_qposadr[root_id]
+                qvel_adr = self.model.jnt_dofadr[root_id]
+
+                # 死死钉在 1.35m 的空中
+                self.data.qpos[qpos_adr + 0] = 0.0
+                self.data.qpos[qpos_adr + 1] = 0.0
+                self.data.qpos[qpos_adr + 2] = 1.35
+                self.data.qpos[qpos_adr + 3:qpos_adr + 7] = [1.0, 0.0, 0.0, 0.0]
+                self.data.qvel[qvel_adr:qvel_adr + 6] = 0.0
+
+            # ⚠️ 强制物理引擎立刻更新状态，避免跳帧
+            mujoco.mj_kinematics(self.model, self.data)
+
+            self._maintain_balance(elapsed_time)
+>>>>>>> upstream/main
             for i in range(self.model.nu):
                 self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
             return
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/main
         # Step 6: Return to path mode
         if self.return_to_path:
             return_phase = (elapsed_time - self.return_to_path_start) / self.return_to_path_duration
@@ -829,8 +906,28 @@ class StablePatrolController:
         print("📌 Features: Enhanced Balance + Dynamic Obstacle Avoidance + Closest Target Selection")
         print("🔍 Press Ctrl+C to stop simulation\n")
 
+<<<<<<< HEAD
         with viewer.launch_passive(self.model, self.data) as viewer_instance:
             self.sim_start_time = time.time()
+=======
+        with viewer.launch_passive(self.model, self.data) as v:
+            # 在这里再次调用一次重置，确保 viewer 启动后位置是对的
+            self._set_initial_pose()
+
+            while v.is_running():
+                step_start = time.time()
+
+                # 软启动：在前 1.5 秒内，强制锁定 Z 轴高度
+                # 这样物理引擎可以平稳地处理关节初始化，而不会因为重力突然坠地
+                if self.data.time < 1.5:
+                    root_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "root")
+                    qpos_adr = self.model.jnt_qposadr[root_id]
+                    self.data.qpos[qpos_adr + 2] = 1.35  # 固定高度
+                    self.data.qvel[:] = 0.0  # 禁止任何速度
+
+                # ... 执行控制逻辑 ...
+                mujoco.mj_step(self.model, self.data)
+>>>>>>> upstream/main
 
             # 优化相机参数：增大距离+调整视角，确保机器人始终在视野内
             if self.torso_id != -1:
@@ -878,6 +975,7 @@ class StablePatrolController:
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     # Default model path
     model_file = "Robot_move_straight.xml"
 
@@ -894,6 +992,28 @@ if __name__ == "__main__":
     # Run simulation
     try:
         controller = StablePatrolController(model_file)
+=======
+    import argparse
+
+    # 设置参数解析器
+    parser = argparse.ArgumentParser(description="DeepMind Humanoid Patrol Controller")
+    parser.add_argument("--model_file", type=str, default="Robot_move_straight.xml", help="Path to MuJoCo XML model")
+    parser.add_argument("--forward_speed", type=float, default=0.05, help="Robot forward walking speed")
+    parser.add_argument("--target_move_speed", type=float, default=0.2, help="Dynamic target movement speed")
+
+    # 解析参数
+    args = parser.parse_args()
+
+    # 检查模型文件是否存在
+    if not os.path.exists(args.model_file):
+        print(f"❌ Model file not found: {args.model_file}")
+        print(f"ℹ️  Current working directory: {os.getcwd()}")
+        sys.exit(1)
+
+    # 运行仿真 (把解析好的 args 传给控制器)
+    try:
+        controller = StablePatrolController(args.model_file, args)
+>>>>>>> upstream/main
         controller.run_simulation()
     except Exception as e:
         print(f"\n❌ Failed to start simulation: {e}")

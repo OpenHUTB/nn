@@ -76,6 +76,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+<<<<<<< HEAD
 import sys
 import os
 
@@ -170,3 +171,5 @@ finally:
     except:
         pass
     print("仿真结束")
+=======
+>>>>>>> upstream/main

@@ -12,7 +12,12 @@
 import collections  # 导入Python标准库中的collections模块
 import os # 导入os库，用于与操作系统交互
 import sys # 导入sys库，用于系统相关参数和函数
+<<<<<<< HEAD
 import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后，用于显示循环进度
+=======
+import json
+from pathlib import Path
+>>>>>>> upstream/main
 
 # 第三方库（按字母顺序排列，优先导入独立库，再导入子模块）
 import numpy as np# 导入NumPy库（科学计算基础库）
@@ -25,6 +30,26 @@ from tensorflow.keras import datasets, layers, optimizers # 导入Keras的子模
 import random # 导入随机数生成模块，用于生成随机数、随机序列等
 import string # 导入字符串常量模块，提供常用的字符串集合（如字母表、数字等）
 
+<<<<<<< HEAD
+=======
+# 运行参数（支持环境变量覆盖）
+SEQREV_SEED = int(os.getenv("SEQREV_SEED", "42"))
+SEQREV_TRAIN_STEPS = int(os.getenv("SEQREV_TRAIN_STEPS", "3000"))
+SEQREV_TRAIN_BATCH = int(os.getenv("SEQREV_TRAIN_BATCH", "32"))
+SEQREV_SEQ_LEN = int(os.getenv("SEQREV_SEQ_LEN", "20"))
+SEQREV_LOG_INTERVAL = int(os.getenv("SEQREV_LOG_INTERVAL", "500"))
+SEQREV_TEST_BATCH = int(os.getenv("SEQREV_TEST_BATCH", "32"))
+SEQREV_TEST_LEN = int(os.getenv("SEQREV_TEST_LEN", "10"))
+SEQREV_REPORT_OUT = os.getenv("SEQREV_REPORT_OUT", "sequence_reversal_report.json")
+SEQREV_SHOW_SAMPLES = int(os.getenv("SEQREV_SHOW_SAMPLES", "10"))
+SEQREV_DEBUG_BATCH = os.getenv("SEQREV_DEBUG_BATCH", "0") == "1"
+
+# 固定随机种子，保证可复现
+random.seed(SEQREV_SEED)
+np.random.seed(SEQREV_SEED)
+tf.random.set_seed(SEQREV_SEED)
+
+>>>>>>> upstream/main
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
@@ -69,8 +94,14 @@ def get_batch(batch_size, length):
             tf.constant(enc_x, dtype = tf.int32),    # 将 enc_x 转换为 TensorFlow 的 int32 类型常量张量，作为编码器（Encoder）的输入
             tf.constant(dec_x, dtype = tf.int32),    # 将 dec_x 转换为 int32 类型的张量，作为解码器（Decoder）的输入
             tf.constant(y, dtype = tf.int32))        # 将 y 转换为 int32 类型的张量，作为标签（Label）或目标输出，用于计算损失
+<<<<<<< HEAD
 #测试
 print(get_batch(2, 10)) # 调用 get_batch 函数，并打印其返回值，参数2和10分别表示批次的起始索引和批次大小
+=======
+# 测试样例输出（默认关闭，避免影响训练日志）
+if SEQREV_DEBUG_BATCH:
+    print(get_batch(2, 10))
+>>>>>>> upstream/main
 
 ###
 
@@ -82,7 +113,11 @@ print(get_batch(2, 10)) # 调用 get_batch 函数，并打印其返回值，参�
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
+<<<<<<< HEAD
        """初始化Seq2Seq模型组件"""
+=======
+        """初始化Seq2Seq模型组件"""
+>>>>>>> upstream/main
         super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
@@ -222,42 +257,67 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
 
     # 返回当前步骤的损失值
     return loss
+<<<<<<< HEAD
 def train(model, optimizer, seqlen):
     """训练过程，迭代 3000 步"""
     # 初始化训练指标
     loss = 0.0 # 记录loss值 (初始为0)
     accuracy = 0.0  # 可扩展性占位 (当前未实际计算准确率)
     for step in range(3000):
+=======
+def train(model, optimizer, seqlen, steps=3000, batch_size=32, log_interval=500):
+    """训练过程"""
+    # 初始化训练指标
+    loss = 0.0 # 记录loss值 (初始为0)
+    for step in range(steps):
+>>>>>>> upstream/main
         # 获取训练batch数据:
         # - batched_examples: 原始样本 (用于调试/可视化)
         # - enc_x: 编码器输入序列 [batch_size, seqlen]
         # - dec_x: 解码器输入序列 [batch_size, seqlen] 
         # - y: 目标输出序列 [batch_size, seqlen]
+<<<<<<< HEAD
         batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
+=======
+        batched_examples, enc_x, dec_x, y = get_batch(batch_size, seqlen)
+>>>>>>> upstream/main
         
         # 执行单步训练并返回当前loss
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
         
         # 每500步计算并打印训练进度和准确率
+<<<<<<< HEAD
         if step % 500 == 0:
+=======
+        if step == 0 or (step + 1) % log_interval == 0:
+>>>>>>> upstream/main
             # 计算训练准确率
             # 使用模型对当前批次的输入数据进行预测，得到logits
             logits = model(enc_x, dec_x)
           
             # 获取预测结果，通过argmax获取概率最高的类别索引
+<<<<<<< HEAD
             preds = tf.argmax(logits, axis=-1)
+=======
+            preds = tf.argmax(logits, axis=-1, output_type=tf.int32)
+>>>>>>> upstream/main
           
             # 计算准确率，比较预测结果与真实标签是否一致，并计算平均值
             acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32))
 
             # 打印当前步数、损失和准确率
+<<<<<<< HEAD
             print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
+=======
+            print(f'step {step + 1}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
+>>>>>>> upstream/main
     return loss
 # loss.numpy(): 将TensorFlow/PyTorch张量转换为NumPy数组并获取标量值
 
 # # 训练迭代
 
 # In[5]:
+<<<<<<< HEAD
 optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数。
 model = mySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
 train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程。
@@ -271,6 +331,9 @@ train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程�
 
 
 def sequence_reversal():
+=======
+def sequence_reversal(model, batch_size=32, length=10):
+>>>>>>> upstream/main
     """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果
     流程说明:
     1. 内部定义decode函数：用于执行自回归解码过程
@@ -310,9 +373,15 @@ def sequence_reversal():
     
 
     # 生成一批测试数据（32个样本，每个序列长度10）
+<<<<<<< HEAD
     batched_examples, enc_x, _, _ = get_batch(32, 10)
     # 对输入序列进行编码
     state = model.encode(enc_x)
+=======
+    batched_examples, enc_x, _, _ = get_batch(batch_size, length)
+    # 对输入序列进行编码
+    _, state = model.encode(enc_x)
+>>>>>>> upstream/main
     # 解码生成逆序序列，步数等于输入序列长度
     return decode(state, enc_x.get_shape()[-1]), batched_examples
 
@@ -326,8 +395,68 @@ def is_reverse(seq, rev_seq):
         return True # 返回 True 表示预测结果与真实逆序相符
     else:
         return False
+<<<<<<< HEAD
 # 测试模型逆序能力的准确性
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
 print(list(zip(*sequence_reversal())))
 # 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
+=======
+def evaluate_sequence_reversal(model, batch_size=32, length=10, show_samples=10):
+    """评估模型逆序能力并返回准确率与样例。"""
+    pred_list, src_list = sequence_reversal(model, batch_size=batch_size, length=length)
+    pairs = list(zip(src_list, pred_list))
+    flags = [is_reverse(src, pred) for src, pred in pairs]
+    acc = float(np.mean(flags))
+    print(f"\nreverse_accuracy: {acc:.4f}")
+    for src, pred in pairs[:show_samples]:
+        print(f"src={src} pred={pred} ok={is_reverse(src, pred)}")
+    return acc, pairs, flags
+
+
+if __name__ == "__main__":
+    if (SEQREV_TRAIN_STEPS <= 0 or SEQREV_TRAIN_BATCH <= 0 or SEQREV_SEQ_LEN <= 0
+            or SEQREV_LOG_INTERVAL <= 0 or SEQREV_TEST_BATCH <= 0 or SEQREV_TEST_LEN <= 0):
+        raise ValueError("SEQREV 参数必须为正整数")
+
+    optimizer = optimizers.Adam(0.0005)
+    model = mySeq2SeqModel()
+
+    print("开始训练...")
+    final_loss = train(
+        model,
+        optimizer,
+        seqlen=SEQREV_SEQ_LEN,
+        steps=SEQREV_TRAIN_STEPS,
+        batch_size=SEQREV_TRAIN_BATCH,
+        log_interval=SEQREV_LOG_INTERVAL,
+    )
+
+    print("\n开始评估...")
+    reverse_acc, pairs, flags = evaluate_sequence_reversal(
+        model,
+        batch_size=SEQREV_TEST_BATCH,
+        length=SEQREV_TEST_LEN,
+        show_samples=SEQREV_SHOW_SAMPLES,
+    )
+
+    report_path = Path(SEQREV_REPORT_OUT)
+    if not report_path.is_absolute():
+        report_path = Path(__file__).resolve().parent / report_path
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report = {
+        "seed": SEQREV_SEED,
+        "train_steps": SEQREV_TRAIN_STEPS,
+        "train_batch": SEQREV_TRAIN_BATCH,
+        "train_seq_len": SEQREV_SEQ_LEN,
+        "log_interval": SEQREV_LOG_INTERVAL,
+        "test_batch": SEQREV_TEST_BATCH,
+        "test_len": SEQREV_TEST_LEN,
+        "final_loss": float(final_loss.numpy()),
+        "reverse_accuracy": reverse_acc,
+        "sample_pairs": [{"src": s, "pred": p, "ok": bool(is_reverse(s, p))} for s, p in pairs[:SEQREV_SHOW_SAMPLES]],
+    }
+    with report_path.open("w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    print("评估报告已保存:", report_path.resolve())
+>>>>>>> upstream/main

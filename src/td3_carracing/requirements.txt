@@ -1,0 +1,78 @@
+# ============================================================
+# TD3 for CarRacing-v3 - 自动驾驶强化学习项目
+# ============================================================
+# 使用 TD3 (Twin Delayed Deep Deterministic Policy Gradient)
+# 算法训练自动驾驶 agent 玩 Gymnasium 的 CarRacing-v3 环境
+# ============================================================
+
+# ---------- 核心强化学习环境 ----------
+# Gymnasium - OpenAI Gym 的继承者，提供 CarRacing-v3 环境
+# 注意：CarRacing-v3 需要 Box2D 支持
+gymnasium>=0.29.0
+gymnasium[box2d]>=0.29.0  # CarRacing-v3 依赖 Box2D
+
+# Box2D - 2D 物理引擎，CarRacing 环境必需
+box2d-py>=2.3.0
+
+# ---------- 深度学习框架 ----------
+# PyTorch - 神经网络框架
+# 注意：根据你的 CUDA 版本选择对应版本
+# CPU 版本：pip install torch
+# CUDA 11.8：pip install torch --index-url https://download.pytorch.org/whl/cu118
+# CUDA 12.1：pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch>=2.0.0
+
+# ---------- 计算机视觉 ----------
+# OpenCV - 图像预处理（灰度化、缩放等）
+opencv-python>=4.8.0
+
+# ---------- 数值计算 ----------
+numpy>=1.24.0
+
+# ---------- 可选依赖（用于可视化）----------
+# 如果需要绘制训练曲线，可安装 matplotlib
+# matplotlib>=3.7.0
+
+# ============================================================
+# 安装说明
+# ============================================================
+#
+# 1. 基础安装（全部依赖）：
+#    pip install -r requirements.txt
+#
+# 2. PyTorch GPU 版本安装（推荐）：
+#    pip install torch --index-url https://download.pytorch.org/whl/cu118
+#
+# 3. 运行训练：
+#    python main.py
+#
+# 4. 注意事项：
+#    - CarRacing-v3 环境需要 Box2D 支持
+#    - 训练时会显示游戏窗口，可通过注释 main.py 中的
+#      os.environ["SDL_VIDEODRIVER"] = "dummy" 来使用虚拟显示
+#    - 模型自动保存在 models/ 目录
+#
+# ============================================================
+# 环境验证
+# ============================================================
+#
+# 验证 Gymnasium 和 CarRacing：
+#   python -c "import gymnasium as gym; env = gym.make('CarRacing-v3'); print('CarRacing-v3 OK')"
+#
+# 验证 PyTorch：
+#   python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
+#
+# 验证 OpenCV：
+#   python -c "import cv2; print(f'OpenCV: {cv2.__version__}')"
+#
+# ============================================================
+# 项目文件说明
+# ============================================================
+#
+# td3_models.py   - Actor 和 Critic 网络定义（含 CNN 图像编码器）
+# td3_agent.py    - TD3 智能体、经验回放缓冲区
+# env_wrappers.py - 环境封装（跳帧、预处理、堆叠、动作平滑）
+# main.py         - 训练入口
+# models/         - 保存的模型文件（自动创建）
+#
+# ============================================================

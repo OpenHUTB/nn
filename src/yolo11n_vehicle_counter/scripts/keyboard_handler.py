@@ -1,9 +1,30 @@
 import cv2 as cv
 import os
 
+<<<<<<< HEAD
 def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
     """处理键盘事件
     
+=======
+# 编辑模式状态（全局变量）
+edit_mode = False
+
+def toggle_edit_mode():
+    """切换编辑模式"""
+    global edit_mode
+    edit_mode = not edit_mode
+    status = "开启" if edit_mode else "关闭"
+    print(f"📝 编辑模式已{status}")
+    return edit_mode
+
+def is_edit_mode():
+    """检查是否处于编辑模式"""
+    return edit_mode
+
+def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
+    """处理键盘事件
+
+>>>>>>> upstream/main
     Args:
         key: 按下的键
         frame: 当前帧
@@ -11,11 +32,24 @@ def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
         cap: 视频捕获对象
         out: 视频输出对象
         window_name: 窗口名称
+<<<<<<< HEAD
     
     Returns:
         bool: 是否继续运行
     """
     if key == ord('p'):  # 按'p'键暂停
+=======
+
+    Returns:
+        tuple: (是否继续运行, 是否需要更新显示)
+    """
+    need_update = False
+
+    if key == ord('d'):  # 按'd'键切换编辑模式
+        toggle_edit_mode()
+        need_update = True
+    elif key == ord('p'):  # 按'p'键暂停
+>>>>>>> upstream/main
         # 进入暂停状态
         paused = True
         while paused:
@@ -38,7 +72,11 @@ def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
                 cap.release()
                 out.release()
                 cv.destroyAllWindows()
+<<<<<<< HEAD
                 return False
+=======
+                return False, False
+>>>>>>> upstream/main
     elif key == ord('s'):  # 按's'键保存当前帧截图
         # 创建截图目录（如果不存在）
         screenshot_dir = "screenshots"
@@ -49,6 +87,12 @@ def handle_keyboard_events(key, frame, frame_count, cap, out, window_name):
         cv.imwrite(screenshot_path, frame)
         print(f"✅ 截图已保存: {screenshot_path}")
     elif key == ord('q'):  # 按'q'键退出程序
+<<<<<<< HEAD
         return False
     
     return True
+=======
+        return False, False
+
+    return True, need_update
+>>>>>>> upstream/main

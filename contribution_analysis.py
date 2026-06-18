@@ -3,11 +3,33 @@ import argparse
 import csv
 import json
 import os
+<<<<<<< HEAD
 import requests
 from collections import Counter
 
 def get_login_by_sha(sha, repo, token, cache):
     """通过 Commit SHA 获取真实的 GitHub Login ID (带缓存)"""
+=======
+from collections import Counter
+from typing import Optional
+
+import requests
+
+
+def get_login_by_sha(sha: str, repo: str, token: str,
+                    cache: dict[str, Optional[str]]) -> Optional[str]:
+    """Get GitHub login ID by commit SHA with caching.
+
+    Args:
+        sha: Commit SHA hash.
+        repo: GitHub repository in format 'owner/repo'.
+        token: GitHub API token.
+        cache: Dictionary for caching SHA to login mappings.
+
+    Returns:
+        GitHub login ID or None if not found.
+    """
+>>>>>>> upstream/main
     if sha in cache:
         return cache[sha]
 
@@ -22,17 +44,35 @@ def get_login_by_sha(sha, repo, token, cache):
                 login = author_obj.get("login")
                 cache[sha] = login
                 return login
+<<<<<<< HEAD
     except Exception as e:
         print(f"SHA查询异常({sha}): {e}")
     return None
 
 def load_ignore_users(file_path):
     """从外部 JSON 加载屏蔽名单"""
+=======
+    except requests.RequestException as e:
+        print(f"SHA查询异常({sha}): {e}")
+    return None
+
+
+def load_ignore_users(file_path: str) -> set[str]:
+    """Load ignore users list from JSON file.
+
+    Args:
+        file_path: Path to JSON file containing ignore list.
+
+    Returns:
+        Set of lowercase usernames to ignore.
+    """
+>>>>>>> upstream/main
     if not os.path.exists(file_path):
         return set()
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return {str(u).strip().lower() for u in json.load(f)}
+<<<<<<< HEAD
     except:
         return set()
 
@@ -60,6 +100,41 @@ def run_analysis():
     shas = [s.strip() for s in result.stdout.split('\n') if s.strip()]
     login_counts = Counter()
     sha_to_login_cache = {}
+=======
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"加载屏蔽名单失败: {e}")
+        return set()
+
+
+def run_analysis() -> None:
+    """Run contribution analysis for a GitHub repository."""
+    parser = argparse.ArgumentParser(description="GitHub contribution analysis")
+    parser.add_argument("-t", "--token", required=True, help="GitHub API token")
+    parser.add_argument("-r", "--repo", required=True, help="GitHub repository (owner/repo)")
+    parser.add_argument("--since", help="Start date for analysis")
+    parser.add_argument("--until", help="End date for analysis")
+    parser.add_argument("--ignore", default="ignore_users.json", help="Ignore users JSON file")
+    parser.add_argument("--output", default="commit_stats.csv", help="Output CSV file")
+    args = parser.parse_args()
+
+    ignore_set = load_ignore_users(args.ignore)
+
+    # Get commit SHA list from local Git repository
+    cmd = ["git", "log", "--pretty=%H"]
+    if args.since:
+        cmd.append(f"--since={args.since}")
+    if args.until:
+        cmd.append(f"--until={args.until}")
+
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        print("获取Git日志失败")
+        return
+
+    shas = [s.strip() for s in result.stdout.split('\n') if s.strip()]
+    login_counts: Counter[str] = Counter()
+    sha_to_login_cache: dict[str, Optional[str]] = {}
+>>>>>>> upstream/main
 
     print(f"检测到 {len(shas)} 个提交，正在追溯归属...")
 
@@ -68,7 +143,11 @@ def run_analysis():
         if login and login.lower() not in ignore_set:
             login_counts[login] += 1
 
+<<<<<<< HEAD
     # 导出
+=======
+    # Export results
+>>>>>>> upstream/main
     sorted_stats = sorted(login_counts.items(), key=lambda x: x[1], reverse=True)
     with open(args.output, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -76,5 +155,9 @@ def run_analysis():
         writer.writerows(sorted_stats)
     print(f"分析完成，导出至 {args.output}")
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/main
 if __name__ == "__main__":
     run_analysis()

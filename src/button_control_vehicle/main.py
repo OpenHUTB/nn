@@ -143,7 +143,11 @@ class GlobalPlannerNode(Node):
         # 新增：检查CARLA连接状态
         if not self.carla_connected or not self.map:
             self.get_logger().error("CARLA连接未建立或地图未初始化，无法规划路径")
+<<<<<<< HEAD
             response.success = False  # 假设服务定义中有success字段
+=======
+        
+>>>>>>> upstream/main
             return response
 
         try:
@@ -405,4 +409,8 @@ def main(args=None):
 
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     main()
+=======
+    main()
+>>>>>>> upstream/main

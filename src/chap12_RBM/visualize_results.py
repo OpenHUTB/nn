@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """RBM Training Results Visualization"""
 
+<<<<<<< HEAD
+=======
+import argparse
+from pathlib import Path
+>>>>>>> upstream/main
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
@@ -9,6 +14,7 @@ import matplotlib
 matplotlib.rcParams['font.family'] = 'DejaVu Sans'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
+<<<<<<< HEAD
 def visualize_rbm_results():
     try:
         training_errors = np.load('training_errors.npy')
@@ -16,6 +22,55 @@ def visualize_rbm_results():
         mnist_data = np.load('mnist_bin.npy')
     except FileNotFoundError as e:
         print(f"Error: {e}")
+=======
+def _resolve_path(path_str):
+    path = Path(path_str)
+    if not path.is_absolute():
+        path = Path(__file__).parent / path
+    return path
+
+
+def _create_demo_data(seed=42):
+    rng = np.random.default_rng(seed)
+    training_errors = np.linspace(0.09, 0.02, 10) + rng.normal(0, 0.002, 10)
+    training_errors = np.clip(training_errors, 1e-4, None)
+    generated_samples = (rng.random((5, 28, 28)) > 0.72).astype(np.float32)
+    mnist_data = (rng.random((200, 784)) > 0.75).astype(np.float32)
+    return training_errors, generated_samples, mnist_data
+
+
+def _load_arrays(errors_file, samples_file, mnist_file, create_demo_data=False, seed=42):
+    errors_path = _resolve_path(errors_file)
+    samples_path = _resolve_path(samples_file)
+    mnist_path = _resolve_path(mnist_file)
+    try:
+        training_errors = np.load(errors_path)
+        generated_samples = np.load(samples_path)
+        mnist_data = np.load(mnist_path)
+        return training_errors, generated_samples, mnist_data, "file"
+    except FileNotFoundError as e:
+        if create_demo_data:
+            print(f"Warning: {e}. Demo data will be generated.")
+            arrays = _create_demo_data(seed=seed)
+            return arrays[0], arrays[1], arrays[2], "demo"
+        print(f"Error: {e}")
+        return None, None, None, None
+
+
+def visualize_rbm_results(
+    errors_file="training_errors.npy",
+    samples_file="generated_samples.npy",
+    mnist_file="mnist_bin.npy",
+    output_path="rbm_results.png",
+    show=True,
+    create_demo_data=False,
+    seed=42,
+):
+    training_errors, generated_samples, mnist_data, data_source = _load_arrays(
+        errors_file, samples_file, mnist_file, create_demo_data=create_demo_data, seed=seed
+    )
+    if training_errors is None:
+>>>>>>> upstream/main
         return
     
     fig = plt.figure(figsize=(16, 10))
@@ -35,7 +90,12 @@ def visualize_rbm_results():
     
     # Original sample
     ax_real = plt.subplot(2, 3, 2)
+<<<<<<< HEAD
     real_idx = np.random.choice(mnist_data.shape[0], 1)[0]
+=======
+    rng = np.random.default_rng(seed)
+    real_idx = rng.integers(0, mnist_data.shape[0])
+>>>>>>> upstream/main
     real_sample = mnist_data[real_idx].reshape(28, 28)
     ax_real.imshow(real_sample, cmap='gray')
     ax_real.set_title('Original MNIST Sample', fontsize=13, fontweight='bold')
@@ -47,15 +107,26 @@ def visualize_rbm_results():
     
     initial_error = training_errors[0]
     final_error = training_errors[-1]
+<<<<<<< HEAD
     improvement = ((initial_error - final_error) / initial_error) * 100
+=======
+    improvement = ((initial_error - final_error) / initial_error) * 100 if initial_error != 0 else 0.0
+>>>>>>> upstream/main
     
     stats_text = f"""Initial Error:  {initial_error:.6f}
 Final Error:    {final_error:.6f}
 Improvement:    {improvement:.2f}%
 
+<<<<<<< HEAD
 Training Epochs: 10
 Batch Size: 100
 Init Method: Xavier
+=======
+Training Epochs: {len(training_errors)}
+Batch Size: 100
+Init Method: Xavier
+Data Source: {data_source}
+>>>>>>> upstream/main
 
 Optimizations:
 * Xavier initialization
@@ -79,16 +150,55 @@ Optimizations:
     plt.suptitle('RBM Training Results: Optimized vs Original', 
                  fontsize=15, fontweight='bold', y=0.98)
     
+<<<<<<< HEAD
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     
     output_path = 'rbm_results.png'
+=======
+    fig.subplots_adjust(left=0.04, right=0.98, top=0.92, bottom=0.06, wspace=0.35, hspace=0.35)
+    
+    output_path = _resolve_path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+>>>>>>> upstream/main
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     print(f"Visualization saved: {output_path}")
     print(f"Error improvement: {improvement:.2f}%")
     
+<<<<<<< HEAD
     plt.show()
 
 
 if __name__ == '__main__':
     visualize_rbm_results()
+=======
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Visualize RBM training results")
+    parser.add_argument("--errors-file", type=str, default="training_errors.npy", help="Path to training_errors.npy")
+    parser.add_argument("--samples-file", type=str, default="generated_samples.npy", help="Path to generated_samples.npy")
+    parser.add_argument("--mnist-file", type=str, default="mnist_bin.npy", help="Path to mnist_bin.npy")
+    parser.add_argument("--output", type=str, default="outputs/rbm_results.png", help="Output image path")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for demo/sample visualization")
+    parser.add_argument("--create-demo-data", action="store_true", help="Generate demo arrays when npy files are missing")
+    parser.add_argument("--no-show", action="store_true", help="Save only, do not pop up figure window")
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    visualize_rbm_results(
+        errors_file=args.errors_file,
+        samples_file=args.samples_file,
+        mnist_file=args.mnist_file,
+        output_path=args.output,
+        show=(not args.no_show),
+        create_demo_data=args.create_demo_data,
+        seed=args.seed,
+    )
+>>>>>>> upstream/main
 

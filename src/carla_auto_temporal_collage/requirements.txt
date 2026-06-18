@@ -1,0 +1,6 @@
+loguru
+numpy
+openai
+opencv-python
+python-dotenv
+scikit-learn

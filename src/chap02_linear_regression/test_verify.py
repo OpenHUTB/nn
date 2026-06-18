@@ -12,6 +12,11 @@
 
 import sys
 import os
+<<<<<<< HEAD
+=======
+import argparse
+import json
+>>>>>>> upstream/main
 from pathlib import Path
 
 # 设置路径
@@ -56,7 +61,11 @@ def test_identity_basis():
     phi = identity_basis(x)
     assert phi.shape == (5, 1), f"Expected (5, 1), got {phi.shape}"
     assert np.allclose(phi.squeeze(), x), "输出值不匹配"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_multinomial_basis():
@@ -67,7 +76,11 @@ def test_multinomial_basis():
     expected = np.array([[2.0, 4.0, 8.0]])
     assert phi.shape == (1, 3), f"Expected (1, 3), got {phi.shape}"
     assert np.allclose(phi, expected), "输出值不匹配"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_gaussian_basis():
@@ -77,7 +90,11 @@ def test_gaussian_basis():
     phi = gaussian_basis(x, feature_num=10)
     assert phi.shape == (5, 10), f"Expected (5, 10), got {phi.shape}"
     assert np.all(phi >= 0) and np.all(phi <= 1), "高斯函数值应在 [0, 1] 范围内"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_least_squares():
@@ -90,7 +107,11 @@ def test_least_squares():
     expected_w = np.array([3, 2])
     assert w.shape == (2,), f"Expected (2,), got {w.shape}"
     assert np.allclose(w, expected_w, atol=1e-5), f"Expected {expected_w}, got {w}"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_gradient_descent():
@@ -103,7 +124,11 @@ def test_gradient_descent():
     assert w.shape == (2,), f"Expected (2,), got {w.shape}"
     # 检查收敛性（允许较大容差）
     assert np.abs(w[0] - 3) < 1.0 and np.abs(w[1] - 2) < 1.0, "梯度下降未收敛"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_main_function():
@@ -115,7 +140,11 @@ def test_main_function():
     assert callable(f), "返回值应该是可调用的函数"
     assert w_lsq is not None, "应返回最小二乘权重"
     assert w_gd is None, "未使用梯度下降时应返回 None"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_main_with_basis():
@@ -125,7 +154,11 @@ def test_main_with_basis():
     y_train = 2 * x_train + 3
     f, w_lsq, w_gd = main(x_train, y_train, basis_func=multinomial_basis)
     assert w_lsq.shape[0] == 11, "多项式基函数应生成 11 个权重（1个偏置 + 10个特征）"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_main_prediction():
@@ -138,7 +171,11 @@ def test_main_prediction():
     y_pred = f(x_test)
     assert y_pred.shape == x_test.shape, "预测输出形状应与输入相同"
     assert np.all(np.isfinite(y_pred)), "预测值应为有限数"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_evaluate():
@@ -149,7 +186,11 @@ def test_evaluate():
     error = evaluate(ys_true, ys_pred)
     assert isinstance(error, (float, np.floating)), "错误应为浮点数"
     assert error > 0, "错误应为正数"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_evaluate_perfect():
@@ -159,7 +200,11 @@ def test_evaluate_perfect():
     ys_pred = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
     error = evaluate(ys_true, ys_pred)
     assert error < 1e-10, "完美预测的错误应接近 0"
+<<<<<<< HEAD
     print("✓ 通过")
+=======
+    print("[PASS] 通过")
+>>>>>>> upstream/main
 
 
 def test_load_data():
@@ -171,6 +216,7 @@ def test_load_data():
         assert isinstance(xs, np.ndarray), "特征应为 numpy 数组"
         assert isinstance(ys, np.ndarray), "标签应为 numpy 数组"
         assert xs.shape[0] == ys.shape[0], "特征和标签数量应相同"
+<<<<<<< HEAD
         print("✓ 通过")
     else:
         print("⊘ 跳过 (data file not found)")
@@ -181,6 +227,23 @@ if __name__ == "__main__":
     print("线性回归模块单元测试")
     print("=" * 60)
     
+=======
+        print("[PASS] 通过")
+    else:
+        print("[SKIP] 跳过 (data file not found)")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Linear regression module verify script")
+    parser.add_argument("--json-out", type=str, default=None, help="Optional: write test report to JSON file")
+    parser.add_argument("--stop-on-fail", action="store_true", help="Stop immediately on first failure")
+    args = parser.parse_args()
+
+    print("=" * 60)
+    print("Linear Regression Module Unit Tests")
+    print("=" * 60)
+
+>>>>>>> upstream/main
     tests = [
         test_identity_basis,
         test_multinomial_basis,
@@ -194,14 +257,23 @@ if __name__ == "__main__":
         test_evaluate_perfect,
         test_load_data,
     ]
+<<<<<<< HEAD
     
     passed = 0
     failed = 0
     
+=======
+
+    passed = 0
+    failed = 0
+    results = []
+
+>>>>>>> upstream/main
     for test_func in tests:
         try:
             test_func()
             passed += 1
+<<<<<<< HEAD
         except Exception as e:
             print(f"✗ 失败: {e}")
             failed += 1
@@ -210,4 +282,32 @@ if __name__ == "__main__":
     print(f"测试结果: {passed} 通过, {failed} 失败")
     print("=" * 60)
     
+=======
+            results.append({"name": test_func.__name__, "status": "passed"})
+        except Exception as e:
+            print(f"[FAIL] Failed: {e}")
+            failed += 1
+            results.append({"name": test_func.__name__, "status": "failed", "error": str(e)})
+            if args.stop_on_fail:
+                break
+
+    print("=" * 60)
+    print(f"Test summary: {passed} passed, {failed} failed")
+    print("=" * 60)
+
+    if args.json_out:
+        out_path = Path(args.json_out)
+        if not out_path.is_absolute():
+            out_path = Path(__file__).parent / out_path
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "passed": passed,
+            "failed": failed,
+            "total": passed + failed,
+            "results": results,
+        }
+        out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"Report saved: {out_path}")
+
+>>>>>>> upstream/main
     sys.exit(0 if failed == 0 else 1)
