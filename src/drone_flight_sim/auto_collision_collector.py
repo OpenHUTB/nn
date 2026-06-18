@@ -15,7 +15,7 @@ import airsim
 import numpy as np
 import cv2
 from datetime import datetime
-
+import argparse
 
 class AutoCollisionCollector:
     """自动碰撞数据采集器"""
@@ -557,8 +557,14 @@ def main():
     mode = select_mode()
 
     # 设置参数
-    duration = 180  # 默认3分钟
-    target = 100    # 每类目标样本数
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--duration", type=int, default=180)
+    parser.add_argument("--target", type=int, default=100)
+
+    args = parser.parse_args()
+
+    duration = args.duration
+    target = args.target
 
     try:
         duration_input = input(f"\n采集时长(秒) [默认{duration}]: ").strip()
