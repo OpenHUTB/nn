@@ -112,6 +112,9 @@ class AutoCollisionCollector:
             filename = f"{prefix}_{timestamp}_{pos.x_val:.1f}_{pos.y_val:.1f}"
 
             # 计算深度统计
+            min_depth = np.min(depth_image)
+            mean_depth = np.mean(depth_image)
+
             max_depth = np.max(depth_image)
             std_depth = np.std(depth_image)
 
