@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/yolo_sign_control/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>🚗 基于 CARLA 仿真器的交通标志检测与车辆控制 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\ud83d\ude97 \u57fa\u4e8e CARLA \u4eff\u771f\u5668\u7684\u4ea4\u901a\u6807\u5fd7\u68c0\u6d4b\u4e0e\u8f66\u8f86\u63a7\u5236";
+        var mkdocs_page_input_path = "yolo_sign_control/README.md";
+        var mkdocs_page_url = "/nn/yolo_sign_control/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">🚗 基于 CARLA 仿真器的交通标志检测与车辆控制</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/yolo_sign_control/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla">🚗 基于 CARLA 仿真器的交通标志检测与车辆控制</h1>
+<p><a href="https://python.org"><img alt="Python 3.7+" src="https://img.shields.io/badge/Python-3.7%2B-blue" /></a>
+<a href="https://carla.org"><img alt="CARLA" src="https://img.shields.io/badge/CARLA-0.9.13%2B-green" /></a>
+<a href="https://ultralytics.com"><img alt="YOLOv8" src="https://img.shields.io/badge/YOLO-v8-red" /></a></p>
+<p>在 <strong>CARLA 仿真器</strong> 中实现自动驾驶行为模拟，使用 <strong>YOLOv8</strong> 实时检测交通标志（停车标志、限速标志）和 <strong>障碍物</strong>，车辆自动调整行驶行为。支持 <strong>碰撞预警与自动避让</strong>，并提供 <strong>Pygame 画面显示</strong> 和 <strong>控制台实时仪表盘</strong> 两种监控方式。</p>
+<hr />
+<h2 id="_1">✨ 功能特性</h2>
+<h3 id="_2">基础功能</h3>
+<ul>
+<li><strong>车道保持</strong> — 基于路径点（Waypoint）的自动转向控制</li>
+<li><strong>交通标志检测</strong> — YOLOv8 实时检测停车标志、限速标志</li>
+<li><strong>交通信号灯响应</strong> — 红灯自动制动</li>
+<li><strong>动态交通流</strong> — 随机生成 10 辆 NPC 车辆，开启自动驾驶</li>
+<li><strong>资源自动清理</strong> — 仿真结束后销毁所有实体，防止内存泄漏</li>
+</ul>
+<h3 id="_3">新增创新功能</h3>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🖼️ <strong>检测结果可视化</strong></td>
+<td>在驾驶员画面上绘制彩色边界框，不同类别不同颜色</td>
+</tr>
+<tr>
+<td>📏 <strong>单目距离估计</strong></td>
+<td>基于边界框大小估算物体与本车距离</td>
+</tr>
+<tr>
+<td>⚠️ <strong>分级碰撞预警</strong></td>
+<td>40m→25m→15m→8m 四级响应，自动减速或紧急制动</td>
+</tr>
+<tr>
+<td>📊 <strong>增强 HUD</strong></td>
+<td>右上角检测统计、右下角最近障碍物距离、中央碰撞警告</td>
+</tr>
+<tr>
+<td>💻 <strong>控制台仪表盘</strong></td>
+<td>不依赖 Pygame，终端实时刷新状态面板</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_4">📁 项目结构</h2>
+<pre><code>├── main.py                 # 主程序入口
+├── console_dashboard.py    # 控制台实时仪表盘（新增）
+├── requirements.txt        # Python 依赖列表
+├── yolov8n.pt              # YOLOv8 预训练模型
+└── README.md               # 本文件
+</code></pre>
+<hr />
+<h2 id="_5">🛠 环境搭建</h2>
+<h3 id="_6">安装依赖</h3>
+<pre><code class="language-bash">pip install carla pygame numpy torch ultralytics opencv-python
+</code></pre>
+<h3 id="_7">额外需求</h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>版本要求</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CARLA 仿真器</strong></td>
+<td>≥ 0.9.13</td>
+<td><a href="https://github.com/carla-simulator/carla/releases">下载地址</a></td>
+</tr>
+<tr>
+<td><strong>Python</strong></td>
+<td>≥ 3.7</td>
+<td>建议使用 Python 3.7 以兼容 CARLA egg 文件</td>
+</tr>
+<tr>
+<td><strong>CUDA</strong></td>
+<td>可选</td>
+<td>GPU 加速 YOLOv8 推理</td>
+</tr>
+<tr>
+<td><strong>OpenCV</strong></td>
+<td>任意</td>
+<td>用于图像色彩空间转换</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ <strong>注意</strong>：CARLA 0.9.14 提供的 egg 文件是为 Python 3.7 编译的。如果你使用 Python 3.12+，会因缺少 <code>imp</code> 模块而报错。建议使用 <strong>Python 3.7 虚拟环境</strong>。</p>
+</blockquote>
+<hr />
+<h2 id="_8">▶️ 运行指南</h2>
+<h3 id="1-carla">1️⃣ 启动 CARLA 仿真器</h3>
+<p><strong>Windows:</strong></p>
+<pre><code class="language-bash">CarlaUE4.exe
+</code></pre>
+<p><strong>Linux:</strong></p>
+<pre><code class="language-bash">./CarlaUE4.sh
+</code></pre>
+<p>等待仿真器加载完成，看到城市画面即可。</p>
+<h3 id="2">2️⃣ 运行主程序</h3>
+<pre><code class="language-bash">python main.py
+</code></pre>
+<p><strong>使用虚拟环境（推荐）：</strong></p>
+<pre><code class="language-bash">.venv\Scripts\python main.py    # Windows
+source .venv/bin/activate &amp;&amp; python main.py  # Linux
+</code></pre>
+<h3 id="3">3️⃣ 运行效果</h3>
+<ul>
+<li>弹出一个 <strong>Pygame 窗口</strong>，显示驾驶员视角和检测结果</li>
+<li><strong>控制台</strong> 实时刷新状态仪表盘</li>
+<li>仿真默认运行 <strong>2 分钟</strong> 后自动停止</li>
+<li>按 <strong>ESC</strong> 或关闭窗口可提前退出</li>
+</ul>
+<hr />
+<h2 id="_9">🧠 系统架构</h2>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│                    CARLA Server                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐  │
+│  │ Ego Veh. │  │ NPC Veh. │  │ Traffic Signs/Lights │  │
+│  └────┬─────┘  └──────────┘  └──────────────────────┘  │
+│       │                                                │
+│  ┌────▼─────┐                                          │
+│  │ RGB Cam  │                                          │
+│  └────┬─────┘                                          │
+└───────┼─────────────────────────────────────────────────┘
+        │ 图像帧
+┌───────▼─────────────────────────────────────────────────┐
+│                    Python Script                        │
+│                                                         │
+│  ┌──────────────┐    ┌──────────────────┐              │
+│  │  parse_image │───▶│  YOLOv8 Detect   │              │
+│  └──────────────┘    └────────┬─────────┘              │
+│                               │ 检测结果                │
+│                    ┌──────────▼──────────┐              │
+│                    │  draw_detections    │──▶ Pygame   │
+│                    │  estimate_distance  │              │
+│                    │  control_vehicle    │──▶ CARLA    │
+│                    └────────────────────┘              │
+│                               │                        │
+│                    ┌──────────▼──────────┐              │
+│                    │  render_dashboard   │──▶ Console  │
+│                    └────────────────────┘              │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="_10">核心流程</h3>
+<ol>
+<li><strong>图像采集</strong> — CARLA 的 RGB 摄像头每帧捕获图像</li>
+<li><strong>YOLOv8 推理</strong> — 检测图像中的交通标志、车辆、行人等</li>
+<li><strong>距离估计</strong> — 基于边界框大小估算物体与本车距离</li>
+<li><strong>碰撞预警</strong> — 根据距离分级响应（40m→预警、25m→减速、15m→强减速、8m→紧急制动）</li>
+<li><strong>车辆控制</strong> — 综合交通标志和障碍物信息，控制油门/刹车/转向</li>
+<li><strong>可视化</strong> — Pygame 显示带边界框的驾驶员视角 + 控制台仪表盘</li>
+</ol>
+<hr />
+<h2 id="_11">🎯 检测类别与颜色</h2>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>颜色</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>person</code></td>
+<td>🔴 红色</td>
+<td>行人</td>
+</tr>
+<tr>
+<td><code>car</code> / <code>truck</code> / <code>bus</code></td>
+<td>🔵 蓝色</td>
+<td>车辆障碍物</td>
+</tr>
+<tr>
+<td><code>bicycle</code> / <code>motorcycle</code></td>
+<td>🟠 橙色</td>
+<td>非机动车</td>
+</tr>
+<tr>
+<td><code>traffic light</code></td>
+<td>🟡 黄色</td>
+<td>交通灯</td>
+</tr>
+<tr>
+<td><code>stop sign</code></td>
+<td>🟣 紫色</td>
+<td>停车标志</td>
+</tr>
+<tr>
+<td>其他</td>
+<td>🟢 绿色</td>
+<td>默认</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_12">📊 碰撞预警等级</h2>
+<table>
+<thead>
+<tr>
+<th>距离</th>
+<th>响应</th>
+<th>显示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 8m</td>
+<td>🚨 <strong>紧急制动</strong>，刹车 100%</td>
+<td>红色闪烁大字</td>
+</tr>
+<tr>
+<td>8m - 15m</td>
+<td>⚠️ <strong>强力减速</strong>，刹车 80%</td>
+<td>红色警告</td>
+</tr>
+<tr>
+<td>15m - 25m</td>
+<td>⚠️ <strong>轻微减速</strong>，刹车 20%</td>
+<td>黄色提示</td>
+</tr>
+<tr>
+<td>25m - 40m</td>
+<td>ℹ️ <strong>提前预警</strong>，不制动</td>
+<td>黄色文字提示</td>
+</tr>
+<tr>
+<td>&gt; 40m</td>
+<td>正常行驶</td>
+<td>绿色正常</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_13">💻 控制台仪表盘</h2>
+<p>不依赖 Pygame，直接在终端实时刷新显示：</p>
+<pre><code>  ╔══════════════════════════════════════════════════════╗
+  ║      CARLA Traffic Sign Detection - Dashboard        ║
+  ╠══════════════════════════════════════════════════════╣
+  ║  Time:  01:23    Speed: 45.2 km/h    Max: 78.5 km/h ║
+  ║  Status: ⚠️ Caution: car at 18.3m                   ║
+  ╠══════════════════════════════════════════════════════╣
+  ║  Detected Objects (4 total):                         ║
+  ║  car     92%  18.3m  🟡 BRAKING                     ║
+  ║  person  78%  12.5m  🔴 EMERGENCY                   ║
+  ║  stop    87%  42.1m  🛑 STOP                        ║
+  ╠══════════════════════════════════════════════════════╣
+  ║  Throttle: [████░░░░░░] 0.30  Brake: [████████░░] 0.50║
+  ║  Steer: ← -0.023  Traffic: 🔴 Red                   ║
+  ╚══════════════════════════════════════════════════════╝
+</code></pre>
+<hr />
+<h2 id="_14">🔧 配置说明</h2>
+<p>可在 <code>main.py</code> 中调整以下参数：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>位置</th>
+<th>说明</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>仿真时长</td>
+<td><code>if elapsed &gt; 120</code></td>
+<td>运行秒数</td>
+<td>120s</td>
+</tr>
+<tr>
+<td>检测阈值</td>
+<td><code>conf=0.5</code></td>
+<td>置信度阈值</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>摄像头分辨率</td>
+<td><code>image_size_x/y</code></td>
+<td>画面尺寸</td>
+<td>800x600</td>
+</tr>
+<tr>
+<td>FOV</td>
+<td><code>fov</code></td>
+<td>摄像头视场角</td>
+<td>90°</td>
+</tr>
+<tr>
+<td>NPC 数量</td>
+<td><code>for _ in range(10)</code></td>
+<td>交通流数量</td>
+<td>10</td>
+</tr>
+<tr>
+<td>紧急制动距离</td>
+<td><code>distance &lt; 8.0</code></td>
+<td>紧急触发阈值</td>
+<td>8m</td>
+</tr>
+<tr>
+<td>预警距离</td>
+<td><code>distance &lt; 40.0</code></td>
+<td>预警触发阈值</td>
+<td>40m</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_15">🧪 测试连接</h2>
+<pre><code class="language-bash">python test_carla_connection.py
+python system_check.py
+</code></pre>
+<ul>
+<li><code>test_carla_connection.py</code> — 测试 CARLA 服务器连接</li>
+<li><code>system_check.py</code> — 检查所有依赖是否安装</li>
+</ul>
+<hr />
+<h2 id="_16">🧼 资源清理</h2>
+<p>仿真结束后会自动销毁所有实体（车辆、传感器、交通标志等），确保 <code>finally</code> 块中的清理代码执行，避免内存泄漏。</p>
+<hr />
+<h2 id="_17">📌 注意事项</h2>
+<ol>
+<li><strong>Python 版本</strong> — CARLA 0.9.14 的 egg 文件依赖 Python 3.7，请使用虚拟环境运行</li>
+<li><strong>模型精度</strong> — 默认使用 <code>yolov8n.pt</code>（轻量），可替换为 <code>yolov8s.pt</code>、<code>yolov8m.pt</code> 提高精度</li>
+<li><strong>场景资源</strong> — 确保 CARLA 地图中包含脚本引用的交通标志模型资源</li>
+<li><strong>YOLO 类别</strong> — 检测依赖 COCO 数据集的预训练类别，如需精准分类交通标志，建议微调模型</li>
+<li><strong>显示问题</strong> — Pygame 画面出现裂痕/撕裂时，可调整 <code>sensor_tick</code> 和 <code>gamma</code> 参数</li>
+</ol>
+<hr />
+<h2 id="_18">📄 许可</h2>
+<p>本项目基于开源协议发布。</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
