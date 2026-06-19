@@ -211,22 +211,22 @@ python Main.py
 ### 图1：驾驶视角检测效果
 展示车辆第一视角下的交通标志检测结果，包含检测框和类别标注。
 
-![驾驶视角检测效果](images/tu1.png)
+![驾驶视角检测效果](images/detection_result.jpg)
 
 ### 图2：驾驶员视图
 显示实时驾驶画面，包含道路、车辆和环境信息。
 
-![驾驶员视图](images/tu2.png)
+![驾驶员视图](images/driver_view.jpg)
 
 ### 图3：全局视角
 从空中视角展示车辆在场景中的位置和行驶状态。
 
-![全局视角](images/tu3.png)
+![全局视角](images/aerial_view.jpg)
 
 ### 图4：测试场景
 展示典型的自动驾驶测试环境配置。
 
-![测试场景](images/tu4.png)
+![测试场景](images/test_environment.jpg)
 
 ---
 
