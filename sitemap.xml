@@ -281,6 +281,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/drone_flight_sim/</loc>
+         <lastmod>2026-06-19</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/drone_hand_gesture/</loc>
          <lastmod>2026-06-19</lastmod>
          <changefreq>daily</changefreq>
