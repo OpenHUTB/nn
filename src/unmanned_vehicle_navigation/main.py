@@ -440,6 +440,10 @@ class SimpleDrivingSystem:
         self.collision_detected = False  # 是否检测到碰撞
         self.collision_count = 0  # 碰撞次数
         self.last_collision_time = 0  # 上次碰撞时间
+        # 场景统计相关
+        self.frame_count = 0  # 帧数计数器
+        self.fps = 0  # 当前帧率
+        self.last_fps_time = time.time()  # 上次计算帧率的时间
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -693,6 +697,40 @@ class SimpleDrivingSystem:
         timer = threading.Timer(3.0, recover)
         timer.start()
 
+    def get_scene_statistics(self):
+        """获取场景统计信息"""
+        stats = {}
+        
+        if self.world:
+            # 统计NPC车辆数量
+            npc_vehicles = self.world.get_actors().filter('vehicle.*')
+            # 排除自己的车辆
+            if self.vehicle:
+                stats['npc_count'] = len([v for v in npc_vehicles if v.id != self.vehicle.id])
+            else:
+                stats['npc_count'] = len(npc_vehicles)
+            
+            # 统计行人数量
+            pedestrians = self.world.get_actors().filter('walker.*')
+            stats['pedestrian_count'] = len(pedestrians)
+        else:
+            stats['npc_count'] = 0
+            stats['pedestrian_count'] = 0
+        
+        # 计算帧率
+        self.frame_count += 1
+        current_time = time.time()
+        elapsed = current_time - self.last_fps_time
+        
+        if elapsed >= 1.0:
+            self.fps = int(self.frame_count / elapsed)
+            self.frame_count = 0
+            self.last_fps_time = current_time
+        
+        stats['fps'] = self.fps
+        
+        return stats
+
     def run(self):
         """主运行循环"""
         print("\n" + "=" * 50)
@@ -896,6 +934,20 @@ class SimpleDrivingSystem:
                             cv2.putText(display_img, f"Distance: {min_dist:.1f}m",
                                         (20, 360), cv2.FONT_HERSHEY_SIMPLEX,
                                         0.8, (0, 255, 0), 2)  # 绿色安全
+
+                    # 显示场景统计信息（右上角）
+                    stats = self.get_scene_statistics()
+                    start_x = display_img.shape[1] - 200
+                    start_y = 40
+                    cv2.putText(display_img, f"FPS: {stats['fps']}",
+                                (start_x, start_y), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7, (0, 255, 0), 2)  # 绿色显示
+                    cv2.putText(display_img, f"NPC: {stats['npc_count']}",
+                                (start_x, start_y + 30), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7, (0, 128, 255), 2)  # 蓝色显示
+                    cv2.putText(display_img, f"Peds: {stats['pedestrian_count']}",
+                                (start_x, start_y + 60), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7, (0, 128, 255), 2)  # 蓝色显示
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
