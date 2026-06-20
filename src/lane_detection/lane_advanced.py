@@ -341,7 +341,6 @@ def draw_lane_on_original(original_img, binary_warped, Minv, left_fitx, right_fi
     # ---- 叠加曲率与偏移信息 ----
     if metrics is not None and CONFIG["show_metrics"]:
         draw_metrics_overlay(result, metrics, warning=warning)
-        draw_metrics_overlay(result, metrics)
 
     return result
 
