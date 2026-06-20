@@ -46,6 +46,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 nav:
 - 首页: 'index.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
+- 特斯拉自动驾驶导航系统: 'carla_black_tesla/README.md'
 
 
 # - mdx_math 用于行内公式显示
