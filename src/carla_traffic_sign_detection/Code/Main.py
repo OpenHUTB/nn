@@ -215,7 +215,7 @@ def main():
                     else:
                         color = (0, 255, 0)
                     cv2.rectangle(display_image, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(display_image, f"{sign} {conf:.2f}", (x1, y1-10), 
+                    cv2.putText(display_image, f"{sign} {conf:.0%}", (x1, y1-10), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                 
                 # Display current speed on screen
@@ -223,6 +223,11 @@ def main():
                 speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6
                 cv2.putText(display_image, f"Speed: {speed:.1f} km/h", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                
+                # Display FPS and detected objects count
+                fps = 1.0 / (time.time() - start_time) if (time.time() - start_time) > 0 else 0
+                cv2.putText(display_image, f"FPS: {fps:.1f}  Objects: {len(detected_signs)}", (10, 60),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                 
                 # Show image with OpenCV
                 cv2.imshow("Driver's View", display_image)
