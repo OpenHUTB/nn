@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/lidar_project/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>交通拥堵仿真与智能调控 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "\u4ea4\u901a\u62e5\u5835\u4eff\u771f\u4e0e\u667a\u80fd\u8c03\u63a7";
+        var mkdocs_page_input_path = "lidar_project/README.md";
+        var mkdocs_page_url = "/nn/lidar_project/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">交通拥堵仿真与智能调控</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#1">1. 强化学习核心原理与数学表达</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#11">1.1 核心数学公式</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2">2. 拥堵识别多模型模块</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#21">2.1 输入特征定义</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#22">2.2 模型组成与集成</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3">3. 项目运行流程与输出文件</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#31">3.1 运行步骤</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#32">3.2 运行效果截图</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#33">3.3 输出文件说明</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4">4. 可视化结果展示</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">交通拥堵仿真与智能调控</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/lidar_project/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla_traffic_control">carla_traffic_control</h1>
+<p>用于在 Carla 模拟器中实现基于强化学习与多模型融合的交通拥堵仿真与智能调控系统。
+该项目旨在提升自动驾驶背景下交通流管理的效率与模型决策透明度。</p>
+<hr />
+<h2 id="1">1. 强化学习核心原理与数学表达</h2>
+<p>在我们的项目中使用了 Q-Learning 强化学习算法来控制车辆行驶速度，以缓解交通拥堵。为了理解智能体是如何做出限速决策的，我们以核心更新公式为例进行说明：</p>
+<h3 id="11">1.1 核心数学公式</h3>
+<p>Q-Learning 的目的是让智能体通过不断与交通环境交互，学习到最优的“状态-动作”价值函数，从而做出缓解拥堵的最优限速决策。</p>
+<p><strong>步骤1：定义状态、动作与奖励</strong></p>
+<p>智能体的状态由车辆的瞬时速度、加速度和与前车的距离共同决定：
+<script type="math/tex; mode=display">s = (\text{round}(speed,1),\ \text{round}(acc,1),\ \text{round}(distance,1))</script>
+</p>
+<p>智能体的动作是三个不同的目标行驶速度：
+- 动作 0：目标车速 $2.0\ \text{m/s}$
+- 动作 1：目标车速 $5.0\ \text{m/s}$
+- 动作 2：目标车速 $8.0\ \text{m/s}$</p>
+<p>根据车辆的实时速度，我们定义了分段奖励函数：
+<script type="math/tex; mode=display">
+r =
+\begin{cases}
+5, & 0.5 < speed < 2.0 \\
+-5, & speed < 0.2 \\
+1, & \text{其他}
+\end{cases}
+</script>
+</p>
+<hr />
+<p><strong>步骤2：更新Q值（状态-动作价值函数）</strong></p>
+<p>通过不断迭代，智能体更新其价值表，公式如下：
+<script type="math/tex; mode=display">Q(s,a) = Q(s,a) + \alpha \cdot \left[ r + \gamma \cdot \max_{a'} Q(s',a') - Q(s,a) \right]</script>
+</p>
+<p>这一步更新后，智能体就能根据新的经验，修正它对“当前状态下采取某个动作能带来多少长期收益”的判断，从而在下一轮做出更优决策。</p>
+<hr />
+<h2 id="2">2. 拥堵识别多模型模块</h2>
+<p>为了判断交通是否拥堵，我们构建了一个多模型融合的分类系统。</p>
+<h3 id="21">2.1 输入特征定义</h3>
+<p>模型的输入是车辆的7维行驶特征向量：
+<script type="math/tex; mode=display">X = \left[ speed,\ acceleration,\ dist\_to\_front,\ lane\_offset,\ yaw,\ congestion\_time,\ stop\_time \right]</script>
+</p>
+<h3 id="22">2.2 模型组成与集成</h3>
+<p>我们训练了三个独立的分类模型，并通过投票机制融合它们的预测结果：
+1.  <strong>逻辑回归</strong>：线性基线模型，用于对比
+2.  <strong>随机森林</strong>：树集成模型，可输出特征重要性
+3.  <strong>MLP多层感知机</strong>：深度学习模型，捕捉非线性关系
+4.  <strong>三模型投票集成</strong>：对三个模型的预测结果取均值后四舍五入，得到最终的拥堵判断</p>
+<hr />
+<h2 id="3">3. 项目运行流程与输出文件</h2>
+<h3 id="31">3.1 运行步骤</h3>
+<ol>
+<li>启动 CARLA 0.9.15 仿真器</li>
+<li>安装项目依赖：
+    ```bash
+    pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple</li>
+</ol>
+<h3 id="32">3.2 运行效果截图</h3>
+<p>CARLA 仿真车流场景：
+<img alt="1" src="image.png" /></p>
+<h3 id="33">3.3 输出文件说明</h3>
+<p>运行结束后，会在项目目录自动生成以下文件：</p>
+<ul>
+<li><code>congestion_data.csv</code>：车辆行驶特征数据集</li>
+<li><code>congestion_rf_model.pkl</code> / <code>congestion_mlp_model.pkl</code>：训练好的分类模型</li>
+<li><code>drl_agent.pkl</code>：训练完成的 Q-Learning 智能体</li>
+<li><code>congestion_result.json</code>：仿真与模型综合统计结果</li>
+<li><code>congestion_video.mp4</code>：车流仿真录制视频</li>
+<li><code>feature_importance.png</code> / <code>training_curve.png</code>：可视化图表</li>
+</ul>
+<hr />
+<h2 id="4">4. 可视化结果展示</h2>
+<p>特征重要性可视化图表：
+<img alt="Feature Importance Visualization" src="feature-importance.png" />
+多模型准确率对比图表：
+<img alt="Model Accuracy Comparison" src="model-accuracy-comparison.png" />
+机器学习模型及分析报告输出结果:
+<img alt="Model Output Results" src="model-output-1.png" /></p>
+<p><img alt="Model Output Results" src="model-output-2.png" /></p>
+<p><img alt="Model Output Results" src="model-output-3.png" /></p>
+<p><img alt="Model Output Results" src="model-output-4.png" /></p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../drone_flight_sim/" class="btn btn-neutral float-left" title="无人机飞行控制程序"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../drone_flight_sim/" style="color: #fcfcfc">&laquo; 前一页</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
