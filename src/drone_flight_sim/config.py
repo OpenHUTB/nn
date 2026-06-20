@@ -15,6 +15,18 @@ class FlightConfig:
     包含所有飞行相关的配置参数，使用类属性定义常量。
     """
 
+    @staticmethod
+    def validate():
+        """校验配置参数合法性，返回 (是否合法, 错误信息列表)"""
+        errors = []
+        if FlightConfig.FLIGHT_VELOCITY <= 0:
+            errors.append("FLIGHT_VELOCITY 必须大于 0")
+        if FlightConfig.MAX_FLIGHT_TIME <= 0:
+            errors.append("MAX_FLIGHT_TIME 必须大于 0")
+        if FlightConfig.COLLISION_COOLDOWN < 0:
+            errors.append("COLLISION_COOLDOWN 不能为负数")
+        return len(errors) == 0, errors
+
     # ==================== 飞行参数 ====================
     # 起飞高度（负值表示向上，AirSim 中 Z 轴向下为正）
     TAKEOFF_HEIGHT = -10

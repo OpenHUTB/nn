@@ -199,9 +199,11 @@ class KeyboardController:
                 self.drone.emergency_stop()
                 listener_running = False
                 return False
-            
-             # ===== 新增：Y 键显示遥测面板 =====
+
+            # 统一获取按键字符，避免重复 hasattr 调用
             key_char = key.char if hasattr(key, 'char') else None
+
+            # ===== Y 键显示遥测面板 =====
             if key_char == 'y' or key_char == 'Y':
                 self._show_telemetry_panel()
                 return
@@ -214,9 +216,6 @@ class KeyboardController:
                     self.drone.hover()
                     print("🛸 悬停")
                 return
-
-            # 获取按键字符
-            key_char = key.char if hasattr(key, 'char') else None
 
             # 拍照模式下的特殊按键
             if self.photo_mode:
@@ -235,9 +234,20 @@ class KeyboardController:
                 names = ['慢', '中', '快', '很快', '极速']
                 print(f"🎚️ 速度档位: {key_char} ({names[self.speed_level]}) - {SPEED_LEVELS[self.speed_level]} m/s")
                 return
-            # ===== 新增：H 键切换高度锁定 =====
+            # ===== H 键：回到起飞点悬停 =====
             if key_char == 'h' or key_char == 'H':
-                self._toggle_height_lock()
+                if self.home_position:
+                    print(f"\n🏠 回到起飞点悬停...")
+                    pos = self.drone.get_position()
+                    self.drone.client.moveToPositionAsync(
+                        self.home_position.x_val,
+                        self.home_position.y_val,
+                        pos.z_val,
+                        5
+                    )
+                    print(f"✅ 已回到起飞点 ({self.home_position.x_val:.1f}, {self.home_position.y_val:.1f})")
+                else:
+                    print("⚠️ 未设置返航点")
                 return
 
             # R 键：一键返航
@@ -504,7 +514,7 @@ def print_control_help():
   🎮 功能键:
      空格      : 悬停（停止移动）
      1-5       : 切换速度档位（慢/中/快/很快/极速）
-     H         : 切换高度锁定（保持当前高度）
+     H         : 回到起飞点悬停（保持当前高度）
      Y         : 显示实时遥测面板
      R         : 一键返航
      P         : 拍照

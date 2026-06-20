@@ -559,6 +559,14 @@ def main():
     # 启用控制台 ANSI 支持（Windows 终端）
     enable_ansi_support()
 
+    # 启动横幅
+    print()
+    print("=" * 55)
+    print("   🚗  CARLA Traffic Sign Detection & Control")
+    print("   🔬  YOLOv8 实时检测 · 碰撞预警 · 自动驾驶")
+    print("=" * 55)
+    print()
+
     # 打印配置信息
     print(f"⚙️  Configuration:")
     print(f"   Duration: {args.time}s | Confidence: {args.conf} | NPCs: {args.cars}")
@@ -577,6 +585,8 @@ def main():
 
     # 仿真统计
     stats = SimulationStats()
+
+=======
 
     # 初始化速度平滑控制器（渐进式加减速）
     speed_ctrl = SpeedController(ramp_rate=0.04)
@@ -608,6 +618,8 @@ def main():
 
         # Spawn NPC traffic
         npc_count = 0
+
+        
 
         for _ in range(args.cars):
         for _ in range(10):
@@ -680,6 +692,11 @@ def main():
         weather_idx = 0
         last_weather_change = 0
 
+        # 快捷键状态
+        paused = False
+        cruise_speed = 0.6  # 巡航油门值（可按 +/- 调节）
+        reset_pending = False
+
         # 设置初始天气
         world.set_weather(weather_presets[0][0])
         print(f"🌤️  Weather: {weather_presets[0][1]}")
@@ -687,8 +704,47 @@ def main():
         while True:
             update_spectator()
             for event in pygame.event.get():
-                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                if event.type == pygame.QUIT:
                     return
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        return
+                    elif event.key == pygame.K_p:
+                        paused = not paused
+                        print(f"{'Paused' if paused else 'Resumed'}")
+                    elif event.key == pygame.K_r:
+                        reset_pending = True
+                        print("Resetting vehicle...")
+                    elif event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS:
+                        cruise_speed = min(1.0, cruise_speed + 0.05)
+                        print(f"Speed: {cruise_speed:.2f}")
+                    elif event.key == pygame.K_MINUS:
+                        cruise_speed = max(0.1, cruise_speed - 0.05)
+                        print(f"Speed: {cruise_speed:.2f}")
+                    elif event.key == pygame.K_w:
+                        weather_idx = (weather_idx + 1) % len(weather_presets)
+                        world.set_weather(weather_presets[weather_idx][0])
+                        last_weather_change = int(time.time() - start_time)
+                        print(f"Weather: {weather_presets[weather_idx][1]}")
+
+            if paused:
+                clock.tick(10)
+                continue
+
+            # 车辆重置（按 R 键）
+            if reset_pending:
+                try:
+                    new_spawn = random.choice(map.get_spawn_points())
+                    vehicle.set_transform(new_spawn)
+                    vehicle.set_velocity(carla.Vector3D(0, 0, 0))
+                    vehicle.set_angular_velocity(carla.Vector3D(0, 0, 0))
+                    speed_ctrl.reset()
+                    elapsed = 0
+                    start_time = time.time()
+                    print(f"✅  Vehicle reset to: ({new_spawn.location.x:.1f}, {new_spawn.location.y:.1f})")
+                except Exception as e:
+                    print(f"Reset error: {e}")
+                reset_pending = False
 
             # Steering control
             trans = vehicle.get_transform()
@@ -708,7 +764,7 @@ def main():
             control.steer = steer
 
             # 通过速度控制器平滑输出油门/刹车
-            target_throttle = 0.6  # 巡航目标油门
+            target_throttle = cruise_speed  # 巡航目标油门（可按 +/- 调节）
             target_brake = 0.0
             smooth_t, smooth_b = speed_ctrl.update(target_throttle, target_brake)
             control.throttle = smooth_t
@@ -886,12 +942,6 @@ def main():
         try:
             if logger:
                 logger.close_and_report()
-        except Exception:
-            pass
-
-        # 输出仿真统计报告
-        try:
-            stats.print_report(elapsed, npc_count + 1)  # +1 for ego vehicle
         except Exception:
             pass
 

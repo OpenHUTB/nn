@@ -1,8 +1,5 @@
 site_name: 神经网络
-<<<<<<< HEAD
-=======
 site_url: https://wengqiuyi.github.io/nn/
->>>>>>> upstream/main
 # 参考链接：https://blog.csdn.net/m0_63203517/article/details/129765689
 
 #repo_url: https://github.com/carla-simulator/carla
@@ -14,11 +11,7 @@ site_url: https://wengqiuyi.github.io/nn/
 repo_url: https://github.com/OpenHUTB/nn
 
 # 页面右上角添加直接编辑页面的按钮
-<<<<<<< HEAD
-edit_uri: edit/master/docs/
-=======
 edit_uri: edit/main/docs/
->>>>>>> upstream/main
 
 theme:
   name: readthedocs
@@ -38,11 +31,7 @@ extra_javascript:
 plugins:
 #  - mkdocs-video
   - search:
-<<<<<<< HEAD
-      lang: ja
-=======
       lang: zh
->>>>>>> upstream/main
       separator: '[\s\-\.]+'
       min_search_length: 3
 
@@ -57,9 +46,6 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
-<<<<<<< HEAD
-
-=======
 - 车道线检测: 'lane_detection/README.md'
 - CarRacing DQN/DoubleDQN：训练改进与可视化对比: 'car_racing_dqn_improvements.md'
 - 自动驾驶感知系统: 'carla_yolo_detection/README.md'
@@ -71,13 +57,11 @@ nav:
 - RL-ACC: 'rl_acc/README.md'
 - CARLA天气鲁棒性测试: 'carla_weather_robustness/README.md'
 - CARLA多传感器自动驾驶仿真平台: 'carla_multisensor_platform/carla_multisensor_platform.md'
->>>>>>> upstream/main
+- 无人机飞行控制程序: 'drone_flight_sim/README.md'
+- 交通拥堵仿真与智能调控: 'lidar_project/README.md'
 
 # - mdx_math 用于行内公式显示
 markdown_extensions:
   - admonition
   - mdx_math
-<<<<<<< HEAD
-=======
   - tables
->>>>>>> upstream/main

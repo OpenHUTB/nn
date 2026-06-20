@@ -2,14 +2,6 @@ title: 主页
 
 # [神经网络](https://github.com/OpenHUTB/nn)
 
-<<<<<<< HEAD
-欢迎使用神经网络文档，该页面包含所有内容的索引。
-
-* [__入门__](#primary)
-* [__感知__](#perception)
-* [__规划__](#planning)
-* [__控制__](#control)
-=======
 欢迎使用模拟器的神经网络应用文档，该页面包含所有内容的索引。
 
 ## 目录
@@ -19,50 +11,11 @@ title: 主页
 - [规划](#planning) - 路径规划与决策
 - [控制](#control) - 控制算法与仿真
 - [其他](#other)
->>>>>>> upstream/main
 
 ---
 
 ## 入门 <span id="primary"></span>
 
-<<<<<<< HEAD
-[__热身__](warmup.md) — 入门热身示例
-
-[__线性回归__](linear_regression.md)
-
-[__softmax回归__](softmax_regression.md)
-
-[__支持向量机__](svm.md)
-
-[__简单神经网络__](simple_nn.md)
-
-[__卷积神经网络__](CNN.md)
-
-[__循环神经网络__](RNN.md)
-
-[__注意力机制__](attention.md)
-
-[__高斯混合__](gaussian_mixture.md)
-
-[__受限玻尔兹曼机__](RBM.md)
-
-[__强化学习__](RL.md)
-
----
-## 感知 <span id="perception"></span>
-
-[__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
-
-[__跟踪__](#tracking) 
-
-## 规划 <span id="planning"></span>
-
-[__导航__](#navigation)
-
-## 控制  <span id="control"></span>
-
-[PID](#pid)
-=======
 - [__热身__](warmup.md) — 入门热身示例
 
 - [__线性回归__](linear_regression.md) - 基础线性回归模型
@@ -124,7 +77,7 @@ title: 主页
 - [__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的强化学习自动驾驶系统
 
 - [__无人机飞行控制__](./UVA_flight_control_system.md) - 基于AirSim的无人机飞行控制系统
-
+- [__无人机飞行控制__](./drone_flight_sim/README.md) - 基于航点跟踪 + 碰撞自恢复的无人机双模式飞行控制系统
 - [__人形机器人平衡控制__](./humanoid_balance/Humanoid_Balance.md) - 基于强化学习的人形机器人平衡控制仿真
 
 - [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
@@ -153,7 +106,10 @@ title: 主页
 
 - [__基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化__](rain_sensor_fusion\DEMO_REPORT.md)
 
+- [__CARLA中的交通标志检测与车辆控制__](maintaining_sign_boards/maintaining_sign_boards.md) - CARLA中的交通标志检测与车辆控制
 
+
+[_交通拥堵仿真与智能调控_](./lidar_project/README.md) - 基于 CARLA 与强化学习的多模型融合交通拥堵仿真与智能调控系统
 
 ## 规划 <span id="planning"></span>
 
@@ -181,7 +137,7 @@ title: 主页
 
 - [__人形机器人SAC强化学习步态优化__](./mujoco_running/running.md) - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真
 
-
+- [__GraspRL机械臂抓取强化学习项目__](./index_wk.md) - 基于DQN与MuJoCo的视觉机械臂抓取仿真项目
 
 ## 控制 <span id="control"></span>
 
@@ -244,5 +200,3 @@ title: 主页
 - [__setup_tool模块汇报文档__](./setup_tool/report.md) - setup_tool 模块背景、改进内容、运行方式与效果总结
 
 - [__carla自动驾驶系统辅助监视器__](./autonomous_vehicle_monitor/monitor.md) -carla自动驾驶系统辅助器
-
->>>>>>> upstream/main

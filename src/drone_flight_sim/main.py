@@ -7,6 +7,10 @@
 
 # 导入 time 模块，用于延时操作
 import time
+# 导入 signal 模块，用于注册退出信号处理器
+import signal
+# 导入 sys 模块，用于系统退出
+import sys
 
 # 从 drone_controller 模块导入无人机控制器
 from drone_controller import DroneController
@@ -16,6 +20,17 @@ from flight_path import FlightPath
 
 # 从 utils 模块导入分隔线打印函数
 from utils import print_separator
+
+# 全局变量，用于信号处理器访问 drone 实例
+_global_drone = None
+
+
+def _signal_handler(signum, frame):
+    """信号处理器，安全退出程序"""
+    print(f"\n\n⚠️  收到退出信号 ({signum})，正在安全降落...")
+    if _global_drone is not None:
+        _global_drone.emergency_stop()
+    sys.exit(0)
 
 
 def auto_flight_mode(drone):
@@ -177,8 +192,15 @@ def keyboard_control_mode(drone):
 
 def main():
     """主函数，程序入口"""
+    global _global_drone
+
+    # 注册信号处理器（支持 Ctrl+C 和终止信号）
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+
     # 创建无人机控制器实例
     drone = DroneController()
+    _global_drone = drone
 
     try:
         # 选择飞行模式

@@ -74,7 +74,7 @@ def color_speed(speed):
 def color_distance(dist):
     """根据距离返回颜色"""
     if dist is None:
-        return Color.DIM
+        return Style.DIM
     if dist < 8:
         return Color.RED + Style.BOLD
     elif dist < 15:
@@ -101,7 +101,7 @@ def render_dashboard(elapsed, speed, max_speed, signs,
                      warning_text, is_emergency,
                      throttle, brake, steer,
                      traffic_light_state, nearest_obs,
-                     vehicle_count=None):
+                     fps=None, vehicle_count=None):
     """
     在控制台绘制实时状态面板
 
@@ -138,15 +138,16 @@ def render_dashboard(elapsed, speed, max_speed, signs,
     title = " CARLA Traffic Sign Detection - Dashboard "
     padding = (W - len(title)) // 2
     lines.append(' ' * padding + Style.BOLD + Color.CYAN + title + Style.RESET)
-    lines.append(Color.DIM + sep + Style.RESET)
+    lines.append(Style.DIM + sep + Style.RESET)
 
     # ── 状态行 ──
     time_str = f"Time:  {m:02d}:{s:02d}"
     speed_colored = color_speed(speed)
     speed_str = f"{speed_colored}Speed: {speed:.1f} km/h{Style.RESET}"
     max_str = f"Max: {max_speed:.1f} km/h"
+    fps_str = f"FPS: {fps:.0f}" if fps else ""
 
-    lines.append(f"  {Style.BOLD}{time_str}{Style.RESET}    {speed_str}    {Color.DIM}{max_str}{Style.RESET}")
+    lines.append(f"  {Style.BOLD}{time_str}{Style.RESET}    {speed_str}    {Style.DIM}{max_str}  {fps_str}{Style.RESET}")
 
     # ── 状态 / 警告 ──
     if warning_text:
@@ -169,7 +170,7 @@ def render_dashboard(elapsed, speed, max_speed, signs,
                      f" {warning_text} " + Style.RESET)
         lines.append('')
 
-    lines.append(Color.DIM + sep + Style.RESET)
+    lines.append(Style.DIM + sep + Style.RESET)
 
     # ── 检测结果表格 ──
     lines.append(f"  {Style.BOLD}Detected Objects{Style.RESET}" +
@@ -181,7 +182,7 @@ def render_dashboard(elapsed, speed, max_speed, signs,
         header = (f"  {Style.DIM}{'Type':<20} {'Conf':<8} {'Dist':<8} "
                   f"{'BBox':<22} Action{Style.RESET}")
         lines.append(header)
-        lines.append(f"  {Color.DIM}{'─' * (W - 4)}{Style.RESET}")
+        lines.append(f"  {Style.DIM}{'─' * (W - 4)}{Style.RESET}")
 
         # 按距离排序（有距离的在前）
         sorted_signs = []
@@ -220,13 +221,13 @@ def render_dashboard(elapsed, speed, max_speed, signs,
             line = (f"  {_truncate(label, 20):<20} "
                     f"{conf_color}{conf_str:<8}{Style.RESET} "
                     f"{dist_color}{dist_str:<8}{Style.RESET} "
-                    f"{Color.DIM}{bbox_str:<22}{Style.RESET} "
+                    f"{Style.DIM}{bbox_str:<22}{Style.RESET} "
                     f"{action}")
             lines.append(line)
     else:
-        lines.append(f"  {Color.DIM}No objects detected in current frame{Style.RESET}")
+        lines.append(f"  {Style.DIM}No objects detected in current frame{Style.RESET}")
 
-    lines.append(Color.DIM + sep + Style.RESET)
+    lines.append(Style.DIM + sep + Style.RESET)
 
     # ── 车辆控制 ──
     # 进度条
@@ -243,7 +244,7 @@ def render_dashboard(elapsed, speed, max_speed, signs,
 
     # 交通灯状态
     tl_str = "Unknown"
-    tl_color = Color.DIM
+    tl_color = Style.DIM
     if traffic_light_state is not None:
         tl_name = str(traffic_light_state).split('.')[-1]
         if tl_name == 'Red':
@@ -263,7 +264,7 @@ def render_dashboard(elapsed, speed, max_speed, signs,
     if vehicle_count is not None:
         lines.append(f"    NPC:     {vehicle_count} vehicles in scene")
 
-    lines.append(Color.DIM + sep + Style.RESET)
+    lines.append(Style.DIM + sep + Style.RESET)
 
     # ── 最近障碍物详情（右下信息区） ──
     if nearest_obs:
@@ -275,8 +276,8 @@ def render_dashboard(elapsed, speed, max_speed, signs,
                      f"(conf: {conf:.0%})")
 
     # ── 操作提示 ──
-    lines.append(Color.DIM + sep + Style.RESET)
-    lines.append(Color.DIM + "  ESC = Exit  |  Console updates every frame" + Style.RESET)
+    lines.append(Style.DIM + sep + Style.RESET)
+    lines.append(Style.DIM + "  ESC = Exit  |  Console updates every frame" + Style.RESET)
 
     # 一次性输出
     print('\n'.join(lines), end='', flush=True)

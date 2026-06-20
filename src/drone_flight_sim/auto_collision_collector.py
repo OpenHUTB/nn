@@ -44,6 +44,7 @@ class AutoCollisionCollector:
         self.target_samples = target_samples
         self.safe_samples = 0
         self.danger_samples = 0
+        self.collision_positions = []
         self.last_safe_capture_time = 0
         self.safe_capture_interval = 2.0  # 安全样本采集间隔(秒)
 
@@ -111,7 +112,9 @@ class AutoCollisionCollector:
             risk_name = "safe" if label == 0 else "danger"
             filename = f"{prefix}_{timestamp}_{pos.x_val:.1f}_{pos.y_val:.1f}"
 
-            # 计算深度统计
+            # ===== 修复：添加缺失的 min_depth 和 mean_depth =====
+            min_depth = np.min(depth_image)
+            mean_depth = np.mean(depth_image)
             max_depth = np.max(depth_image)
             std_depth = np.std(depth_image)
 
@@ -181,6 +184,38 @@ class AutoCollisionCollector:
             time.sleep(0.5)
         self.client.hoverAsync()
 
+    # ========== 新增：进度条显示优化 ==========
+    def _print_progress_bar(self, elapsed, pos, mode_name="飞行"):
+        """打印带进度条的采集状态
+
+        Args:
+            elapsed: 已运行时间(秒)
+            pos: 当前位置对象
+            mode_name: 飞行模式名称
+        """
+        # 计算完成百分比
+        safe_pct = min(100, self.safe_samples / self.target_samples * 100)
+        danger_pct = min(100, self.danger_samples / self.target_samples * 100)
+
+        bar_len = 12
+        safe_bar = '█' * int(safe_pct / 100 * bar_len) + '░' * (bar_len - int(safe_pct / 100 * bar_len))
+        danger_bar = '█' * int(danger_pct / 100 * bar_len) + '░' * (bar_len - int(danger_pct / 100 * bar_len))
+
+        # 计算总进度
+        total_target = self.target_samples * 2
+        total_collected = self.safe_samples + self.danger_samples
+        total_pct = min(100, total_collected / total_target * 100)
+        total_bar = '█' * int(total_pct / 100 * 20) + '░' * (20 - int(total_pct / 100 * 20))
+
+        print(f"\r⏱ {int(elapsed):3d}s | {mode_name:<6} | "
+              f"位置:({pos.x_val:5.1f},{pos.y_val:5.1f}) | "
+              f"总进度 [{total_bar}] {total_collected}/{total_target} | "
+              f"✅安全[{safe_bar}] {self.safe_samples:3d} | "
+              f"💥危险[{danger_bar}] {self.danger_samples:3d}   ",
+              end="")
+
+    # ============================================================
+
     def fly_spiral(self, duration=120):
         """螺旋飞行采集 - 使用速度控制
 
@@ -209,6 +244,11 @@ class AutoCollisionCollector:
 
             # 检测新的碰撞事件
             if self.check_collision_event():
+                pos = self.get_position()
+
+                self.collision_positions.append(
+                    (pos.x_val, pos.y_val, pos.z_val)
+                )
                 if self.danger_samples < self.target_samples:
                     print(f"\n💥 碰撞！采集危险样本 ({self.danger_samples + 1}/{self.target_samples})")
                     self.capture_sample(1, "collision")
@@ -239,12 +279,9 @@ class AutoCollisionCollector:
 
             self.client.moveByVelocityAsync(vx, vy, vz, 0.2)
 
-            # 显示进度
-            if int(elapsed) % 2 == 0:
-                pos = self.get_position()
-                print(f"\r⏱ {int(elapsed)}s | 位置:({pos.x_val:.1f},{pos.y_val:.1f}) | "
-                      f"✅ 安全: {self.safe_samples}/{self.target_samples} | "
-                      f"💥 危险: {self.danger_samples}/{self.target_samples}", end="")
+            # ===== 优化：使用带进度条的显示 =====
+            pos = self.get_position()
+            self._print_progress_bar(elapsed, pos, "螺旋")
 
             time.sleep(0.1)
 
@@ -308,11 +345,9 @@ class AutoCollisionCollector:
                 vy = (dy / dist) * self.fly_speed
                 self.client.moveByVelocityAsync(vx, vy, 0, 0.2)
 
-            # 显示进度
-            if int(elapsed) % 2 == 0:
-                print(f"\r⏱ {int(elapsed)}s | 位置:({current_pos.x_val:.1f},{current_pos.y_val:.1f}) | "
-                      f"✅ 安全: {self.safe_samples}/{self.target_samples} | "
-                      f"💥 危险: {self.danger_samples}/{self.target_samples}", end="")
+            # ===== 优化：使用带进度条的显示 =====
+            current_pos = self.get_position()
+            self._print_progress_bar(elapsed, current_pos, "随机")
 
             time.sleep(0.1)
 
@@ -380,12 +415,9 @@ class AutoCollisionCollector:
                 vx = np.sign(dx) * self.fly_speed
                 self.client.moveByVelocityAsync(vx, 0, 0, 0.2)
 
-            # 显示进度
-            if int(elapsed) % 2 == 0:
-                print(f"\r⏱ {int(elapsed)}s | 位置:({current_pos.x_val:.1f},{current_pos.y_val:.1f}) | "
-                      f"✅ 安全: {self.safe_samples}/{self.target_samples} | "
-                      f"💥 危险: {self.danger_samples}/{self.target_samples}", end="")
-
+            # ===== 优化：使用带进度条的显示 =====
+            current_pos = self.get_position()
+            self._print_progress_bar(elapsed, current_pos, "折线")
             time.sleep(0.1)
 
         self.client.hoverAsync()
@@ -456,12 +488,9 @@ class AutoCollisionCollector:
             if int(elapsed) % change_interval == 0 and int(elapsed) > 0:
                 direction_index = (direction_index + 1) % len(danger_directions)
 
-            # 显示进度
-            if int(elapsed) % 2 == 0:
-                current_pos = self.get_position()
-                print(f"\r⏱ {int(elapsed)}s | 位置:({current_pos.x_val:.1f},{current_pos.y_val:.1f}) | "
-                      f"✅ 安全: {self.safe_samples}/{self.target_samples} | "
-                      f"💥 危险: {self.danger_samples}/{self.target_samples}", end="")
+            # ===== 优化：使用带进度条的显示 =====
+            current_pos = self.get_position()
+            self._print_progress_bar(elapsed, current_pos, "撞墙")
 
             time.sleep(0.1)
 
@@ -520,7 +549,17 @@ class AutoCollisionCollector:
             'safe_ratio': safe_ratio,
             'danger_ratio': danger_ratio
         }
+    def save_collision_log(self):
+        log_file = os.path.join(
+            self.output_dir,
+            "collision_positions.csv"
+        )
 
+        with open(log_file, "w") as f:
+            f.write("x,y,z\n")
+
+            for x, y, z in self.collision_positions:
+                f.write(f"{x:.2f},{y:.2f},{z:.2f}\n")      
 
 def select_mode():
     """交互式选择飞行模式"""
@@ -618,6 +657,7 @@ def main():
         print(f"   安全样本占比: {stats['safe_ratio']:.1f}%")
         print(f"   危险样本占比: {stats['danger_ratio']:.1f}%")
         print(f"   数据保存: {collector.labels_file}")
+        collector.save_collision_log()
         print("=" * 50)
 
 
