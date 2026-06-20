@@ -136,7 +136,7 @@ def main():
         print(f"Vehicle spawned at: {spawn_point.location}")
 
         # Spawn random traffic
-        for _ in range(10):
+        for _ in range(15):
             traffic_bp = random.choice(blueprint_library.filter('vehicle.*'))
             traffic_spawn = random.choice(map.get_spawn_points())
             traffic_vehicle = world.try_spawn_actor(traffic_bp, traffic_spawn)
