@@ -444,6 +444,9 @@ class SimpleDrivingSystem:
         self.frame_count = 0  # 帧数计数器
         self.fps = 0  # 当前帧率
         self.last_fps_time = time.time()  # 上次计算帧率的时间
+        # 车灯控制相关
+        self.headlights_on = False  # 车灯是否开启
+        self.auto_headlights = True  # 自动车灯模式
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -731,6 +734,42 @@ class SimpleDrivingSystem:
         
         return stats
 
+    def toggle_headlights(self):
+        """切换车灯状态"""
+        self.headlights_on = not self.headlights_on
+        self.auto_headlights = False  # 手动切换时关闭自动模式
+        self._apply_headlights()
+        print(f"车灯状态: {'开启' if self.headlights_on else '关闭'}")
+
+    def set_auto_headlights(self, auto):
+        """设置自动车灯模式"""
+        self.auto_headlights = auto
+        if auto:
+            self._update_auto_headlights()
+
+    def _apply_headlights(self):
+        """应用车灯状态到车辆"""
+        if self.vehicle:
+            light_state = carla.VehicleLightState.NONE
+            if self.headlights_on:
+                light_state = carla.VehicleLightState.Position | carla.VehicleLightState.LowBeam | carla.VehicleLightState.HighBeam
+            self.vehicle.set_light_state(carla.VehicleLightState(light_state))
+
+    def _update_auto_headlights(self):
+        """根据天气自动更新车灯"""
+        if not self.auto_headlights or not self.weather_manager:
+            return
+        
+        # 在夜晚、雾天、雨天、暴风雨时自动开启车灯
+        weather = self.weather_manager.current_weather
+        auto_on_weathers = ['night', 'foggy', 'rainy', 'stormy']
+        
+        should_be_on = weather in auto_on_weathers
+        
+        if should_be_on != self.headlights_on:
+            self.headlights_on = should_be_on
+            self._apply_headlights()
+
     def run(self):
         """主运行循环"""
         print("\n" + "=" * 50)
@@ -790,6 +829,8 @@ class SimpleDrivingSystem:
         print("  - - 减少速度限制")
         print("  t - 重置行程里程")
         print("  m - 切换手动/自动驾驶模式")
+        print("  l - 切换车灯（手动模式）")
+        print("  a - 切换自动车灯模式")
         print("\n手动驾驶模式控制:")
         print("  W - 加速")
         print("  S - 刹车")
@@ -809,6 +850,8 @@ class SimpleDrivingSystem:
                 # 定期刷新天气，防止CARLA自动改变天气参数
                 if self.weather_manager:
                     self.weather_manager.tick()
+                    # 更新自动车灯
+                    self._update_auto_headlights()
 
                 # 获取车辆状态
                 velocity = self.vehicle.get_velocity()
@@ -949,6 +992,14 @@ class SimpleDrivingSystem:
                                 (start_x, start_y + 60), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.7, (0, 128, 255), 2)  # 蓝色显示
 
+                    # 显示车灯状态
+                    light_text = f"Light: {'ON' if self.headlights_on else 'OFF'}"
+                    if self.auto_headlights:
+                        light_text += " (Auto)"
+                    cv2.putText(display_img, light_text,
+                                (start_x, start_y + 90), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7, (255, 255, 0) if self.headlights_on else (128, 128, 128), 2)
+
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
                 # 处理按键
@@ -993,6 +1044,14 @@ class SimpleDrivingSystem:
                 elif key == ord('m') or key == ord('M'):
                     # 切换手动/自动驾驶模式
                     self.controller.toggle_manual_mode()
+                elif key == ord('l') or key == ord('L'):
+                    # 切换车灯状态
+                    self.toggle_headlights()
+                elif key == ord('a') or key == ord('A'):
+                    # 切换自动车灯模式（注意：手动模式下A键用于左转）
+                    if not self.controller.is_manual_mode():
+                        self.set_auto_headlights(not self.auto_headlights)
+                        print(f"自动车灯模式: {'开启' if self.auto_headlights else '关闭'}")
                 
                 # 手动驾驶控制（仅在手动模式下生效）
                 if self.controller.is_manual_mode():
