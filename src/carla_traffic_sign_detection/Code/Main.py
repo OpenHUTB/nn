@@ -196,6 +196,13 @@ def main():
                 simulation_time = time.time() - start_time
                 control_vehicle_based_on_sign(vehicle, detected_signs, world.get_actors().filter("traffic.traffic_light"), simulation_time)
 
+                # Print detected objects to terminal
+                if detected_signs:
+                    print(f"检测到 {len(detected_signs)} 个物体: ", end="")
+                    for sign, conf, _ in detected_signs:
+                        print(f"[{sign} {conf:.1%}] ", end="")
+                    print()
+
                 # Draw detection boxes on image (color by sign type)
                 display_image = image_surface[0].copy()
                 for sign, conf, bbox in detected_signs:
