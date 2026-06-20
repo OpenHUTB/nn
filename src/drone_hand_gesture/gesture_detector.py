@@ -124,6 +124,32 @@ class GestureDetector:
             "thumb_down": "stop",      # 大拇指向下 - 停止
         }
 
+        # ============ 多无人机控制配置 ============
+        # 控制模式: "dual" - 左手控制Drone1，右手控制Drone2
+        #           "single" - 只控制选中的无人机
+        #           "sync" - 同步控制所有无人机
+        self.multi_drone_mode = False  # 默认不启用多无人机模式
+        self.multi_drone_commands = {
+            # 左手手势 - 控制 Drone 1
+            "left_victory": "forward",        # 左手胜利 - 前进
+            "left_thumb_up": "backward",       # 左手大拇指向上 - 后退
+            "left_pointing_left": "left",      # 左手食指向左 - 左转
+            "left_pointing_right": "right",    # 左手食指向右 - 右转
+            "left_swipe_left": "drone1_left",  # 左手左滑 - Drone1左移
+            "left_swipe_right": "drone1_right",# 左手右滑 - Drone1右移
+            # 右手手势 - 控制 Drone 2
+            "right_pointing_up": "up",          # 右手食指向上 - 上升
+            "right_pointing_down": "down",      # 右手食指向下 - 下降
+            "right_ok": "hover",                # 右手OK - 悬停
+            "right_swipe_left": "drone2_left",  # 右手左滑 - Drone2左移
+            "right_swipe_right": "drone2_right",# 右手右滑 - Drone2右移
+            # 双手手势 - 全体命令
+            "both_open_palm": "takeoff_all",   # 双手张开 - 全体起飞
+            "both_closed_fist": "land_all",    # 双手握拳 - 全体降落
+            "both_thumbs_up": "formation_line", # 双手拇指向上 - 切换直线编队
+            "both_thumbs_down": "formation_v",  # 双手拇指向下 - 切换V字编队
+        }
+
         # 合并所有手势命令（用于显示）
         self.gesture_commands = {
             "open_palm": "takeoff",
@@ -208,6 +234,26 @@ class GestureDetector:
         """
         设置灵敏度级别
         
+        Returns:
+            dict: 包含灵敏度级别、名称、阈值等信息的字典
+        """
+        preset = self.sensitivity_presets[self.sensitivity_level]
+        return {
+            'level': self.sensitivity_level,
+            'name': self.sensitivity_names[self.sensitivity_level],
+            'detection_confidence': preset['min_detection_confidence'],
+            'tracking_confidence': preset['min_tracking_confidence'],
+            'gesture_threshold': preset['gesture_threshold'],
+            'swipe_threshold': preset['swipe_threshold'],
+            'swipe_velocity': preset['swipe_min_velocity'],
+            'contour_area_min': preset['contour_area_min'],
+            'mode': self.mode
+        }
+
+    def detect_gestures(self, image, simulation_mode=False):
+        """
+        检测图像中的手势（支持双手和滑动手势）
+
         Args:
             level: 1=低(严格), 2=中, 3=高(宽松)
             
@@ -652,6 +698,113 @@ class GestureDetector:
                 result['special_command'] = self.both_hands_commands[gesture]
 
         return result
+
+    def get_multi_drone_commands(self, left_hand_data, right_hand_data):
+        """
+        获取多无人机控制命令（双手分离控制）
+        左手控制 Drone 1，右手控制 Drone 2
+
+        Args:
+            left_hand_data: 左手数据
+            right_hand_data: 右手数据
+
+        Returns:
+            dict: 包含两个无人机的控制命令
+        """
+        result = {
+            # Drone 1 命令（左手控制）
+            'drone1_command': None,
+            'drone1_intensity': 0.5,
+            'drone1_gesture': None,
+            # Drone 2 命令（右手控制）
+            'drone2_command': None,
+            'drone2_intensity': 0.5,
+            'drone2_gesture': None,
+            # 全体命令（双手手势触发）
+            'all_command': None,
+            'formation_command': None,
+            # 手势原始数据
+            'left_gesture': None,
+            'right_gesture': None
+        }
+
+        # 处理左手 - 控制 Drone 1（方向）
+        if left_hand_data:
+            gesture = left_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(left_hand_data, gesture)
+            result['left_gesture'] = gesture
+            result['drone1_gesture'] = gesture
+            result['drone1_intensity'] = intensity
+
+            # 滑动手势 - Drone 1 侧向移动
+            if gesture == 'swipe_left':
+                result['drone1_command'] = 'left'
+                result['drone1_intensity'] = self.swipe_intensity
+            elif gesture == 'swipe_right':
+                result['drone1_command'] = 'right'
+                result['drone1_intensity'] = self.swipe_intensity
+            elif gesture == 'swipe_up':
+                result['drone1_command'] = 'forward'
+                result['drone1_intensity'] = self.swipe_intensity
+            elif gesture == 'swipe_down':
+                result['drone1_command'] = 'backward'
+                result['drone1_intensity'] = self.swipe_intensity
+            # 普通手势 - Drone 1 方向控制
+            elif gesture in self.left_hand_commands:
+                result['drone1_command'] = self.left_hand_commands[gesture]
+            # 双手手势检测
+            elif gesture in ['open_palm', 'closed_fist', 'thumb_up', 'thumb_down']:
+                if right_hand_data and right_hand_data.get('gesture') == gesture:
+                    # 双手同时做相同手势 - 触发全体命令
+                    if gesture == 'open_palm':
+                        result['all_command'] = 'takeoff'
+                    elif gesture == 'closed_fist':
+                        result['all_command'] = 'land'
+                    elif gesture == 'thumb_up':
+                        result['formation_command'] = 'line'
+                    elif gesture == 'thumb_down':
+                        result['formation_command'] = 'v'
+
+        # 处理右手 - 控制 Drone 2（高度）
+        if right_hand_data:
+            gesture = right_hand_data.get('gesture', 'none')
+            intensity = self.get_gesture_intensity(right_hand_data, gesture)
+            result['right_gesture'] = gesture
+            result['drone2_intensity'] = intensity
+
+            # 滑动手势 - Drone 2 侧向移动
+            if gesture == 'swipe_left':
+                result['drone2_command'] = 'left'
+                result['drone2_intensity'] = self.swipe_intensity
+            elif gesture == 'swipe_right':
+                result['drone2_command'] = 'right'
+                result['drone2_intensity'] = self.swipe_intensity
+            elif gesture == 'swipe_up':
+                result['drone2_command'] = 'forward'
+                result['drone2_intensity'] = self.swipe_intensity
+            elif gesture == 'swipe_down':
+                result['drone2_command'] = 'backward'
+                result['drone2_intensity'] = self.swipe_intensity
+            # 普通手势 - Drone 2 高度控制
+            elif gesture in self.right_hand_commands:
+                result['drone2_command'] = self.right_hand_commands[gesture]
+            # 双手手势已在上方处理
+
+        return result
+
+    def set_multi_drone_mode(self, enabled):
+        """启用/禁用多无人机模式"""
+        self.multi_drone_mode = enabled
+        if enabled:
+            print("[手势检测器] 多无人机模式已启用")
+            print("  左手 -> 控制 Drone 1 (方向)")
+            print("  右手 -> 控制 Drone 2 (高度)")
+        else:
+            print("[手势检测器] 多无人机模式已禁用")
+
+    def is_multi_drone_mode(self):
+        """检查是否启用多无人机模式"""
+        return self.multi_drone_mode
 
     def get_gesture_intensity(self, landmarks, gesture_type):
         """获取手势强度"""

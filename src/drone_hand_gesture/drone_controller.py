@@ -39,6 +39,10 @@ class SimulationDroneController(BaseDroneController):
         self.replay_speed: float = 1.0
         self.replay_start_time: float = 0.0
 
+        # 紧急返航状态
+        self._return_home_active: bool = False
+        self._return_home_start_pos: np.ndarray = None
+
     def disconnect(self) -> bool:
         """断开连接"""
         if self.master:
@@ -108,6 +112,8 @@ class SimulationDroneController(BaseDroneController):
             self._hover_simulation()
         elif command == "stop":
             self._stop_simulation()
+        elif command == "return_home":
+            self.return_home()
         else:
             self._simulate_takeoff(altitude)
 
@@ -214,6 +220,66 @@ class SimulationDroneController(BaseDroneController):
         self.logger.warning("警告: 电池耗尽，紧急降落！")
         self._simulate_land()
 
+    def return_home(self):
+        """一键紧急返航 - 立即飞回起飞点 (0, 0, 0) 并自动降落
+        
+        功能：
+        1. 如果无人机未解锁，直接重置（已经在原点）
+        2. 计算当前位置到原点的方向向量
+        3. 以最大速度的1.5倍飞向原点（紧急速度）
+        4. 到达原点附近后自动降落
+        5. 返航期间忽略其他移动命令
+        """
+        if not self.connected:
+            self.logger.error("[返航] 未连接，无法返航")
+            return False
+
+        current_pos = self.state['position']
+        home_pos = np.array([0.0, 0.0, 0.0])
+
+        # 计算到原点的距离
+        distance = np.linalg.norm(current_pos - home_pos)
+
+        if distance < 0.3:
+            # 已经在原点附近，直接降落
+            self.logger.info("[返航] 无人机已在原点附近，直接降落")
+            if self.state['armed']:
+                self.state['mode'] = 'RETURN_HOME'
+                self._simulate_land()
+            else:
+                self.reset()
+            return True
+
+        # 计算返航方向向量
+        direction = home_pos - current_pos
+        direction_norm = direction / distance
+
+        # 紧急返航速度（最大速度的1.5倍）
+        max_speed = self.config.get("drone.max_speed", 2.0) if self.config else 2.0
+        return_speed = max_speed * 1.5
+
+        # 设置速度向量指向原点
+        self.state['velocity'] = direction_norm * return_speed
+        self.state['mode'] = 'RETURN_HOME'
+
+        # 记录返航起点，用于后续判断是否到达
+        self._return_home_start_pos = current_pos.copy()
+        self._return_home_active = True
+
+        self.logger.info(f"[返航] 紧急返航启动！")
+        self.logger.info(f"  当前位置: ({current_pos[0]:.2f}, {current_pos[1]:.2f}, {current_pos[2]:.2f})")
+        self.logger.info(f"  目标位置: (0.00, 0.00, 0.00)")
+        self.logger.info(f"  距离: {distance:.2f}m | 返航速度: {return_speed:.2f}m/s")
+        self.logger.info(f"  预计到达: {distance / return_speed:.1f}秒")
+        print(f"\n{'='*60}")
+        print(f"  ⚠️  紧急返航已启动！")
+        print(f"  无人机正在全速返回起飞点...")
+        print(f"  当前位置: ({current_pos[0]:.2f}, {current_pos[1]:.2f}, {current_pos[2]:.2f})")
+        print(f"  距原点: {distance:.2f}m")
+        print(f"{'='*60}\n")
+
+        return True
+
     def _send_mavlink_takeoff(self):
         try:
             from pymavlink import mavutil
@@ -246,6 +312,28 @@ class SimulationDroneController(BaseDroneController):
         """更新物理仿真"""
         if not self.state['armed']:
             return
+
+        # 处理返航模式
+        if self._return_home_active and self.state['mode'] == 'RETURN_HOME':
+            current_pos = self.state['position']
+            home_pos = np.array([0.0, 0.0, 0.0])
+            distance_to_home = np.linalg.norm(current_pos - home_pos)
+
+            # 到达原点附近（1米内），自动降落
+            if distance_to_home < 1.0:
+                self.logger.info(f"[返航] 已到达原点附近 ({distance_to_home:.2f}m)，自动降落")
+                print(f"\n[返航] ✅ 已到达起飞点，正在自动降落...")
+                self._return_home_active = False
+                self.state['velocity'] = np.array([0.0, 0.0, 0.0])
+                self.state['mode'] = 'LAND'
+                self.state['velocity'][1] = -0.8  # 缓慢降落
+            else:
+                # 持续修正方向，确保飞向原点
+                direction = home_pos - current_pos
+                direction_norm = direction / distance_to_home
+                max_speed = self.config.get("drone.max_speed", 2.0) if self.config else 2.0
+                return_speed = max_speed * 1.5
+                self.state['velocity'] = direction_norm * return_speed
 
         # 更新位置
         self.state['position'] += self.state['velocity'] * dt

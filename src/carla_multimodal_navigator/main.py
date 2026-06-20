@@ -188,7 +188,140 @@ class SimpleDrivingSystem:
         self.parking_target_angle = 0.0  # 目标停车角度
         self.parking_step = 0  # 当前泊车步骤
         self.parking_timer = 0.0  # 泊车计时器
+        
+        # 地图切换相关
+        self.available_maps = []  # 动态获取可用地图列表
+        self.current_map_index = 0  # 当前地图索引
+        self.current_map_name = 'Town01'  # 当前地图名称
+        
+        # 交通信号灯识别相关
+        self.traffic_light_enabled = True  # 交通信号灯识别开关
+        self.detected_traffic_light = None  # 当前检测到的交通灯
+        self.traffic_light_state = 'none'  # none/green/yellow/red
+        self.traffic_light_distance = 0.0  # 到交通灯的距离
+        self.traffic_light_timer = 0.0  # 交通灯倒计时
 
+    def init_available_maps(self):
+        """初始化可用地图列表（动态获取CARLA服务器上的地图）"""
+        try:
+            # 获取服务器上所有可用的地图
+            maps = self.client.get_available_maps()
+            # 过滤出 Town 系列地图
+            town_maps = [m for m in maps if 'Town' in m]
+            # 按名称排序
+            town_maps.sort()
+            self.available_maps = town_maps
+            print(f"\n检测到 {len(town_maps)} 个可用地图:")
+            for i, map_name in enumerate(town_maps):
+                print(f"  {i+1}. {map_name}")
+        except Exception as e:
+            print(f"获取可用地图失败: {e}")
+            # 如果获取失败，使用默认列表
+            self.available_maps = ['Town01', 'Town02', 'Town03', 'Town04', 'Town05', 'Town06', 'Town07']
+    
+    def detect_traffic_light(self):
+        """检测交通信号灯状态"""
+        if not self.traffic_light_enabled or not self.vehicle or not self.world:
+            self.traffic_light_state = 'none'
+            self.traffic_light_distance = 0.0
+            return
+        
+        try:
+            # 获取车辆位置
+            vehicle_location = self.vehicle.get_location()
+            
+            # 获取所有交通灯
+            traffic_lights = self.world.get_actors().filter('traffic.traffic_light')
+            
+            min_distance = float('inf')
+            closest_light = None
+            
+            # 获取车辆的朝向（yaw角）
+            vehicle_transform = self.vehicle.get_transform()
+            vehicle_yaw = vehicle_transform.rotation.yaw  # 车辆朝向角度（度）
+            
+            for light in traffic_lights:
+                # 只关注激活的交通灯（兼容不同CARLA版本）
+                try:
+                    # 尝试作为方法调用
+                    is_active = light.is_active()
+                except TypeError:
+                    # 如果失败，作为属性访问
+                    is_active = light.is_active
+                
+                if not is_active:
+                    continue
+                
+                # 计算距离
+                light_location = light.get_location()
+                distance = ((vehicle_location.x - light_location.x) ** 2 + 
+                           (vehicle_location.y - light_location.y) ** 2) ** 0.5
+                
+                # 只考虑前方50米范围内的交通灯
+                if distance < 50.0:
+                    # 计算交通灯相对于车辆前方的角度
+                    dx = light_location.x - vehicle_location.x
+                    dy = light_location.y - vehicle_location.y
+                    
+                    # 计算交通灯相对于车辆的角度（度）
+                    import math
+                    light_angle = math.degrees(math.atan2(dy, dx))
+                    
+                    # 计算相对角度（考虑车辆朝向）
+                    relative_angle = (light_angle - vehicle_yaw) % 360
+                    if relative_angle > 180:
+                        relative_angle -= 360
+                    
+                    # 只考虑车辆前方±45度范围内的交通灯
+                    if abs(relative_angle) < 45.0 and distance < min_distance:
+                        min_distance = distance
+                        closest_light = light
+            
+            if closest_light:
+                # 获取交通灯状态
+                if closest_light.state == carla.TrafficLightState.Red:
+                    self.traffic_light_state = 'red'
+                elif closest_light.state == carla.TrafficLightState.Yellow:
+                    self.traffic_light_state = 'yellow'
+                elif closest_light.state == carla.TrafficLightState.Green:
+                    self.traffic_light_state = 'green'
+                else:
+                    self.traffic_light_state = 'none'
+                
+                self.traffic_light_distance = min_distance
+                self.detected_traffic_light = closest_light
+                
+                # 计算倒计时（基于CARLA的交通灯时间，兼容不同版本）
+                try:
+                    time_remaining = closest_light.get_time_remaining()
+                    if time_remaining > 0:
+                        self.traffic_light_timer = time_remaining
+                except AttributeError:
+                    # 某些CARLA版本没有这个方法
+                    self.traffic_light_timer = 0.0
+            else:
+                self.traffic_light_state = 'none'
+                self.traffic_light_distance = 0.0
+                self.detected_traffic_light = None
+                
+        except Exception as e:
+            print(f"检测交通信号灯失败: {e}")
+            self.traffic_light_state = 'none'
+    
+    def get_traffic_light_control(self):
+        """根据交通信号灯状态获取控制指令"""
+        if self.traffic_light_state == 'red' and self.traffic_light_distance < 15.0:
+            # 红灯且距离小于15米，需要停车
+            return {'throttle': 0.0, 'brake': 1.0, 'message': 'STOP - RED LIGHT'}
+        elif self.traffic_light_state == 'yellow' and self.traffic_light_distance < 20.0:
+            # 黄灯且距离较近，减速停车
+            return {'throttle': 0.0, 'brake': 0.5, 'message': 'CAUTION - YELLOW LIGHT'}
+        elif self.traffic_light_state == 'green':
+            # 绿灯，正常行驶
+            return {'throttle': 0.3, 'brake': 0.0, 'message': 'GO - GREEN LIGHT'}
+        else:
+            return None
+    
     def init_available_models(self):
         """初始化可用车型列表（检查哪些车型在CARLA中存在）"""
         blueprint_library = self.world.get_blueprint_library()
@@ -231,6 +364,66 @@ class SimpleDrivingSystem:
         if self.current_model_name not in self.available_models and self.available_models:
             self.current_model_name = self.available_models[0]
             self.current_model_index = 0
+
+    def change_map(self, direction='next'):
+        """切换地图"""
+        # 尝试多次切换，直到找到可用的地图
+        max_attempts = len(self.available_maps)
+        attempts = 0
+        
+        while attempts < max_attempts:
+            if direction == 'next':
+                self.current_map_index = (self.current_map_index + 1) % len(self.available_maps)
+            elif direction == 'prev':
+                self.current_map_index = (self.current_map_index - 1) % len(self.available_maps)
+            
+            new_map = self.available_maps[self.current_map_index]
+            self.current_map_name = new_map
+            
+            print(f"\n正在切换到地图: {new_map}")
+            
+            try:
+                # 清理现有资源
+                self.cleanup()
+                
+                # 加载新地图
+                self.world = self.client.load_world(new_map)
+                print(f"地图 {new_map} 加载成功！")
+                
+                # 等待地图加载
+                time.sleep(0.5)
+                
+                # 重新生成车辆
+                if self.spawn_vehicle():
+                    # 重新设置传感器
+                    self.setup_camera()
+                    self.setup_speed_sensor()
+                    
+                    # 设置控制器
+                    self.setup_controller()
+                    
+                    # 生成NPC车辆
+                    self.spawn_npc_vehicles(2)
+                    
+                    print(f"地图切换完成！当前地图: {new_map}")
+                    return  # 成功切换，退出函数
+                else:
+                    print(f"地图 {new_map} 车辆生成失败，尝试下一个地图...")
+                    attempts += 1
+                    
+            except Exception as e:
+                print(f"地图 {new_map} 加载失败: {e}")
+                import traceback
+                traceback.print_exc()
+                attempts += 1
+        
+        # 如果所有地图都失败了，回退到原始地图
+        print("警告：所有地图切换都失败了，保持当前地图")
+        if direction == 'next':
+            self.current_map_index = (self.current_map_index - 1) % len(self.available_maps)
+        else:
+            self.current_map_index = (self.current_map_index + 1) % len(self.available_maps)
+        self.current_map_name = self.available_maps[self.current_map_index]
 
     def auto_parking_control(self, vehicle):
         """完整倒车入库控制逻辑 - 模拟真实倒车入库动作"""
@@ -405,6 +598,9 @@ class SimpleDrivingSystem:
 
             # 初始化可用车型列表
             self.init_available_models()
+            
+            # 初始化可用地图列表（动态获取服务器上的地图）
+            self.init_available_maps()
             
             print("连接成功！")
             return True
@@ -1004,6 +1200,69 @@ class SimpleDrivingSystem:
                 # 其他标志：显示类型名称
                 cv2.putText(image, self.get_sign_name(sign)[:2], (center_x - 10, center_y + 5), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, sign['color'], 2)
+    
+    def draw_traffic_light(self, image):
+        """在图像上绘制交通信号灯"""
+        if not self.traffic_light_enabled or self.traffic_light_state == 'none':
+            return
+        
+        height, width = image.shape[:2]
+        
+        # 在右上角绘制交通信号灯
+        light_width = 40
+        light_height = 100
+        margin = 15
+        x = width - margin - light_width
+        y = margin + 80  # 在交通标志下方
+        
+        # 绘制信号灯外壳
+        cv2.rectangle(image, (x, y), (x + light_width, y + light_height), (50, 50, 50), -1)
+        cv2.rectangle(image, (x, y), (x + light_width, y + light_height), (200, 200, 200), 2)
+        
+        # 灯的位置
+        light_radius = 12
+        spacing = 12
+        
+        # 红灯
+        red_color = (0, 0, 255) if self.traffic_light_state == 'red' else (50, 50, 50)
+        cv2.circle(image, (x + light_width // 2, y + spacing + light_radius), light_radius, red_color, -1)
+        
+        # 黄灯
+        yellow_color = (0, 255, 255) if self.traffic_light_state == 'yellow' else (50, 50, 50)
+        cv2.circle(image, (x + light_width // 2, y + 2*spacing + 3*light_radius), light_radius, yellow_color, -1)
+        
+        # 绿灯
+        green_color = (0, 255, 0) if self.traffic_light_state == 'green' else (50, 50, 50)
+        cv2.circle(image, (x + light_width // 2, y + 3*spacing + 5*light_radius), light_radius, green_color, -1)
+        
+        # 显示状态文字和倒计时
+        state_text = {
+            'red': 'STOP',
+            'yellow': 'CAUTION',
+            'green': 'GO'
+        }
+        
+        text_color = {
+            'red': (0, 0, 255),
+            'yellow': (0, 255, 255),
+            'green': (0, 255, 0)
+        }
+        
+        cv2.putText(image, state_text.get(self.traffic_light_state, ''), 
+                    (x, y + light_height + 25), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color.get(self.traffic_light_state, (255, 255, 255)), 2)
+        
+        # 显示倒计时
+        if self.traffic_light_timer > 0:
+            cv2.putText(image, f"{int(self.traffic_light_timer)}s", 
+                        (x, y + light_height + 45), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        
+        # 显示距离
+        if self.traffic_light_distance > 0:
+            cv2.putText(image, f"Dist: {int(self.traffic_light_distance)}m", 
+                        (x, y + light_height + 65), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
     def create_multi_view_display(self, speed, throttle, steer):
         """创建多视角显示"""
@@ -1013,10 +1272,11 @@ class SimpleDrivingSystem:
             if view_name in self.camera_images and self.camera_images[view_name] is not None:
                 display_img = self.camera_images[view_name].copy()
                 
-                # 在前视图上绘制车道线和交通标志
+                # 在前视图上绘制车道线、交通标志和交通信号灯
                 if view_name == 'front':
                     self.draw_lane_lines(display_img)
                     self.draw_traffic_signs(display_img)
+                    self.draw_traffic_light(display_img)
                 
                 # 添加状态信息
                 cv2.putText(display_img, f"View: {view_name.upper()}",
@@ -1186,6 +1446,8 @@ class SimpleDrivingSystem:
         print("  r - 重置车辆")
         print("  s - 紧急停止")
         print("  m - 切换车辆型号")
+        print("  , - 切换到上一个地图")
+        print("  . - 切换到下一个地图")
         print("  l - 切换车道保持辅助(LKA)")
         print("  k - 切换交通标志识别(TSR)")
         print("  w - 切换自动天气变化")
@@ -1199,6 +1461,7 @@ class SimpleDrivingSystem:
         print("\n视角: 1-前视 2-后视 3-左视 4-右视 5-鸟瞰 6-第三人称")
         print("\n天气控制: W-切换自动天气 7-晴天 8-雨天 9-雾天 0-白天/黑夜")
         print("\n车辆型号: M-切换车型 切换后按R重置车辆")
+        print("\n地图切换: ,-上一个地图 .-下一个地图 (Town01-Town10)")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -1222,6 +1485,9 @@ class SimpleDrivingSystem:
 
                 # 检测交通标志
                 self.detect_traffic_signs()
+                
+                # 检测交通信号灯
+                self.detect_traffic_light()
 
                 # 检查自动泊车状态
                 if self.auto_parking_enabled:
@@ -1247,6 +1513,15 @@ class SimpleDrivingSystem:
                         lka_enabled=self.lka_enabled, 
                         lane_offset=self.lane_offset
                     )
+                    
+                    # 检查交通信号灯状态
+                    tl_control = self.get_traffic_light_control()
+                    if tl_control:
+                        # 有交通信号灯控制指令，覆盖原有控制
+                        throttle = tl_control['throttle']
+                        brake = tl_control['brake']
+                        print(tl_control['message'])
+                    
                     control = carla.VehicleControl(
                         throttle=float(throttle),
                         brake=float(brake),
@@ -1276,6 +1551,14 @@ class SimpleDrivingSystem:
                 elif key == ord('m'):
                     # 切换车辆型号
                     model_name = self.change_vehicle_model('next')
+                elif key == 44:  # 逗号的ASCII码
+                    # 切换到上一个地图
+                    print("检测到逗号键，切换到上一个地图")
+                    self.change_map('prev')
+                elif key == 46:  # 句号的ASCII码
+                    # 切换到下一个地图
+                    print("检测到句号键，切换到下一个地图")
+                    self.change_map('next')
                 elif key == ord('l'):
                     # 切换车道保持辅助(LKA)
                     self.lka_enabled = not self.lka_enabled
@@ -1286,6 +1569,11 @@ class SimpleDrivingSystem:
                     self.tsr_enabled = not self.tsr_enabled
                     status = "开启" if self.tsr_enabled else "关闭"
                     print(f"交通标志识别(TSR)已{status}")
+                elif key == ord('t'):
+                    # 切换交通信号灯识别
+                    self.traffic_light_enabled = not self.traffic_light_enabled
+                    status = "开启" if self.traffic_light_enabled else "关闭"
+                    print(f"交通信号灯识别已{status}")
                 elif key == ord('p'):
                     # 切换倒车入库
                     self.auto_parking_enabled = not self.auto_parking_enabled

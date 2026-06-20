@@ -134,7 +134,11 @@ class YOLO(object):
     # 核心方法，输入图像进行目标检测+简易追踪，返回绘制了检测框/轨迹的图像
     # cars：已追踪目标的坐标列表（每个元素为目标的历史中心坐标）
     # car_not_vis：每个追踪目标的连续不可见帧数
-    def detect_image(self, image, cars=[], car_not_vis=[]):
+    def detect_image(self, image, cars=None, car_not_vis=None):
+        if cars is None:
+            cars = []
+        if car_not_vis is None:
+            car_not_vis = []
         # ---------------------------------------------------------#
         #   在这里将图像转换成RGB图像，防止灰度图在预测时报错。
         # ---------------------------------------------------------#

@@ -1,0 +1,10 @@
+#path: C:/yolo
+train: C:/CARLA_0.9.14/WindowsNoEditor/carladataset/carla/train
+val: C:/CARLA_0.9.14/WindowsNoEditor/carladataset/carla/valid
+
+
+
+nc: 4
+names: ['bike', 'motobike', 'person',  'vehicle']
+
+

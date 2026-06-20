@@ -1,0 +1,81 @@
+# Active Lane Keeping Assistant Configuration
+
+# CARLA Connection Settings
+connection:
+  server_ip: "127.0.0.1"
+  port: 2000
+  timeout: 10.0  # 增加超时时间，避免地图加载超时
+
+# Simulation Settings
+simulation:
+  map: "Town05"  # 地图名称
+  time_difference: 0.01  # 每步时间间隔
+
+# Camera Settings
+camera:
+  image_height: 480
+  image_width: 640
+  fov: 110
+  x_offset: 2.5  # 摄像头相对车辆的位置
+  z_offset: 0.7
+
+# Lane Detection Settings (鲁棒性优化)
+lane_detection:
+  use_adaptive_threshold: true  # 使用Otsu自适应阈值替代固定阈值
+  use_edge_detection: true      # 结合边缘检测提高鲁棒性
+  canny_low: 50                 # Canny边缘检测低阈值
+  canny_high: 150               # Canny边缘检测高阈值
+  max_lost_frames: 5            # 最大连续丢失帧数（使用历史数据预测）
+
+# Performance Optimization Settings (性能优化)
+performance:
+  use_gpu: false                # 启用GPU加速（需要CUDA支持的OpenCV）
+  use_parallel: true            # 启用并行处理（多线程）
+  use_incremental: true         # 启用增量更新（利用前帧结果）
+  time_budget_ms: 40.0          # 每帧最大处理时间（毫秒，25FPS目标）
+  enable_profiling: false       # 启用性能分析（FPS统计、耗时分析）
+
+# Controller Settings (自适应控制器优化)
+controller:
+  default_controller: "pid_gs"  # simple, p, pd, pid, pid_gs, mpc
+  tau_p: 0.65              # 比例参数
+  tau_i: 0.00000002        # 积分参数
+  tau_d: 0.034             # 微分参数
+  throttle: 0.3            # 油门值
+  surface_lower_threshold: 20000000.0  # 检测面积下限
+  surface_upper_threshold: 30000000.0  # 检测面积上限
+  
+  # 增益调度参数（速度自适应）
+  use_gain_scheduling: true  # 启用增益调度
+  gain_schedule:
+    low_speed:   # < 30 km/h
+      tau_p: 0.8
+      tau_d: 0.02
+      tau_i: 0.00000003
+    medium_speed:  # 30-60 km/h
+      tau_p: 0.65
+      tau_d: 0.034
+      tau_i: 0.00000002
+    high_speed:   # > 60 km/h
+      tau_p: 0.5
+      tau_d: 0.05
+      tau_i: 0.00000001
+  
+  # 自适应积分饱和
+  use_adaptive_integral: true  # 启用自适应积分饱和
+  integral_limit: 50.0        # 积分累积上限
+  
+  # MPC参数（模型预测控制）
+  use_mpc: false             # 启用MPC控制器
+  mpc_horizon: 5             # 预测步数
+  mpc_control_horizon: 3     # 控制时域
+
+# Run Settings
+run:
+  default_steps: 1000      # 默认运行步数
+  save_video: true         # 是否保存视频
+
+# Debug Settings
+debug:
+  show_error_plot: true    # 显示误差曲线图
+  save_error_image: true   # 保存误差图片

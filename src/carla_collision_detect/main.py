@@ -6,6 +6,8 @@ import keyboard
 import numpy as np
 from vision_module import VisionSystem
 from planner import LanePlanner
+from acc_module import ACCController
+from aeb_module import AEBController
 
 def main():
     print("===================================")
@@ -16,6 +18,16 @@ def main():
     print("===================================")
     choice = input("请输入选项 (1 或 2，默认按回车选 1): ").strip()
     target_type_name = "行人" if choice == '2' else "车辆"
+    has_side_car = False
+    if choice != '2':
+        print("\n  [1] 测试场景A：侧道无车")
+        print("  [2] 测试场景B：侧道有车")
+        scene_choice = input("请选择场景 (1 或 2，默认选 1): ").strip()
+        has_side_car = (scene_choice == '2')
+    print("  [1] 障碍物靠左生成")
+    print("  [2] 障碍物靠右生成")
+    side_choice = input("请选择障碍物位置 (1 或 2，默认按回车选 1): ").strip()
+    spawn_side = "right" if side_choice == '2' else "left"
     print(f"\n⏳ 正在连接 CARLA 服务器并准备生成 {target_type_name}...\n")
 
     client = carla.Client('localhost', 2000)
@@ -51,19 +63,58 @@ def main():
         
         for sp in spawn_points:
             wp = world.get_map().get_waypoint(sp.location)
-            # 必须当前不是路口
-            if not wp.is_junction:
-                # 探寻前方 60 米处的路点
-                fwd_wps = wp.next(60.0)
-                if fwd_wps and not fwd_wps[0].is_junction:
-                    ego_spawn_point = sp
-                    target_waypoint = fwd_wps[0]
+            if wp.is_junction:
+                continue
+                
+            is_perfect_straight = True
+            check_wp = wp
+            start_yaw = wp.transform.rotation.yaw  # 💡 新增：记录起始路点的绝对航向角
+            
+            for _ in range(8):
+                next_wps = check_wp.next(10.0)
+                # 条件 1：不能是断头路或十字路口
+                if not next_wps or next_wps[0].is_junction:
+                    is_perfect_straight = False
                     break
+                    
+                # 💡 条件 2（核心修复）：弯道测谎仪！
+                current_yaw = next_wps[0].transform.rotation.yaw
+                yaw_diff = abs((current_yaw - start_yaw) % 360)
+                if yaw_diff > 180: 
+                    yaw_diff = 360 - yaw_diff
+                    
+                # 如果前方路点的朝向，和起点偏差超过 2 度，说明这是一条弯路，立刻抛弃！
+                if yaw_diff > 2.0:
+                    is_perfect_straight = False
+                    break
+                    
+                check_wp = next_wps[0]
+
+            # 2. 如果经过了重重考验，这 80 米是一条绝对纯正的直道
+            if is_perfect_straight:
+                target_wp = wp
+                current_lane_id = target_wp.lane_id
+                
+                # 靠左/靠右生成的逻辑 (带防逆行双黄线保护)
+                if spawn_side == "left":
+                    while target_wp.get_left_lane() and target_wp.get_left_lane().lane_type == carla.LaneType.Driving and (target_wp.get_left_lane().lane_id * current_lane_id > 0):
+                        target_wp = target_wp.get_left_lane()
+                else:
+                    while target_wp.get_right_lane() and target_wp.get_right_lane().lane_type == carla.LaneType.Driving and (target_wp.get_right_lane().lane_id * current_lane_id > 0):
+                        target_wp = target_wp.get_right_lane()
+
+                # 3. 锁定主车生成点
+                ego_spawn_point = target_wp.transform
+                ego_spawn_point.location.z += 0.5
+                
+                # 4. 在正前方 30 米处生成测试靶标
+                target_waypoint = target_wp.next(20.0)[0]
+                break
                     
         if not ego_spawn_point:
             print("⚠️ 没找到完美的超长直道，将就用默认点。")
             ego_spawn_point = spawn_points[0]
-            target_waypoint = world.get_map().get_waypoint(ego_spawn_point.location).next(40.0)[0]
+            target_waypoint = world.get_map().get_waypoint(ego_spawn_point.location).next(20.0)[0]
 
         # 2. 生成主车
         ego_vehicle = world.try_spawn_actor(vehicle_bp, ego_spawn_point)
@@ -76,9 +127,21 @@ def main():
             # 3. 生成靶标 (使用地图路网获取的精确前方航点)
             target_transform = target_waypoint.transform
             target_transform.location.z += 0.5  # 稍微抬高防止卡地里
-            
+
             if choice == '2':
                 target_bp = bp_lib.filter('walker.pedestrian.*')[0]
+
+                pedestrian_wp = target_waypoint
+                while pedestrian_wp.get_right_lane() and \
+                      pedestrian_wp.get_right_lane().lane_type == carla.LaneType.Driving and \
+                      (pedestrian_wp.get_right_lane().lane_id * target_waypoint.lane_id > 0):
+                    pedestrian_wp = pedestrian_wp.get_right_lane()
+
+                target_transform = pedestrian_wp.transform
+                target_transform.location.z += 0.5
+                right_vector = target_waypoint.transform.get_right_vector()
+                target_transform.location.x += right_vector.x * 3.0
+                target_transform.location.y += right_vector.y * 3.0
             else:
                 target_bp = bp_lib.find('vehicle.tesla.model3')
                 
@@ -86,6 +149,19 @@ def main():
             
             if dummy_target:
                 print(f"🎯 前方固定坐标静态测试靶标 [{target_type_name}] 已生成！准备进行测试。")
+                lead_start_loc = dummy_target.get_location() # 🌟 记录前车起点
+                side_dummy = None
+                if has_side_car:
+                    side_wp = target_waypoint.next(25.0)[0] 
+                    if spawn_side == "left" and side_wp.get_right_lane():
+                        side_wp = side_wp.get_right_lane()
+                    elif spawn_side == "right" and side_wp.get_left_lane():
+                        side_wp = side_wp.get_left_lane()
+                    side_transform = side_wp.transform
+                    side_transform.location.z += 0.5
+                    side_dummy = world.try_spawn_actor(bp_lib.find('vehicle.audi.etron'), side_transform)
+                    if side_dummy:
+                        print("🚙 [场景构建] 侧方盲区干扰车已部署")
             else:
                 print(f"⚠️ {target_type_name} 生成失败，前方空间可能受限。")
 
@@ -113,20 +189,67 @@ def main():
             control = carla.VehicleControl()
             steer_cache, is_reverse, target_speed_kmh = 0.0, False, 0.0  
             Kp, Ki, error_sum = 0.15, 0.02, 0.0 
+            saved_target_speed = None
 
             prev_key_w = False
             prev_key_s = False
             prev_key_q = False
 
             vision_aeb_active = False 
-            was_aeb_active = False 
+            was_aeb_active = False
+            acc_sys = ACCController()
+            vru_aeb_sys = AEBController()
 
             running = True
             while running:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
+                
+                if choice != '2':
+                    if dummy_target is not None:
+                        lead_ctrl = carla.VehicleControl()
+                        if target_speed_kmh < 10.0:
+                            lead_ctrl.throttle = 0.0
+                            lead_ctrl.brake = 1.0
+                            dummy_target.set_light_state(carla.VehicleLightState.Brake)
+                            lead_start_loc = dummy_target.get_location() 
+                        else:
+                            dist_driven = dummy_target.get_location().distance(lead_start_loc)
+                            v_lead = dummy_target.get_velocity()
+                            lead_speed_kmh = math.sqrt(v_lead.x**2 + v_lead.y**2 + v_lead.z**2) * 3.6
+                            if dist_driven < 20.0:
+                                if lead_speed_kmh < 25.0:
+                                    lead_ctrl.throttle = 0.35
+                                else:
+                                    lead_ctrl.throttle = 0.0
+                                lead_ctrl.brake = 0.0
+                                dummy_target.set_light_state(carla.VehicleLightState.NONE)
+                            else:
+                                lead_ctrl.throttle = 0.0
+                                lead_ctrl.brake = 1.0
+                                dummy_target.set_light_state(carla.VehicleLightState.Brake)
+                                
+                        dummy_target.apply_control(lead_ctrl)
+                else:
+                    # 必须确保行人成功生成了才给他下指令
+                    if dummy_target is not None:
+                        walker_control = carla.WalkerControl()
+                        # CARLA 只有右向量，我们获取右向量后加负号，就是纯正的左向量
+                        right_vec = target_waypoint.transform.get_right_vector()
+                        walker_control.direction = carla.Vector3D(-right_vec.x, -right_vec.y, 0.0)
                         
+                        ego_loc = ego_vehicle.get_location()
+                        target_loc = dummy_target.get_location()
+                        dist_to_target = math.sqrt((ego_loc.x - target_loc.x)**2 + (ego_loc.y - target_loc.y)**2)
+
+                        if dist_to_target < 20.0:
+                            walker_control.speed = 3.5
+                        else:
+                            walker_control.speed = 0.0
+
+                        dummy_target.apply_control(walker_control)
+                    
                 if keyboard.is_pressed('esc'):
                     running = False
 
@@ -149,64 +272,104 @@ def main():
                 curr_a = keyboard.is_pressed('a')
                 curr_d = keyboard.is_pressed('d')
 
+                # ==========================================
+                # 1. 获取当前主车车速
+                # ==========================================
                 v = ego_vehicle.get_velocity() 
-                speed_m_s = math.sqrt(v.x**2 + v.y**2 + v.z**2) 
+                speed_m_s = math.sqrt(v.x**2 + v.y**2) 
                 current_speed_kmh = speed_m_s * 3.6 
-                error = target_speed_kmh - current_speed_kmh
 
-                if target_speed_kmh > 0:
+                # ==========================================
+                # 2. 视觉感知与 ACC 状态判定
+                # ==========================================
+                vision_aeb_active = False
+                min_dist = float('inf')
+                obstacle_side = None
+                is_following = False
+
+                if vision_system:
+                    _, min_dist, obstacle_side, target_class, target_x, aeb_dist, left_blocked, right_blocked = vision_system.process_and_render()
+                    
+                    active_target_speed = target_speed_kmh
+                    
+                    if min_dist != float('inf') and not lane_planner.is_changing_lane:
+                        if target_class == "car":
+                            active_target_speed = acc_sys.update_target_speed(min_dist, current_speed_kmh, target_speed_kmh)
+                            if hasattr(acc_sys, 'lead_speed_kmh') and acc_sys.lead_speed_kmh > 5.0:
+                                is_following = True
+                        else:
+                            if min_dist < 15.0:
+                                active_target_speed = 0.0
+                            is_following = False
+
+                # ==========================================
+                # 3. 规划与横向控制 (决定是否变道)
+                # ==========================================
+                if vision_system:
+                    safe_dist = min_dist if min_dist != float('inf') else 100.0
+                    if has_side_car:
+                        left_blocked = True
+                        right_blocked = True                    
+                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh, obstacle_side, is_following, target_class, left_blocked, right_blocked)
+                    
+                    if not is_reverse and planner_steer is not None:
+                        control.steer = planner_steer
+
+                # ==========================================
+                # 4. 纵向速度管理 (变道限速与恢复)
+                # ==========================================
+                if lane_planner.is_changing_lane and not is_reverse and not control.hand_brake:
+                    if saved_target_speed is None:
+                        saved_target_speed = target_speed_kmh 
+                    active_target_speed = 15.0  # 变道慢行
+                    control.brake = 0.0
+                else:
+                    if saved_target_speed is not None:
+                        target_speed_kmh = saved_target_speed
+                        saved_target_speed = None
+                        active_target_speed = target_speed_kmh
+
+                # ==========================================
+                # 5. 底层 PI 速度控制器 (计算油门和刹车)
+                # ==========================================
+                error = active_target_speed - current_speed_kmh
+
+                if active_target_speed > 0:
                     error_sum = max(min(error_sum + error, 40.0), -40.0) 
                 else:
                     error_sum = 0.0
 
-                if target_speed_kmh == 0.0:
-                    control.throttle, control.brake = 0.0, 0.2 if current_speed_kmh > 0.5 else 1.0
+                if active_target_speed == 0.0:
+                    control.throttle, control.brake = 0.0, 1.0
                 elif error > 0:
                     control.throttle, control.brake = min(max((error * Kp) + (error_sum * Ki), 0.0), 0.75), 0.0
                 else:
-                    control.throttle, control.brake = 0.0, min(max((-error * Kp) - (error_sum * Ki), 0.0), 0.5)
+                    control.throttle, control.brake = 0.0, min(max((-error * Kp * 2.5) - (error_sum * Ki), 0.0), 1.0)
+
+                # ==========================================
+                # 6. 紧急制动 AEB
+                # ==========================================
+                vru_aeb_triggered = False
+                if vision_system:
+                    vru_aeb_triggered = vru_aeb_sys.evaluate(aeb_dist, target_class, target_x, lane_planner.is_changing_lane)
+
+                if min_dist != float('inf'):
+                    braking_dist = (speed_m_s ** 2) / (2 * 10.0) + 0.5
+                    if min_dist < braking_dist and not lane_planner.is_changing_lane:
+                        vision_aeb_active = True
+                        
+                if vru_aeb_triggered or vision_aeb_active:
+                    vision_aeb_active = True
+                    control.throttle = 0.0
+                    control.brake = 1.0
 
                 if curr_space or collision_flag[0]:
-                    control.hand_brake, control.throttle, control.brake, target_speed_kmh, error_sum = True, 0.0, 1.0, 0.0, 0.0             
+                    control.hand_brake, control.throttle, control.brake = True, 0.0, 1.0
+                    target_speed_kmh = 0.0
+                    error_sum = 0.0             
                 else:
                     control.hand_brake = False
-
-                # ==========================================
-                # 🌟 核心：感知、规划与控制
-                # ==========================================
-                vision_aeb_active = False
-                
-                if vision_system:
-                    # 1. 视觉感知：获取最近障碍物距离
-                    _, min_dist = vision_system.process_and_render()
                     
-                    safe_dist = min_dist if min_dist != float('inf') else 100.0
-                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh)
-                    
-                    if not is_reverse and planner_steer is not None:
-                        control.steer = planner_steer
-                        
-                    # 3. 纵向决策 (AES 减速 vs AEB 急刹)
-                    if min_dist != float('inf'):
-                        # 计算当前车速下的安全制动距离 (公式：v²/2a + 反应距离)
-                        braking_dist = (speed_m_s ** 2) / (2 * 6.0) + 3.0 
-                        
-                        if lane_planner.is_changing_lane and not is_reverse:
-                            # 【变道优先级高】：如果正在变道，我们选择“减速绕过”而不是“原地停死”
-                            # 这样可以防止车子切到一半停在马路中间
-                            target_speed_kmh = 15.0  
-                            control.brake = 0.0     # 变道时禁制 AEB 介入
-                            
-                        elif min_dist <= braking_dist and current_speed_kmh > 2.0 and not is_reverse:
-                            # 【制动保底】：如果没有在变道（比如旁边没路），则触发 AEB 紧急制动
-                            vision_aeb_active = True
-                            if not was_aeb_active:
-                                print(f"\033[91m⚠️ 路径受阻且无法变道，触发 AEB 紧急刹车！\033[0m")
-                            target_speed_kmh = 0.0   
-                            control.throttle = 0.0
-                            control.brake = 1.0      
-                            control.hand_brake = True
-                
                 was_aeb_active = vision_aeb_active
                 # ==========================================
 
@@ -250,6 +413,8 @@ def main():
     except KeyboardInterrupt:
         print("\n👋 停止程序")
     finally:
+        settings.synchronous_mode = False
+        world.apply_settings(settings)
         keyboard.unhook_all()
         if vision_system:
             vision_system.destroy()
@@ -259,9 +424,9 @@ def main():
             dummy_target.destroy()
         if ego_vehicle:
             ego_vehicle.destroy()
+        if 'side_dummy' in locals() and side_dummy:
+            side_dummy.destroy()
             
-        settings.synchronous_mode = False
-        world.apply_settings(settings)
         pygame.quit() 
         print("🧹 环境已清理。")
 

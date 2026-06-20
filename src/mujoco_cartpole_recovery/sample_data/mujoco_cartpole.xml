@@ -1,0 +1,17 @@
+<mujoco model="cartpole_recovery">
+  <option timestep="0.01" gravity="0 0 -9.81"/>
+  <worldbody>
+    <geom name="floor" type="plane" size="3 1 0.05"/>
+    <body name="cart" pos="0 0 0.1">
+      <joint name="slider" type="slide" axis="1 0 0" damping="0.08"/>
+      <geom name="cart_geom" type="box" size="0.16 0.10 0.06" mass="1.0"/>
+      <body name="pole" pos="0 0 0.08">
+        <joint name="hinge" type="hinge" axis="0 1 0" damping="0.02"/>
+        <geom name="pole_geom" type="capsule" fromto="0 0 0 0 0 0.65" size="0.025" mass="0.35"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="cart_motor" joint="slider" gear="1.0"/>
+  </actuator>
+</mujoco>
