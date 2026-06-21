@@ -251,6 +251,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/carla_traffic_light/carla_traffic_light/</loc>
+         <lastmod>2026-06-21</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/carla_traffic_sign_detection/</loc>
          <lastmod>2026-06-21</lastmod>
          <changefreq>daily</changefreq>

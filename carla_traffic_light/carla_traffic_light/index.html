@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_traffic_light/carla_traffic_light/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>CARLA 自动驾驶控制程序使用文档 - 神经网络</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "CARLA \u81ea\u52a8\u9a7e\u9a76\u63a7\u5236\u7a0b\u5e8f\u4f7f\u7528\u6587\u6863";
+        var mkdocs_page_input_path = "carla_traffic_light/carla_traffic_light.md";
+        var mkdocs_page_url = "/nn/carla_traffic_light/carla_traffic_light/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../drone_path_learning/">无人机路径学习</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../rl_acc/">RL-ACC</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../drone_flight_sim/">无人机飞行控制程序</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../lidar_project/">交通拥堵仿真与智能调控</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">CARLA 自动驾驶控制程序使用文档</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_traffic_light/carla_traffic_light.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carla">CARLA 自动驾驶控制程序使用文档</h1>
+<h2 id="1">1. 程序概述</h2>
+<p>该Python程序基于CARLA 0.9.15仿真平台实现了自动驾驶车辆的控制功能，支持自动驾驶/手动驾驶切换、传感器数据采集、交通参与者生成与管理、天气切换等核心功能，适用于自动驾驶算法测试、交通场景仿真等应用场景。</p>
+<h3 id="11">1.1 核心特性</h3>
+<ul>
+<li>支持自动驾驶（BehaviorAgent/BasicAgent）与手动驾驶模式切换</li>
+<li>集成碰撞、车道入侵、GNSS等传感器，实时采集车辆状态数据</li>
+<li>动态生成行人、NPC交通车辆，支持批量生成与清理</li>
+<li>支持天气预设切换、摄像头视角调整</li>
+<li>实时HUD显示车辆状态（速度、位置、里程、碰撞信息等）
+<img alt="red_light_stop" src="images/redlight.png" />
+<img alt="green_light_run" src="images/greenlight.png" /></li>
+</ul>
+<h2 id="2">2. 环境准备</h2>
+<h3 id="21">2.1核心运行依赖</h3>
+<p>本项目基于 CARLA 0.9.15 开发，核心依赖及推荐版本如下：</p>
+<table>
+<thead>
+<tr>
+<th>依赖库</th>
+<th>版本要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>carla</td>
+<td>0.9.15</td>
+</tr>
+<tr>
+<td>numpy</td>
+<td>≥1.21.6</td>
+</tr>
+<tr>
+<td>pygame</td>
+<td>≥2.1.0</td>
+</tr>
+</tbody>
+</table>
+<p>一键安装命令：</p>
+<pre><code class="language-bash">pip install pygame numpy
+</code></pre>
+<h3 id="22">2.2 路径配置</h3>
+<p>程序中已配置CARLA PythonAPI路径，需根据实际安装路径调整：</p>
+<pre><code class="language-python">sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'CARLA_0.9.15', 'WindowsNoEditor', 'PythonAPI', 'carla'))
+</code></pre>
+<h2 id="3">3. 核心功能说明</h2>
+<h3 id="31">3.1 驾驶模式控制</h3>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F</td>
+<td>切换自动驾驶/手动驾驶模式</td>
+</tr>
+<tr>
+<td>WASD/方向键</td>
+<td>手动驾驶（仅自动驾驶关闭时生效）：<br>- W/上方向键：油门（0.8）<br>- S/下方向键：刹车（0.8）<br>- A/左方向键：左转（-0.6）<br>- D/右方向键：右转（0.6）</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="f键切换驾驶模式" src="images/f.png" /></p>
+<h3 id="32">3.2 场景管理</h3>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G</td>
+<td>生成随机行人（优先在人行道生成，无人行道则在道路生成）</td>
+</tr>
+<tr>
+<td>T</td>
+<td>生成5辆NPC交通车辆（自动开启自动驾驶）</td>
+</tr>
+<tr>
+<td>Y</td>
+<td>批量清理所有生成的交通车辆</td>
+</tr>
+<tr>
+<td>N</td>
+<td>切换下一个天气预设</td>
+</tr>
+<tr>
+<td>M</td>
+<td>切换上一个天气预设</td>
+</tr>
+<tr>
+<td>C</td>
+<td>切换摄像头视角</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="g键生成随机行人" src="images/g.png" />
+<img alt="t键生成npc交通车辆" src="images/t.png" />
+<img alt="切换天气" src="images/wetherchange.png" />
+<img alt="切换视角" src="images/c1.png" />
+<img alt="切换视角" src="images/c2.png" />
+<img alt="切换视角" src="images/c3.png" /></p>
+<h3 id="33">3.3 基础操作</h3>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H</td>
+<td>显示/隐藏帮助信息</td>
+</tr>
+<tr>
+<td>ESC/Ctrl+Q</td>
+<td>退出程序</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="helptext_show" src="images/h.png" /></p>
+<h2 id="4">4. 核心类说明</h2>
+<h3 id="41-world">4.1 World类</h3>
+<ul>
+<li>作用：管理CARLA仿真世界，包括车辆生成、传感器初始化、天气切换等</li>
+<li>核心方法：</li>
+<li><code>restart()</code>：重新生成车辆并初始化传感器</li>
+<li><code>next_weather()</code>：切换天气预设</li>
+<li><code>destroy()</code>：销毁所有演员（车辆、传感器等）</li>
+</ul>
+<h3 id="42-keyboardcontrol">4.2 KeyboardControl类</h3>
+<ul>
+<li>作用：处理键盘事件，实现驾驶控制、场景交互</li>
+<li>核心方法：</li>
+<li><code>parse_events()</code>：解析键盘输入事件</li>
+<li><code>spawn_random_pedestrian()</code>：生成随机行人</li>
+<li><code>spawn_traffic_vehicles()</code>：生成NPC交通车辆</li>
+<li><code>clear_traffic_vehicles_batch()</code>：批量清理交通车辆</li>
+</ul>
+<h3 id="43">4.3 传感器类</h3>
+<table>
+<thead>
+<tr>
+<th>类名</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CollisionSensor</td>
+<td>碰撞传感器，检测车辆碰撞事件并记录碰撞强度</td>
+</tr>
+<tr>
+<td>LaneInvasionSensor</td>
+<td>车道入侵传感器，检测车辆压线行为</td>
+</tr>
+<tr>
+<td>GnssSensor</td>
+<td>GNSS传感器，采集车辆经纬度信息</td>
+</tr>
+<tr>
+<td>CameraManager</td>
+<td>摄像头管理器，控制摄像头视角与数据采集</td>
+</tr>
+</tbody>
+</table>
+<h3 id="44-hud">4.4 HUD类</h3>
+<ul>
+<li>作用：实时显示车辆状态信息，包括：</li>
+<li>服务器/客户端帧率</li>
+<li>车辆速度、航向、位置、GNSS坐标</li>
+<li>行驶里程（里程表）</li>
+<li>碰撞历史、附近车辆数量</li>
+<li>油门/刹车/转向参数</li>
+</ul>
+<p><img alt="hud_show" src="images/hud.png" /></p>
+<h2 id="5">5. 运行说明</h2>
+<h3 id="51-carla">5.1 启动CARLA服务器</h3>
+<pre><code class="language-bash"># Windows
+cd CARLA_0.9.15/WindowsNoEditor
+CarlaUE4.exe
+# Linux
+cd CARLA_0.9.15/NoEditor
+./CarlaUE4.sh
+</code></pre>
+<h3 id="52">5.2 运行程序</h3>
+<pre><code class="language-bash">python automatic_control.py [可选参数]
+</code></pre>
+<h3 id="53">5.3 可选参数</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>--filter</td>
+<td>车辆蓝图过滤（如：vehicle.*）</td>
+</tr>
+<tr>
+<td>--gamma</td>
+<td>摄像头伽马校正值</td>
+</tr>
+<tr>
+<td>--seed</td>
+<td>随机种子</td>
+</tr>
+<tr>
+<td>--agent</td>
+<td>自动驾驶代理类型（Basic/Behavior）</td>
+</tr>
+<tr>
+<td>--loop</td>
+<td>循环模式</td>
+</tr>
+<tr>
+<td>--behavior</td>
+<td>驾驶风格（normal/cautious/aggressive）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6">6. 扩展开发</h2>
+<h3 id="61">6.1 新增传感器</h3>
+<p>可参考现有传感器类（如CollisionSensor）实现新传感器集成：</p>
+<pre><code class="language-python">class CustomSensor(object):
+    def __init__(self, parent_actor, hud):
+        self.sensor = None
+        self._parent = parent_actor
+        self.hud = hud
+        world = self._parent.get_world()
+        # 加载传感器蓝图
+        blueprint = world.get_blueprint_library().find('sensor.xxx.xxx')
+        # 生成传感器并绑定到车辆
+        self.sensor = world.spawn_actor(blueprint, carla.Transform(), attach_to=self._parent)
+        # 监听传感器数据
+        weak_self = weakref.ref(self)
+        self.sensor.listen(lambda event: self._on_data(weak_self, event))
+
+    @staticmethod
+    def _on_data(weak_self, event):
+        self = weak_self()
+        if not self:
+            return
+        # 处理传感器数据
+        pass
+</code></pre>
+<h3 id="62">6.2 自定义驾驶策略</h3>
+<p>修改<code>KeyboardControl</code>类的<code>parse_events</code>方法，或扩展BehaviorAgent/BasicAgent实现自定义自动驾驶逻辑：</p>
+<pre><code class="language-python"># 示例：修改手动驾驶参数
+elif event.key == pygame.K_UP or event.key == pygame.K_w:
+    self.throttle = 1.0  # 调整油门至100%
+    self.brake = 0.0
+</code></pre>
+<h2 id="7">7. 注意事项</h2>
+<ol>
+<li>确保CARLA服务器版本与PythonAPI版本一致（0.9.15）</li>
+<li>生成大量交通车辆时，建议降低仿真帧率以保证性能</li>
+<li>清理交通车辆时，程序会自动检查车辆状态，避免销毁已失效的演员</li>
+<li>行人生成优先选择人行道，若无人行道会降级到道路生成，需注意碰撞风险</li>
+<li>自动驾驶模式下，BehaviorAgent支持交通灯识别，BasicAgent仅实现基础路径跟踪</li>
+</ol>
+<h2 id="8">8. 故障排除</h2>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>无法导入carla模块</td>
+<td>检查PythonAPI路径配置是否正确</td>
+</tr>
+<tr>
+<td>车辆无法生成</td>
+<td>确认地图存在Spawn Point，或检查过滤参数是否正确</td>
+</tr>
+<tr>
+<td>传感器数据无响应</td>
+<td>检查传感器是否成功生成，或CARLA服务器是否正常运行</td>
+</tr>
+<tr>
+<td>批量清理车辆失败</td>
+<td>确认client对象已初始化，或手动调用clear_traffic_vehicles()方法</td>
+</tr>
+</tbody>
+</table>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
