@@ -206,6 +206,9 @@ waypoints = FlightPath.square_path(size=15, height=-3)
 # 使用矩形路径
 waypoints = FlightPath.rectangle_path(width=20, length=10, altitude=-3)
 
+#使用三角形路径
+waypoints = FlightPath.triangle_path(size=15, height=-5)
+
 # 使用自定义路径
 waypoints = [(5, 0, -3), (5, -5, -3), (0, -5, -3), (0, 0, -3)]
 ```
@@ -333,9 +336,8 @@ python collision_data_collector.py
 
 **CSV 数据格式：**
 ```
-filename,label,risk,min_depth,mean_depth,pos_x,pos_y
-collision_20260430_220825_0.0_0.0,0,safe,0.41,11811.93,0.0,0.0
-collision_20260430_221730_9.1_-10.1,1,danger,0.14,6190.47,9.1,-10.1
+filename,label,risk,min_depth,mean_depth,x,y,z,timestamp
+collision_xxx,0,safe,0.41,11811.93,0.0,0.0,-5.0,20260615_221530
 ```
 
 **下一步计划：**

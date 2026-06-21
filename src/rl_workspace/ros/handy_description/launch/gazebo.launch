@@ -1,0 +1,11 @@
+<launch>
+    <arg name="spawn_args" default="-x 0 -y 0 -z 0.75" />
+    <arg
+    name="model"
+    default="$(find handy_description)/urdf/handy_description.urdf.xacro"
+  />
+    <include file="$(find finalarm_description)/launch/gazebo.launch">
+        <arg name="spawn_args" value="$(arg spawn_args)" />
+        <arg name="model" value="$(arg model)" />
+    </include>
+</launch>

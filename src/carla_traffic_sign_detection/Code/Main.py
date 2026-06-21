@@ -137,6 +137,7 @@ def main():
 
         # Spawn random traffic
         for _ in range(15):
+        for _ in range(10):
             traffic_bp = random.choice(blueprint_library.filter('vehicle.*'))
             traffic_spawn = random.choice(map.get_spawn_points())
             traffic_vehicle = world.try_spawn_actor(traffic_bp, traffic_spawn)
@@ -216,6 +217,7 @@ def main():
                         color = (0, 255, 0)
                     cv2.rectangle(display_image, (x1, y1), (x2, y2), color, 2)
                     cv2.putText(display_image, f"{sign} {conf:.0%}", (x1, y1-10), 
+                    cv2.putText(display_image, f"{sign} {conf:.2f}", (x1, y1-10), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                 
                 # Display current speed on screen

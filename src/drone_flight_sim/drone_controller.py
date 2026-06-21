@@ -153,15 +153,34 @@ class DroneController:
         print(f"   起始位置: ({start_pos.x_val:.1f}, {start_pos.y_val:.1f}, {start_pos.z_val:.1f})")
         print(f"   目标距离: {total_distance:.1f}m")
 
-        # 发送异步飞往目标位置的命令（非阻塞）
-        self.client.moveToPositionAsync(x, y, z, velocity)
-
         # 记录飞行开始时间
         start_time = time.time()
         # 上一进度打印时间
         last_print_time = 0
+        # ===== 新增：上次速度更新时间 =====
+        last_speed_update = 0
+
         # 进入飞行监控循环
         while time.time() - start_time < FlightConfig.MAX_FLIGHT_TIME:
+            # ===== 新增：动态速度调整（每0.3秒更新一次） =====
+            current_time = time.time()
+            if current_time - last_speed_update >= 0.3:
+                pos = self.get_position()
+                current_distance = (
+                    (pos.x_val - x) ** 2 +
+                    (pos.y_val - y) ** 2 +
+                    (pos.z_val - z) ** 2
+                ) ** 0.5
+    
+                if current_distance > 10:
+                    adjusted_velocity = min(velocity * 1.2, 8)
+                elif current_distance > 3:
+                    adjusted_velocity = velocity
+                else:
+                    adjusted_velocity = max(velocity * 0.5, 1)
+    
+                self.client.moveToPositionAsync(x, y, z, adjusted_velocity)
+                last_speed_update = current_time
             # 检查是否发生严重碰撞
             is_serious, _ = self.collision_handler.check_collision()
             if is_serious:
@@ -179,20 +198,57 @@ class DroneController:
 
             # 显示飞行进度（每0.5秒更新一次）
             current_time = time.time()
-            if show_progress and current_time - last_print_time >= 0.5:
+            if show_progress and current_time - last_print_time >= 0.3: # 0.3秒更新一次
                 pos = self.get_position()
                 current_distance = (
                     (pos.x_val - x) ** 2 +
                     (pos.y_val - y) ** 2 +
                     (pos.z_val - z) ** 2
                 ) ** 0.5
+                 # 计算进度
                 progress = max(0, min(100, (1 - current_distance / total_distance) * 100)) if total_distance > 0 else 100
+                
+                # 获取速度
                 speed = self.get_speed()
-                print(f"   进度: {progress:5.1f}% | 剩余: {current_distance:5.1f}m | 速度: {speed:.1f}m/s    ", end="\r")
+                
+                # 获取高度（取绝对值）
+                height = abs(pos.z_val)
+                
+                # 获取碰撞状态
+                collision_info = self.client.simGetCollisionInfo()
+                collision_status = "⚠️" if collision_info.has_collided else "✅"
+                
+                # ===== 新增：速度图标 =====
+                if current_distance > 10:
+                    speed_icon = "🚀"
+                elif current_distance > 3:
+                    speed_icon = "✈️"
+                else:
+                    speed_icon = "🐢"
+                # 进度条
+                bar_length = 20
+                filled = int(bar_length * progress / 100)
+                bar = '█' * filled + '░' * (bar_length - filled)
+                
+                # ===== 新增：动态状态栏（含 ETA） =====
+                # 计算预计剩余时间
+                if speed > 0.1:
+                    eta_seconds = current_distance / speed
+                    eta_str = f"ETA:{eta_seconds:4.0f}s"
+                else:
+                    eta_str = "ETA: -- "
+                print(f"\r"
+                      f"进度: {progress:5.1f}% [{bar}] "
+                      f"距离: {current_distance:5.1f}m "
+                      f"高度: {height:5.1f}m "
+                      f"速度: {speed_icon} {speed:4.1f}m/s "
+                      f"{eta_str} "
+                      f"碰撞: {collision_status}   ", end="")
+                
                 last_print_time = current_time
 
             # 短暂休眠，减少 CPU 占用
-            time.sleep(0.1)
+            time.sleep(0.05)  # 加快更新频率
 
         # 清除进度行
         print(" " * 80, end="\r")

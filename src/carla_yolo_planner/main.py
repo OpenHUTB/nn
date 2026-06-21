@@ -146,22 +146,56 @@ def main():
             
             if args.in_carla:
                 try:
+                    # 推进世界模拟（同步模式下必须调用）
+                    client.tick()
+                    
                     client.follow_vehicle()
                     client.draw_vehicle_boxes()
                     
                     if results:
                         client.draw_detection_in_carla(results, detector.classes)
                     
-                    # 更新并绘制 HUD
-                    client.update_hud_info(fps, len(results), warning_msg if is_brake else "")
-                    client.draw_hud()
+                    # 获取车辆速度（m/s 转换为 km/h）
+                    speed_kmh = 0
+                    if client.vehicle:
+                        velocity = client.vehicle.get_velocity()
+                        speed_kmh = velocity.length() * 3.6
+                    
+                    # 获取主视角画面（车内摄像头）并显示
+                    if frame is not None:
+                        display_frame = draw_results(draw_safe_zone(frame.copy()), results, detector.classes)
+                        
+                        # 添加 HUD 信息到左上角
+                        cv2.putText(display_frame, f"Speed: {speed_kmh:.1f} km/h", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                        cv2.putText(display_frame, f"FPS: {fps:.1f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+                        cv2.putText(display_frame, f"Detections: {len(results)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                        cv2.putText(display_frame, f"View: {client.get_current_camera_name()}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 128, 0), 2)
+                        cv2.putText(display_frame, "Press Q to Quit", (display_frame.shape[1] - 180, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (128, 128, 128), 1)
+                        
+                        if is_brake:
+                            cv2.putText(display_frame, "!!! EMERGENCY BRAKING !!!", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                        
+                        cv2.imshow("CARLA Object Detection", display_frame)
+                    
+                    # 处理键盘输入
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord('q'):
+                        break
+                    elif key == ord('1'):
+                        client.switch_camera('front')
+                    elif key == ord('2'):
+                        client.switch_camera('back')
+                    elif key == ord('3'):
+                        client.switch_camera('left')
+                    elif key == ord('4'):
+                        client.switch_camera('right')
                     
                     # 检测碰撞并自动重置
                     client.check_collision_and_reset()
                     
-                    # 控制台显示FPS信息
+                    # 控制台显示FPS和速度信息
                     if frame_count % 30 == 0:
-                        print(f"[INFO] FPS: {fps:.1f} | 检测目标: {len(results)}")
+                        print(f"[INFO] FPS: {fps:.1f} | 速度: {speed_kmh:.1f} km/h | 检测目标: {len(results)}")
                 except Exception as e:
                     if frame_count % 100 == 0:
                         print(f"[WARNING] CARLA 绘制异常: {e}")

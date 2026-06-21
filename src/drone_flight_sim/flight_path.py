@@ -77,7 +77,19 @@ class FlightPath:
             # 右上角点
             (0, 0, altitude)
         ]
-
+    
+    @staticmethod
+    def triangle_path(size: float = 10, height: float = -3) -> List[Tuple[float, float, float]]:
+        """生成五边形飞行路径"""
+        import math
+        points = []
+        for i in range(5):
+            angle = math.radians(90 + i * 72)  # 五边形，72度间隔
+            x = size / 2 + size * 0.6 * math.cos(angle)
+            y = size / 2 + size * 0.6 * math.sin(angle)
+            points.append((x, y, height))
+        return points
+    
     @staticmethod
     def custom_path(waypoints: List[Tuple[float, float, float]]) -> List[Tuple[float, float, float]]:
         """自定义飞行路径
@@ -93,6 +105,8 @@ class FlightPath:
         """
         # 直接返回用户传入的航点列表
         return waypoints
+    
+
 
     @staticmethod
     def print_path(waypoints: List[Tuple[float, float, float]]):

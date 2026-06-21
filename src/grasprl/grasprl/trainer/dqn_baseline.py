@@ -1,3 +1,6 @@
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
 import torch.nn as nn
 import numpy as np
 import torch
@@ -6,7 +9,6 @@ import torchvision.transforms as T
 from torch.utils.tensorboard import SummaryWriter
 import math
 import random
-import os
 import sys
 import cv2
 #改成相对路径 
@@ -34,8 +36,8 @@ class VisualFeatureEnhancer(nn.Module):
         return torch.clamp(x, -1.0, 1.0)
 
 class DQN_Trainer(object):
-    def __init__(self, learning_rate=0.0005, mem_size=10000, eps_start=1.0, eps_end=0.01,
-                 eps_decay=8000, seed=20, log_dir="test", render_mode=None):
+    def __init__(self, learning_rate=0.001, mem_size=10000, eps_start=1.0, eps_end=0.01,
+                 eps_decay=5000, seed=20, log_dir="test", render_mode=None):
         self.writer = SummaryWriter(f"grasprl/log/DQN/{log_dir}")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.env = GraspRobot(render_mode=render_mode)
@@ -79,6 +81,30 @@ class DQN_Trainer(object):
         pixel_y = max_idx // self.env.IMAGE_WIDTH
         pixel_x = max(0, min(pixel_x, self.env.IMAGE_WIDTH - 1))
         pixel_y = max(0, min(pixel_y, self.env.IMAGE_HEIGHT - 1))
+        
+        # 选择一个实际的物体而不是依赖深度图
+        selected_obj = None
+        min_dist = float('inf')
+        for obj_name in self.env.target_objects:
+            wx, wy, wz = self.env.get_body_com(obj_name)
+            if -0.224 <= wx <= 0.224 and -0.224 <= wy <= 0.224 and wz >= 0.9:
+                px, py = self.env.world2pixel(1, wx, wy, wz)
+                old_w, old_h = 224, 224
+                new_w, new_h = self.env.IMAGE_WIDTH, self.env.IMAGE_HEIGHT
+                px = int(px * new_w / old_w)
+                py = int(py * new_h / old_h)
+                px = max(0, min(px, new_w - 1))
+                py = max(0, min(py, new_h - 1))
+                dist = ((pixel_x - px)**2 + (pixel_y - py)**2)**0.5
+                if dist < min_dist:
+                    min_dist = dist
+                    selected_obj = obj_name
+        
+        if selected_obj:
+            wx, wy, wz = self.env.get_body_com(selected_obj)
+            return np.array([wx, wy, wz], dtype=np.float32)
+        
+        # 如果没有找到合适的物体，使用原方法
         if 0 <= pixel_x < self.env.IMAGE_WIDTH and 0 <= pixel_y < self.env.IMAGE_HEIGHT:
             depth = self.depth_before[pixel_y][pixel_x]
         else:
@@ -104,18 +130,23 @@ class DQN_Trainer(object):
         else:
             self.last_action = "instruction"
             action = None
+            available_objects = []
             for obj_name in self.env.target_objects:
                 wx, wy, wz = self.env.get_body_com(obj_name)
                 if -0.224 <= wx <= 0.224 and -0.224 <= wy <= 0.224 and wz >= 0.9:
-                    px, py = self.env.world2pixel(1, wx, wy, wz)
-                    old_w, old_h = 224, 224
-                    new_w, new_h = self.env.IMAGE_WIDTH, self.env.IMAGE_HEIGHT
-                    px = int(px * new_w / old_w)
-                    py = int(py * new_h / old_h)
-                    px = max(0, min(px, new_w - 1))
-                    py = max(0, min(py, new_h - 1))
-                    action = py * new_w + px
-                    break
+                    available_objects.append((obj_name, wx, wy, wz))
+            
+            if available_objects:
+                obj_name, wx, wy, wz = random.choice(available_objects)
+                px, py = self.env.world2pixel(1, wx, wy, wz)
+                old_w, old_h = 224, 224
+                new_w, new_h = self.env.IMAGE_WIDTH, self.env.IMAGE_HEIGHT
+                px = int(px * new_w / old_w)
+                py = int(py * new_h / old_h)
+                px = max(0, min(px, new_w - 1))
+                py = max(0, min(py, new_h - 1))
+                action = py * new_w + px
+            
             if action is None:
                 action = np.random.randint(0, self.env.IMAGE_WIDTH * self.env.IMAGE_HEIGHT)
             return torch.tensor([[action]], dtype=torch.long)
@@ -171,17 +202,15 @@ def main():
     trainer = DQN_Trainer(log_dir="resnet_dqn_insne_v2", render_mode="human")
     state = trainer.env.reset_without_random()
     state = trainer.transform_state(state)
-    loop = tqdm(range(1, max_iter + 1))
     grasp_success = 0
     recent_successes = []
 
-    for i_iter in loop:
+    for i_iter in range(1, max_iter + 1):
         max_idx = trainer.select_action_by_instruction(state)
         action = trainer.transform_action(max_idx)
         action = trainer.limit_action(action)
         next_state, reward, done, info = trainer.env.step(action)
-        loop.set_description(f"iter [{i_iter}]/[{max_iter}]")
-        loop.set_postfix(grasp_info=info['grasp'], reward=reward, action=trainer.last_action)
+        print(f"iter [{i_iter}]/[{max_iter}]  grasp_info={info['grasp']}  reward={reward:.3f}  action={trainer.last_action}")
         
         if info["grasp"] == "Success":
             grasp_success += 1

@@ -13,7 +13,8 @@ import sys
 
 # except IndexError:
 #     pass
-
+# 用于存储激光雷达检测到的最近障碍物距离
+nearest_obstacle_distance = None
 import carla
 import time
 import numpy as np
@@ -72,12 +73,34 @@ def update_display(world, displaymanager, weather_manager, ego_vehicle):
     # Update displays
     displaymanager.render()
 
+def lidar_callback(point_cloud):
+    """激光雷达回调函数，计算最近障碍物距离"""
+    global nearest_obstacle_distance
+    try:
+        # 解析点云数据
+        points = np.frombuffer(point_cloud.raw_data, dtype=np.dtype([
+            ('x', np.float32), ('y', np.float32), ('z', np.float32),
+            ('intensity', np.float32)]))
+        
+        # 筛选前方障碍物（x > 0 且 |y| < 2 米）
+        forward_points = [p for p in points if p['x'] > 0 and abs(p['y']) < 2.0]
+        
+        if forward_points:
+            min_distance = min(p['x'] for p in forward_points)
+            nearest_obstacle_distance = min_distance
+        else:
+            nearest_obstacle_distance = None
+    except Exception as e:
+        pass
+
 def main():
     """Main simulation loop"""
-    test_connection.run()
+   # test_connection.run()
     colorama.init()
     InfoLogger = Logger()
-    
+    # 添加自动驾驶模式开关（放在这里，其他初始化之前）
+    autopilot_enabled = False
+    print("控制说明：WASD/方向键 | C:定速巡航 | P:自动驾驶 | R:录制 | ESC:退出")
     # Initialize environment
     CarlaEnv = CarlaEnvironment(world_map='Town10HD', timeout=10.0)
     world, traffic_manager = CarlaEnv.setup_carla_environment()
@@ -98,14 +121,13 @@ def main():
     
     # Setup display and sensors
     displaymanager = DisplayManager(
-        grid_size=[2, 4], 
+        grid_size=[1, 1], 
         window_size=[WINDOW_SIZE[0], WINDOW_SIZE[1]]
     )
     
     # sensor = [[x, y, z], [display grid], enabled]
     sensors_dict = {
         'DepthCamera': [[0, 0, 2.4], [0, 0], False],
-        'RGBCamera': [[0, 0, 2.4], [0, 0], True],
         'RGBCamera': [[0, 0, 2.4], [0, 0], True],
         'RGBCamera_BEV': [[0, 0, 20.0], [0, 1], False],
         'RGBCamera_Lane': [[2.0, 0, 2.4], [1, 3], False],
@@ -117,7 +139,10 @@ def main():
     }
     
     sensermanagers = SensorManager.setup_sensors(world, ego_vehicle, displaymanager, sensors_dict)
-    
+    # 设置激光雷达回调
+    for sm in sensermanagers:
+       if hasattr(sm, 'sensor') and 'lidar' in sm.sensor_type.lower():
+          sm.sensor.listen(lidar_callback)
     # Set data recorder for all sensor managers
     for sm in sensermanagers:
         sm.set_data_recorder(data_recorder)
@@ -177,10 +202,30 @@ def main():
                     elif event.key == pygame.K_s:  # Show recording status with 'S' key
                         status = data_recorder.get_recording_status()
                         print(f'\nRecording Status: {status}')
-
+                    elif event.key == pygame.K_p:  # 自动驾驶模式（新增）
+                        autopilot_enabled = not autopilot_enabled
+                        ego_vehicle.set_autopilot(autopilot_enabled)
+                        if autopilot_enabled:
+                          # 自动驾驶模式下手动控制无效
+                          ego_control.controller.throttle = 0.0
+                          ego_control.controller.steer = 0.0
+                          ego_control.controller.brake = 0.0
+                          ego_vehicle.apply_control(ego_control.controller)
+                        print(f"自动驾驶模式 {'开启' if autopilot_enabled else '关闭'}")
             # Update ego vehicle control
-            ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller)
-            
+            if not autopilot_enabled:
+                 # 手动模式：使用你的控制器
+                 ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
+            else:
+                 # 自动驾驶模式：CARLA 自动控制，无需额外操作
+                 pass
+            # 更新 ego vehicle control（传入障碍物距离）
+            if not autopilot_enabled:
+                # 手动模式：使用你的控制器
+                ego_control.update_ego_vehicle(ego_vehicle, ego_control.controller, nearest_obstacle_distance)
+            else:
+                # 自动驾驶模式：CARLA 自动控制，无需额外操作
+                pass
             # Update data recorder with current vehicle state
             data_recorder.update_vehicle_state(ego_vehicle)
             data_recorder.update_control_signals(

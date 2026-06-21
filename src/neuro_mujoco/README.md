@@ -6,30 +6,36 @@ Windows 10/11、Ubuntu 20.04/22.04（ROS 推荐）、macOS（Intel/Apple Silicon
 2. 软件要求
 Python 3.7-3.12（推荐 3.11）、MuJoCo 物理引擎、PyTorch（策略网络依赖，可选）、ROS 1 Noetic（ROS 功能依赖，可选）
 3. 核心依赖安装
-shell
-## 安装 MuJoCo Python 绑定
+
+```bash
+# 安装 MuJoCo Python 绑定
 pip install mujoco -i http://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
 
-## PyTorch（策略网络推理必需）
+# PyTorch（策略网络推理必需）
 pip install torch torchvision torchaudio -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 
-## ROS 1 依赖（仅 Ubuntu，需先安装 ROS Noetic）
+# ROS 1 依赖（仅 Ubuntu，需先安装 ROS Noetic）
 sudo apt install ros-noetic-rospy ros-noetic-geometry-msgs ros-noetic-sensor-msgs
+```
+
 ## 验证安装
-shell
-### 验证 MuJoCo
+
+```bash
+# 验证 MuJoCo
 python -c "import mujoco; print(f'MuJoCo 版本: {mujoco.__version__}')"
 
 # 验证 PyTorch（策略功能）
 python -c "import torch; print(f'PyTorch 版本: {torch.__version__}')"
 
-### 验证 ROS（ROS 功能）
+# 验证 ROS（ROS 功能）
 # python -c "import rospy; print('ROS 1 导入成功')"
+```
 ## 快速开始
 ### 模型可视化（核心功能）
 支持加载单个模型文件或目录（自动识别目录内 .xml/.mjb 文件），控制优先级：ROS 指令 > 策略推理 > 无控制。
 1.1 运行命令
-shell
+
+```bash
 # 基础可视化（无控制）
 python mujoco_utils.py visualize /path/to/your/model.xml
 
@@ -47,6 +53,7 @@ python mujoco_utils.py visualize /home/lan/桌面/nn/mujoco_menagerie/anybotics_
 
 # 启动交互式模型选择菜单（支持PD控制、预设位置切换）
 python mujoco_utils.py menu
+```
 
 1.2 交互说明
 窗口操作：鼠标拖拽旋转、滚轮缩放，按 ESC 键退出；
@@ -69,33 +76,42 @@ python mujoco_utils.py menu
 
 ### 模型格式转换
 2.1 运行命令
-shell
+
+```bash
 # XML 转 MJB（提升加载速度）
 python mujoco_utils.py convert input.xml output.mjb
 
 # MJB 转 XML（便于编辑）
 python mujoco_utils.py convert input.mjb output.xml
+```
 ### 仿真速度测试
 多线程测试模型仿真性能，优化点：线程内动态生成控制噪声，降低内存占用。
 3.1 运行命令
-shell
+
+```bash
 # 默认参数（1线程，10000步，噪声0.01）
 python mujoco_utils.py testspeed /path/to/your/model.xml
 
 # 自定义配置（4线程，50000步，噪声0.02）
 python mujoco_utils.py testspeed /path/to/your/model.xml --nthread 4 --nstep 50000 --ctrlnoise 0.02
+```
 3.2 输出指标
 总步数 / 总耗时 / 每秒步数；
 实时因子（仿真时间 / 真实时间）；
 线程耗时统计（平均值 ± 标准差）。
 ## ROS 1 集成（Ubuntu 专属）
-1. ROS 话题说明
-类型	   话题名	                    消息类型	                    说明
-发布	/mujoco/joint_states	sensor_msgs/JointState	      非自由关节位置 / 速度
-发布	/mujoco/pose	        geometry_msgs/PoseStamped	  基座位置 / 姿态（world 帧）
-订阅	/mujoco/ctrl_cmd	    std_msgs/Float32MultiArray	  控制指令（长度 = 模型 nu）
-2. 运行步骤
-shell
+
+### ROS 话题说明
+
+| 类型 | 话题名 | 消息类型 | 说明 |
+|------|--------|----------|------|
+| 发布 | `/mujoco/joint_states` | `sensor_msgs/JointState` | 非自由关节位置 / 速度 |
+| 发布 | `/mujoco/pose` | `geometry_msgs/PoseStamped` | 基座位置 / 姿态（world 帧） |
+| 订阅 | `/mujoco/ctrl_cmd` | `std_msgs/Float32MultiArray` | 控制指令（长度 = 模型 nu） |
+
+### 运行步骤
+
+```bash
 # 1. 启动 ROS 核心（新开终端）
 roscore
 
@@ -104,11 +120,13 @@ python mujoco_utils.py visualize /path/to/your/model.xml --ros
 
 # 3. （可选）发布测试控制指令（100Hz）
 rostopic pub /mujoco/ctrl_cmd std_msgs/Float32MultiArray "data: [0.1, 0.2, 0.3]" -r 100
+```
 ## 策略网络说明
 1. 网络结构
+
 轻量级 MLP，适配机器人关节控制场景：
-python
-运行
+
+```python
 class PolicyNetwork(nn.Module):
     def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = 64):
         super().__init__()
@@ -117,40 +135,58 @@ class PolicyNetwork(nn.Module):
             nn.Linear(hidden_dim, hidden_dim), nn.Tanh(),
             nn.Linear(hidden_dim, action_dim), nn.Tanh()  # 输出 [-1,1]
         )
+```
+
 2. 输入输出
+
 输入：观测（关节位置 qpos + 关节速度 qvel）；
 输出：归一化控制指令（[-1,1]），自动映射至模型 actuator_ctrlrange 范围：
-python
-运行
+
+```python
+action = ctrl_min + (ctrl_max - ctrl_min) * (action + 1) / 2
+action = np.clip(action, ctrl_min, ctrl_max)  # 强制裁剪至物理极限
+```
 
 ## PD控制器说明
 适用于模型精确位置控制，核心参数与逻辑：
 1. 控制参数：每个模型预配置KP（比例增益）和KD（微分增益），如Franka Panda默认KP=800.0、KD=60.0
 2. 控制逻辑：
-   ```python
-   # 核心PD计算
-   pos_error = 目标关节位置 - 当前关节位置
-   vel_error = -当前关节速度
-   关节力矩 = KP * pos_error + KD * vel_error
-   
+
+```python
+# 核心PD计算
+pos_error = 目标关节位置 - 当前关节位置
+vel_error = -当前关节速度
+关节力矩 = KP * pos_error + KD * vel_error
+```
+
 ### 核心映射逻辑
+
+```python
 action = ctrl_min + (ctrl_max - ctrl_min) * (action + 1) / 2
 action = np.clip(action, ctrl_min, ctrl_max)  # 强制裁剪至物理极限
+```
+
 ## 性能优化点
-速度测试：线程内动态生成控制噪声，避免主线程预生成大数组；
-策略推理：复用张量对象，避免重复内存分配；
-控制指令：强制裁剪至执行器物理极限，防止超限报错；
-路径处理：支持目录自动识别模型文件，提升易用性；
-关节映射：精准过滤自由关节，仅发布有效关节状态。
+
+- 速度测试：线程内动态生成控制噪声，避免主线程预生成大数组
+- 策略推理：复用张量对象，避免重复内存分配
+- 控制指令：强制裁剪至执行器物理极限，防止超限报错
+- 路径处理：支持目录自动识别模型文件，提升易用性
+- 关节映射：精准过滤自由关节，仅发布有效关节状态
+
 ## 常见问题
-问题现象	               解决方案
-模型加载失败	检查路径是否正确，确保文件为 .xml/.mjb 格式
-策略加载失败	确认 PyTorch 已安装、策略文件路径正确、输入输出维度匹配
-ROS 无数据	    确保 roscore 已启动、话题名称匹配、控制指令长度 = 模型 nu
-仿真实时性差	使用 MJB 格式模型、减少线程数、降低控制噪声强度
-控制指令无效果	检查模型 nu（控制维度）是否 > 0，策略输出是否映射至正确范围
+
+| 问题现象 | 解决方案 |
+|----------|----------|
+| 模型加载失败 | 检查路径是否正确，确保文件为 .xml/.mjb 格式 |
+| 策略加载失败 | 确认 PyTorch 已安装、策略文件路径正确、输入输出维度匹配 |
+| ROS 无数据 | 确保 roscore 已启动、话题名称匹配、控制指令长度 = 模型 nu |
+| 仿真实时性差 | 使用 MJB 格式模型、减少线程数、降低控制噪声强度 |
+| 控制指令无效果 | 检查模型 nu（控制维度）是否 > 0，策略输出是否映射至正确范围 |
+
 ## 参考资源
-1、MuJoCo 官方文档
-2、PyTorch 神经网络教程
-3、ROS 1 Noetic 文档
-4、MuJoCo 官方模型库
+
+1. [MuJoCo 官方文档](https://mujoco.readthedocs.io/)
+2. [PyTorch 神经网络教程](https://pytorch.org/tutorials/)
+3. [ROS 1 Noetic 文档](https://wiki.ros.org/noetic)
+4. [MuJoCo 官方模型库](https://github.com/google-deepmind/mujoco_menagerie)
