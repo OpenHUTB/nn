@@ -108,6 +108,7 @@ title: 主页
 
 - [__CARLA中的交通标志检测与车辆控制__](maintaining_sign_boards/maintaining_sign_boards.md) - CARLA中的交通标志检测与车辆控制
 
+- [__雨天条件下的自动驾驶车辆___](./carla_3D_object_fusion_detect/README.md)- 雨天多传感器自动驾驶仿真数据采集系统项目
 
 [_交通拥堵仿真与智能调控_](./lidar_project/README.md) - 基于 CARLA 与强化学习的多模型融合交通拥堵仿真与智能调控系统
 
