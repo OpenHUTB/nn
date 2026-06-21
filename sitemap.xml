@@ -481,6 +481,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://wengqiuyi.github.io/nn/vehicle_HUD/</loc>
+         <lastmod>2026-06-21</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://wengqiuyi.github.io/nn/vehicle_autonomous_core/</loc>
          <lastmod>2026-06-21</lastmod>
          <changefreq>daily</changefreq>
