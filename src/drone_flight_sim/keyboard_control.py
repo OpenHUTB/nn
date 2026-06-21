@@ -11,6 +11,7 @@ from pynput import keyboard
 import threading
 # 导入时间模块
 import time
+import numpy as np
 
 # 全局变量，用于控制监听循环
 listener_running = True
@@ -48,6 +49,12 @@ class KeyboardController:
 
         # 起飞点位置
         self.home_position = None
+
+        # ===== 新增：高度锁定功能 =====
+        self.height_locked = False          # 是否锁定高度
+        self.locked_altitude = None         # 锁定的高度值
+        self._height_thread = None          # 高度维持线程
+        self._height_running = False        # 高度维持线程运行标志
 
     def _get_direction_key(self, key):
         """获取按键对应的移动方向"""
@@ -193,6 +200,14 @@ class KeyboardController:
                 listener_running = False
                 return False
 
+            # 统一获取按键字符，避免重复 hasattr 调用
+            key_char = key.char if hasattr(key, 'char') else None
+
+            # ===== Y 键显示遥测面板 =====
+            if key_char == 'y' or key_char == 'Y':
+                self._show_telemetry_panel()
+                return
+
             # 空格键：悬停（停止当前移动并总结）
             if key == keyboard.Key.space:
                 if self.current_movement:
@@ -201,9 +216,6 @@ class KeyboardController:
                     self.drone.hover()
                     print("🛸 悬停")
                 return
-
-            # 获取按键字符
-            key_char = key.char if hasattr(key, 'char') else None
 
             # 拍照模式下的特殊按键
             if self.photo_mode:
@@ -221,6 +233,21 @@ class KeyboardController:
                 self.drone.velocity = SPEED_LEVELS[self.speed_level]
                 names = ['慢', '中', '快', '很快', '极速']
                 print(f"🎚️ 速度档位: {key_char} ({names[self.speed_level]}) - {SPEED_LEVELS[self.speed_level]} m/s")
+                return
+            # ===== H 键：回到起飞点悬停 =====
+            if key_char == 'h' or key_char == 'H':
+                if self.home_position:
+                    print(f"\n🏠 回到起飞点悬停...")
+                    pos = self.drone.get_position()
+                    self.drone.client.moveToPositionAsync(
+                        self.home_position.x_val,
+                        self.home_position.y_val,
+                        pos.z_val,
+                        5
+                    )
+                    print(f"✅ 已回到起飞点 ({self.home_position.x_val:.1f}, {self.home_position.y_val:.1f})")
+                else:
+                    print("⚠️ 未设置返航点")
                 return
 
             # R 键：一键返航
@@ -342,6 +369,114 @@ class KeyboardController:
         self.drone.hover()
         print("✅ 环绕完成")
 
+    def _show_telemetry_panel(self):
+        """显示实时遥测面板"""
+        pos = self.drone.get_position()
+        state = self.drone.client.getMultirotorState()
+        vel = state.kinematics_estimated.linear_velocity
+        orientation = state.kinematics_estimated.orientation
+    
+        # 计算速度
+        speed = (vel.x_val**2 + vel.y_val**2 + vel.z_val**2) ** 0.5
+    
+        # 计算姿态角
+        pitch, roll, yaw = self._quaternion_to_euler(orientation)
+        yaw_deg = round(yaw * 180 / 3.14159, 1)
+        pitch_deg = round(pitch * 180 / 3.14159, 1)
+        roll_deg = round(roll * 180 / 3.14159, 1)
+    
+        # 获取碰撞状态
+        collision_info = self.drone.client.simGetCollisionInfo()
+    
+        # 速度档位名称
+        speed_names = ['慢', '中', '快', '很快', '极速']
+    
+        print("\n" + "─" * 50)
+        print("📊 实时遥测面板")
+        print("─" * 50)
+        print(f"  位置: X={pos.x_val:6.1f}m  Y={pos.y_val:6.1f}m  Z={pos.z_val:6.1f}m")
+        print(f"  高度: {abs(pos.z_val):5.1f}m")
+        print(f"  速度: {speed:5.1f} m/s  |  档位: {speed_names[self.speed_level]}")
+        print(f"  姿态: 俯仰={pitch_deg:+4.1f}°  滚转={roll_deg:+4.1f}°  偏航={yaw_deg:+4.1f}°")
+        print(f"  碰撞: {'⚠️ 是' if collision_info.has_collided else '✅ 否'}")
+        print(f"  当前移动: {self.current_movement or '悬停'}")
+        print("─" * 50 + "\n")
+
+    def _quaternion_to_euler(self, q):
+        """四元数转欧拉角"""
+        # 滚转 (roll)
+        sinr_cosp = 2 * (q.w_val * q.x_val + q.y_val * q.z_val)
+        cosr_cosp = 1 - 2 * (q.x_val * q.x_val + q.y_val * q.y_val)
+        roll = np.arctan2(sinr_cosp, cosr_cosp)
+    
+        # 俯仰 (pitch)
+        sinp = 2 * (q.w_val * q.y_val - q.z_val * q.x_val)
+        if abs(sinp) >= 1:
+            pitch = np.sign(sinp) * np.pi / 2
+        else:
+            pitch = np.arcsin(sinp)
+    
+        # 偏航 (yaw)
+        siny_cosp = 2 * (q.w_val * q.z_val + q.x_val * q.y_val)
+        cosy_cosp = 1 - 2 * (q.y_val * q.y_val + q.z_val * q.z_val)
+        yaw = np.arctan2(siny_cosp, cosy_cosp)
+    
+        return pitch, roll, yaw
+    
+     # ================================================================
+    # 高度锁定功能
+    # ================================================================
+
+    def _toggle_height_lock(self):
+        """切换高度锁定状态"""
+        if not self.height_locked:
+            pos = self.drone.get_position()
+            self.locked_altitude = pos.z_val
+            self.height_locked = True
+            print(f"🔒 高度已锁定: {abs(self.locked_altitude):.1f}m")
+            self._start_height_hold()
+        else:
+            self.height_locked = False
+            self.locked_altitude = None
+            self._stop_height_hold()
+            print("🔓 高度锁定已解除")
+
+    def _start_height_hold(self):
+        """启动高度维持线程"""
+        self._height_running = True
+        self._height_thread = threading.Thread(
+            target=self._height_hold_loop,
+            daemon=True
+        )
+        self._height_thread.start()
+
+    def _stop_height_hold(self):
+        """停止高度维持线程"""
+        self._height_running = False
+        if self._height_thread and self._height_thread.is_alive():
+            self._height_thread.join(timeout=0.3)
+        self._height_thread = None
+
+    def _height_hold_loop(self):
+        """高度维持循环（在独立线程中运行）"""
+        while self._height_running and self.height_locked:
+            try:
+                pos = self.drone.get_position()
+                current_z = pos.z_val
+                target_z = self.locked_altitude
+
+                if abs(current_z - target_z) > 0.3:
+                    speed = 1.0
+                    if current_z > target_z:
+                        self.drone.client.moveByVelocityAsync(0, 0, speed, 0.2)
+                    else:
+                        self.drone.client.moveByVelocityAsync(0, 0, -speed, 0.2)
+                else:
+                    self.drone.client.moveByVelocityAsync(0, 0, 0, 0.1)
+            except Exception:
+                pass
+            time.sleep(0.1)
+
     def start(self):
         """启动键盘监听
 
@@ -351,11 +486,15 @@ class KeyboardController:
         listener_running = True
 
         # 创建键盘监听器
-        with keyboard.Listener(
-            on_press=self.on_press,
-            on_release=self.on_release
-        ) as listener:
-            listener.join()
+        try:
+            with keyboard.Listener(
+                on_press=self.on_press,
+                on_release=self.on_release
+            ) as listener:
+                listener.join()
+        finally:
+            # ===== 新增：退出时清理高度锁定线程 =====
+            self._stop_height_hold()
 
 
 def print_control_help():
@@ -375,6 +514,8 @@ def print_control_help():
   🎮 功能键:
      空格      : 悬停（停止移动）
      1-5       : 切换速度档位（慢/中/快/很快/极速）
+     H         : 回到起飞点悬停（保持当前高度）
+     Y         : 显示实时遥测面板
      R         : 一键返航
      P         : 拍照
      T         : 拍摄所有图像(RGB+深度+分割)

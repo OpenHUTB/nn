@@ -55,6 +55,7 @@ class PandaAutoGrab:
     PHASE_MOVE_BACK_FROM_PLACE = 10
     PHASE_MOVE_BACK_TO_INIT = 11
     PHASE_FINISHED = 12
+    PHASE_VERIFY_GRASP = 5.5
 
     def __init__(self):
         """初始化Franka Panda机械臂抓取控制器，加载模型和初始化参数"""
@@ -65,6 +66,7 @@ class PandaAutoGrab:
         self.step_counter = 0
         self.current_phase = 0
         self.grab_complete = False
+        self.max_steps_per_phase = 5000 # 添加超时保护
 
         # 尝试加载模型文件
         try:
@@ -95,7 +97,23 @@ class PandaAutoGrab:
         self.ee_body_id = self.model.body("hand").id
         self.joint_names = [f"joint{i}" for i in range(1, 8)]
         self.joint_ids = [self.model.joint(name).id for name in self.joint_names]
-        self.gripper_joint_names = ["finger_joint1", "finger_joint2"]
+        self.arm_actuator_ids = [self.model.actuator(f"actuator{i}").id for i in range(1, 8)]
+        self.gripper_actuator_ids = []
+        for i in range(self.model.nu): 
+            act_name = self.model.actuator(i).name
+            if 'finger' in act_name.lower() or 'gripper' in act_name.lower():
+                self.gripper_actuator_ids.append(i)
+                logging.info(f"✅ 自动发现夹爪执行器: {act_name} (ID: {i})")
+
+        if not self.gripper_actuator_ids:
+            fallback_names = ["actuator8", "actuator9", "gripper_finger1_actuator", "gripper_finger2_actuator"]
+            for name in fallback_names:
+                try:
+                    id = self.model.actuator(name).id
+                    self.gripper_actuator_ids.append(id)
+                    logging.info(f"✅ 回退发现夹爪执行器: {name} (ID: {id})")
+                except:
+                    pass
 
         # 雅克比矩阵
         self.jacp = np.zeros((3, self.model.nv))
@@ -103,19 +121,24 @@ class PandaAutoGrab:
 
         # 抓取参数
         self.cube_body_id = self.model.body("cube").id
-        self.target_place_pos = np.array([0.3, 0.0, 0.1])
-        self.gripper_open_pos = 0.04
-        self.gripper_close_pos = 0.005
+        self.target_place_pos = np.array([0.4, -0.2, 0.05])  
+        self.gripper_open_ctrl = 255.0  
+        self.gripper_close_ctrl = 0.0   
         self.safe_lift_height = 0.15
-        self.grab_height = 0.05
+        self.grab_height = 0.11  
+        self.cube_half_size = 0.02
+        self.target_quat = np.array([0, 1, 0, 0]) 
+        self.grasp_retries = 0
+        self.max_grasp_retries = 3
+
 
         # PD控制参数
-        self.PD_KP = 250  # 比例增益
-        self.PD_KD = 100  # 微分增益
-        self.TORQUE_LIMIT = 20  # 力矩限制
+        self.PD_KP = 300  
+        self.PD_KD = 80  
+        self.TORQUE_LIMIT = 40 
 
         # 雅克比伪逆参数
-        self.JACOBIAN_DAMPING = 0.01  # 雅克比伪逆的阻尼系数
+        self.JACOBIAN_DAMPING = 0.01 
 
         # 关节速度参数
         self.JOINT_VEL_LIMIT = 0.5  # 关节速度上限
@@ -124,7 +147,7 @@ class PandaAutoGrab:
         self.POS_TOLERANCE = 0.003  # 末端执行器位置误差容忍阈值
 
         # 夹爪控制参数
-        self.GRIPPER_WAIT_STEPS = 100  # 夹爪动作完成所需的等待步数
+        self.GRIPPER_WAIT_STEPS = 200  # 夹爪动作完成所需的等待步数
 
         # 位置坐标参数
         self.INIT_EE_POS = np.array([0.4, 0.0, 0.2])  # 末端执行器初始目标位置
@@ -143,6 +166,7 @@ class PandaAutoGrab:
         logging.info("=" * 50)
         logging.info("📌 模型Body列表: %s", [self.model.body(i).name for i in range(min(self.model.nbody, 10))])
         logging.info("📌 模型Joint列表: %s", [self.model.joint(i).name for i in range(min(self.model.njnt, 10))])
+        logging.info("📌 模型Actuator列表: %s", [self.model.actuator(i).name for i in range(min(self.model.nu, 10))])
         logging.info("=" * 50)
 
     def get_ee_pos(self) -> np.ndarray:
@@ -161,16 +185,16 @@ class PandaAutoGrab:
         """
         return self.data.xpos[self.cube_body_id].copy()
 
-    def _compute_jacobian(self) -> np.ndarray:
+    def _compute_jacobian(self) -> tuple[np.ndarray, np.ndarray]:
         """计算末端执行器的位置雅克比矩阵
 
         Returns:
             np.ndarray: 3×7的位置雅克比矩阵（仅包含机械臂7个关节的分量）
         """
         mujoco.mj_jac(self.model, self.data, self.jacp, self.jacr, self.get_ee_pos(), self.ee_body_id)
-        return self.jacp[:, self.joint_ids]
+        return self.jacp[:, self.joint_ids], self.jacr[:, self.joint_ids]
 
-    def _move_step(self, target: np.ndarray, speed: float = 0.3) -> bool:
+    def _move_step(self, target_pos: np.ndarray, target_quat: np.ndarray = None, speed: float = 0.3) -> bool:
         """单步位置控制：基于雅克比伪逆实现末端执行器的位置跟踪
 
         Args:
@@ -181,27 +205,42 @@ class PandaAutoGrab:
             bool: 若到达目标位置返回True，否则返回False
         """
         ee_pos = self.get_ee_pos()
-        error = target - ee_pos
-        error_norm = np.linalg.norm(error)
+        pos_err = target_pos - ee_pos
+        dist = np.linalg.norm(pos_err)
 
-        if error_norm < self.POS_TOLERANCE:
-            return True  # 到达目标
+        ori_err = np.zeros(3)
+        if target_quat is not None:
+            ee_quat = self.data.xquat[self.ee_body_id]
+            mujoco.mju_subQuat(ori_err, target_quat, ee_quat)
 
-        jacobian = self._compute_jacobian()
-        jacobian_pinv = jacobian.T @ np.linalg.inv(jacobian @ jacobian.T + self.JACOBIAN_DAMPING * np.eye(3))
+        if dist < self.POS_TOLERANCE and (target_quat is None or np.linalg.norm(ori_err) < 0.05):
+            return True
 
-        joint_vel_cmd = speed * jacobian_pinv @ error
+        jp, jr = self._compute_jacobian()
+
+        if target_quat is not None:
+            # 6D 控制
+            jacobian = np.vstack([jp, jr])
+            task_err = np.concatenate([pos_err, ori_err])
+            damping = self.JACOBIAN_DAMPING * np.eye(6)
+        else:
+            jacobian = jp
+            task_err = pos_err
+            damping = self.JACOBIAN_DAMPING * np.eye(3)
+
+        jacobian_pinv = jacobian.T @ np.linalg.inv(jacobian @ jacobian.T + damping)
+
+        adaptive_speed = speed * min(1.0, dist / 0.05)
+        joint_vel_cmd = adaptive_speed * jacobian_pinv @ task_err
         joint_vel_cmd = np.clip(joint_vel_cmd, -self.JOINT_VEL_LIMIT, self.JOINT_VEL_LIMIT)
 
-        torque = np.zeros(7)
-        for i in range(7):
-            angle_error = joint_vel_cmd[i] * 0.1
-            torque[i] = self.PD_KP * angle_error - self.PD_KD * self.data.qvel[self.joint_ids[i]]
-            torque[i] = np.clip(torque[i], -self.TORQUE_LIMIT, self.TORQUE_LIMIT)
+        dt = self.model.opt.timestep
 
         for i in range(7):
-            self.data.ctrl[self.joint_ids[i]] = torque[i]
-
+            angle_error = joint_vel_cmd[i] * dt
+            torque = self.PD_KP * angle_error - self.PD_KD * self.data.qvel[self.joint_ids[i]]
+            torque = np.clip(torque, -self.TORQUE_LIMIT, self.TORQUE_LIMIT)
+            self.data.ctrl[self.arm_actuator_ids[i]] = torque
         return False
 
     def _gripper_step(self, pos: float) -> None:
@@ -210,91 +249,149 @@ class PandaAutoGrab:
         Args:
             pos (float): 夹爪目标位置，0.04为完全打开，0.005为闭合抓取
         """
-        for j_name in self.gripper_joint_names:
-            j_id = self.model.joint(j_name).id
-            self.data.ctrl[j_id] = pos
+        if self.gripper_actuator_ids:
+            for actuator_id in self.gripper_actuator_ids:
+                ctrlrange = self.model.actuator_ctrlrange[actuator_id]
+                final_ctrl = np.clip(pos, ctrlrange[0], ctrlrange[1])
+
+                if actuator_id < len(self.data.ctrl):
+                    self.data.ctrl[actuator_id] = final_ctrl
+                else:
+                    logging.error(f"❌ 执行器ID {actuator_id} 超出 ctrl 数组范围!")
+        else:
+
+            pass
 
     def _grab_phase_machine(self) -> None:
         """抓取状态机：按阶段执行机械臂的抓取、移动、放置等一系列动作"""
+        if self.current_phase in [self.PHASE_MOVE_TO_CUBE_ABOVE, self.PHASE_MOVE_TO_GRAB_HEIGHT]:
+            self.cube_pos = self.get_cube_pos()
+
+        if hasattr(self, '_phase_start_step') and (self.step_counter - self._phase_start_step) > self.max_steps_per_phase:
+            logging.warning(f"⚠️ 阶段 {self.current_phase} 超时，强制进入下一阶段。")
+            self._advance_phase()
+
         if self.current_phase == self.PHASE_MOVE_TO_INIT:
-            if self._move_step(self.INIT_EE_POS):
+            self._gripper_step(self.gripper_open_ctrl) 
+            if self._move_step(self.INIT_EE_POS, self.target_quat):
                 logging.info("✅ 到达初始位置")
-                self.current_phase = self.PHASE_DETECT_CUBE
-                self.step_counter = 0
+                self._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_DETECT_CUBE:
             self.cube_pos = self.get_cube_pos()
             logging.info("🎯 识别到立方体位置: %s", np.round(self.cube_pos, 3))
-            self.current_phase = self.PHASE_MOVE_TO_CUBE_ABOVE
+            self._advance_phase()
 
         elif self.current_phase == self.PHASE_MOVE_TO_CUBE_ABOVE:
-            if self._move_step(self.cube_pos + np.array([0, 0, self.safe_lift_height]), speed=0.4):
+            target = self.cube_pos + np.array([0, 0, self.safe_lift_height])
+            if self._move_step(target, self.target_quat, speed=0.4):
                 logging.info("✅ 到达立方体上方")
-                self.current_phase = self.PHASE_OPEN_GRIPPER
-                self.step_counter = 0
+                self._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_OPEN_GRIPPER:
             if self.step_counter == 0:
-                self._gripper_step(self.gripper_open_pos)
+                self._gripper_step(self.gripper_open_ctrl)
                 logging.info("✋ 打开夹爪")
             if self.step_counter > self.GRIPPER_WAIT_STEPS:
-                self.current_phase = self.PHASE_MOVE_TO_GRAB_HEIGHT
-                self.step_counter = 0
+                self._advance_phase()
             self.step_counter += 1
+            self._set_phase_start_if_unset()
 
         elif self.current_phase == self.PHASE_MOVE_TO_GRAB_HEIGHT:
-            if self._move_step(self.cube_pos + np.array([0, 0, self.grab_height]), speed=0.2):
-                logging.info("✅ 下降到抓取高度")
-                self.current_phase = self.PHASE_CLOSE_GRIPPER
-                self.step_counter = 0
+            grab_target_z = self.cube_pos[2] + self.grab_height
+            target = np.array([self.cube_pos[0], self.cube_pos[1], grab_target_z])
+            if self._move_step(target, self.target_quat, speed=0.5):
+                logging.info("✅ 下降到抓取高度: %.3f (立方体中心 Z: %.3f)", grab_target_z, self.cube_pos[2])
+                self._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_CLOSE_GRIPPER:
             if self.step_counter == 0:
-                self._gripper_step(self.gripper_close_pos)
+                self._gripper_step(self.gripper_close_ctrl)
                 logging.info("🤏 闭合夹爪抓取")
             if self.step_counter > self.GRIPPER_WAIT_STEPS:
-                self.current_phase = self.PHASE_LIFT_CUBE
+                self.current_phase = self.PHASE_VERIFY_GRASP
                 self.step_counter = 0
             self.step_counter += 1
+            self._set_phase_start_if_unset()
+
+        elif self.current_phase == self.PHASE_VERIFY_GRASP:
+            has_contact = False
+            for i in range(self.data.ncon):
+                contact = self.data.contact[i]
+                body1 = self.model.body(self.model.geom_bodyid[contact.geom1]).name
+                body2 = self.model.body(self.model.geom_bodyid[contact.geom2]).name
+                if ("finger" in body1 and "cube" in body2) or ("finger" in body2 and "cube" in body1):
+                    has_contact = True
+                    break
+
+            if has_contact:
+                logging.info("✅ 抓取确认成功")
+                self.current_phase = self.PHASE_LIFT_CUBE
+                self.grasp_retries = 0
+            else:
+                self.grasp_retries += 1
+                if self.grasp_retries < self.max_grasp_retries:
+                    logging.warning("⚠️ 抓取失败，重试中 (%d/%d)", self.grasp_retries, self.max_grasp_retries)
+                    self.current_phase = self.PHASE_OPEN_GRIPPER
+                else:
+                    logging.error("❌ 多次抓取失败，放弃任务")
+                    self.current_phase = self.PHASE_MOVE_BACK_TO_INIT
+            self.step_counter = 0
+            self._set_phase_start()
 
         elif self.current_phase == self.PHASE_LIFT_CUBE:
-            lift_target = self.cube_pos + np.array([0, 0, self.safe_lift_height + self.LIFT_HEIGHT_INCREMENT])
-            if self._move_step(lift_target, speed=0.3):
+            lift_target = self.get_cube_pos() + np.array([0, 0, self.safe_lift_height])
+            if self._move_step(lift_target, self.target_quat, speed=0.3):
                 logging.info("✅ 抬升立方体")
-                self.current_phase = self.PHASE_MOVE_TO_PLACE_ABOVE
-                self.step_counter = 0
+                self._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_MOVE_TO_PLACE_ABOVE:
-            if self._move_step(self.target_place_pos + np.array([0, 0, self.safe_lift_height]), speed=0.4):
+            target = self.target_place_pos + np.array([0, 0, self.safe_lift_height])
+            if self._move_step(target, self.target_quat, speed=0.4):
                 logging.info("✅ 到达放置点上方")
-                self.current_phase = self.PHASE_MOVE_TO_PLACE_HEIGHT
-                self.step_counter = 0
+                self._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_MOVE_TO_PLACE_HEIGHT:
-            if self._move_step(self.target_place_pos + np.array([0, 0, self.grab_height]), speed=0.2):
+            target = self.target_place_pos + np.array([0, 0, self.grab_height])
+            if self._move_step(target, self.target_quat, speed=0.5):
                 logging.info("✅ 下降到放置高度")
-                self.current_phase = self.PHASE_RELEASE_CUBE
-                self.step_counter = 0
+                elf._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_RELEASE_CUBE:
             if self.step_counter == 0:
-                self._gripper_step(self.gripper_open_pos)
+                self._gripper_step(self.gripper_open_ctrl)
                 logging.info("🫳 释放立方体")
             if self.step_counter > self.GRIPPER_WAIT_STEPS:
-                self.current_phase = self.PHASE_MOVE_BACK_FROM_PLACE
-                self.step_counter = 0
+                sself._advance_phase()
             self.step_counter += 1
+            self._set_phase_start_if_unset()
 
         elif self.current_phase == self.PHASE_MOVE_BACK_FROM_PLACE:
-            if self._move_step(self.target_place_pos + np.array([0, 0, self.safe_lift_height]), speed=0.3):
+            target = self.target_place_pos + np.array([0, 0, self.safe_lift_height])
+            if self._move_step(target, self.target_quat, speed=0.3):
                 logging.info("✅ 撤离机械臂")
-                self.current_phase = self.PHASE_MOVE_BACK_TO_INIT
-                self.step_counter = 0
+                self._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_MOVE_BACK_TO_INIT:
-            if self._move_step(self.INIT_EE_POS, speed=0.4):
+            if self._move_step(self.INIT_EE_POS, self.target_quat, speed=0.4):
                 logging.info("✅ 返回初始位置")
-                self.current_phase = self.PHASE_FINISHED
+                self._advance_phase()
+            else:
+                self._set_phase_start()
 
         elif self.current_phase == self.PHASE_FINISHED:
             if not self.grab_complete:
@@ -302,6 +399,23 @@ class PandaAutoGrab:
                 logging.info("✅ 智能抓取任务完成！")
                 logging.info("=" * 50)
                 self.grab_complete = True
+            for i in range(7):
+                self.data.ctrl[self.joint_ids[i]] = 0
+
+    def _advance_phase(self):
+        """进入下一阶段"""
+        self.current_phase += 1
+        self.step_counter = 0
+
+    def _set_phase_start(self):
+        """记录当前阶段开始的步数"""
+        if not hasattr(self, '_phase_start_step'):
+            self._phase_start_step = self.step_counter
+
+    def _set_phase_start_if_unset(self):
+        """如果未设置，则记录当前阶段开始的步数"""
+        if not hasattr(self, '_phase_start_step'):
+            self._set_phase_start()
 
     def _init_camera(self) -> None:
         """初始化Viewer的相机视角"""
@@ -329,6 +443,7 @@ class PandaAutoGrab:
                 mujoco.mj_step(self.model, self.data)
                 self.viewer.sync()
                 time.sleep(self.SIMULATION_SLEEP)
+                self.step_counter += 1 
         except KeyboardInterrupt:
             logging.warning("⚠️ 检测到Ctrl+C，正在退出仿真...")
 

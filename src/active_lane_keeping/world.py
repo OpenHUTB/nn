@@ -7,14 +7,19 @@ import queue
 
 from lane import Lane
 
+
 class World():
     """Environment that wraps around the Carla-API
     """
 
     def __init__(self, server_ip:str='127.0.0.1', port:int=2000,
-        timeout:float=5.0, map:str='Town04', image_height:int=480,
+        timeout:float=10.0, map:str='Town05', image_height:int=480,
         image_width:int=640, fov:int=110,
-        time_difference:float=0.01) -> None:
+        time_difference:float=0.01, x_offset:float=2.5, z_offset:float=0.7,
+        use_adaptive_threshold:bool=True, use_edge_detection:bool=True,
+        canny_low:int=50, canny_high:int=150,
+        use_gpu:bool=False, use_parallel:bool=True, use_incremental:bool=True,
+        time_budget_ms:float=40.0, enable_profiling:bool=False) -> None:
         """Constructor
 
         Args:
@@ -24,9 +29,9 @@ class World():
                 Defaults to 2000.
             timeout (float, optional): Time difference after which the
                 connection attempt with the server is aborted. Note that several
-                attempts may be needed. Defaults to 5.0.
+                attempts may be needed. Defaults to 10.0.
             map (str, optional): Map to be used. The available options depend on
-                the Carla simulator used. Defaults to 'Town04'.
+                the Carla simulator used. Defaults to 'Town05'.
             image_height (int, optional): Height of the image to return.
                 Defaults to 480.
             image_width (int, optional): Width of the image to return. Defaults
@@ -34,12 +39,37 @@ class World():
             fov (int, optional): Field of view of the camera. Defaults to 110.
             time_difference (float, optional): Difference of time simulated at
                 each step. Defaults to 0.01.
+            x_offset (float, optional): Camera offset in x direction relative to car.
+                Defaults to 2.5.
+            z_offset (float, optional): Camera offset in z direction relative to car.
+                Defaults to 0.7.
+            use_adaptive_threshold (bool, optional): Use Otsu's adaptive thresholding.
+                Defaults to True.
+            use_edge_detection (bool, optional): Combine color detection with edge detection.
+                Defaults to True.
+            canny_low (int, optional): Lower threshold for Canny edge detection.
+                Defaults to 50.
+            canny_high (int, optional): Upper threshold for Canny edge detection.
+                Defaults to 150.
+            use_gpu (bool, optional): Enable GPU acceleration. Defaults to False.
+            use_parallel (bool, optional): Enable parallel processing. Defaults to True.
+            use_incremental (bool, optional): Enable incremental update. Defaults to True.
+            time_budget_ms (float, optional): Max time per frame in ms. Defaults to 40.0.
+            enable_profiling (bool, optional): Enable performance profiling. Defaults to False.
         """
 
         self.image_height = image_height
         self.image_width = image_width
+        self.x_offset = x_offset
+        self.z_offset = z_offset
 
-        self.lane = Lane(height=self.image_height, width=self.image_width)
+        self.lane = Lane(height=self.image_height, width=self.image_width,
+            use_adaptive_threshold=use_adaptive_threshold,
+            use_edge_detection=use_edge_detection,
+            canny_low=canny_low, canny_high=canny_high,
+            use_gpu=use_gpu, use_parallel=use_parallel,
+            use_incremental=use_incremental, time_budget_ms=time_budget_ms,
+            enable_profiling=enable_profiling)
 
         self.fov = fov
         self.client = carla.Client(server_ip, port)
@@ -64,6 +94,45 @@ class World():
         self.collision_detected = False
         self.initialized = False
 
+    @classmethod
+    def from_config(cls, config: dict) -> 'World':
+        """Create a World instance from a configuration dictionary.
+
+        Args:
+            config (dict): Configuration dictionary containing connection,
+                simulation, camera, lane detection, and performance settings.
+
+        Returns:
+            World: A new World instance configured according to the provided config.
+        """
+        conn = config.get('connection', {})
+        sim = config.get('simulation', {})
+        cam = config.get('camera', {})
+        lane_det = config.get('lane_detection', {})
+        perf = config.get('performance', {})
+
+        return cls(
+            server_ip=conn.get('server_ip', '127.0.0.1'),
+            port=conn.get('port', 2000),
+            timeout=conn.get('timeout', 10.0),
+            map=sim.get('map', 'Town05'),
+            time_difference=sim.get('time_difference', 0.01),
+            image_height=cam.get('image_height', 480),
+            image_width=cam.get('image_width', 640),
+            fov=cam.get('fov', 110),
+            x_offset=cam.get('x_offset', 2.5),
+            z_offset=cam.get('z_offset', 0.7),
+            use_adaptive_threshold=lane_det.get('use_adaptive_threshold', True),
+            use_edge_detection=lane_det.get('use_edge_detection', True),
+            canny_low=lane_det.get('canny_low', 50),
+            canny_high=lane_det.get('canny_high', 150),
+            use_gpu=perf.get('use_gpu', False),
+            use_parallel=perf.get('use_parallel', True),
+            use_incremental=perf.get('use_incremental', True),
+            time_budget_ms=perf.get('time_budget_ms', 40.0),
+            enable_profiling=perf.get('enable_profiling', False)
+        )
+
     def close(self) -> None:
         """Destroys all currently used Actors
         """
@@ -74,15 +143,16 @@ class World():
         if self.collision_sensor is not None:
             self.collision_sensor.destroy()
 
-    def reset(self) -> tuple[float, float, np.ndarray, bool]:
+    def reset(self) -> tuple[float, float, np.ndarray, bool, float]:
         """Resets the Actors
 
         Returns:
-            tuple[float, float, np.ndarray, bool]:
+            tuple[float, float, np.ndarray, bool, float]:
                 [0]: Difference to the center of the detected lane.
                 [1]: Detected surface area.
                 [2]: Image consisting including the detected surface area.
                 [3]: Whether a collision has been detected.
+                [4]: Current vehicle speed in m/s.
         """
         self.image_queue = queue.Queue()
         self.close()
@@ -95,14 +165,13 @@ class World():
         blueprint.set_attribute('fov', f'{self.fov}')
 
         # Relative location to car
-        spawn_point = carla.Transform(carla.Location(x=2.5, z=0.7))
+        spawn_point = carla.Transform(carla.Location(x=self.x_offset, z=self.z_offset))
         self.sensor = self.world.spawn_actor(blueprint, spawn_point,
                                         attach_to=self.vehicle)
         self.sensor.listen(self.image_queue.put)
 
         # Spawn collision sensor
-        blueprint = self.world.get_blueprint_library() \
-            .find('sensor.other.collision')
+        blueprint = self.blueprint_library.find('sensor.other.collision')
         self.collision_sensor = self.world.spawn_actor(blueprint,
             carla.Transform(), attach_to=self.vehicle)
         self.collision_detected = False
@@ -116,24 +185,37 @@ class World():
         """
         self.collision_detected = True
 
-    def _change_to_left_lane(self) -> tuple[float, float, np.ndarray, bool]:
+    def _change_to_left_lane(self) -> tuple[float, float, np.ndarray, bool, float]:
         """Hard Code to make the Car start in the leftmost Lane
 
         Returns:
-            tuple[float, float, np.ndarray, bool]:
+            tuple[float, float, np.ndarray, bool, float]:
                 [0]: Difference to the center of the detected lane.
                 [1]: Detected surface area.
                 [2]: Image consisting including the detected surface area.
                 [3]: Whether a collision has been detected.
+                [4]: Current vehicle speed in m/s.
         """
         for throttle, steer, steps in [
             (0.2, -0.11, 850), (0.2, 0.17, 250), (-0.2, 0.17, 50)]:
             for _ in range(steps):
-                error, detection_surface_area, transformed_image, _ = self.step(
+                error, detection_surface_area, transformed_image, _, _ = self.step(
                     throttle=throttle, steer=steer)
 
         return error, detection_surface_area, transformed_image, \
-            self.collision_detected
+            self.collision_detected, self._get_vehicle_speed()
+    
+    def _get_vehicle_speed(self) -> float:
+        """Get the current vehicle speed in m/s.
+        
+        Returns:
+            float: Vehicle speed in m/s.
+        """
+        if self.vehicle is None:
+            return 0.0
+        velocity = self.vehicle.get_velocity()
+        speed = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        return speed
 
     def get_image(self) -> np.ndarray:
         """Retrieve the Image in RGB
@@ -158,7 +240,7 @@ class World():
         cv2.waitKey(1)
 
     def step(self, show:bool=True, throttle:float=0,
-        steer:float=0) -> tuple[float, float, np.ndarray, bool]:
+        steer:float=0) -> tuple[float, float, np.ndarray, bool, float]:
         """Simulate one Step
 
         Args:
@@ -171,11 +253,12 @@ class World():
             Exception: Requires the reset method to be called before step.
 
         Returns:
-            tuple[float, float, np.ndarray, bool]:
+            tuple[float, float, np.ndarray, bool, float]:
                 [0]: Difference to the center of the detected lane.
                 [1]: Detected surface area.
                 [2]: Image consisting including the detected surface area.
                 [3]: Whether a collision has been detected.
+                [4]: Current vehicle speed in m/s.
         """
 
         if not self.initialized:
@@ -187,9 +270,10 @@ class World():
         image = self.get_image()
         transformed_image, error, detection_surface_area = self.lane \
             .pipe(img=image)
+        speed = self._get_vehicle_speed()
 
         if show:
             World.show_image(image=transformed_image)
             
         return error, detection_surface_area, transformed_image, \
-            self.collision_detected
+            self.collision_detected, speed

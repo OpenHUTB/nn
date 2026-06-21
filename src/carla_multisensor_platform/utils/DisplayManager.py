@@ -5,7 +5,7 @@ class DisplayManager:
         pygame.init()
         pygame.font.init()
         self.display = pygame.display.set_mode(window_size, pygame.RESIZABLE)
-        pygame.display.set_caption("CARLA Simulation")
+        pygame.display.set_caption("CARLA Simulation - Press ESC to exit")
         self.grid_size = grid_size
         self.window_size = window_size
         self.sensor_list = []

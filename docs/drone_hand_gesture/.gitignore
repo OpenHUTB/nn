@@ -1,0 +1,24 @@
+# Python虚拟环境
+gesture_env/
+venv/
+.env/
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# IDE
+.idea/
+# 构建/文档站点
+site/
+
+# 配置文件（本地配置，不提交）
+config.json
+
+# 日志文件
+logs/
+flight_log.json
+*.log
+
+# 数据集
+dataset/

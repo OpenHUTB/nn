@@ -45,7 +45,7 @@ class VisionSystem:
         self.image_queue.put(image)
 
     def process_and_render(self):
-        """处理图像，并返回：(图像帧, 当前正前方的最短障碍物距离)"""
+        """处理图像，并返回：(图像帧, 当前正前方的最短障碍物距离等)"""
         if not self.image_queue.empty():
             image = self.image_queue.get()
             
@@ -56,12 +56,18 @@ class VisionSystem:
             results = self.yolo_model(img_bgr, conf=0.6, verbose=False)
             current_seen_classes = set()
             min_distance = float('inf') 
+            detected_side = None
+            closest_target_class = None
+            closest_center_x = None
+            aeb_min_distance = float('inf')
             
             roi_left = 200
             roi_right = 440
             
             radar_max_range = 40.0
-            
+            left_blocked = False
+            right_blocked = False
+
             for box in results[0].boxes:
                 cls_id = int(box.cls[0])
                 cls_name = self.yolo_model.names[cls_id]
@@ -71,14 +77,30 @@ class VisionSystem:
                 box_height = y2 - y1
                 box_center_x = (x1 + x2) / 2
                 ratio = max(0.0, min(1.0, (y2 - 240.0) / 240.0))
+                
                 dynamic_roi_left = 320.0 - (220.0 * ratio)
                 dynamic_roi_right = 320.0 + (220.0 * ratio)
-                if dynamic_roi_left < box_center_x < dynamic_roi_right:
-                    if cls_name in ["car", "person"]:
-                        real_height = 1.7 if cls_name == "person" else 1.5
-                        distance = (self.focal_length * real_height) / max(1.0, box_height)
-                        
-                        # (AEB 会用到这个最小距离，哪怕在40米外也要持续算)
+                
+                wide_roi_left = 320.0 - (150.0 + 150.0 * ratio)
+                wide_roi_right = 320.0 + (150.0 + 150.0 * ratio)
+
+                if cls_name in ["car", "person"]:
+                    real_height = 1.7 if cls_name == "person" else 1.5
+                    distance = (self.focal_length * real_height) / max(1.0, box_height)
+
+                    if cls_name != "person" and distance < 80.0:
+                        if box_center_x < dynamic_roi_left:
+                            left_blocked = True
+                        elif box_center_x > dynamic_roi_right:
+                            right_blocked = True
+
+                    if wide_roi_left < box_center_x < wide_roi_right:
+                        if distance < aeb_min_distance:
+                            aeb_min_distance = distance
+                            closest_target_class = cls_name
+                            closest_center_x = box_center_x
+
+                    if dynamic_roi_left < box_center_x < dynamic_roi_right:
                         if distance < min_distance:
                             if self.smoothed_distance == float('inf'):
                                 self.smoothed_distance = distance
@@ -86,42 +108,60 @@ class VisionSystem:
                                 self.smoothed_distance = (0.3 * distance) + (0.7 * self.smoothed_distance)
                                 
                             min_distance = self.smoothed_distance
+                            detected_side = "left" if box_center_x < 320 else "right"
                             
-                        # 🌟 核心拦截逻辑：只有距离小于 40 米时，才将其计入“雷达监控名单”
                         if distance <= radar_max_range:
                             current_seen_classes.add(cls_name)
             
-            newly_appeared = current_seen_classes - self.last_seen_classes
             current_time = time.time()
+
+            # 动态初始化追踪状态，避免修改 __init__ 影响其他已有功能
+            if not hasattr(self, 'last_seen_time'):
+                self.last_seen_time = {"person": 0.0, "car": 0.0}
+                self.has_alerted = {"person": False, "car": False}
+
+            # 遍历当前检测到的关键类别
+            for target_type in ["person", "car"]:
+                if target_type in current_seen_classes:
+                    if current_time - self.last_seen_time[target_type] > 3.0:
+                        self.has_alerted[target_type] = False
+
+                    if not self.has_alerted[target_type]:
+                        color = "\033[93m" if target_type == "person" else "\033[96m"
+                        name = "行人" if target_type == "person" else "车辆"
+                        print(f"{color}[视觉雷达] ⚠️ 正前方 {int(radar_max_range)} 米内发现{name}。\033[0m")
+                        self.has_alerted[target_type] = True
+
+                    self.last_seen_time[target_type] = current_time
             
-            # 配合距离过滤，更新了控制台的文案
-            if "person" in newly_appeared and current_time - self.last_alert_time.get("person", 0) > 3.0:
-                print(f"\033[93m[视觉雷达] ⚠️ 正前方 {int(radar_max_range)} 米内发现行人。\033[0m")
-                self.last_alert_time["person"] = current_time 
-                    
-            if "car" in newly_appeared and current_time - self.last_alert_time.get("car", 0) > 3.0:
-                print(f"\033[96m[视觉雷达] ⚠️ 正前方 {int(radar_max_range)} 米内发现车辆。\033[0m")
-                self.last_alert_time["car"] = current_time
-            
-            self.last_seen_classes = current_seen_classes
-            
-            # 替换原来画垂直直线的代码
-            annotated_frame = results[0].plot()
-            
+            annotated_frame = results[0].plot()                    
             pt_horizon = (320, 240)      # 远方的地平线中心 (灭点)
             pt_bottom_left = (100, 480)  # 本车道左下角
             pt_bottom_right = (540, 480) # 本车道右下角
             
             cv2.line(annotated_frame, pt_horizon, pt_bottom_left, (0, 255, 0), 2)
             cv2.line(annotated_frame, pt_horizon, pt_bottom_right, (0, 255, 0), 2)
-            cv2.putText(annotated_frame, "Dynamic Perspective ROI", (100, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.putText(annotated_frame, "ACC Lane ROI", (100, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            pt_aeb_top_left = (170, 240)
+            pt_aeb_top_right = (470, 240)
+            pt_aeb_bottom_left = (20, 480)
+            pt_aeb_bottom_right = (620, 480)
+            cv2.line(annotated_frame, pt_aeb_top_left, pt_aeb_bottom_left, (0, 255, 255), 2)
+            cv2.line(annotated_frame, pt_aeb_top_right, pt_aeb_bottom_right, (0, 255, 255), 2)
+            cv2.putText(annotated_frame, "AEB Wide ROI", (20, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+            v = self.ego_vehicle.get_velocity()
+            speed_kmh = 3.6 * (v.x**2 + v.y**2 + v.z**2)**0.5
+            cv2.putText(annotated_frame, f"Ego Speed: {speed_kmh:.1f} km/h", (20, 40), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2, cv2.LINE_AA)
             
             cv2.imshow("CARLA YOLOv8 Vision", annotated_frame)
             cv2.waitKey(1)
             
-            return annotated_frame, min_distance
+            return annotated_frame, min_distance, detected_side, closest_target_class, closest_center_x, aeb_min_distance, left_blocked, right_blocked
             
-        return None, float('inf')
+        return None, float('inf'), None, None, None, float('inf'), False, False
 
     def destroy(self):
         if self.camera_sensor:
@@ -129,4 +169,4 @@ class VisionSystem:
             self.camera_sensor.destroy()
         cv2.destroyAllWindows() 
         cv2.waitKey(1)
-        print("🧹 [视觉模块] 摄像头已卸载，窗口已关闭。")
+        print("🧹 [视觉模块] 摄像头已卸载，窗口已关闭。")   

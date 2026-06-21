@@ -1,0 +1,13 @@
+{
+  "source": "CARLA object track log",
+  "objects": 3,
+  "records": 33,
+  "max_collision_risk": 0.8216,
+  "min_ttc_s": 1.012,
+  "emergency_brake_frames": 3,
+  "generated_files": [
+    "carla_ttc_by_object.png",
+    "carla_collision_risk_map.png",
+    "carla_ttc_advice.csv"
+  ]
+}

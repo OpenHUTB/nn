@@ -1,7 +1,22 @@
-tensorflow
-carla
-pygame
-numpy
-datetime
-termcolor
-matplotlib
+# TensorFlow
+tensorflow>=2.4.0
+# or tensorflow-gpu for GPU support
+
+# CARLA simulator client
+carla>=0.9.11
+
+# Game development
+pygame>=2.0.0
+
+# Scientific computing
+numpy>=1.19.0
+
+# Terminal output coloring
+termcolor>=1.1.0
+
+# Plotting and visualization
+matplotlib>=3.3.0
+pillow>=8.0.0
+
+# OpenCV for image processing
+opencv-python>=4.5.0
