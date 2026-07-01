@@ -7,7 +7,6 @@
   <img src="https://img.shields.io/badge/Stable--Baselines3-2.2.1-purple" alt="SB3 2.2.1"/>
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"/>
 </p>
-
 ## 目录
 
 - [项目简介](#项目简介)
