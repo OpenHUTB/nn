@@ -1,0 +1,17 @@
+# 自动驾驶奖励函数分析系统 - 配置文件
+
+speed_reward:
+  target_speed: 25.0      # 目标速度 (m/s)
+  tolerance: 5.0          # 速度容忍度 (m/s)
+
+distance_reward:
+  safe_distance: 15.0     # 安全距离 (m)
+  critical_distance: 5.0  # 临界距离 (m)
+
+comfort_reward:
+  max_acceleration: 2.0   # 最大加速度 (m/s²)
+
+visualization:
+  fig_size: [12, 10]      # 图表尺寸
+  dpi: 100                # 输出分辨率
+  output_dir: "outputs"   # 输出目录
