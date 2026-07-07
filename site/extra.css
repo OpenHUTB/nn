@@ -1,0 +1,119 @@
+/* ===========================
+   Material 主题自定义样式
+   =========================== */
+
+/* ----- 全局字体优化 ----- */
+:root {
+  --md-text-font: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --md-code-font: "Fira Code", "Cascadia Code", "Consolas", monospace;
+}
+
+/* ----- 首页 Hero 区 ----- */
+.md-main__inner {
+  margin-top: 0;
+}
+
+/* ----- 标题美化 ----- */
+h1 {
+  font-weight: 700;
+  color: var(--md-primary-fg-color);
+}
+
+h2 {
+  font-weight: 600;
+  border-bottom: 2px solid var(--md-primary-fg-color--light);
+  padding-bottom: 0.3em;
+}
+
+h3 {
+  font-weight: 500;
+}
+
+/* ----- 表格美化 ----- */
+.md-typeset table:not([class]) {
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background: linear-gradient(135deg, var(--md-primary-fg-color), var(--md-primary-fg-color--dark));
+  color: white;
+  font-weight: 600;
+  padding: 10px 16px;
+  border: none;
+}
+
+.md-typeset table:not([class]) td {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset table:not([class]) tr:last-child td {
+  border-bottom: none;
+}
+
+.md-typeset table:not([class]) tbody tr:hover {
+  background-color: var(--md-primary-fg-color--transparent);
+}
+
+/* ----- Admonition 提示框 ----- */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.5rem;
+  border-left-width: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* ----- 代码块美化 ----- */
+.md-typeset code {
+  border-radius: 0.25rem;
+  padding: 0.2em 0.4em;
+}
+
+.md-typeset pre > code {
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ----- 链接样式 ----- */
+.md-content a:not(.md-button) {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  transition: color 0.2s;
+}
+
+/* ----- 图片圆角 ----- */
+.md-typeset img {
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ----- 脚注分隔线 ----- */
+.md-typeset .footnote {
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+  padding-top: 0.5rem;
+}
+
+/* ----- 搜索框美化 ----- */
+.md-search__form {
+  border-radius: 0.25rem;
+}
+
+/* ----- 返回顶部按钮 ----- */
+.md-top {
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ----- 标签导航活跃项 ----- */
+.md-tabs__link--active {
+  font-weight: 600;
+}
+
+/* ----- 打印样式 ----- */
+@media print {
+  .md-typeset table:not([class]) {
+    box-shadow: none;
+  }
+}
