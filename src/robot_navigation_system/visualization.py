@@ -120,7 +120,7 @@ class NavigationVisualizer:
         if not os.path.exists(self.config.RESULT_DIR):
             os.makedirs(self.config.RESULT_DIR)
         plt.savefig(os.path.join(self.config.RESULT_DIR, 'training_history.png'), dpi=150)
-        plt.show()
+        plt.close()
     
     def plot_lidar_heatmap(self, lidar_data):
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
@@ -132,7 +132,7 @@ class NavigationVisualizer:
         if not os.path.exists(self.config.RESULT_DIR):
             os.makedirs(self.config.RESULT_DIR)
         plt.savefig(os.path.join(self.config.RESULT_DIR, 'lidar_heatmap.png'), dpi=150)
-        plt.show()
+        plt.close()
     
     def reset_path(self):
         self.path_x = []
