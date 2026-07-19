@@ -59,6 +59,7 @@ nav:
 - CARLA多传感器自动驾驶仿真平台: 'carla_multisensor_platform/carla_multisensor_platform.md'
 - 无人机飞行控制程序: 'drone_flight_sim/README.md'
 - 交通拥堵仿真与智能调控: 'lidar_project/README.md'
+- 自动驾驶感知与控制系统研究: 'carla_yolo_detection/README.md'
 
 # - mdx_math 用于行内公式显示
 markdown_extensions:
