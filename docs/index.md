@@ -186,7 +186,7 @@ title: 主页
 # 其他  <span id="other"></span>
 
 - [__YOLO数据生成器__](./carla-yolo-dataset-generator/README.md)
-
+  - [__双机械臂协同仿真系统__](./dua_arm/index.md) - 基于Gymnasium/MuJoCo的仿真与强化学习实验环境
 - [__驾驶事故视频识别__](./carla_temporal_collage/index.md) - 基于 Temporal Collage Prompting 的 CARLA 驾驶事故视频识别系统
 
 - [__CARLA IMU 数据采集平台__](./carla_imu/carla_imu.md) — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档
