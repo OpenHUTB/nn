@@ -328,7 +328,8 @@ if !WAIT_COUNT! geq %MAX_WAIT% (
 REM Wait for 2 seconds before checking again
 echo   Waiting for %PORT%... (Attempt !WAIT_COUNT! of %MAX_WAIT%)
 timeout /t 2 /nobreak >nul
-goto :WAIT_LOOP
+:WAIT_LOOP
+goto :CHECK_TIMER
 
 :START_CARLA
 REM ========================================
