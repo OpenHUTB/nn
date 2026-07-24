@@ -1,0 +1,34 @@
+site_name: MuJoCo ANYmal 四足机器人仿真
+site_url: https://liu-yirun.github.io/nn/
+
+repo_url: https://github.com/Liu-Yirun/nn
+edit_uri: edit/main/docs/
+
+theme:
+  name: readthedocs
+  sticky_navigation: True
+  navigation_depth: 3
+  features:
+    - search.suggest
+
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
+
+plugins:
+  - search:
+      lang: zh
+      separator: '[\s\-\.]+'
+      min_search_length: 3
+
+extra:
+  generator: false
+
+copyright: OpenHUTB 版权所有 © {year}
+
+nav:
+  - 首页: index.md
+
+markdown_extensions:
+  - admonition
+  - mdx_math
+  - tables
