@@ -1,9 +1,10 @@
+import os
 import mujoco
 import mujoco.viewer
 import numpy as np
 
 # 模型路径
-model_path = "src/mujoco01/humanoid.xml"
+model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "humanoid.xml")
 model = mujoco.MjModel.from_xml_path(model_path)
 data = mujoco.MjData(model)
 

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="mode" default="squat" />
+  <node name="mujoco01_node" pkg="mujoco01" type="main.py" output="screen"
+        args="$(arg mode)" />
+</launch>
