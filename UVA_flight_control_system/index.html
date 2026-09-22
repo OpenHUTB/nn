@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/UVA_flight_control_system/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>基于AirSim的无人机飞行控制系统 - 神经网络</title>
+    <title>基于 AirSim 的无人机飞行控制系统 - 神经网络</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "\u57fa\u4e8eAirSim\u7684\u65e0\u4eba\u673a\u98de\u884c\u63a7\u5236\u7cfb\u7edf";
+        var mkdocs_page_name = "\u57fa\u4e8e AirSim \u7684\u65e0\u4eba\u673a\u98de\u884c\u63a7\u5236\u7cfb\u7edf";
         var mkdocs_page_input_path = "UVA_flight_control_system.md";
         var mkdocs_page_url = "/nn/UVA_flight_control_system/";
       </script>
@@ -110,9 +110,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">基于AirSim的无人机飞行控制系统</li>
+      <li class="breadcrumb-item active">基于 AirSim 的无人机飞行控制系统</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/UVA_flight_control_system.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/UVA_flight_control_system.md"> 编辑页面</a>
     </li>
   </ul>
   <hr/>
@@ -120,13 +120,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="airsim">基于AirSim的无人机飞行控制系统</h1>
+                <h1 id="airsim">基于 AirSim 的无人机飞行控制系统</h1>
 <h2 id="_1">摘要</h2>
 <p>本项目设计并实现了一套基于AirSim仿真平台的无人机飞行控制系统。系统以<strong>多旋翼无人机</strong>为控制对象，通过Python接口实现键盘交互式飞行控制，并集成了<strong>多种典型飞行模式</strong>，包括环绕飞行、方形轨迹、螺旋上升和原地旋转等等。同时，针对传统手动控制中存在的安全性与可控性问题，系统引入了自动返航机制，可在任意时刻一键返回起飞点并安全悬停。</p>
 <p>在实现过程中，通过<strong>多线程机制</strong>对各类飞行模式进行异步调度，避免阻塞主控制流程，从而提升系统响应性能；结合速度分级与平滑控制策略，优化了飞行过程的稳定性与流畅性。实验表明，该系统能够在仿真环境中<strong>稳定运行，实现多模式切换与实时控制</strong>，具备良好的可扩展性，可为后续无人机感知避障、路径规划等进阶开发提供稳定可靠的基础框架。</p>
 <h2 id="1">1. 项目背景</h2>
 <h3 id="11">1.1 功能定位</h3>
-<p>UVA_flight_control_system是一个基于<strong>AirSim仿真平台开发</strong>的无人机核心控制模块。该模块作为无人机系统的中枢，负责处理从底层仿真通信到高层自主航迹生成的全流程控制逻辑，主要面向<strong>无人机飞行控制算法验证与基础自主飞行任务开发</strong>。</p>
+<p>UVA_flight_control_system 是一个基于<strong>AirSim仿真平台开发</strong>的无人机核心控制模块。该模块作为无人机系统的中枢，负责处理从底层仿真通信到高层自主航迹生成的全流程控制逻辑，主要面向<strong>无人机飞行控制算法验证与基础自主飞行任务开发</strong>。</p>
 <h4 id="111">1.1.1 系统层级架构</h4>
 <p>无人机飞行控制系统采用分层设计，在仿真环境中构建了清晰的技术栈，从物理仿真到指令执行形成完整的控制闭环，各层级功能如下表所示：</p>
 <table>
@@ -305,7 +305,7 @@ while True:
 </table>
 <h3 id="22">2.2 核心理论基础</h3>
 <h4 id="221">2.2.1 系统整体运行流程</h4>
-<p><img width="450" alt="系统流程图" src="https://github.com/user-attachments/assets/8cfd4940-8560-4552-99a9-25f7f8b8edcf" /></p>
+<p><img alt="" src="../img/flow_chat.png" /></p>
 <h4 id="222">2.2.2 关键算法原理</h4>
 <p><strong>自主巡航轨迹数学模型</strong></p>
 <ul>
@@ -318,10 +318,10 @@ while True:
 </ul>
 <p>
 <script type="math/tex; mode=display">
-x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
-</script>
+  x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
+  </script>
 </p>
-<p>，其中R为盘旋半径，k为上升速率系数，实现匀速盘旋加稳定爬升三维运动。</p>
+<p>其中 R 为盘旋半径，k 为上升速率系数，实现匀速盘旋加稳定爬升三维运动。</p>
 <ul>
 <li>
 <p><strong>NED坐标系映射</strong>：系统严格遵循无人机标准 NED 坐标系规范：</p>
@@ -339,7 +339,7 @@ x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
 <h2 id="3">3. 系统模块设计</h2>
 <p>本系统为了提升代码的可维护性与功能的可扩展性，采用模块化分层设计，构建了 “<strong>通信交互层 - 核心控制层 - 功能实现层</strong>” 三级架构：以飞行控制模块为核心，整合AirSim仿真通信与键盘交互能力，将各类轨迹与安全功能封装为独立可调用的模块，既实现了控制逻辑的解耦，也为后续功能迭代与问题调试提供了便利。</p>
 <h3 id="31">3.1 核心模块概览</h3>
-<p><img width="2191" height="523" alt="核心模块图" src="https://github.com/user-attachments/assets/63232eb7-abb9-40ee-ba11-eb959c29df00" /></p>
+<p><img alt="" src="../img/modules.png" /></p>
 <h3 id="32">3.2 主要函数说明</h3>
 <p>所有功能均封装为独立函数，每个函数实现单一功能，便于调试与维护：</p>
 <table>
@@ -384,75 +384,74 @@ x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
 <p>在项目开发与调试过程中，遇到了多类典型技术问题，如异步指令执行时序异常、异常捕获机制屏蔽底层报错、控制权限生效时序不当等。本节对关键问题进行分析，并给出经调试验证的解决方案，为同类仿真控制项目提供参考。</p>
 <h3 id="41">4.1 无人机执行起飞指令无响应</h3>
 <ul>
-<li><strong>根本原因</strong>：</li>
+<li>
+<p><strong>根本原因</strong>： 原代码中起飞指令未添加<code>.join()</code>阻塞等待，异步指令未执行完成就直接运行后续代码，导致起飞流程中断；且外层包裹冗余<code>try-except</code>代码块，吞掉了底层报错信息，无法定位故障。</p>
+</li>
+<li>
+<p><strong>解决方案</strong>： 移除冗余的<code>try-except</code>异常捕获，避免屏蔽报错；给<code>takeoffAsync()</code>添加<code>.join()</code>，确保起飞指令完整执行后再运行后续高度调节代码；确认API控制与电机解锁步骤顺序无误。</p>
+</li>
 </ul>
-<p>原代码中起飞指令未添加<code>.join()</code>阻塞等待，异步指令未执行完成就直接运行后续代码，导致起飞流程中断；且外层包裹冗余<code>try-except</code>代码块，吞掉了底层报错信息，无法定位故障。</p>
-<ul>
-<li><strong>解决方案</strong>：</li>
-</ul>
-<p>移除冗余的<code>try-except</code>异常捕获，避免屏蔽报错；给<code>takeoffAsync()</code>添加<code>.join()</code>，确保起飞指令完整执行后再运行后续高度调节代码；确认API控制与电机解锁步骤顺序无误。</p>
-<pre><code>   修复前
-   try:
-      client.takeoffAsync()
-      time.sleep(2)
-      client.moveToZAsync(HEIGHT, 1).join()
-   except:
-      pass
-
-   修复后
-   client.takeoffAsync().join()
-   time.sleep(2)
-   client.moveToZAsync(HEIGHT, 1).join()
+<p>修复前：</p>
+<pre><code class="language-python">try:
+  client.takeoffAsync()
+  time.sleep(2)
+  client.moveToZAsync(HEIGHT, 1).join()
+except:
+  pass
 </code></pre>
-<p><img width="1280" height="642" alt="平稳飞行512" src="https://github.com/user-attachments/assets/c62730be-1c40-419d-9e4c-e94b18f254b2" /></p>
+<p>修复后：</p>
+<pre><code class="language-python">client.takeoffAsync().join()
+time.sleep(2)
+client.moveToZAsync(HEIGHT, 1).join()
+</code></pre>
+<p><img alt="" src="../img/shake.gif" /></p>
 <h3 id="42">4.2 飞行时抖动严重</h3>
 <ul>
-<li><strong>根本原因</strong>：</li>
+<li>
+<p><strong>根本原因</strong>： 原代码直接采用固定速度调用<code>moveByVelocityBodyFrameAsync</code>，无平滑系数处理，指令下发频率过高且速度突变；同时缺少速度分级机制，操控力度无法适配精细飞行需求。</p>
+</li>
+<li>
+<p><strong>解决方案</strong>： 新增平滑系数smooth与三级速度倍率数组speed_ratio，动态计算实时飞行速度，避免速度突变；优化指令下发时长参数，让速度过渡更平缓，模拟真实无人机惯性。</p>
+</li>
 </ul>
-<p>原代码直接采用固定速度调用<code>moveByVelocityBodyFrameAsync</code>，无平滑系数处理，指令下发频率过高且速度突变；同时缺少速度分级机制，操控力度无法适配精细飞行需求。</p>
-<ul>
-<li><strong>解决方案</strong>：</li>
-</ul>
-<p>新增平滑系数smooth与三级速度倍率数组speed_ratio，动态计算实时飞行速度，避免速度突变；优化指令下发时长参数，让速度过渡更平缓，模拟真实无人机惯性。</p>
-<pre><code>   核心修复代码片段：
-   # 新增平滑与调速参数
+<p>核心修复代码片段：</p>
+<pre><code class="language-python">   # 新增平滑与调速参数
    smooth = 0.5
    speed_level = 2
    speed_ratio = [0.6, 1.0, 1.6]
-
    # 优化后速度计算
    now_speed = SPEED * speed_ratio[speed_level - 1] * smooth
    client.moveByVelocityBodyFrameAsync(now_speed,0,0,0.1)
 </code></pre>
-<p><img width="1280" height="642" alt="平稳飞行512" src="https://github.com/user-attachments/assets/c62730be-1c40-419d-9e4c-e94b18f254b2" />  </p>
+<p><img alt="" src="../img/smooth_fly.gif" /></p>
 <h3 id="43">4.3 按下自动返航键无人机无反应</h3>
 <ul>
-<li><strong>根本原因</strong>：</li>
+<li>
+<p><strong>根本原因</strong>：自动返航函数<code>auto_return_home</code>直接在主线程中执行，返航过程会持续阻塞键盘监听与控制流程，导致界面卡死、指令无法响应，属于单线程架构缺陷。</p>
+</li>
+<li>
+<p><strong>解决方案</strong>：将自动返航函数封装为独立守护线程，与主线程分离运行，避免阻塞键盘监听与主控制流程，实现返航过程中仍可正常响应操控指令。</p>
+</li>
 </ul>
-<p>自动返航函数<code>auto_return_home</code>直接在主线程中执行，返航过程会持续阻塞键盘监听与控制流程，导致界面卡死、指令无法响应，属于单线程架构缺陷。</p>
-<ul>
-<li><strong>解决方案</strong>：</li>
-</ul>
-<p>将自动返航函数封装为独立守护线程，与主线程分离运行，避免阻塞键盘监听与主控制流程，实现返航过程中仍可正常响应操控指令。</p>
-<pre><code>  # 修复前
-  if key.char == 'b':
-      auto_return_home()
-
-  # 修复后
-  if key.char == 'b':
-      threading.Thread(target=auto_return_home, daemon=True).start()
+<p>修复前：</p>
+<pre><code class="language-python">if key.char == 'b':
+    auto_return_home()
 </code></pre>
-<p><img width="1280" height="640" alt="返航512" src="https://github.com/user-attachments/assets/c8f5cbc9-9af9-4e8e-9063-4eb2df2b62b4" /></p>
+<p>修复后：</p>
+<pre><code class="language-python">if key.char == 'b':
+    threading.Thread(target=auto_return_home, daemon=True).start()
+</code></pre>
+<p><img alt="" src="../img/homeward.gif" /></p>
 <h3 id="44">4.4 自动轨迹模式运行时，键盘操控失灵无响应</h3>
 <ul>
-<li><strong>根本原因</strong>：</li>
+<li>
+<p><strong>根本原因</strong>： 原自动轨迹函数直接在主线程运行，持续占用主线程资源，阻塞键盘监听逻辑，导致按键指令无法被正常捕获与执行，属于单线程架构缺陷。</p>
+</li>
+<li>
+<p><strong>解决方案</strong>：采用多线程异步架构，将所有自动轨迹函数封装为独立守护线程，与键盘监听主线程分离运行，实现自动飞行与手动操控无缝切换，手动指令可随时打断自动轨迹。</p>
+</li>
 </ul>
-<p>原自动轨迹函数直接在主线程运行，持续占用主线程资源，阻塞键盘监听逻辑，导致按键指令无法被正常捕获与执行，属于单线程架构缺陷。</p>
-<ul>
-<li><strong>解决方案</strong>：</li>
-</ul>
-<p>采用多线程异步架构，将所有自动轨迹函数封装为独立守护线程，与键盘监听主线程分离运行，实现自动飞行与手动操控无缝切换，手动指令可随时打断自动轨迹。</p>
-<pre><code>  # 独立线程启动自动轨迹
+<pre><code class="language-python">  # 独立线程启动自动轨迹
   def start_orbit():
       threading.Thread(target=orbit_mode, daemon=True).start()
 
@@ -460,7 +459,7 @@ x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
   if key.char == 'o': start_orbit()
   if key.char == 'm': start_square()
 </code></pre>
-<p><img width="1280" height="640" alt="环形512" src="https://github.com/user-attachments/assets/5eda9d8f-a704-414f-b4e1-e77f8da2e564" /></p>
+<p><img alt="" src="../img/curcle.gif" /></p>
 <h2 id="5">5. 系统运行效果</h2>
 <h3 id="51">5.1 运行环境</h3>
 <table>
@@ -557,11 +556,11 @@ x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
 <h3 id="54">5.4 运行效果</h3>
 <p>下面是部分功能的运行效果展示：</p>
 <h4 id="541">5.4.1 螺旋上升</h4>
-<p><img width="1280" height="564" alt="螺旋上升512" src="https://github.com/user-attachments/assets/292797e2-06bd-4199-9432-1d5999fb09b5" /></p>
+<p><img alt="" src="../img/spine.gif" /></p>
 <h4 id="542">5.4.2 原地旋转</h4>
-<p><img width="1280" height="632" alt="原地旋转512" src="https://github.com/user-attachments/assets/15a7ae42-f60b-413e-9dc9-b26501fd7218" /></p>
+<p><img alt="" src="../img/spin_in_place.gif" /></p>
 <h4 id="543">5.4.3 切换飞行速度</h4>
-<p><img width="1280" height="632" alt="变速512" src="https://github.com/user-attachments/assets/3c98c691-9f1c-40e2-a330-a3a0ffb1512c" /></p>
+<p><img alt="" src="../img/switch_speed.gif" /></p>
 <h2 id="6">6. 功能扩展与未来规划</h2>
 <p>在现有基础飞行控制能力之上，本系统仍有较大的扩展空间。未来将围绕环境感知、路径规划、视觉任务与数据可视化四个方向持续迭代，逐步构建更智能、更稳定的无人机控制体系，为后续复杂场景下的算法验证与应用开发提供更完善的平台支撑。</p>
 <ul>
@@ -598,7 +597,7 @@ x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
   <span class="rst-current-version" data-toggle="rst-current-version">
     
         <span>
-          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
         </span>
     
     
