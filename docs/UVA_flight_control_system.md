@@ -1,4 +1,4 @@
-# 基于AirSim的无人机飞行控制系统
+# 基于 AirSim 的无人机飞行控制系统
 ## 摘要
 本项目设计并实现了一套基于AirSim仿真平台的无人机飞行控制系统。系统以**多旋翼无人机**为控制对象，通过Python接口实现键盘交互式飞行控制，并集成了**多种典型飞行模式**，包括环绕飞行、方形轨迹、螺旋上升和原地旋转等等。同时，针对传统手动控制中存在的安全性与可控性问题，系统引入了自动返航机制，可在任意时刻一键返回起飞点并安全悬停。
 
@@ -6,7 +6,7 @@
 
 ## 1. 项目背景
 ### 1.1 功能定位
-UVA_flight_control_system是一个基于**AirSim仿真平台开发**的无人机核心控制模块。该模块作为无人机系统的中枢，负责处理从底层仿真通信到高层自主航迹生成的全流程控制逻辑，主要面向**无人机飞行控制算法验证与基础自主飞行任务开发**。
+UVA_flight_control_system 是一个基于**AirSim仿真平台开发**的无人机核心控制模块。该模块作为无人机系统的中枢，负责处理从底层仿真通信到高层自主航迹生成的全流程控制逻辑，主要面向**无人机飞行控制算法验证与基础自主飞行任务开发**。
 #### 1.1.1 系统层级架构
 无人机飞行控制系统采用分层设计，在仿真环境中构建了清晰的技术栈，从物理仿真到指令执行形成完整的控制闭环，各层级功能如下表所示：
 
@@ -145,7 +145,7 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
 
 ### 2.2 核心理论基础
 #### 2.2.1 系统整体运行流程
-<img width="450" alt="系统流程图" src="https://github.com/user-attachments/assets/8cfd4940-8560-4552-99a9-25f7f8b8edcf" />
+![](./img/flow_chat.png)
 
 #### 2.2.2 关键算法原理
 **自主巡航轨迹数学模型**
@@ -154,11 +154,11 @@ Threading|多线程并发处理，分离手动操控与自动轨迹任务
 
 - **螺旋上升轨迹**：融合极坐标变换与高度增量控制，定时更新平面坐标与垂直高度
   
-$$
-x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
-$$
+  $$
+  x=R \cos(\omega t),\quad y=R \sin(\omega t),\quad z=z_0-kt
+  $$
   
-，其中R为盘旋半径，k为上升速率系数，实现匀速盘旋加稳定爬升三维运动。
+其中 R 为盘旋半径，k 为上升速率系数，实现匀速盘旋加稳定爬升三维运动。
 
 - **NED坐标系映射**：系统严格遵循无人机标准 NED 坐标系规范：
   
@@ -179,7 +179,7 @@ $$
 本系统为了提升代码的可维护性与功能的可扩展性，采用模块化分层设计，构建了 “**通信交互层 - 核心控制层 - 功能实现层**” 三级架构：以飞行控制模块为核心，整合AirSim仿真通信与键盘交互能力，将各类轨迹与安全功能封装为独立可调用的模块，既实现了控制逻辑的解耦，也为后续功能迭代与问题调试提供了便利。
 ### 3.1 核心模块概览
 
-<img width="2191" height="523" alt="核心模块图" src="https://github.com/user-attachments/assets/63232eb7-abb9-40ee-ba11-eb959c29df00" />
+![](./img/modules.png)
 
 ### 3.2 主要函数说明
   所有功能均封装为独立函数，每个函数实现单一功能，便于调试与维护：
@@ -197,82 +197,70 @@ $$
 ## 4. 开发关键问题与技术解决方案
   在项目开发与调试过程中，遇到了多类典型技术问题，如异步指令执行时序异常、异常捕获机制屏蔽底层报错、控制权限生效时序不当等。本节对关键问题进行分析，并给出经调试验证的解决方案，为同类仿真控制项目提供参考。
 ### 4.1 无人机执行起飞指令无响应
-- **根本原因**：
+- **根本原因**： 原代码中起飞指令未添加`.join()`阻塞等待，异步指令未执行完成就直接运行后续代码，导致起飞流程中断；且外层包裹冗余`try-except`代码块，吞掉了底层报错信息，无法定位故障。
 
-  原代码中起飞指令未添加`.join()`阻塞等待，异步指令未执行完成就直接运行后续代码，导致起飞流程中断；且外层包裹冗余`try-except`代码块，吞掉了底层报错信息，无法定位故障。
+- **解决方案**： 移除冗余的`try-except`异常捕获，避免屏蔽报错；给`takeoffAsync()`添加`.join()`，确保起飞指令完整执行后再运行后续高度调节代码；确认API控制与电机解锁步骤顺序无误。
 
-- **解决方案**：
-
-  移除冗余的`try-except`异常捕获，避免屏蔽报错；给`takeoffAsync()`添加`.join()`，确保起飞指令完整执行后再运行后续高度调节代码；确认API控制与电机解锁步骤顺序无误。
-  
-```
-   修复前
-   try:
-      client.takeoffAsync()
-      time.sleep(2)
-      client.moveToZAsync(HEIGHT, 1).join()
-   except:
-      pass
-   
-   修复后
-   client.takeoffAsync().join()
-   time.sleep(2)
-   client.moveToZAsync(HEIGHT, 1).join()
+修复前：
+```python
+try:
+  client.takeoffAsync()
+  time.sleep(2)
+  client.moveToZAsync(HEIGHT, 1).join()
+except:
+  pass
 ```
 
-   <img width="1280" height="642" alt="平稳飞行512" src="https://github.com/user-attachments/assets/c62730be-1c40-419d-9e4c-e94b18f254b2" />
+修复后：
+```python
+client.takeoffAsync().join()
+time.sleep(2)
+client.moveToZAsync(HEIGHT, 1).join()
+```
+
+![](./img/shake.gif)
 
 ### 4.2 飞行时抖动严重
-- **根本原因**：
-  
-  原代码直接采用固定速度调用`moveByVelocityBodyFrameAsync`，无平滑系数处理，指令下发频率过高且速度突变；同时缺少速度分级机制，操控力度无法适配精细飞行需求。
+- **根本原因**： 原代码直接采用固定速度调用`moveByVelocityBodyFrameAsync`，无平滑系数处理，指令下发频率过高且速度突变；同时缺少速度分级机制，操控力度无法适配精细飞行需求。
 
-- **解决方案**：
+- **解决方案**： 新增平滑系数smooth与三级速度倍率数组speed_ratio，动态计算实时飞行速度，避免速度突变；优化指令下发时长参数，让速度过渡更平缓，模拟真实无人机惯性。
 
-  新增平滑系数smooth与三级速度倍率数组speed_ratio，动态计算实时飞行速度，避免速度突变；优化指令下发时长参数，让速度过渡更平缓，模拟真实无人机惯性。
-```
-   核心修复代码片段：
+核心修复代码片段：
+```python
    # 新增平滑与调速参数
    smooth = 0.5
    speed_level = 2
    speed_ratio = [0.6, 1.0, 1.6]
-  
    # 优化后速度计算
    now_speed = SPEED * speed_ratio[speed_level - 1] * smooth
    client.moveByVelocityBodyFrameAsync(now_speed,0,0,0.1)
 ```
-   <img width="1280" height="642" alt="平稳飞行512" src="https://github.com/user-attachments/assets/c62730be-1c40-419d-9e4c-e94b18f254b2" />  
+![](./img/smooth_fly.gif)
 
 ### 4.3 按下自动返航键无人机无反应
-- **根本原因**：
+- **根本原因**：自动返航函数`auto_return_home`直接在主线程中执行，返航过程会持续阻塞键盘监听与控制流程，导致界面卡死、指令无法响应，属于单线程架构缺陷。
 
-  自动返航函数`auto_return_home`直接在主线程中执行，返航过程会持续阻塞键盘监听与控制流程，导致界面卡死、指令无法响应，属于单线程架构缺陷。
+- **解决方案**：将自动返航函数封装为独立守护线程，与主线程分离运行，避免阻塞键盘监听与主控制流程，实现返航过程中仍可正常响应操控指令。
 
-- **解决方案**：
-
-  将自动返航函数封装为独立守护线程，与主线程分离运行，避免阻塞键盘监听与主控制流程，实现返航过程中仍可正常响应操控指令。
-```
-  # 修复前
-  if key.char == 'b':
-      auto_return_home()
-  
-  # 修复后
-  if key.char == 'b':
-      threading.Thread(target=auto_return_home, daemon=True).start()
+修复前：
+```python
+if key.char == 'b':
+    auto_return_home()
+```  
+修复后：
+```python
+if key.char == 'b':
+    threading.Thread(target=auto_return_home, daemon=True).start()
 ```
 
- <img width="1280" height="640" alt="返航512" src="https://github.com/user-attachments/assets/c8f5cbc9-9af9-4e8e-9063-4eb2df2b62b4" />
+![](./img/homeward.gif)
 
   
 ### 4.4 自动轨迹模式运行时，键盘操控失灵无响应
-- **根本原因**：
-
-  原自动轨迹函数直接在主线程运行，持续占用主线程资源，阻塞键盘监听逻辑，导致按键指令无法被正常捕获与执行，属于单线程架构缺陷。
+- **根本原因**： 原自动轨迹函数直接在主线程运行，持续占用主线程资源，阻塞键盘监听逻辑，导致按键指令无法被正常捕获与执行，属于单线程架构缺陷。
   
-- **解决方案**：
-
-  采用多线程异步架构，将所有自动轨迹函数封装为独立守护线程，与键盘监听主线程分离运行，实现自动飞行与手动操控无缝切换，手动指令可随时打断自动轨迹。
-```
+- **解决方案**：采用多线程异步架构，将所有自动轨迹函数封装为独立守护线程，与键盘监听主线程分离运行，实现自动飞行与手动操控无缝切换，手动指令可随时打断自动轨迹。
+```python
   # 独立线程启动自动轨迹
   def start_orbit():
       threading.Thread(target=orbit_mode, daemon=True).start()
@@ -282,9 +270,10 @@ $$
   if key.char == 'm': start_square()
 ```
 
- <img width="1280" height="640" alt="环形512" src="https://github.com/user-attachments/assets/5eda9d8f-a704-414f-b4e1-e77f8da2e564" />
+![](./img/curcle.gif)
 
 ## 5. 系统运行效果
+
 ### 5.1 运行环境
 |项目|配置参数|
 | ---- | ---- |
@@ -318,17 +307,17 @@ $$
 下面是部分功能的运行效果展示：
 #### 5.4.1 螺旋上升
 
-<img width="1280" height="564" alt="螺旋上升512" src="https://github.com/user-attachments/assets/292797e2-06bd-4199-9432-1d5999fb09b5" />
+![](./img/spine.gif)
 
 
 #### 5.4.2 原地旋转
 
-<img width="1280" height="632" alt="原地旋转512" src="https://github.com/user-attachments/assets/15a7ae42-f60b-413e-9dc9-b26501fd7218" />
+![](./img/spin_in_place.gif)
 
 
 #### 5.4.3 切换飞行速度
 
-<img width="1280" height="632" alt="变速512" src="https://github.com/user-attachments/assets/3c98c691-9f1c-40e2-a330-a3a0ffb1512c" />
+![](./img/switch_speed.gif)
 
 
 ## 6. 功能扩展与未来规划
