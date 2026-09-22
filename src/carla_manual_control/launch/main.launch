@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="host" default="localhost" />
+  <arg name="port" default="2000" />
+  <node name="carla_manual_control_node" pkg="carla_manual_control"
+        type="main.py" output="screen"
+        args="--host=$(arg host) --port=$(arg port)" />
+</launch>
