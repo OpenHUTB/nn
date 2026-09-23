@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/robot_arm/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Franka Panda 机械臂自动抓取仿真项目 - 神经网络</title>
+    <title>Franka Panda 机械臂自动抓取仿真 - 神经网络</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Franka Panda \u673a\u68b0\u81c2\u81ea\u52a8\u6293\u53d6\u4eff\u771f\u9879\u76ee";
+        var mkdocs_page_name = "Franka Panda \u673a\u68b0\u81c2\u81ea\u52a8\u6293\u53d6\u4eff\u771f";
         var mkdocs_page_input_path = "robot_arm/README.md";
         var mkdocs_page_url = "/nn/robot_arm/";
       </script>
@@ -110,7 +110,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Franka Panda 机械臂自动抓取仿真项目</li>
+      <li class="breadcrumb-item active">Franka Panda 机械臂自动抓取仿真</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenHUTB/nn/edit/main/docs/robot_arm/README.md"> 编辑页面</a>
     </li>
@@ -120,11 +120,11 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="franka-panda">Franka Panda 机械臂自动抓取仿真项目</h1>
+                <h1 id="franka-panda">Franka Panda 机械臂自动抓取仿真</h1>
 <h2 id="_1">一、项目概述</h2>
-<p>本项目基于MuJoCo 高精度物理仿真引擎与 Python 语言开发，实现 Franka Panda 自由度协作机械臂全自动抓取搬运仿真系统，是基础抓取程序的全面优化升级版本。</p>
-<p>系统依托运动学逆解、雅可比伪逆算法、PD 力矩闭环控制与分段状态机逻辑，完成目标立方体定位、精准抓取、稳定抬升、定点放置、机械臂自动复位全流程无人化作业。同时加入目标位置随机扰动、抓取接触校验、失败自动重试、运动姿态约束、阶段超时防护等增强功能，大幅提升仿真系统鲁棒性与实际工程贴合度，可用于机器人运动控制算法验证、机械臂抓取策略调试、高校机器人课程实训、工业抓取场景预仿真等场景。</p>
-<p>项目摒弃基础版本仅位置控制、姿态偏移、抓取易脱落、程序易卡死等缺陷，实现末端执行器6 自由度位姿同步控制，运动平稳无抖动，抓取成功率高，代码模块化程度高，便于二次开发与算法迭代。</p>
+<p>本项目基于 MuJoCo 高精度物理仿真引擎与 Python 语言开发，实现 Franka Panda 自由度协作机械臂<strong>全自动抓取搬运</strong>仿真系统，是基础抓取程序的全面优化升级版本。</p>
+<p>系统依托<strong>运动学逆解、雅可比伪逆算法、PD 力矩闭环控制与分段状态机逻辑</strong>，完成目标立方体定位、精准抓取、稳定抬升、定点放置、机械臂自动复位全流程无人化作业。同时加入目标位置随机扰动、抓取接触校验、失败自动重试、运动姿态约束、阶段超时防护等增强功能，<strong>大幅提升仿真系统鲁棒性与实际工程贴合度</strong>，可用于机器人运动控制算法验证、机械臂抓取策略调试、高校机器人课程实训、工业抓取场景预仿真等场景。</p>
+<p>项目摒弃基础版本仅位置控制、姿态偏移、抓取易脱落、程序易卡死等缺陷，实现末端执行器 6 自由度位姿同步控制，运动平稳无抖动，<strong>抓取成功率高</strong>，代码模块化程度高，便于二次开发与算法迭代。</p>
 <h2 id="_2">二、开发环境与技术栈</h2>
 <h3 id="1">1 技术栈</h3>
 <ul>
@@ -151,7 +151,7 @@
 <li>仿真建模：MJCF 机器人场景建模</li>
 </ul>
 <h2 id="_3">三、整体系统架构</h2>
-<p>项目采用面向对象编程设计，以<code>PandaAutoGrab</code>为主控制类，整体划分为六大功能模块，模块间低耦合高内聚：</p>
+<p>项目采用面向对象编程设计，以<code>PandaAutoGrab</code>为主控制类，整体划分为六大功能模块，模块间<strong>低耦合高内聚</strong>：</p>
 <ul>
 <li><strong>模型加载与异常处理模块</strong>：自动匹配 XML 场景路径，捕获模型缺失、语法错误等异常，初始化机械臂关节、夹爪、末端执行器参数</li>
 <li><strong>场景随机扰动模块</strong>：仿真启动时自动给立方体添加 XY 方向随机位置偏移，模拟真实场景目标摆放偏差，测试算法容错能力</li>
@@ -229,8 +229,8 @@ for i in range(self.model.nu):
 </code></pre>
 <h1 id="_5">五、核心控制原理</h1>
 <h3 id="1_1">1. 阻尼最小二乘法逆运动学求解</h3>
-<p>本项目采用<strong>阻尼最小二乘法（Damped Least Squares, DLS）</strong>求解逆运动学，避免雅可比矩阵奇异，实现末端6D位姿的平滑控制。</p>
-<p>首先，通过MuJoCo内置接口求解末端的位置雅可比矩阵 $\boldsymbol{J}_p$ 与姿态雅可比矩阵 $\boldsymbol{J}_r$，拼接得到6维任务空间雅可比矩阵：</p>
+<p>本项目采用 <strong>阻尼最小二乘法（Damped Least Squares, DLS）</strong> 求解逆运动学，避免雅可比矩阵奇异，实现末端6D位姿的平滑控制。</p>
+<p>首先，通过 MuJoCo 内置接口求解末端的位置雅可比矩阵 $\boldsymbol{J}_p$ 与姿态雅可比矩阵 $\boldsymbol{J}_r$，拼接得到 6 维任务空间雅可比矩阵：</p>
 <p>
 <script type="math/tex; mode=display">\boldsymbol{J} = [\boldsymbol{J}_p \ ; \ \boldsymbol{J}_r] \in \mathbb{R}^{6 \times 7}</script>
 </p>
