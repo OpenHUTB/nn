@@ -1,10 +1,11 @@
+import os
 import time
 import csv
 import mujoco
 from mujoco import viewer
 
 def main():
-    model_path = "src/mujoco01/humanoid.xml"
+    model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "humanoid.xml")
     try:
         model = mujoco.MjModel.from_xml_path(model_path)
     except Exception as e:
