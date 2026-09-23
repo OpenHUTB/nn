@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/humanoid_balance/Humanoid_Balance/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>基于强化学习的人形机器人平衡控制仿真 - 神经网络</title>
+    <title>基于基于软演员-评论家（SAC）深度强化学习的人形机器人平衡控制仿真 - 神经网络</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "\u57fa\u4e8e\u5f3a\u5316\u5b66\u4e60\u7684\u4eba\u5f62\u673a\u5668\u4eba\u5e73\u8861\u63a7\u5236\u4eff\u771f";
+        var mkdocs_page_name = "\u57fa\u4e8e\u57fa\u4e8e\u8f6f\u6f14\u5458-\u8bc4\u8bba\u5bb6\uff08SAC\uff09\u6df1\u5ea6\u5f3a\u5316\u5b66\u4e60\u7684\u4eba\u5f62\u673a\u5668\u4eba\u5e73\u8861\u63a7\u5236\u4eff\u771f";
         var mkdocs_page_input_path = "humanoid_balance/Humanoid_Balance.md";
         var mkdocs_page_url = "/nn/humanoid_balance/Humanoid_Balance/";
       </script>
@@ -110,7 +110,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">基于强化学习的人形机器人平衡控制仿真</li>
+      <li class="breadcrumb-item active">基于基于软演员-评论家（SAC）深度强化学习的人形机器人平衡控制仿真</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenHUTB/nn/edit/main/docs/humanoid_balance/Humanoid_Balance.md"> 编辑页面</a>
     </li>
@@ -120,7 +120,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="_1">基于强化学习的人形机器人平衡控制仿真</h1>
+                <h1 id="-sac">基于基于软演员-评论家（SAC）深度强化学习的人形机器人平衡控制仿真</h1>
 <h2 id="1">1 项目概述</h2>
 <p>本项目面向高自由度人形机器人的动态平衡与行走控制需求，基于软演员 - 评论家（SAC）深度强化学习算法，在 MuJoCo 高精度物理仿真环境中完成核心策略的训练与部署。针对人形机器人控制场景下的核心痛点 ——376 维高维观测空间的策略学习效率、MuJoCo 跨版本（v3/v4）环境兼容性、预训练权重跨环境加载适配 —— 进行系统性工程化攻关。最终实现机器人从 “原地高频抖动” 到稳定站立，并具备初步行走能力的核心目标，为复杂运动控制（如跑步、上下台阶）奠定可复现、可扩展的技术基础。</p>
 <h2 id="2">2 项目目标</h2>
@@ -279,10 +279,7 @@ critic.load_state_dict(model_weights[&quot;critic&quot;], strict=False)
 <h2 id="5">5 系统技术架构</h2>
 <h3 id="51">5.1整体架构（三层闭环）</h3>
 <p>本项目采用典型的“环境-模型-部署”三层架构：</p>
-<div align="center">
-  <img width="626" height="1093" alt="image" src="https://github.com/user-attachments/assets/7c587cf0-e835-461b-8bbd-6d80d5e27578" /><p>图1 系统整体三层架构图</p>
-</div>
-
+<p><img alt="" src="../img/architecture.png" /></p>
 <h3 id="52">5.2 核心模块职责</h3>
 <table>
 <thead>
@@ -399,12 +396,11 @@ critic.load_state_dict(model_weights[&quot;critic&quot;], strict=False)
 </table>
 <h3 id="63">6.3 可视化结果</h3>
 <p>优化前后机器人运动状态对比图如下：</p>
-<div align="center">
-<img width="1439" height="980" alt="image" src="https://github.com/user-attachments/assets/22c0ee59-d417-4261-8d4c-78411e7c126f" /><p>图2 优化前：机器人无法稳定站立，原地高频抖动</p> 
+<p><img alt="" src="../img/shake.png" /></p>
+<p>图2 优化前：机器人无法稳定站立，原地高频抖动</p>
 
-<img width="1084" height="846" alt="image" src="https://github.com/user-attachments/assets/53c4f874-4fff-4e93-9824-364c316a64a6" /><p>图3 优化后：机器人稳定站立并完成小步行走</p>
-</div>
-
+<p><img width="1084" height="846" alt="image" src="https://github.com/user-attachments/assets/53c4f874-4fff-4e93-9824-364c316a64a6" /><p>图3 优化后：机器人稳定站立并完成小步行走</p>
+</div></p>
 <h3 id="64">6.4 关键优化手段效果</h3>
 <table>
 <thead>
