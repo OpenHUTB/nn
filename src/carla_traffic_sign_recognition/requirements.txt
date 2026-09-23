@@ -1,0 +1,7 @@
+hutb==2.9.16
+torch==2.14.0
+torchvision==0.29.0
+ultralytics==8.4.160
+opencv-python==5.0.0
+numpy==2.2.6
+pillow
