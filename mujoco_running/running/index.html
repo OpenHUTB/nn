@@ -157,8 +157,6 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#9">9. 项目总结</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#sim2real">本系统同时具备工程应用价值和算法研究价值，既可以作为人形机器人运动控制的一个稳定基线，也可以用于残差强化学习、Sim2Real 迁移等方向的算法实验。希望这个项目课可以给你带来一点思考和研究价值。</a>
-    </li>
     <li class="toctree-l2"><a class="reference internal" href="#_1">参考文献</a>
     </li>
     </ul>
@@ -216,7 +214,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="cpgpdsac">基于 CPG+PD+SAC残差强化学习的人形机器人行走仿真</h1>
+                <h1 id="cpgpdsac">基于 CPG+PD+SAC 残差强化学习的人形机器人行走仿真</h1>
 <h2 id="1">1. 项目概述</h2>
 <h3 id="11">1.1 项目简介</h3>
 <p>本项目基于 MuJoCo 物理仿真平台，搭建了一套 <strong>CPG周期步态生成 + IMU姿态PID稳定 + 足底力自适应PD控制 + SAC残差强化学习微调</strong> 的分层人形机器人控制系统。区别于传统纯规则控制方案，本项目以手工稳定控制为基线，引入残差强化学习，让SAC强化学习模型仅输出微小关节补偿增量，修正传统CPG步态的抖动、偏移、稳定性不足问题。</p>
@@ -653,7 +651,7 @@ model.learn(total_timesteps=100000, callback=GradientClipCallback(clip_val=0.5))
 </code></pre>
 <h3 id="57">5.7 低通滤波降噪</h3>
 <p>对 IMU 姿态角、机身角速度做一阶低通滤波，滤除仿真高频噪声，避免控制高频抖动。</p>
-<pre><code>class LowPassFilter:
+<pre><code class="language-python">class LowPassFilter:
     def __init__(self, alpha=0.2):
         &quot;&quot;&quot;
         一阶低通滤波器
@@ -693,7 +691,7 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
 
 <p><strong>原因</strong>：因为CPG步态中的动态俯仰补偿逻辑不合理，加上腰部PD刚度过低，所以导致迈步时身体向后弯曲。二是手臂不受控制地大幅上抬，摆动幅度过大，反向拉扯上身进一步加剧后仰倾倒，是肩部关节基准坐标偏高且手臂CPG摆动幅值过大导致的。</p>
 <p><strong>解决</strong>：针对躯干问题，将 <code>abdomen_x</code> 俯仰基准值锁定为0，移除所有速度或误差驱动的前倾后仰动态增量；同时大幅提高腰部abdomen三轴PD刚度，对躯干形态进行刚性约束；并在姿态控制环中叠加俯仰积分纠偏力矩，主动拉回竖直姿态，效果如图2所示。针对手臂问题，强制下沉肩部静态基准偏移量，大幅压缩手臂左右摆动幅度；设置肘部固定下垂弯曲角度，提高手臂关节PD增益以限制抬升自由度，并彻底隔绝步态信号对手臂抬升方向的驱动。</p>
-<p><img alt="倾斜图" src="../image/astro_recline%20.png" /></p>
+<p><img alt="倾斜图" src="../image/astro_recline.png" /></p>
 <p align="center" style="font-size:10px;">图2 修正后躯干基本保持竖直</p>
 
 <h3 id="62-2sacrl">6.2 难点2：SAC残差RL扰动破坏基础稳定姿态</h3>
@@ -771,7 +769,7 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
 <li>支持前后行走、左右转向、平滑启停</li>
 <li>SAC 模型加载后步态更平顺、抗扰动更强</li>
 <li>接收 ROS 远程指令，可适配机器人自动驾驶系统
-<img alt="运行效果" src="../image/stand-stance%20.png" />
+<img alt="运行效果" src="../image/stand-stance.png" />
 <img alt="运行效果" src="../image/mince.png" />
 <img alt="运行效果" src="../image/march.png" /></li>
 </ul>
@@ -784,7 +782,8 @@ filtered_yaw_rate = yaw_rate_filter.filter(raw_yaw_rate)
 <hr />
 <h2 id="9">9. 项目总结</h2>
 <p>本项目建设了一套基于 CPG 仿生步态、自适应 PD/PID 稳定控制和 SAC 残差强化学习的分层人形机器人控制系统。相比纯规则控制方法，本系统引入了强化学习残差微调，提升了步态的自然度和适应性；相比纯强化学习方法，底层规则控制器提供了稳定性兜底，避免了训练过程中的频繁崩溃。通过一系列工程优化，解决了 MuJoCo 仿真中常见的关节索引错位、控制指令无效、开局摔倒和步态抖动等问题，最终实现了稳定站立、多模式行走、实时交互和 AI 步态优化的完整闭环。</p>
-<h2 id="sim2real">本系统同时具备工程应用价值和算法研究价值，既可以作为人形机器人运动控制的一个稳定基线，也可以用于残差强化学习、Sim2Real 迁移等方向的算法实验。希望这个项目课可以给你带来一点思考和研究价值。</h2>
+<p>本系统同时具备工程应用价值和算法研究价值，既可以作为人形机器人运动控制的一个稳定基线，也可以用于残差强化学习、Sim2Real 迁移等方向的算法实验。希望这个项目可以给你带来一点思考和研究价值。</p>
+<hr />
 <h2 id="_1">参考文献</h2>
 <p>[1] 林宇舜,李杰,陈之焕,等. 结合评价模型与多Q值SAC的交叉口信号控制方法[J/OL].福州大学学报(自然科学版),1-8[2026-06-12].https://link.cnki.net/urlid/35.1337.N.20260511.1404.004.
 [2] 钱姜枚,李唯唯. SCMRec：基于SAC与对比学习的多模态推荐[J/OL].软件导刊,1-8[2026-06-12].https://link.cnki.net/urlid/42.1671.TP.20260414.1404.027.
