@@ -1,4 +1,4 @@
-# 基于强化学习的人形机器人平衡控制仿真
+# 基于基于软演员-评论家（SAC）深度强化学习的人形机器人平衡控制仿真
 
 
 ## 1 项目概述
@@ -156,9 +156,7 @@ critic.load_state_dict(model_weights["critic"], strict=False)
 ### 5.1整体架构（三层闭环）
 本项目采用典型的“环境-模型-部署”三层架构：
   
-<div align="center">
-  <img width="626" height="1093" alt="image" src="https://github.com/user-attachments/assets/7c587cf0-e835-461b-8bbd-6d80d5e27578" /><p>图1 系统整体三层架构图</p>
-</div>
+![](./img/architecture.png)
 
 ### 5.2 核心模块职责
    | 模块名              | 核心输入                  | 核心输出              | 关键功能                                       |
@@ -195,8 +193,8 @@ critic.load_state_dict(model_weights["critic"], strict=False)
 ### 6.3 可视化结果
 优化前后机器人运动状态对比图如下：
 
-<div align="center">
-<img width="1439" height="980" alt="image" src="https://github.com/user-attachments/assets/22c0ee59-d417-4261-8d4c-78411e7c126f" /><p>图2 优化前：机器人无法稳定站立，原地高频抖动</p> 
+![](./img/shake.png)
+<p>图2 优化前：机器人无法稳定站立，原地高频抖动</p> 
 
 <img width="1084" height="846" alt="image" src="https://github.com/user-attachments/assets/53c4f874-4fff-4e93-9824-364c316a64a6" /><p>图3 优化后：机器人稳定站立并完成小步行走</p>
 </div>

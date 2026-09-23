@@ -78,8 +78,6 @@ title: 主页
 
 - [__碰撞自恢复的无人机双模式飞行控制系统__](./drone_flight_sim/README.md) - 基于航点跟踪 + 碰撞自恢复的无人机双模式飞行控制系统
 
-- [__人形机器人平衡控制__](./humanoid_balance/Humanoid_Balance.md) - 基于强化学习的人形机器人平衡控制仿真
-
 - [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
 
 - [__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) - 基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
