@@ -127,8 +127,6 @@ title: 主页
 
 - [__无人机路径学习__](./drone_path_learning/README.md) - 基于 AirSim + Gym + Stable-Baselines3 的无人机视觉导航强化学习项目
 
-- [__机器人仿真(MuJoCo)__](ant_robot/机器人仿真系统.md)
-
 - [__机械臂仿真系统__](arm_sim.md) - 基于MuJoCo的机械臂仿真与功能优化
 
 - [__CARLA自动驾驶系统__](carla_ad_gym_rl/carla_ad_gym_rl.md) - CARLA 仿真与强化学习的自动驾驶智能决策系统
@@ -137,9 +135,8 @@ title: 主页
 
 - [__Carla YOLO规划器__](carla_yolo_planner.md) - Carla环境结合YOLO的自动驾驶路径规划方案
 
-- [__人形机器人SAC强化学习步态优化__](./mujoco_running/running.md) - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真
-
 - [__GraspRL机械臂抓取强化学习项目__](./index_wk.md) - 基于DQN与MuJoCo的视觉机械臂抓取仿真项目
+
 
 ## 控制 <span id="control"></span>
 
@@ -151,7 +148,7 @@ title: 主页
 
 - [__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
 
-- [__机器人仿真(MuJoCo)__](ant_robot/机器人仿真系统.md)
+- [__基于 Mujoco 的蚂蚁机器人（Ant）行走和巡逻__](ant_robot/ant_control.md)
 
 - [__机械臂仿真系统__](arm_sim.md) - 基于MuJoCo的机械臂仿真与功能优化
 
@@ -191,9 +188,6 @@ title: 主页
 
 - [__CARLA IMU 数据采集平台__](./carla_imu/carla_imu.md) — CARLA惯性测量单元数据采集与可视化驾驶平台开发汇报文档
 
-- [__人形机器人SAC强化学习步态优化__](./mujoco_running/running.md) - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真
-
-- [__机器人仿真__](ant_robot/机器人仿真系统.md) - MuJoCo机器人仿真
 
 - [__强化学习工作空间__](rl_workspace.md) - 强化学习工作空间
 

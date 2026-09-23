@@ -1,10 +1,8 @@
-# 机器人仿真系统 (Humanoid Robot Simulation)
+# 基于 Mujoco 的蚂蚁机器人（Ant）行走和巡逻
 
 # 背景介绍
 
-这是一个基于 Python 和 MuJoCo 物理引擎的机器人仿真项目。目的是实现机器人行走和巡逻功能。
-
-本项目旨在实现：
+这是一个基于 Python 和 MuJoCo 物理引擎的机器人仿真项目。MuJoCo 中的 Ant（蚂蚁）机器人是一个经典的 3D 四足强化学习仿真环境。它由一个中央躯干和 4 条连接腿组成（每条腿含 2 个活动连杆），包含 8 个受控的铰链关节。任务目标是通过协调这 8 个关节电机，学习在不跌倒的前提下以最快速度向前爬行。
 
 ## 距离优先的多目标巡逻与智能避障
 
@@ -43,17 +41,17 @@ self.forward_speed = args.forward_speed if args else 0.05  # 机器人前进速�
 ## 移除阻塞式的 `input()` (适配自动化部署)
 
 ```python
-     # Ask for auto-install
-    if input("\n📥 Auto-install missing packages? (y/n): ").lower() == 'y':
-        try:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install"] + missing_packages,
-                check=True
-            )
-            print("✅ Packages installed successfully")
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Package installation failed: {e}")
-            sys.exit(1)
+ # Ask for auto-install
+if input("\n📥 Auto-install missing packages? (y/n): ").lower() == 'y':
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install"] + missing_packages,
+            check=True
+        )
+        print("✅ Packages installed successfully")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Package installation failed: {e}")
+        sys.exit(1)
 ```
 
 ```python
@@ -106,7 +104,7 @@ def check_dependencies():
 
 # 机器人步态调试
 
-原项目没有实现机器人站立和行走的功能，在原项目的基础上，我进行了多种尝试。
+原项目没有实现机器人站立和行走的功能，在原项目的基础上进行了多种尝试。
 
 ![screenshot](./汇报文档.assets/screenshot-1778667538059-2.png)
 
@@ -130,21 +128,21 @@ self.data.qpos[2] = 0.95 # ✨ 核心修复：把出生点太高一点，让它�
 
 ```python
 if elapsed_time < self.stabilization_phase:
-            # ✨ 加入“上帝之手”：给躯干施加向上的外力，像提着衣领一样让它慢慢站稳落地
-            if self.torso_id != -1:
-                # 提拉力随着时间从 200N 线性递减到 0N
-                lift_force = 200.0 * (1.0 - (elapsed_time / self.stabilization_phase))
-                self.data.xfrc_applied[self.torso_id][2] = lift_force
+    # ✨ 加入“上帝之手”：给躯干施加向上的外力，像提着衣领一样让它慢慢站稳落地
+    if self.torso_id != -1:
+        # 提拉力随着时间从 200N 线性递减到 0N
+        lift_force = 200.0 * (1.0 - (elapsed_time / self.stabilization_phase))
+        self.data.xfrc_applied[self.torso_id][2] = lift_force
 
-            self._maintain_balance(elapsed_time)
-            # Clip all control commands during stabilization
-            for i in range(self.model.nu):
-                self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
-            return
-        else:
-            # ✨ 稳定期结束后，撤销上帝之手，让机器人完全靠自己的双腿站立
-            if self.torso_id != -1:
-                self.data.xfrc_applied[self.torso_id][2] = 0.0
+    self._maintain_balance(elapsed_time)
+    # Clip all control commands during stabilization
+    for i in range(self.model.nu):
+        self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
+    return
+    else:
+        # ✨ 稳定期结束后，撤销上帝之手，让机器人完全靠自己的双腿站立
+        if self.torso_id != -1:
+            self.data.xfrc_applied[self.torso_id][2] = 0.0
 ```
 
 但是修改代码后小人依然是立刻直接落地，没有悬停，也没有站立起来。怀疑是施加的拉力太小，在调控拉力之后仍然没有变化，于是寻找其它原因。
@@ -157,31 +155,30 @@ if elapsed_time < self.stabilization_phase:
 
 ```python
 # Step 5: Initial stabilization phase (no movement, only balance)
-        if elapsed_time < self.stabilization_phase:
-            # ✨ 核弹级修复：时空绝对锁死！
-            # 直接在内存底层把机器人“钉”在空中，无视任何物理法则
-            
-            # 1. 强行锁定根节点空间坐标 (悬空在 0.95m 处)
-            self.data.qpos[0] = 0.0
-            self.data.qpos[1] = 0.0
-            self.data.qpos[2] = 0.95
-            
-            # 2. 强行锁定绝对垂直姿态 (四元数 [w, x, y, z])
-            self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
-            
-            # 3. 强行清零六轴速度 (禁止任何移动和旋转)
-            self.data.qvel[0:6] = 0.0
-            
-            # 清除之前没用的外力
-            if self.torso_id != -1:
-                self.data.xfrc_applied[self.torso_id][2] = 0.0
-
-            # 在被死死钉在空中的这两秒内，让四肢活动，摆出站立准备姿势
-            self._maintain_balance(elapsed_time)
-            
-            for i in range(self.model.nu):
-                self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
-            return
+if elapsed_time < self.stabilization_phase:
+    # ✨ 核弹级修复：时空绝对锁死！
+    # 直接在内存底层把机器人“钉”在空中，无视任何物理法则
+    
+    # 1. 强行锁定根节点空间坐标 (悬空在 0.95m 处)
+    self.data.qpos[0] = 0.0
+    self.data.qpos[1] = 0.0
+    self.data.qpos[2] = 0.95
+    
+    # 2. 强行锁定绝对垂直姿态 (四元数 [w, x, y, z])
+    self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
+    
+    # 3. 强行清零六轴速度 (禁止任何移动和旋转)
+    self.data.qvel[0:6] = 0.0
+    
+    # 清除之前没用的外力
+    if self.torso_id != -1:
+        self.data.xfrc_applied[self.torso_id][2] = 0.0
+    # 在被死死钉在空中的这两秒内，让四肢活动，摆出站立准备姿势
+    self._maintain_balance(elapsed_time)
+    
+    for i in range(self.model.nu):
+        self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
+    return
 ```
 
 可是依然没有变化。
@@ -198,14 +195,14 @@ if elapsed_time < self.stabilization_phase:
 
 ```python
 def _get_joint_vel_id(self, joint_name):
-        """Get joint velocity ID for a given joint name"""
-        mapped_name = self.joint_name_mapping.get(joint_name, joint_name)
-        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, mapped_name)
-        if joint_id != -1:
-            # ✨ 史诗级底层修复：绝对不能直接返回 joint_id！
-            # 必须通过 jnt_dofadr 查询该关节在 qvel 数组中真正的内存地址！
-            return self.model.jnt_dofadr[joint_id]
-        return -1
+    """Get joint velocity ID for a given joint name"""
+    mapped_name = self.joint_name_mapping.get(joint_name, joint_name)
+    joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, mapped_name)
+    if joint_id != -1:
+        # ✨ 史诗级底层修复：绝对不能直接返回 joint_id！
+        # 必须通过 jnt_dofadr 查询该关节在 qvel 数组中真正的内存地址！
+        return self.model.jnt_dofadr[joint_id]
+    return -1
 ```
 
 但是，还是没有变化，目前仍然没有找到问题所在。
@@ -285,7 +282,7 @@ def _get_joint_vel_id(self, joint_name):
 
 # 后期计划
 
-项目后期有两个方向：
+项目后期的两个方向：
 
 1.步态调整
 
