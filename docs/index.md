@@ -80,8 +80,6 @@ title: 主页
 
 - [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
 
-- [__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) - 基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
-
 - [__机械臂自动抓取__](./robot_arm/README.md) - 基于Franka Panda的机械臂自动抓取仿真项目
 
 - [__CARLA天气鲁棒性测试__](./carla_weather_robustness/README.md) - CARLA多天气条件下自动驾驶感知鲁棒性测试系统
@@ -118,8 +116,6 @@ title: 主页
 - [__人形机器人SAC强化学习步态优化__](./mujoco_running/running.md) - 基于CPG+PD+SAC残差强化学习的缓步稳定行走仿真
 
 - [__人形机器人自主行走__](./mujoco_hci_sim/README.md) - 基于PPO强化学习的Humanoid人形机器人自主行走仿真
-
-- [__人形机器人站立行走__](./mujoco_man/mujoco_manrun.md) - 基于 CPG + PD 的人形机器人稳定站立与行走仿真（MuJoCo）
 
 - [__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
 
