@@ -75,3 +75,45 @@ humanoid_mujoco_py/
 - [MuJoCo GitHub 仓库](https://github.com/google-deepmind/mujoco)：获取最新版MuJoCo库与官方示例模型
 - [MJCF 模型格式参考](https://mujoco.readthedocs.io/en/stable/XMLreference.html)：详细了解`humanoid.xml`各节点配置规则
 - [MuJoCo Python 教程](https://mujoco.readthedocs.io/en/stable/python.html)：学习Python调用MuJoCo的进阶用法（如控制、传感器、数据记录）
+## 键盘控制
+
+`main_keyboard_control.py` 提供基于 pygame 的键盘实时控制，使用 PD 控制器保持机器人稳定姿态。
+
+### 运行方式
+
+    python main_keyboard_control.py
+
+### 操作说明
+
+| 按键 | 功能 |
+|------|------|
+| W / S | 躯干前倾 / 后仰 |
+| A / D | 躯干左转 / 右转 |
+| Q / E | 抬右臂 / 抬左臂 |
+| R / F | 屈右肘 / 屈左肘 |
+| Space | 全部复位 |
+| ESC | 退出程序 |
+
+### PD 控制原理
+
+对于每个电机，使用 PD 控制律计算输出力矩：
+
+    tau = Kp * (target - q) - Kd * q_dot
+
+其中：
+
+- `target = home_qpos[j] + keyboard_offset[i]`：目标关节角 = home 关键帧角度 + 键盘偏移量
+- `q`：当前关节角
+- `q_dot`：当前关节角速度
+- `Kp = 40.0`，`Kd = 4.0`
+
+为解决 MuJoCo humanoid 纯力矩控制下双足无法稳定站立的问题，脚本每步仿真前强制将 root 的 6 自由度位姿和速度重置为 home 关键帧值：
+
+    data.qpos[0:7] = home_qpos[0:7]
+    data.qvel[0:6] = 0.0
+
+机器人因而悬空稳定站立，便于观察各关节的键盘控制响应。
+
+### 演示
+
+![demo](demo_keyboard.gif)
