@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/ant_robot/%E6%9C%BA%E5%99%A8%E4%BA%BA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/ant_robot/ant_control/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>机器人仿真系统 (Humanoid Robot Simulation) - 神经网络</title>
+    <title>基于 Mujoco 的蚂蚁机器人（Ant）行走和巡逻 - 神经网络</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,9 +13,9 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "\u673a\u5668\u4eba\u4eff\u771f\u7cfb\u7edf (Humanoid Robot Simulation)";
-        var mkdocs_page_input_path = "ant_robot/\u673a\u5668\u4eba\u4eff\u771f\u7cfb\u7edf.md";
-        var mkdocs_page_url = "/nn/ant_robot/%E6%9C%BA%E5%99%A8%E4%BA%BA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/";
+        var mkdocs_page_name = "\u57fa\u4e8e Mujoco \u7684\u8682\u8681\u673a\u5668\u4eba\uff08Ant\uff09\u884c\u8d70\u548c\u5de1\u903b";
+        var mkdocs_page_input_path = "ant_robot/ant_control.md";
+        var mkdocs_page_url = "/nn/ant_robot/ant_control/";
       </script>
     
     <!--[if lt IE 9]>
@@ -110,9 +110,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">机器人仿真系统 (Humanoid Robot Simulation)</li>
+      <li class="breadcrumb-item active">基于 Mujoco 的蚂蚁机器人（Ant）行走和巡逻</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/ant_robot/机器人仿真系统.md"> 编辑页面</a>
+          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/ant_robot/ant_control.md"> 编辑页面</a>
     </li>
   </ul>
   <hr/>
@@ -120,10 +120,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="humanoid-robot-simulation">机器人仿真系统 (Humanoid Robot Simulation)</h1>
+                <h1 id="mujoco-ant">基于 Mujoco 的蚂蚁机器人（Ant）行走和巡逻</h1>
 <h1 id="_1">背景介绍</h1>
-<p>这是一个基于 Python 和 MuJoCo 物理引擎的机器人仿真项目。目的是实现机器人行走和巡逻功能。</p>
-<p>本项目旨在实现：</p>
+<p>这是一个基于 Python 和 MuJoCo 物理引擎的机器人仿真项目。MuJoCo 中的 Ant（蚂蚁）机器人是一个经典的 3D 四足强化学习仿真环境。它由一个中央躯干和 4 条连接腿组成（每条腿含 2 个活动连杆），包含 8 个受控的铰链关节。任务目标是通过协调这 8 个关节电机，学习在不跌倒的前提下以最快速度向前爬行。</p>
 <h2 id="_2">距离优先的多目标巡逻与智能避障</h2>
 <p>场地上存在多个运动的小球，机器人会时刻计算自己离每个小球有多远，谁离得近就追谁，追到了之后就自动换下一个目标，在追到所有小球之后就停止。场景里会有多堵墙壁，机器人一旦碰到某堵墙，就会自动转向，绕开墙后继续追逐目标。</p>
 <p><img alt="screenshot" src="../%E6%B1%87%E6%8A%A5%E6%96%87%E6%A1%A3.assets/screenshot.png" /></p>
@@ -143,17 +142,17 @@ self.forward_speed = args.forward_speed if args else 0.05  # 机器人前进速�
 <p><img alt="image-20260507125438126" src="../%E6%B1%87%E6%8A%A5%E6%96%87%E6%A1%A3.assets/image-20260507125438126.png" /></p>
 <p><img alt="image-20260507125522649" src="../%E6%B1%87%E6%8A%A5%E6%96%87%E6%A1%A3.assets/image-20260507125522649.png" /></p>
 <h2 id="input">移除阻塞式的 <code>input()</code> (适配自动化部署)</h2>
-<pre><code class="language-python">     # Ask for auto-install
-    if input(&quot;\n📥 Auto-install missing packages? (y/n): &quot;).lower() == 'y':
-        try:
-            subprocess.run(
-                [sys.executable, &quot;-m&quot;, &quot;pip&quot;, &quot;install&quot;] + missing_packages,
-                check=True
-            )
-            print(&quot;✅ Packages installed successfully&quot;)
-        except subprocess.CalledProcessError as e:
-            print(f&quot;❌ Package installation failed: {e}&quot;)
-            sys.exit(1)
+<pre><code class="language-python"> # Ask for auto-install
+if input(&quot;\n📥 Auto-install missing packages? (y/n): &quot;).lower() == 'y':
+    try:
+        subprocess.run(
+            [sys.executable, &quot;-m&quot;, &quot;pip&quot;, &quot;install&quot;] + missing_packages,
+            check=True
+        )
+        print(&quot;✅ Packages installed successfully&quot;)
+    except subprocess.CalledProcessError as e:
+        print(f&quot;❌ Package installation failed: {e}&quot;)
+        sys.exit(1)
 </code></pre>
 <pre><code class="language-python">def get_user_input_with_timeout(timeout=5):
     print(f&quot;\n📥 Auto-install missing packages? (y/n) [将在 {timeout} 秒后默认选择 'y']: &quot;, end='', flush=True)
@@ -190,7 +189,7 @@ self.forward_speed = args.forward_speed if args else 0.05  # 机器人前进速�
 <p><img alt="image-20260507131156955" src="../%E6%B1%87%E6%8A%A5%E6%96%87%E6%A1%A3.assets/image-20260507131156955.png" /></p>
 <p>以上内容均在原项目上修改，目的是方便项目的安装和调试，之后开始进行机器人步态调试。</p>
 <h1 id="_8">机器人步态调试</h1>
-<p>原项目没有实现机器人站立和行走的功能，在原项目的基础上，我进行了多种尝试。</p>
+<p>原项目没有实现机器人站立和行走的功能，在原项目的基础上进行了多种尝试。</p>
 <p><img alt="screenshot" src="../%E6%B1%87%E6%8A%A5%E6%96%87%E6%A1%A3.assets/screenshot-1778667538059-2.png" /></p>
 <h2 id="_9">出生点穿模/电机力量过小</h2>
 <p><strong>出生点穿模爆炸：</strong> 设置的初始高度（<code>z=0.8</code>）可能太低了。如果机器人的脚在第 0 帧时嵌在了地板内部，MuJoCo 的物理引擎为了解决“物体穿透”，会瞬间施加一个成千上万牛顿的排斥力，直接把它弹飞、抽搐。</p>
@@ -205,52 +204,51 @@ self.max_ctrl_amplitude = 5.0  # ✨ 核心修复：把电机最大输出拉高�
 self.data.qpos[2] = 0.95 # ✨ 核心修复：把出生点太高一点，让它处于悬空状态，避免脚插进地板里
 </code></pre>
 <pre><code class="language-python">if elapsed_time &lt; self.stabilization_phase:
-            # ✨ 加入“上帝之手”：给躯干施加向上的外力，像提着衣领一样让它慢慢站稳落地
-            if self.torso_id != -1:
-                # 提拉力随着时间从 200N 线性递减到 0N
-                lift_force = 200.0 * (1.0 - (elapsed_time / self.stabilization_phase))
-                self.data.xfrc_applied[self.torso_id][2] = lift_force
+    # ✨ 加入“上帝之手”：给躯干施加向上的外力，像提着衣领一样让它慢慢站稳落地
+    if self.torso_id != -1:
+        # 提拉力随着时间从 200N 线性递减到 0N
+        lift_force = 200.0 * (1.0 - (elapsed_time / self.stabilization_phase))
+        self.data.xfrc_applied[self.torso_id][2] = lift_force
 
-            self._maintain_balance(elapsed_time)
-            # Clip all control commands during stabilization
-            for i in range(self.model.nu):
-                self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
-            return
-        else:
-            # ✨ 稳定期结束后，撤销上帝之手，让机器人完全靠自己的双腿站立
-            if self.torso_id != -1:
-                self.data.xfrc_applied[self.torso_id][2] = 0.0
+    self._maintain_balance(elapsed_time)
+    # Clip all control commands during stabilization
+    for i in range(self.model.nu):
+        self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
+    return
+    else:
+        # ✨ 稳定期结束后，撤销上帝之手，让机器人完全靠自己的双腿站立
+        if self.torso_id != -1:
+            self.data.xfrc_applied[self.torso_id][2] = 0.0
 </code></pre>
 <p>但是修改代码后小人依然是立刻直接落地，没有悬停，也没有站立起来。怀疑是施加的拉力太小，在调控拉力之后仍然没有变化，于是寻找其它原因。</p>
 <h2 id="_10">碰撞穿模惩罚机制</h2>
 <p>在 MuJoCo 中，只要机器人的脚底板和地面发生了哪怕 $0.1$ 毫米的“穿透（Penetration）”，物理引擎为了把它们分开，会瞬间产生高达<strong>数万牛顿</strong>的排斥力。这个力比刚才算的几百牛顿的“体重提拉力”大了几十倍，所以机器人的力学状态瞬间就爆炸了，直接被拍在地上抽搐。</p>
 <p><strong>直接在每一帧强行改写它躯干的空间坐标</strong>。就像把它用钉子钉在半空中一样，无视重力，无视碰撞，强行让它在空中把腿伸直，然后再“拔掉钉子”让它落地。</p>
 <pre><code class="language-python"># Step 5: Initial stabilization phase (no movement, only balance)
-        if elapsed_time &lt; self.stabilization_phase:
-            # ✨ 核弹级修复：时空绝对锁死！
-            # 直接在内存底层把机器人“钉”在空中，无视任何物理法则
+if elapsed_time &lt; self.stabilization_phase:
+    # ✨ 核弹级修复：时空绝对锁死！
+    # 直接在内存底层把机器人“钉”在空中，无视任何物理法则
 
-            # 1. 强行锁定根节点空间坐标 (悬空在 0.95m 处)
-            self.data.qpos[0] = 0.0
-            self.data.qpos[1] = 0.0
-            self.data.qpos[2] = 0.95
+    # 1. 强行锁定根节点空间坐标 (悬空在 0.95m 处)
+    self.data.qpos[0] = 0.0
+    self.data.qpos[1] = 0.0
+    self.data.qpos[2] = 0.95
 
-            # 2. 强行锁定绝对垂直姿态 (四元数 [w, x, y, z])
-            self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
+    # 2. 强行锁定绝对垂直姿态 (四元数 [w, x, y, z])
+    self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
 
-            # 3. 强行清零六轴速度 (禁止任何移动和旋转)
-            self.data.qvel[0:6] = 0.0
+    # 3. 强行清零六轴速度 (禁止任何移动和旋转)
+    self.data.qvel[0:6] = 0.0
 
-            # 清除之前没用的外力
-            if self.torso_id != -1:
-                self.data.xfrc_applied[self.torso_id][2] = 0.0
+    # 清除之前没用的外力
+    if self.torso_id != -1:
+        self.data.xfrc_applied[self.torso_id][2] = 0.0
+    # 在被死死钉在空中的这两秒内，让四肢活动，摆出站立准备姿势
+    self._maintain_balance(elapsed_time)
 
-            # 在被死死钉在空中的这两秒内，让四肢活动，摆出站立准备姿势
-            self._maintain_balance(elapsed_time)
-
-            for i in range(self.model.nu):
-                self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
-            return
+    for i in range(self.model.nu):
+        self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
+    return
 </code></pre>
 <p>可是依然没有变化。</p>
 <h2 id="_11">寻址出错。</h2>
@@ -259,14 +257,14 @@ self.data.qpos[2] = 0.95 # ✨ 核心修复：把出生点太高一点，让它�
 <p><img alt="image-20260507134545650" src="../%E6%B1%87%E6%8A%A5%E6%96%87%E6%A1%A3.assets/image-20260507134545650.png" /></p>
 <p>于是尝试寻找真正的内存地址：</p>
 <pre><code class="language-python">def _get_joint_vel_id(self, joint_name):
-        &quot;&quot;&quot;Get joint velocity ID for a given joint name&quot;&quot;&quot;
-        mapped_name = self.joint_name_mapping.get(joint_name, joint_name)
-        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, mapped_name)
-        if joint_id != -1:
-            # ✨ 史诗级底层修复：绝对不能直接返回 joint_id！
-            # 必须通过 jnt_dofadr 查询该关节在 qvel 数组中真正的内存地址！
-            return self.model.jnt_dofadr[joint_id]
-        return -1
+    &quot;&quot;&quot;Get joint velocity ID for a given joint name&quot;&quot;&quot;
+    mapped_name = self.joint_name_mapping.get(joint_name, joint_name)
+    joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, mapped_name)
+    if joint_id != -1:
+        # ✨ 史诗级底层修复：绝对不能直接返回 joint_id！
+        # 必须通过 jnt_dofadr 查询该关节在 qvel 数组中真正的内存地址！
+        return self.model.jnt_dofadr[joint_id]
+    return -1
 </code></pre>
 <p>但是，还是没有变化，目前仍然没有找到问题所在。</p>
 <p>当前，人形机器人仍然保持原地抽搐状态。</p>
@@ -319,7 +317,7 @@ self.data.qpos[2] = 0.95 # ✨ 核心修复：把出生点太高一点，让它�
 <p>让两个小球以一定速率运动，机器人动态追踪小球。</p>
 <p><img alt="动态" src="../%E6%B1%87%E6%8A%A5%E6%96%87%E6%A1%A3.assets/%E5%8A%A8%E6%80%81.gif" /></p>
 <h1 id="_17">后期计划</h1>
-<p>项目后期有两个方向：</p>
+<p>项目后期的两个方向：</p>
 <p>1.步态调整</p>
 <p>重新转回人形机器人模型，尝试调整其步态，让其做到站立并行走</p>
 <p>2.复杂场景</p>
