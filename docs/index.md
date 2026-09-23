@@ -76,7 +76,8 @@ title: 主页
 
 - [__无人机飞行控制__](./UVA_flight_control_system.md) - 基于AirSim的无人机飞行控制系统
 
-- [__无人机飞行控制__](./drone_flight_sim/README.md) - 基于航点跟踪 + 碰撞自恢复的无人机双模式飞行控制系统
+- [__碰撞自恢复的无人机双模式飞行控制系统__](./drone_flight_sim/README.md) - 基于航点跟踪 + 碰撞自恢复的无人机双模式飞行控制系统
+
 - [__人形机器人平衡控制__](./humanoid_balance/Humanoid_Balance.md) - 基于强化学习的人形机器人平衡控制仿真
 
 - [__工程规范优化__](./improve/project.md) - 多场景仿真与控制优化项目
