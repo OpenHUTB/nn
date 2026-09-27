@@ -1,3 +1,36 @@
+# MuJoCo 人形机器人物理仿真
+
+## 运行环境
+
+- Ubuntu 20.04
+- Python 3.10（推荐 Miniconda）
+- MuJoCo 3.x
+
+## 依赖安装
+
+    conda create -n carla python=3.10 -y
+    conda activate carla
+    pip install mujoco numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+## 运行步骤
+
+    cd src/mujoco01
+    python main.py
+
+或通过 launch 启动：
+
+    roslaunch mujoco01 main.launch
+
+## 运行效果
+
+![演示](demo.gif)
+
+## 输出说明
+
+终端实时打印仿真时间与躯干位置，MuJoCo 可视化窗口显示人形机器人的物理运动。
+
+---
+
 # MuJoCo 基本使用
 
 这是一个使用MuJoCo物理引擎的Python示例项目，展示了如何加载人形机器人模型、运行物理模拟并实时可视化结果。示例模拟了人形机器人在预设初始姿势下的物理运动，支持实时查看关节状态与躯干位置。
