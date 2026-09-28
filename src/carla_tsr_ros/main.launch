@@ -1,0 +1,23 @@
+<launch>
+    <arg name="image_dir" default="$(find carla_tsr_ros)/data" />
+    <arg name="model_path" default="$(find carla_tsr_ros)/yolov8n.pt" />
+    <arg name="publish_rate" default="2.0" />
+
+    <node pkg="carla_tsr_ros" type="image_publisher.py" name="image_publisher" output="screen">
+        <param name="image_dir" value="$(arg image_dir)" />
+        <param name="publish_rate" value="$(arg publish_rate)" />
+        <param name="loop" value="true" />
+    </node>
+
+    <node pkg="carla_tsr_ros" type="perception_node.py" name="perception_node" output="screen">
+        <param name="model_path" value="$(arg model_path)" />
+        <param name="conf_threshold" value="0.5" />
+        <param name="target_class" value="11" />
+        <param name="infer_every_n" value="2" />
+    </node>
+
+    <node pkg="carla_tsr_ros" type="control_node.py" name="control_node" output="screen">
+        <param name="stop_distance" value="0.3" />
+        <param name="brake_value" value="1.0" />
+    </node>
+</launch>

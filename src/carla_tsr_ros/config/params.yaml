@@ -1,0 +1,18 @@
+# 图像发布节点
+image_publisher:
+  image_dir: "data"
+  publish_rate: 5.0        # Hz
+  loop: true
+
+# 感知节点
+perception:
+  model_path: "yolov8n.pt"
+  conf_threshold: 0.5
+  target_class: 11         # COCO: stop sign
+  infer_every_n: 2         # 每 2 帧推理一次
+
+# 控制节点
+control:
+  stop_distance: 0.3       # 检测框占比阈值
+  brake_value: 1.0
+  throttle_value: 0.0
