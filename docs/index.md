@@ -61,6 +61,7 @@ title: 主页
 - [__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
 
 - [__交通标识识别__](./carla_traffic_sign_recognition/carla_traffic_sign_recognition.md) — 交通标识识别
+- [__Carla 交通标志识别 ROS 封装__](./carla_tsr_ros/index.md) - 基于 YOLOv8 的 ROS Noetic 感知与控制节点
 
 - [__V2X路侧智能感知__](./edge_intelligence_V2X/README.md) - 基于YOLOv8n的V2X路侧智能感知系统优化与实现
 
