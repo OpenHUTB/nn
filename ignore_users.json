@@ -1,5 +1,8 @@
 [
-    "Haidong Wang",
-    "donghaiwang",
-    "whd@hutb.edu.cn"
+    {
+        "name": "Haidong Wang",
+        "github": "donghaiwang",
+        "email": "whd@hutb.edu.cn",
+        "role": "author"
+    }
 ]
