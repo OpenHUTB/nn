@@ -181,7 +181,7 @@ self.state_map = {
 
 #### 3.4.2 CPG 振荡器（Van der Pol + 相位耦合）
 
-CPG（Central Pattern Generator）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
+中枢模式发生器（Central Pattern Generator, CPG）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
 数学模型：
 
 $$
@@ -223,14 +223,13 @@ self.joint_targets["ankle_y_right"] = 0.0 + right_hip_offset * 0.5
 #### 3.4.4 关节空间 PD 跟踪控制
 
 对每个关节执行独立的位置闭环，实现关节目标跟踪：
-实现关节目标跟踪：
 
 $$
 \tau_i = K_{p,i} \cdot (q_{des,i} - q_i) - K_{d,i} \cdot \dot{q}_i
 $$
 
 
-系统根据足底接触力动态调整 PD 增益：
+系统根据足底接触力动态调整 PD（比例微分）增益：
 
 - 支撑相：增大刚度，提升稳定性
   
@@ -238,7 +237,7 @@ $$
   
 对应代码：HumanoidStabilizer.\_calculate\_stabilizing\_torques(main.py#L743-L755)
 
-#### 3.4.5 躯干姿态 PID 控制（Roll/Pitch）
+#### 3.4.5 躯干姿态 PID 控制（横滚Roll/俯仰Pitch）
 
 以 IMU 欧拉角与角速度为反馈，对躯干姿态进行闭环稳定，Roll/Pitch 加入积分项抑制漂移：
 
