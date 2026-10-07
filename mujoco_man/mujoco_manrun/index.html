@@ -372,7 +372,7 @@ self.state_map = {
 </code></pre>
 <p>对应代码：HumanoidStabilizer.state_map(main.py#L352-L357)。</p>
 <h4 id="342-cpg-van-der-pol">3.4.2 CPG 振荡器（Van der Pol + 相位耦合）</h4>
-<p>CPG（Central Pattern Generator）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
+<p>中枢模式发生器（Central Pattern Generator, CPG）通过耦合振荡器生成周期性节律信号，模拟生物行走步态。
 数学模型：</p>
 <p>
 <script type="math/tex; mode=display">
@@ -399,14 +399,13 @@ self.joint_targets[&quot;ankle_y_right&quot;] = 0.0 + right_hip_offset * 0.5
 <p>实现自然交替迈步的步态联动。</p>
 <p>对应代码：HumanoidStabilizer._state_walk(main.py#L588-L642)</p>
 <h4 id="344-pd">3.4.4 关节空间 PD 跟踪控制</h4>
-<p>对每个关节执行独立的位置闭环，实现关节目标跟踪：
-实现关节目标跟踪：</p>
+<p>对每个关节执行独立的位置闭环，实现关节目标跟踪：</p>
 <p>
 <script type="math/tex; mode=display">
 \tau_i = K_{p,i} \cdot (q_{des,i} - q_i) - K_{d,i} \cdot \dot{q}_i
 </script>
 </p>
-<p>系统根据足底接触力动态调整 PD 增益：</p>
+<p>系统根据足底接触力动态调整 PD（比例微分）增益：</p>
 <ul>
 <li>
 <p>支撑相：增大刚度，提升稳定性</p>
@@ -416,7 +415,7 @@ self.joint_targets[&quot;ankle_y_right&quot;] = 0.0 + right_hip_offset * 0.5
 </li>
 </ul>
 <p>对应代码：HumanoidStabilizer._calculate_stabilizing_torques(main.py#L743-L755)</p>
-<h4 id="345-pid-rollpitch">3.4.5 躯干姿态 PID 控制（Roll/Pitch）</h4>
+<h4 id="345-pid-rollpitch">3.4.5 躯干姿态 PID 控制（横滚Roll/俯仰Pitch）</h4>
 <p>以 IMU 欧拉角与角速度为反馈，对躯干姿态进行闭环稳定，Roll/Pitch 加入积分项抑制漂移：</p>
 <p>
 <script type="math/tex; mode=display">
