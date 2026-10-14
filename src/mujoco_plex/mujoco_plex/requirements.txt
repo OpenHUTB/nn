@@ -1,0 +1,4 @@
+mkdocs
+python-markdown-math
+mujoco>=2.2.2
+numpy
