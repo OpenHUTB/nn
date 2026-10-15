@@ -44,3 +44,34 @@
 - 异常检测
 - 图像分割
 - 语音识别
+- 
+## 数学公式
+
+GMM 的概率密度函数为：
+
+`p(x) = Σ π_k * N(x | μ_k, Σ_k)`
+
+其中：
+- K 为高斯成分数量
+- π_k 为第 k 个成分的混合权重，满足 Σπ_k = 1
+- N(x | μ_k, Σ_k) 为第 k 个高斯分布
+
+## 代码示例
+
+使用 scikit-learn 拟合高斯混合模型：
+
+```python
+from sklearn.mixture import GaussianMixture
+import numpy as np
+
+# 生成示例数据
+X = np.random.randn(300, 2)
+
+# 创建并训练模型
+gmm = GaussianMixture(n_components=3, random_state=0)
+gmm.fit(X)
+
+# 预测类别
+labels = gmm.predict(X)
+print("各成分权重:", gmm.weights_)
+```
