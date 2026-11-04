@@ -1,4 +1,4 @@
-# 基于 PPO 算法的 CARLA 自动驾驶系统
+# 基于 PPO 算法的 Carla 自动驾驶系统
 
 <p align="center">
   <img src="https://img.shields.io/badge/CARLA-0.9.15-blue" alt="CARLA 0.9.15"/>
@@ -17,28 +17,28 @@
 - [安装步骤](#安装步骤)
 - [目录结构](#目录结构)
 - [核心模块详解](#核心模块详解)
-  - [环境封装 (env.py)](#环境封装-envpy)
-  - [奖励函数 (rewards.py)](#奖励函数-rewardspy)
-  - [配置管理 (config.py)](#配置管理-configpy)
-  - [训练脚本 (train.py)](#训练脚本-trainpy)
-  - [工具函数 (utils.py)](#工具函数-utilspy)
+    - [环境封装 (env.py)](#环境封装-envpy)
+    - [奖励函数 (rewards.py)](#奖励函数-rewardspy)
+    - [配置管理 (config.py)](#配置管理-configpy)
+    - [训练脚本 (train.py)](#训练脚本-trainpy)
+    - [工具函数 (utils.py)](#工具函数-utilspy)
 - [使用方法](#使用方法)
-  - [训练](#训练)
-  - [训练参数](#训练参数)
-  - [配置说明](#配置说明)
-  - [评估与测试](#评估与测试)
-  - [TensorBoard 监控](#tensorboard-监控)
+    - [训练](#训练)
+    - [训练参数](#训练参数)
+    - [配置说明](#配置说明)
+    - [评估与测试](#评估与测试)
+    - [TensorBoard 监控](#tensorboard-监控)
 - [奖励函数优化](#奖励函数优化)
-  - [原始奖励函数的问题分析](#原始奖励函数的问题分析)
-  - [Bug 修复](#bug-修复)
-  - [优化策略一：乘法改加权求和](#优化策略一乘法改加权求和)
-  - [优化策略二：低速惩罚机制](#优化策略二低速惩罚机制)
-  - [优化策略三：Waypoint 前进奖励](#优化策略三waypoint-前进奖励)
-  - [两种奖励函数对比](#两种奖励函数对比)
+    - [原始奖励函数的问题分析](#原始奖励函数的问题分析)
+    - [Bug 修复](#bug-修复)
+    - [优化策略一：乘法改加权求和](#优化策略一乘法改加权求和)
+    - [优化策略二：低速惩罚机制](#优化策略二低速惩罚机制)
+    - [优化策略三：Waypoint 前进奖励](#优化策略三waypoint-前进奖励)
+    - [两种奖励函数对比](#两种奖励函数对比)
 - [训练结果](#训练结果)
-  - [关键指标](#关键指标)
-  - [训练曲线](#训练曲线)
-  - [结果分析](#结果分析)
+    - [关键指标](#关键指标)
+    - [训练曲线](#训练曲线)
+    - [结果分析](#结果分析)
 - [运行效果](#运行效果)
 - [调参经验](#调参经验)
 - [常见问题](#常见问题)
@@ -59,7 +59,7 @@
 1. **乘法组合导致梯度消失**：`reward = speed × centering × angle`，只要任一维度接近 0，整体奖励就被"抹杀"，智能体难以从多个维度同时获得有效梯度信号
 2. **角度计算跨零点 bug**：车辆朝向 1°，waypoint 朝向 359°，实际夹角仅 2°，但 `abs(359-1) = 358°`，导致角度因子错误归零
 3. **低速计时器累积 bug**：`low_speed_timer` 只增不减，智能体偶尔减速也会被误判为"连续低速"而终止
-4. **终止惩罚固定**：活 60 步和 5 步终止都给 -1，智能体没有动力多存活
+4. **终止惩罚固定**：存活 60 步和 5 步终止都给 -1，智能体没有动力多存活
 
 通过系统性优化奖励函数设计——乘法改加权求和、修复 bug、加入低速惩罚机制、增加 waypoint 前进奖励——训练从无法收敛提升至 `ep_rew_mean = 30.1`，智能体能够沿路径行驶约 60 步。
 
@@ -95,9 +95,7 @@ CARLA (Car Learning to Act) 是一个开源的高保真自动驾驶仿真平台�
 
 ### 整体架构图
 
-<p align="center">
-  <img src="image/frame.gif" alt="系统架构图" width="600"/>
-</p>
+![系统架构图](../auto_drive_system/image/frame.gif)
 
 ### 交互流程图
 
@@ -226,7 +224,7 @@ pip install carla-0.9.15-cp310-cp310-win_amd64.whl
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YuHang-Zhou/nn.git
+git clone https://github.com/OpenHUTB/nn.git
 cd nn
 
 # 创建 Conda 环境
@@ -429,7 +427,7 @@ def create_reward_fn(reward_fn):
 
 当前使用 `reward_fn_5_best` 配置，与默认配置 `reward_fn_5_default` 的主要区别：
 
-| 参数 | default | best | 说明 |
+| 参数 | 默认 | 最佳 | 说明 |
 |------|---------|------|------|
 | max_distance | 3.0 m | **2.0 m** | 更严格的偏移阈值 |
 | max_std_center_lane | 0.4 | **0.35** | 更严格的偏离标准差阈值 |
@@ -441,10 +439,7 @@ def create_reward_fn(reward_fn):
 
 #### 训练流程
 
-<p align="center">
-  <img src="image/training.gif
-  " alt="训练流程图" width="600"/>
-</p>
+![训练流程图](../auto_drive_system/image/training.gif)
 
 #### 模型命名规则
 
@@ -621,7 +616,7 @@ reward = speed_reward * centering_factor * angle_factor
 
 这是最致命的问题。考虑以下场景：
 
-| 场景 | speed | centering | angle | 乘法结果 | 加权求和结果 |
+| 场景 | 速度因子 | 居中因子 | 角度因子 | 乘法结果 | 加权求和结果 |
 |------|-------|-----------|-------|----------|-------------|
 | 速度适中，略偏 | 1.0 | 0.1 | 0.8 | **0.08** | **0.62** |
 | 速度适中，略歪 | 1.0 | 0.8 | 0.1 | **0.08** | **0.67** |

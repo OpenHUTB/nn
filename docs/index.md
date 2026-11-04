@@ -148,7 +148,7 @@ title: 主页
 
 - [__CARLA自动驾驶多场景仿真项目__](./DeFIX/docs/index.md)
 
-- [__自动驾驶系统__](./auto_drive_system/auto_drive_system_README) - 基于强化学习的自动驾驶系统
+- [__基于 PPO 算法的 Carla 自动驾驶系统__](./auto_drive_system/auto_drive_system_README)
 
 - [__carla_2d_deeprl__](./carla_2d_deeprl/README.md) - 基于 CARLA 的极简 2D 深度强化学习自动驾驶环境。
 
@@ -161,8 +161,6 @@ title: 主页
 - [__V2X路侧智能感知__](./edge_intelligence_V2X/README.md) - 基于YOLOv8n的V2X路侧智能感知系统优化与实现
 
 - [__车辆自动驾驶辅助功能__](./vehicle_autonomous_core/README.md) - 基于CARLA 的多模块车辆辅助驾驶系统
-
-- [__自动驾驶系统__](./auto_drive_system/auto_drive_system_README) - 基于强化学习的自动驾驶系统
 
 - [__CARLA自动驾驶多场景仿真项目__](./DeFIX/docs/index.md)
 
