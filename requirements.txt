@@ -1,2 +1,10 @@
-mkdocs
 python-markdown-math
+pymdown-extensions
+imageio
+mkdocs-bibtex
+# fix OSError: No pandoc was found: 
+pypandoc-binary
+mkdocs-video
+# 支持表格跨多行和多列
+markdown-grid-tables
+mkdocs-mermaid2-plugin
