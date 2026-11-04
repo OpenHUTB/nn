@@ -1,157 +1,150 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/active_lane_keeping/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>自动驾驶车道保持系统 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/active_lane_keeping/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>自动驾驶车道保持系统 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u81ea\u52a8\u9a7e\u9a76\u8f66\u9053\u4fdd\u6301\u7cfb\u7edf";
         var mkdocs_page_input_path = "active_lane_keeping/README.md";
         var mkdocs_page_url = "/nn/active_lane_keeping/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">自动驾驶车道保持系统</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/active_lane_keeping/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">自动驾驶车道保持系统</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">自动驾驶车道保持系统</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/active_lane_keeping/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">自动驾驶车道保持系统</h1>
 <h2 id="_2">目录</h2>
 <ul>
-<li><a href="#项目简介">项目简介</a></li>
-<li><a href="#功能特性">功能特性</a></li>
-<li><a href="#快速开始">快速开始</a></li>
-<li><a href="#环境要求">环境要求</a></li>
-<li><a href="#安装步骤">安装步骤</a></li>
-<li><a href="#运行方式">运行方式</a></li>
-<li><a href="#运行效果">运行效果</a></li>
-<li><a href="#核心技术">核心技术</a></li>
-<li><a href="#车道线检测">车道线检测</a></li>
-<li><a href="#控制器算法">控制器算法</a></li>
-<li><a href="#配置说明">配置说明</a></li>
-<li><a href="#命令行接口">命令行接口</a></li>
-<li><a href="#项目结构">项目结构</a></li>
-<li><a href="#数据输出">数据输出</a></li>
-<li><a href="#性能优化">性能优化</a></li>
-<li><a href="#参考资料">参考资料</a></li>
+<li><a href="#%E9%A1%B9%E7%9B%AE%E7%AE%80%E4%BB%8B">项目简介</a></li>
+<li><a href="#%E5%8A%9F%E8%83%BD%E7%89%B9%E6%80%A7">功能特性</a></li>
+<li><a href="#%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B">快速开始</a></li>
+<li><a href="#%E7%8E%AF%E5%A2%83%E8%A6%81%E6%B1%82">环境要求</a></li>
+<li><a href="#%E5%AE%89%E8%A3%85%E6%AD%A5%E9%AA%A4">安装步骤</a></li>
+<li><a href="#%E8%BF%90%E8%A1%8C%E6%96%B9%E5%BC%8F">运行方式</a></li>
+<li><a href="#%E8%BF%90%E8%A1%8C%E6%95%88%E6%9E%9C">运行效果</a></li>
+<li><a href="#%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF">核心技术</a></li>
+<li><a href="#%E8%BD%A6%E9%81%93%E7%BA%BF%E6%A3%80%E6%B5%8B">车道线检测</a></li>
+<li><a href="#%E6%8E%A7%E5%88%B6%E5%99%A8%E7%AE%97%E6%B3%95">控制器算法</a></li>
+<li><a href="#%E9%85%8D%E7%BD%AE%E8%AF%B4%E6%98%8E">配置说明</a></li>
+<li><a href="#%E5%91%BD%E4%BB%A4%E8%A1%8C%E6%8E%A5%E5%8F%A3">命令行接口</a></li>
+<li><a href="#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84">项目结构</a></li>
+<li><a href="#%E6%95%B0%E6%8D%AE%E8%BE%93%E5%87%BA">数据输出</a></li>
+<li><a href="#%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96">性能优化</a></li>
+<li><a href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99">参考资料</a></li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_3">项目简介</h2>
 <p>Active Lane Keeping Assistant 是一个基于计算机视觉的自动驾驶车道保持系统。通过传统图像处理技术实现鲁棒的车道线检测，结合自适应 PID 控制器实现车辆自动跟踪控制。项目使用 CARLA 模拟器进行真实环境仿真测试。</p>
 <p><strong>核心优势</strong>：
 - 🎯 <strong>鲁棒检测</strong>：自适应阈值 + 边缘检测融合，适应复杂光照条件
 - 🚀 <strong>智能控制</strong>：增益调度 + 模型预测控制，实现精准转向
 - ⚡ <strong>实时性能</strong>：GPU 加速 + 并行处理，保证实时性要求</p>
-<hr />
+<hr/>
 <h2 id="_4">功能特性</h2>
 <table>
 <thead>
@@ -207,7 +200,7 @@
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_5">快速开始</h2>
 <h3 id="_6">环境要求</h3>
 <ul>
@@ -217,35 +210,35 @@
 <li><strong>操作系统</strong>: Windows / Linux / macOS</li>
 </ul>
 <h3 id="_7">安装步骤</h3>
-<pre><code class="language-bash"># 1. 克隆项目
-git clone https://github.com/C2G-BR/Active-Lane-Keeping-Assistant.git
-cd Active-Lane-Keeping-Assistant
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. 克隆项目</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/C2G-BR/Active-Lane-Keeping-Assistant.git
+<span class="nb">cd</span><span class="w"> </span>Active-Lane-Keeping-Assistant
 
-# 2. 安装依赖
-pip install -r requirements.txt
-</code></pre>
+<span class="c1"># 2. 安装依赖</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</code></pre></div>
 <p><strong>安装 CARLA 模拟器</strong>：
 - 下载地址: <a href="https://github.com/carla-simulator/carla/releases/tag/0.9.13">CARLA 0.9.13</a>
 - 解压后运行 <code>CarlaUE4.exe</code>（Windows）或 <code>CarlaUE4.sh</code>（Linux）</p>
 <h3 id="_8">运行方式</h3>
-<pre><code class="language-bash"># 1. 启动 CARLA 模拟器（单独窗口）
-# CarlaUE4.exe
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. 启动 CARLA 模拟器（单独窗口）</span>
+<span class="c1"># CarlaUE4.exe</span>
 
-# 2. 运行车道保持系统（默认使用 PID 控制器）
-python src/main.py -id &quot;test_run&quot; -c pid -s 1000
+<span class="c1"># 2. 运行车道保持系统（默认使用 PID 控制器）</span>
+python<span class="w"> </span>src/main.py<span class="w"> </span>-id<span class="w"> </span><span class="s2">"test_run"</span><span class="w"> </span>-c<span class="w"> </span>pid<span class="w"> </span>-s<span class="w"> </span><span class="m">1000</span>
 
-# 3. 使用 MPC 控制器（推荐）
-python src/main.py -id &quot;mpc_demo&quot; -c mpc -s 1000
+<span class="c1"># 3. 使用 MPC 控制器（推荐）</span>
+python<span class="w"> </span>src/main.py<span class="w"> </span>-id<span class="w"> </span><span class="s2">"mpc_demo"</span><span class="w"> </span>-c<span class="w"> </span>mpc<span class="w"> </span>-s<span class="w"> </span><span class="m">1000</span>
 
-# 4. 启用 GPU 加速
-python src/main.py -id &quot;gpu_run&quot; -c pid --gpu -s 1000
-</code></pre>
-<hr />
+<span class="c1"># 4. 启用 GPU 加速</span>
+python<span class="w"> </span>src/main.py<span class="w"> </span>-id<span class="w"> </span><span class="s2">"gpu_run"</span><span class="w"> </span>-c<span class="w"> </span>pid<span class="w"> </span>--gpu<span class="w"> </span>-s<span class="w"> </span><span class="m">1000</span>
+</code></pre></div>
+<hr/>
 <h2 id="_9">运行效果</h2>
 <p>系统在 CARLA 模拟器中实现了实时车道检测和自动控制。车辆能够根据检测到的车道线自动保持在车道中心行驶，左上角实时显示距离车道中心的偏差（单位：厘米）。</p>
-<p><img alt="车道检测效果1" src="images/demo1.png" /></p>
-<p><img alt="车道检测效果2" src="images/demo2.png" /></p>
-<hr />
+<p><img alt="车道检测效果1" src="images/demo1.png"/></p>
+<p><img alt="车道检测效果2" src="images/demo2.png"/></p>
+<hr/>
 <h2 id="_10">核心技术</h2>
 <h3 id="_11">车道线检测</h3>
 <p>采用传统图像处理技术实现鲁棒的车道线检测：</p>
@@ -338,68 +331,68 @@ python src/main.py -id &quot;gpu_run&quot; -c pid --gpu -s 1000
 - 低速（&lt; 30 km/h）：P=0.8, D=0.02
 - 中速（30-60 km/h）：P=0.65, D=0.034
 - 高速（&gt; 60 km/h）：P=0.5, D=0.05</p>
-<hr />
+<hr/>
 <h2 id="_13">配置说明</h2>
 <p>配置文件位于 <code>src/config.yaml</code>，支持以下配置项：</p>
-<pre><code class="language-yaml"># 连接设置
-connection:
-  server_ip: &quot;127.0.0.1&quot;
-  port: 2000
-  timeout: 10.0
+<div class="highlight"><pre><span></span><code><span class="c1"># 连接设置</span>
+<span class="nt">connection</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">server_ip</span><span class="p">:</span><span class="w"> </span><span class="s">"127.0.0.1"</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000</span>
+<span class="w">  </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10.0</span>
 
-# 仿真设置
-simulation:
-  map: &quot;Town05&quot;
-  time_difference: 0.01
+<span class="c1"># 仿真设置</span>
+<span class="nt">simulation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">map</span><span class="p">:</span><span class="w"> </span><span class="s">"Town05"</span>
+<span class="w">  </span><span class="nt">time_difference</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span>
 
-# 摄像头设置
-camera:
-  image_height: 480
-  image_width: 640
-  fov: 110
-  x_offset: 2.5
-  z_offset: 0.7
+<span class="c1"># 摄像头设置</span>
+<span class="nt">camera</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">image_height</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">480</span>
+<span class="w">  </span><span class="nt">image_width</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">640</span>
+<span class="w">  </span><span class="nt">fov</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">110</span>
+<span class="w">  </span><span class="nt">x_offset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.5</span>
+<span class="w">  </span><span class="nt">z_offset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.7</span>
 
-# 车道检测设置
-lane_detection:
-  use_adaptive_threshold: true    # 使用 Otsu 自适应阈值
-  use_edge_detection: true        # 启用边缘检测融合
-  canny_low: 50                   # Canny 低阈值
-  canny_high: 150                 # Canny 高阈值
-  max_lost_frames: 5              # 最大连续丢失帧数
+<span class="c1"># 车道检测设置</span>
+<span class="nt">lane_detection</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">use_adaptive_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">    </span><span class="c1"># 使用 Otsu 自适应阈值</span>
+<span class="w">  </span><span class="nt">use_edge_detection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">        </span><span class="c1"># 启用边缘检测融合</span>
+<span class="w">  </span><span class="nt">canny_low</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span><span class="w">                   </span><span class="c1"># Canny 低阈值</span>
+<span class="w">  </span><span class="nt">canny_high</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">150</span><span class="w">                 </span><span class="c1"># Canny 高阈值</span>
+<span class="w">  </span><span class="nt">max_lost_frames</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w">              </span><span class="c1"># 最大连续丢失帧数</span>
 
-# 控制器设置
-controller:
-  default_controller: &quot;pid_gs&quot;    # simple, p, pd, pid, pid_gs, mpc
-  tau_p: 0.65                     # 比例参数
-  tau_i: 0.00000002               # 积分参数
-  tau_d: 0.034                    # 微分参数
-  throttle: 0.3                   # 油门值
-  mpc_prediction_steps: 5         # MPC 预测步数
-  mpc_control_steps: 3            # MPC 控制步数
+<span class="c1"># 控制器设置</span>
+<span class="nt">controller</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">default_controller</span><span class="p">:</span><span class="w"> </span><span class="s">"pid_gs"</span><span class="w">    </span><span class="c1"># simple, p, pd, pid, pid_gs, mpc</span>
+<span class="w">  </span><span class="nt">tau_p</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.65</span><span class="w">                     </span><span class="c1"># 比例参数</span>
+<span class="w">  </span><span class="nt">tau_i</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.00000002</span><span class="w">               </span><span class="c1"># 积分参数</span>
+<span class="w">  </span><span class="nt">tau_d</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.034</span><span class="w">                    </span><span class="c1"># 微分参数</span>
+<span class="w">  </span><span class="nt">throttle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span><span class="w">                   </span><span class="c1"># 油门值</span>
+<span class="w">  </span><span class="nt">mpc_prediction_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w">         </span><span class="c1"># MPC 预测步数</span>
+<span class="w">  </span><span class="nt">mpc_control_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span><span class="w">            </span><span class="c1"># MPC 控制步数</span>
 
-# 性能设置
-performance:
-  use_gpu: true                   # 使用 GPU 加速
-  parallel_processing: true       # 启用并行处理
-  enable_profiling: true          # 启用性能监控
+<span class="c1"># 性能设置</span>
+<span class="nt">performance</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">use_gpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                   </span><span class="c1"># 使用 GPU 加速</span>
+<span class="w">  </span><span class="nt">parallel_processing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">       </span><span class="c1"># 启用并行处理</span>
+<span class="w">  </span><span class="nt">enable_profiling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># 启用性能监控</span>
 
-# 运行设置
-run:
-  default_steps: 1000
-  save_video: true
+<span class="c1"># 运行设置</span>
+<span class="nt">run</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">default_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w">  </span><span class="nt">save_video</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 
-# 调试设置
-debug:
-  show_error_plot: true
-  save_error_image: true
-</code></pre>
-<hr />
+<span class="c1"># 调试设置</span>
+<span class="nt">debug</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">show_error_plot</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">save_error_image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<hr/>
 <h2 id="_14">命令行接口</h2>
-<pre><code class="language-bash">python src/main.py [-h] -id IDENTIFIER [-c {simple,p,pd,pid,pid_gs,mpc}]
-                   [-s STEPS] [-a] [-t TOLERANCE] [-d] [-cfg CONFIG]
-                   [--gpu] [--profile]
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>src/main.py<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span>-id<span class="w"> </span>IDENTIFIER<span class="w"> </span><span class="o">[</span>-c<span class="w"> </span><span class="o">{</span>simple,p,pd,pid,pid_gs,mpc<span class="o">}]</span>
+<span class="w">                   </span><span class="o">[</span>-s<span class="w"> </span>STEPS<span class="o">]</span><span class="w"> </span><span class="o">[</span>-a<span class="o">]</span><span class="w"> </span><span class="o">[</span>-t<span class="w"> </span>TOLERANCE<span class="o">]</span><span class="w"> </span><span class="o">[</span>-d<span class="o">]</span><span class="w"> </span><span class="o">[</span>-cfg<span class="w"> </span>CONFIG<span class="o">]</span>
+<span class="w">                   </span><span class="o">[</span>--gpu<span class="o">]</span><span class="w"> </span><span class="o">[</span>--profile<span class="o">]</span>
+</code></pre></div>
 <table>
 <thead>
 <tr>
@@ -456,19 +449,19 @@ debug:
 </tr>
 </tbody>
 </table>
-<p><strong>示例</strong>：</p>
-<pre><code class="language-bash"># 使用增益调度 PID 控制器
-python src/main.py -id &quot;gs_pid_run&quot; -c pid_gs -s 1000
+<p><strong>示例</strong>：
+</p><div class="highlight"><pre><span></span><code><span class="c1"># 使用增益调度 PID 控制器</span>
+python<span class="w"> </span>src/main.py<span class="w"> </span>-id<span class="w"> </span><span class="s2">"gs_pid_run"</span><span class="w"> </span>-c<span class="w"> </span>pid_gs<span class="w"> </span>-s<span class="w"> </span><span class="m">1000</span>
 
-# 使用 MPC 控制器并启用 GPU 加速
-python src/main.py -id &quot;mpc_gpu&quot; -c mpc --gpu -s 1000
+<span class="c1"># 使用 MPC 控制器并启用 GPU 加速</span>
+python<span class="w"> </span>src/main.py<span class="w"> </span>-id<span class="w"> </span><span class="s2">"mpc_gpu"</span><span class="w"> </span>-c<span class="w"> </span>mpc<span class="w"> </span>--gpu<span class="w"> </span>-s<span class="w"> </span><span class="m">1000</span>
 
-# 启用性能分析
-python src/main.py -id &quot;profile_run&quot; -c pid --profile -s 500
-</code></pre>
-<hr />
+<span class="c1"># 启用性能分析</span>
+python<span class="w"> </span>src/main.py<span class="w"> </span>-id<span class="w"> </span><span class="s2">"profile_run"</span><span class="w"> </span>-c<span class="w"> </span>pid<span class="w"> </span>--profile<span class="w"> </span>-s<span class="w"> </span><span class="m">500</span>
+</code></pre></div>
+<hr/>
 <h2 id="_15">项目结构</h2>
-<pre><code>Active-Lane-Keeping-Assistant/
+<div class="highlight"><pre><span></span><code>Active-Lane-Keeping-Assistant/
 ├── assets/                 # 静态资源
 ├── docs/                   # 文档和示例图片
 ├── img/                    # 图像处理示例输出
@@ -487,7 +480,7 @@ python src/main.py -id &quot;profile_run&quot; -c pid --profile -s 500
 ├── .gitignore
 ├── README.md
 └── requirements.txt
-</code></pre>
+</code></pre></div>
 <h3 id="_16">模块说明</h3>
 <table>
 <thead>
@@ -531,7 +524,7 @@ python src/main.py -id &quot;profile_run&quot; -c pid --profile -s 500
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_17">数据输出</h2>
 <p>每次运行会在 <code>src/data/{run_id}/</code> 目录下生成以下文件：</p>
 <table>
@@ -580,7 +573,7 @@ python src/main.py -id &quot;profile_run&quot; -c pid --profile -s 500
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_18">性能优化</h2>
 <h3 id="_19">已实现的优化措施</h3>
 <table>
@@ -656,7 +649,7 @@ python src/main.py -id &quot;profile_run&quot; -c pid --profile -s 500
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_21">参考资料</h2>
 <ul>
 <li><a href="https://towardsdatascience.com/lane-detection-with-deep-learning-part-1-9e096f3320b7">Lane Detection with Deep Learning</a></li>
@@ -664,50 +657,42 @@ python src/main.py -id &quot;profile_run&quot; -c pid --profile -s 500
 <li><a href="https://carla.readthedocs.io/">CARLA Simulator Documentation</a></li>
 <li><a href="https://arxiv.org/abs/1708.02596">Model Predictive Control for Autonomous Vehicles</a></li>
 <li><a href="https://controltheorypro.com/pid-controller/">PID Controller Explained</a></li>
-</ul>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+</ul></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

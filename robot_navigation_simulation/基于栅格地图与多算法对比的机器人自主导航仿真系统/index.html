@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/robot_navigation_simulation/%E5%9F%BA%E4%BA%8E%E6%A0%85%E6%A0%BC%E5%9C%B0%E5%9B%BE%E4%B8%8E%E5%A4%9A%E7%AE%97%E6%B3%95%E5%AF%B9%E6%AF%94%E7%9A%84%E6%9C%BA%E5%99%A8%E4%BA%BA%E8%87%AA%E4%B8%BB%E5%AF%BC%E8%88%AA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/" />
-      <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>基于栅格地图与多算法对比的机器人自主导航仿真系统 - 神经网络</title>
-    <link rel="stylesheet" href="../../css/theme.css" />
-    <link rel="stylesheet" href="../../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/robot_navigation_simulation/%E5%9F%BA%E4%BA%8E%E6%A0%85%E6%A0%BC%E5%9C%B0%E5%9B%BE%E4%B8%8E%E5%A4%9A%E7%AE%97%E6%B3%95%E5%AF%B9%E6%AF%94%E7%9A%84%E6%9C%BA%E5%99%A8%E4%BA%BA%E8%87%AA%E4%B8%BB%E5%AF%BC%E8%88%AA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/" rel="canonical"/>
+<link href="../../img/favicon.ico" rel="shortcut icon"/>
+<title>基于栅格地图与多算法对比的机器人自主导航仿真系统 - 神经网络</title>
+<link href="../../css/theme.css" rel="stylesheet"/>
+<link href="../../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e\u6805\u683c\u5730\u56fe\u4e0e\u591a\u7b97\u6cd5\u5bf9\u6bd4\u7684\u673a\u5668\u4eba\u81ea\u4e3b\u5bfc\u822a\u4eff\u771f\u7cfb\u7edf";
         var mkdocs_page_input_path = "robot_navigation_simulation/\u57fa\u4e8e\u6805\u683c\u5730\u56fe\u4e0e\u591a\u7b97\u6cd5\u5bf9\u6bd4\u7684\u673a\u5668\u4eba\u81ea\u4e3b\u5bfc\u822a\u4eff\u771f\u7cfb\u7edf.md";
         var mkdocs_page_url = "/nn/robot_navigation_simulation/%E5%9F%BA%E4%BA%8E%E6%A0%85%E6%A0%BC%E5%9C%B0%E5%9B%BE%E4%B8%8E%E5%A4%9A%E7%AE%97%E6%B3%95%E5%AF%B9%E6%AF%94%E7%9A%84%E6%9C%BA%E5%99%A8%E4%BA%BA%E8%87%AA%E4%B8%BB%E5%AF%BC%E8%88%AA%E4%BB%BF%E7%9C%9F%E7%B3%BB%E7%BB%9F/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href="../.." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href="../.."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">基于栅格地图与多算法对比的机器人自主导航仿真系统</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/robot_navigation_simulation/基于栅格地图与多算法对比的机器人自主导航仿真系统.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">基于栅格地图与多算法对比的机器人自主导航仿真系统</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="../..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href="../.."></a></li>
+<li class="breadcrumb-item active">基于栅格地图与多算法对比的机器人自主导航仿真系统</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/robot_navigation_simulation/基于栅格地图与多算法对比的机器人自主导航仿真系统.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">基于栅格地图与多算法对比的机器人自主导航仿真系统</h1>
 <h2 id="_2">摘要</h2>
 <p>本项目围绕移动机器人自主导航这一经典问题，构建了一套基于二维栅格地图的轻量级导航仿真系统。系统从环境建模、全局路径规划、动态障碍插入、在线重规划、轨迹平滑到可视化分析形成了完整闭环，并进一步引入多算法对比评测机制，对 <code>A*</code>、<code>Dijkstra</code>、<code>Greedy Best-First</code> 与 <code>RRT*</code> 等方法在同一环境中的表现进行统一分析。针对传统项目“只给出一条路径、缺少动态响应与实验对比”的不足，项目在原始路径规划基础上增加了动态重规划、批量地图实验、轨迹平滑、简易运动学约束与交互式二维仿真界面等改进，使系统既能演示导航过程，又能支撑定量实验分析。</p>
 <h2 id="1">1. 项目背景与研究动机</h2>
@@ -431,50 +424,50 @@ T = t_{end} - t_{start}
 <h2 id="8">8. 仿真流程与核心结果</h2>
 <h3 id="81">8.1 地图与障碍分布</h3>
 <p>下图展示了单次导航实验中的栅格地图与障碍物分布。黑色区域表示障碍物，绿色方块为起点，红色星形为目标点。</p>
-<p><img alt="地图与障碍分布" src="../image/map_obstacle_distribution.png" /></p>
+<p><img alt="地图与障碍分布" src="../image/map_obstacle_distribution.png"/></p>
 <p><em>图 8.1：二维栅格环境中的障碍分布与起终点设置。</em></p>
 <h3 id="82">8.2 初始路径与重规划路径</h3>
 <p>在机器人运动过程中，系统会向路径前方插入动态障碍物，并触发重规划。下图展示了初始规划路径与重规划路径之间的差异。</p>
-<p><img alt="初始路径与重规划路径对比" src="../image/initial_vs_replanned_path.png" /></p>
+<p><img alt="初始路径与重规划路径对比" src="../image/initial_vs_replanned_path.png"/></p>
 <p><em>图 8.2：动态障碍插入后，系统基于剩余空间重新生成替代路径。</em></p>
 <h3 id="83">8.3 导航轨迹、平滑轨迹与运动学轨迹</h3>
 <p>项目在原始导航轨迹之外，还叠加了平滑轨迹与受转向约束的运动学轨迹，用于说明路径优化带来的轨迹连续性提升。</p>
-<p><img alt="导航轨迹图" src="../image/navigation_trajectory.png" /></p>
+<p><img alt="导航轨迹图" src="../image/navigation_trajectory.png"/></p>
 <p><em>图 8.3：机器人导航轨迹、平滑轨迹与运动学轨迹在同一环境中的可视化结果。</em></p>
 <p>为了更直观展示机器人在动态障碍插入后的实际运动过程，项目还输出了单次导航过程动图：</p>
-<p><img alt="单次导航过程动图" src="../image/navigation_demo.gif" /></p>
+<p><img alt="单次导航过程动图" src="../image/navigation_demo.gif"/></p>
 <p><em>图 8.4：机器人从起点出发、遭遇动态障碍、触发重规划并最终到达目标点的完整动态过程。</em></p>
 <p>从图中可以观察到，原始轨迹主要由离散栅格节点连接而成，存在较多拐点；平滑后路径去除了大量冗余折点；进一步施加运动学约束后，轨迹在转角处变得更加连续，这说明“可达路径”与“适合执行的路径”之间仍然存在优化空间。</p>
 <h3 id="84">8.4 单次实验中的算法对比</h3>
 <p>对于同一张地图，系统会输出不同算法的对比图，用于观察算法在路径形态、代价和搜索效率上的差异。</p>
-<p><img alt="单地图算法对比" src="../image/algorithm_comparison.png" /></p>
+<p><img alt="单地图算法对比" src="../image/algorithm_comparison.png"/></p>
 <p><em>图 8.4：在同一导航场景下，不同算法的总代价、重规划次数、扩展节点数与运行时间对比。</em></p>
 <h3 id="85">8.5 批量地图实验结果</h3>
 <p>为了避免只依赖单一场景得出结论，系统额外构建了多张随机地图并进行批量测试。下图给出了批量实验的汇总结果。</p>
-<p><img alt="批量算法评测结果" src="../image/batch_algorithm_metrics.png" /></p>
+<p><img alt="批量算法评测结果" src="../image/batch_algorithm_metrics.png"/></p>
 <p><em>图 8.5：批量地图实验下的成功率、平均路径代价、平均重规划次数、平均扩展节点数、平均运行时间与获胜次数统计。</em></p>
 <p>此外，系统还会为不同随机地图分别保存单独的算法对比图，用于观察不同环境结构下算法行为的变化。例如：</p>
-<p><img alt="单地图批量对比示例" src="../image/batch_map_01_comparison.png" /></p>
+<p><img alt="单地图批量对比示例" src="../image/batch_map_01_comparison.png"/></p>
 <p><em>图 8.6：某一随机地图下多种规划算法的路径与统计结果并列对比。</em></p>
 <p>对于批量实验中的导航过程，系统还额外生成了不同地图、不同算法对应的动图文件，用于展示各方法在相同场景下的实际行进过程和重规划响应。</p>
 <p>例如，在同一张批量测试地图中，<code>A*</code> 的动态导航过程可表示为：</p>
-<p><img alt="批量地图中的 A* 导航动图" src="../image/batch_map_01_astar.gif" /></p>
+<p><img alt="批量地图中的 A* 导航动图" src="../image/batch_map_01_astar.gif"/></p>
 <p><em>图 8.7：<code>A*</code> 在批量实验某一测试地图中的实时导航与重规划过程。</em></p>
 <h3 id="86">8.6 障碍密度变化实验</h3>
 <p>为了进一步说明环境复杂度对路径规划性能的影响，项目额外设计了障碍密度扫描实验。实验在相同起终点设置下，分别取较低、中等和较高三组障碍密度，对 <code>A*</code>、<code>Dijkstra</code> 和 <code>Greedy Best-First</code> 进行统一评测，输出成功率、平均路径代价、平均扩展节点数和平均运行时间的变化趋势。</p>
-<p><img alt="障碍密度变化实验" src="../image/experiment_obstacle_density.png" /></p>
+<p><img alt="障碍密度变化实验" src="../image/experiment_obstacle_density.png"/></p>
 <p><em>图 8.8：随着障碍密度上升，不同算法在搜索效率与路径质量上的变化趋势。</em></p>
 <p>该实验主要说明两个问题：一是环境越拥挤，搜索空间越容易被障碍切割，算法需要花费更多代价寻找可行路径；二是启发式信息是否有效，会在复杂环境下被进一步放大。</p>
 <p>从当前实验结果可以看出，在障碍密度由 <code>0.10</code> 提高到 <code>0.26</code> 的过程中，<code>A*</code> 的平均路径代价始终保持在 <code>44.0</code>，说明其在环境复杂度变化下仍能够稳定地产生较优路径。相比之下，<code>Greedy Best-First</code> 的平均路径代价由 <code>46.0</code> 上升至 <code>58.0</code>，表明该方法虽然具有较快的搜索速度，但在障碍结构趋于复杂时更容易受到局部启发信息的影响，从而产生次优路径。<code>Dijkstra</code> 的路径代价与 <code>A*</code> 基本接近，但其平均扩展节点数长期维持在 <code>800</code> 以上，搜索代价显著更高。由此可见，在障碍密度变化实验中，<code>A*</code> 在路径质量与搜索效率之间表现出更稳定的折中能力。</p>
 <h3 id="87">8.7 动态障碍触发时机实验</h3>
 <p>除了空间复杂度外，动态障碍出现的时机也会影响系统重规划负担。为此，项目设置了不同的障碍注入步数，对比障碍在较早、中等和较晚阶段出现时，导航总代价、重规划代价和运行时间的变化。</p>
-<p><img alt="动态障碍触发时机实验" src="../image/experiment_injection_step.png" /></p>
+<p><img alt="动态障碍触发时机实验" src="../image/experiment_injection_step.png"/></p>
 <p><em>图 8.9：动态障碍越早出现，剩余路径越长，算法越可能面临更大的后续重规划空间。</em></p>
 <p>该实验用于说明：同一算法在动态环境中的表现，不仅取决于地图结构，也取决于环境变化发生的时间点。较早的障碍触发通常意味着更大的路径调整空间，而较晚的障碍触发则更考验算法在局部受阻时的响应效率。</p>
 <p>从实验输出可以看到，当动态障碍触发步数分别取 <code>4</code>、<code>8</code> 和 <code>12</code> 时，<code>A*</code> 的平均路径代价始终保持为 <code>44.0</code>，平均重规划次数稳定为 <code>1.0</code>，说明其对障碍出现时机具有较好的鲁棒性。<code>Greedy Best-First</code> 在三组设置下的平均路径代价分别为 <code>50.0</code>、<code>50.0</code> 和 <code>52.0</code>，始终高于 <code>A*</code>，反映出其在动态环境下更容易因局部贪心策略而牺牲整体路径质量。<code>Dijkstra</code> 虽然在路径代价上与 <code>A*</code> 一致，但其运行时间明显偏高，例如在触发步数为 <code>8</code> 时平均运行时间达到 <code>11.412 ms</code>。这说明在需要在线响应的导航任务中，<code>A*</code> 不仅能够保持较高的路径质量，而且具有更适中的实时计算开销。</p>
 <h3 id="88">8.8 地图尺度变化实验</h3>
 <p>在保持算法种类一致的前提下，项目还设计了不同地图尺度下的导航实验，用于观察地图规模扩张后搜索效率、路径代价与运行时间的变化规律。实验选择了三种代表性栅格尺寸，以较稳定的障碍密度进行测试。</p>
-<p><img alt="地图尺度变化实验" src="../image/experiment_map_scale.png" /></p>
+<p><img alt="地图尺度变化实验" src="../image/experiment_map_scale.png"/></p>
 <p><em>图 8.10：地图尺寸扩大后，搜索空间随之增长，不同算法的扩展节点数与运行时间差异更加明显。</em></p>
 <p>这一实验的意义在于验证系统不仅能在单一地图上工作，而且可以在不同规模的环境中保持可分析性，从而使项目更接近“参数化仿真实验平台”的形态。</p>
 <p>地图尺度实验进一步反映了算法在搜索空间扩张条件下的稳定性。随着栅格规模由 <code>20 x 20</code> 扩展至 <code>30 x 30</code>，各算法的运行时间与扩展节点数均呈上升趋势，这是由于状态空间规模扩大、绕障组合增多所致。在这一过程中，<code>A*</code> 仍能够借助启发式函数维持较强的目标导向性，从而避免 <code>Dijkstra</code> 式的大范围均匀扩展；与此同时，它又不像 <code>Greedy Best-First</code> 那样过度依赖局部启发信息，因此不会在复杂场景下显著牺牲路径质量。由此说明，随着地图规模增加，<code>A*</code> 在全局性与引导性之间的平衡优势反而更加明显。</p>
@@ -506,50 +499,42 @@ T = t_{end} - t_{start}
 </ul>
 <h2 id="11">11. 小结</h2>
 <p>本项目以栅格地图为基础，以多算法对比为主线，以动态重规划与轨迹优化为增强手段，构建了一套轻量但完整的机器人自主导航仿真系统。它既能直观展示机器人导航的过程，也能提供多维度实验指标支持算法比较，适合作为机器人导航算法的原型验证与教学实验平台。</p>
-<p>若进一步结合 <code>ROS + Gazebo</code>、<code>Webots</code> 或真实移动机器人底盘，本项目中的地图建模、全局规划、重规划判定和平滑策略都可以继续复用，因此它不仅适合作为课程设计成果，也具备向更真实仿真平台迁移的工程延展性；但这部分属于后续扩展，而不属于当前版本已经完成的验证范围。</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<p>若进一步结合 <code>ROS + Gazebo</code>、<code>Webots</code> 或真实移动机器人底盘，本项目中的地图建模、全局规划、重规划判定和平滑策略都可以继续复用，因此它不仅适合作为课程设计成果，也具备向更真实仿真平台迁移的工程延展性；但这部分属于后续扩展，而不属于当前版本已经完成的验证范围。</p></div>
 </div>
-    <script src="../../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "../..";</script>
-    <script src="../../js/theme_extra.js"></script>
-    <script src="../../js/theme.js"></script>
-      <script src="../../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../../search/main.js"></script>
-    <script>
+</div><footer>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "../..";</script>
+<script src="../../js/theme_extra.js"></script>
+<script src="../../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../../js/umlconvert.js"></script>
+<script src="../../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

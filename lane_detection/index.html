@@ -1,158 +1,151 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/lane_detection/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>车道线检测 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/lane_detection/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>车道线检测 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u8f66\u9053\u7ebf\u68c0\u6d4b";
         var mkdocs_page_input_path = "lane_detection/README.md";
         var mkdocs_page_url = "/nn/lane_detection/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">车道线检测</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#_1">模块结构</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_2">开发环境</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_3">运行方式</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#1canny">步骤1：基础版（Canny + 霍夫）</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#2hsv">步骤2：HSV 预处理优化</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#3">步骤3：透视变换 + 滑动窗口 + 多项式拟合</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#4">步骤4：视频处理与帧间平滑</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#5">步骤5：车道曲率与车辆偏移计算</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#6">步骤6：车道偏离预警系统</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#7">步骤7：快速搜索优化（视频模式）</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#8">步骤8：预处理方法对比与评估</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_4">参考</a>
-    </li>
-    </ul>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">车道线检测</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/lane_detection/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="lane_detection">车道线检测（lane_detection）</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal current" href="#">车道线检测</a>
+<ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="#_1">模块结构</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_2">开发环境</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_3">运行方式</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#1canny">步骤1：基础版（Canny + 霍夫）</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#2hsv">步骤2：HSV 预处理优化</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#3">步骤3：透视变换 + 滑动窗口 + 多项式拟合</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#4">步骤4：视频处理与帧间平滑</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#5">步骤5：车道曲率与车辆偏移计算</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#6">步骤6：车道偏离预警系统</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#7">步骤7：快速搜索优化（视频模式）</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#8">步骤8：预处理方法对比与评估</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_4">参考</a>
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">车道线检测</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/lane_detection/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="lane_detection">车道线检测（lane_detection）</h1>
 <p>基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。</p>
-<p><strong>作者</strong>：ultra223<br />
+<p><strong>作者</strong>：ultra223<br/>
 <strong>课题进度</strong>：8/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警 + 步骤7 快速搜索优化 + 步骤8 预处理对比评估）
 <strong>课题进度</strong>：7/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警 + 步骤7 快速搜索优化）
 <strong>课题进度</strong>：6/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警）
@@ -224,59 +217,59 @@
 <li>Python 3.8+</li>
 <li>OpenCV-Python、NumPy</li>
 </ul>
-<pre><code class="language-bash">pip install opencv-python numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>opencv-python<span class="w"> </span>numpy<span class="w"> </span>-i<span class="w"> </span>https://pypi.tuna.tsinghua.edu.cn/simple
+</code></pre></div>
 <h2 id="_3">运行方式</h2>
 <p>在仓库根目录或模块目录下执行：</p>
-<pre><code class="language-bash">cd src/lane_detection
-python main.py
-</code></pre>
-<pre><code class="language-bash"># 步骤2：HSV 多车道检测
-python main.py --mode hsv
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src/lane_detection
+python<span class="w"> </span>main.py
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># 步骤2：HSV 多车道检测</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>hsv
 
-# 步骤3：透视变换 + 滑动窗口 + 多项式拟合
-python main.py --mode advanced
+<span class="c1"># 步骤3：透视变换 + 滑动窗口 + 多项式拟合</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>advanced
 
-# 步骤4：视频模式（逐帧检测 + EMA 平滑）
-python main.py --mode video --video path/to/video.mp4
+<span class="c1"># 步骤4：视频模式（逐帧检测 + EMA 平滑）</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>video<span class="w"> </span>--video<span class="w"> </span>path/to/video.mp4
 
-# 重新生成文档配图（写入 docs/lane_detection/images）
-python main.py --save-docs --no-show
-python main.py --mode hsv --save-docs --no-show
-python main.py --mode advanced --save-docs --no-show
-</code></pre>
+<span class="c1"># 重新生成文档配图（写入 docs/lane_detection/images）</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--save-docs<span class="w"> </span>--no-show
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>hsv<span class="w"> </span>--save-docs<span class="w"> </span>--no-show
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>advanced<span class="w"> </span>--save-docs<span class="w"> </span>--no-show
+</code></pre></div>
 <h2 id="1canny">步骤1：基础版（Canny + 霍夫）</h2>
 <p>对 Carla 测试图做灰度化、高斯模糊、Canny 边缘检测、梯形 ROI 裁剪，再用霍夫变换检测车道线段。</p>
 <p><strong>输入原图</strong></p>
-<p><img alt="Carla 测试输入" src="images/step01_input.jpg" /></p>
+<p><img alt="Carla 测试输入" src="images/step01_input.jpg"/></p>
 <p><strong>Canny 边缘</strong></p>
-<p><img alt="Canny 边缘" src="images/step01_canny.jpg" /></p>
+<p><img alt="Canny 边缘" src="images/step01_canny.jpg"/></p>
 <p><strong>ROI 区域</strong></p>
-<p><img alt="ROI 掩膜" src="images/step01_roi.jpg" /></p>
+<p><img alt="ROI 掩膜" src="images/step01_roi.jpg"/></p>
 <p><strong>霍夫直线叠加结果</strong></p>
-<p><img alt="步骤1 检测结果" src="images/step01_hough.jpg" /></p>
+<p><img alt="步骤1 检测结果" src="images/step01_hough.jpg"/></p>
 <h2 id="2hsv">步骤2：HSV 预处理优化</h2>
 <p>在 HSV 空间分别提取黄色（双黄线）与白色（车道线）掩膜，以双黄线为界划分左右车道并拟合绘制。</p>
 <p><strong>输入原图</strong></p>
-<p><img alt="HSV 步骤输入" src="images/step02_input.jpg" /></p>
+<p><img alt="HSV 步骤输入" src="images/step02_input.jpg"/></p>
 <p><strong>黄色车道线掩膜</strong></p>
-<p><img alt="黄色掩膜" src="images/step02_yellow_mask.jpg" /></p>
+<p><img alt="黄色掩膜" src="images/step02_yellow_mask.jpg"/></p>
 <p><strong>白色车道线掩膜</strong></p>
-<p><img alt="白色掩膜" src="images/step02_white_mask.jpg" /></p>
+<p><img alt="白色掩膜" src="images/step02_white_mask.jpg"/></p>
 <p><strong>多车道拟合结果</strong></p>
-<p><img alt="步骤2 检测结果" src="images/step02_result.jpg" /></p>
+<p><img alt="步骤2 检测结果" src="images/step02_result.jpg"/></p>
 <h2 id="3">步骤3：透视变换 + 滑动窗口 + 多项式拟合</h2>
 <p>在 HSV + Sobel 梯度联合二值化的基础上，通过透视变换获取鸟瞰图，利用直方图定位车道线基点，滑动窗口搜索车道像素，最后使用二次多项式拟合弯道曲线并反透视叠加回原图。</p>
 <p><strong>HSV + Sobel 二值化车道线</strong></p>
-<p><img alt="步骤3 二值化" src="images/step03_binary.jpg" /></p>
+<p><img alt="步骤3 二值化" src="images/step03_binary.jpg"/></p>
 <p><strong>鸟瞰图透视变换</strong></p>
-<p><img alt="步骤3 鸟瞰图" src="images/step03_birdseye.jpg" /></p>
+<p><img alt="步骤3 鸟瞰图" src="images/step03_birdseye.jpg"/></p>
 <p><strong>滑动窗口搜索</strong></p>
-<p><img alt="步骤3 滑动窗口" src="images/step03_sliding_window.jpg" /></p>
+<p><img alt="步骤3 滑动窗口" src="images/step03_sliding_window.jpg"/></p>
 <p><strong>二次多项式拟合结果</strong></p>
-<p><img alt="步骤3 多项式拟合" src="images/step03_poly_fit.jpg" /></p>
+<p><img alt="步骤3 多项式拟合" src="images/step03_poly_fit.jpg"/></p>
 <p><strong>最终检测结果</strong></p>
-<p><img alt="步骤3 检测结果" src="images/step03_result.jpg" /></p>
+<p><img alt="步骤3 检测结果" src="images/step03_result.jpg"/></p>
 <h2 id="4">步骤4：视频处理与帧间平滑</h2>
 <p>在步骤3的基础上，支持视频文件输入，逐帧执行高级车道线检测流水线，并对连续帧的多项式拟合系数做指数移动平均（EMA）平滑，消除相邻帧之间的抖动，输出稳定的车道线跟踪结果。</p>
 <p><strong>关键参数</strong></p>
@@ -307,8 +300,8 @@ python main.py --mode advanced --save-docs --no-show
 </tbody>
 </table>
 <p><strong>EMA 平滑公式</strong></p>
-<pre><code>fit_smoothed = α × fit_current + (1 − α) × fit_previous
-</code></pre>
+<div class="highlight"><pre><span></span><code>fit_smoothed = α × fit_current + (1 − α) × fit_previous
+</code></pre></div>
 <ul>
 <li>α = 1.0：完全使用当前帧结果（无平滑，可能抖动）</li>
 <li>α = 0.1：高度平滑，响应慢但稳定</li>
@@ -344,9 +337,9 @@ python main.py --mode advanced --save-docs --no-show
 </tbody>
 </table>
 <p><strong>曲率半径公式</strong></p>
-<pre><code>车道线模型: x = A·y² + B·y + C
+<div class="highlight"><pre><span></span><code>车道线模型: x = A·y² + B·y + C
 曲率半径:   R = (1 + (2Ay + B)²)^(3/2) / |2A|
-</code></pre>
+</code></pre></div>
 <ul>
 <li>像素坐标系数先转换为真实世界（米）坐标再计算</li>
 <li>曲率半径 &gt; 800 m 视为直道</li>
@@ -384,16 +377,16 @@ python main.py --mode advanced --save-docs --no-show
 </tbody>
 </table>
 <p><strong>使用方式</strong></p>
-<pre><code class="language-bash"># 图片模式（自动显示曲率与偏移）
-python main.py --mode advanced
+<div class="highlight"><pre><span></span><code><span class="c1"># 图片模式（自动显示曲率与偏移）</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>advanced
 
-# 视频模式（每帧显示曲率与偏移）
-python main.py --mode video --video path/to/video.mp4
+<span class="c1"># 视频模式（每帧显示曲率与偏移）</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>video<span class="w"> </span>--video<span class="w"> </span>path/to/video.mp4
 
-# 隐藏曲率信息
-python main.py --mode advanced --no-metrics
-python main.py --mode video --video path/to/video.mp4 --no-metrics
-</code></pre>
+<span class="c1"># 隐藏曲率信息</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>advanced<span class="w"> </span>--no-metrics
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>video<span class="w"> </span>--video<span class="w"> </span>path/to/video.mp4<span class="w"> </span>--no-metrics
+</code></pre></div>
 <h2 id="6">步骤6：车道偏离预警系统</h2>
 <p>基于曲率半径和车辆偏移量，实时判定三级驾驶风险，并通过车道区域颜色变化和信息面板给出视觉预警。</p>
 <p><strong>三级预警</strong></p>
@@ -467,16 +460,16 @@ python main.py --mode video --video path/to/video.mp4 --no-metrics
 </tbody>
 </table>
 <p><strong>使用方式</strong></p>
-<pre><code class="language-bash"># 图片模式（自动显示预警状态）
-python main.py --mode advanced
+<div class="highlight"><pre><span></span><code><span class="c1"># 图片模式（自动显示预警状态）</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>advanced
 
-# 视频模式（每帧实时显示预警）
-python main.py --mode video --video path/to/video.mp4
+<span class="c1"># 视频模式（每帧实时显示预警）</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>video<span class="w"> </span>--video<span class="w"> </span>path/to/video.mp4
 
-# 隐藏预警信息
-python main.py --mode advanced --no-warning
-python main.py --mode video --video path/to/video.mp4 --no-warning
-</code></pre>
+<span class="c1"># 隐藏预警信息</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>advanced<span class="w"> </span>--no-warning
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>video<span class="w"> </span>--video<span class="w"> </span>path/to/video.mp4<span class="w"> </span>--no-warning
+</code></pre></div>
 <h2 id="7">步骤7：快速搜索优化（视频模式）</h2>
 <p>视频模式下，首帧使用滑动窗口搜索，后续帧在上一帧多项式曲线 ±margin 范围内搜索车道像素（带搜索），大幅减少计算量。检测丢失时自动回退到滑动窗口。</p>
 <p><strong>搜索策略</strong></p>
@@ -517,12 +510,12 @@ python main.py --mode video --video path/to/video.mp4 --no-warning
 <li>处理完成后输出统计：带搜索次数、滑动窗口次数、回退次数</li>
 </ul>
 <p><strong>使用方式</strong></p>
-<pre><code class="language-bash"># 默认启用快速搜索
-python main.py --mode video --video path/to/video.mp4
+<div class="highlight"><pre><span></span><code><span class="c1"># 默认启用快速搜索</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>video<span class="w"> </span>--video<span class="w"> </span>path/to/video.mp4
 
-# 关闭快速搜索（回退到纯滑动窗口）
-python main.py --mode video --video path/to/video.mp4 --no-fast
-</code></pre>
+<span class="c1"># 关闭快速搜索（回退到纯滑动窗口）</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>video<span class="w"> </span>--video<span class="w"> </span>path/to/video.mp4<span class="w"> </span>--no-fast
+</code></pre></div>
 <h2 id="8">步骤8：预处理方法对比与评估</h2>
 <p>在同一张图上并排展示三种预处理方法的效果对比，并计算定量评估指标。</p>
 <p><strong>三种方法</strong></p>
@@ -578,68 +571,58 @@ python main.py --mode video --video path/to/video.mp4 --no-fast
 <li>保存 <code>step08_compare.jpg</code></li>
 </ul>
 <p><strong>使用方式</strong></p>
-<pre><code class="language-bash"># 默认图片
-python main.py --mode compare --save-docs
+<div class="highlight"><pre><span></span><code><span class="c1"># 默认图片</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>compare<span class="w"> </span>--save-docs
 
-# 指定图片
-python main.py --mode compare --image path/to/your_image.jpg --save-docs
-</code></pre>
+<span class="c1"># 指定图片</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="w"> </span>compare<span class="w"> </span>--image<span class="w"> </span>path/to/your_image.jpg<span class="w"> </span>--save-docs
+</code></pre></div>
 <h2 id="_4">参考</h2>
 <ul>
 <li><a href="https://github.com/OpenHUTB/nn/blob/main/README.md">OpenHUTB/nn 贡献指南</a></li>
 <li><a href="../carla_CAM/">carla_CAM 模块文档</a>（文档与 mkdocs 约定示例）</li>
-</ul>
-              
-            </div>
-          </div><footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href=".." class="btn btn-neutral float-left" title="首页"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
-        <a href="../car_racing_dqn_improvements/" class="btn btn-neutral float-right" title="CarRacing DQN/DoubleDQN：训练改进与可视化对比">后一页 <span class="icon icon-circle-arrow-right"></span></a>
-    </div>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-      <span><a href=".." style="color: #fcfcfc">&laquo; 前一页</a></span>
-    
-    
-      <span><a href="../car_racing_dqn_improvements/" style="color: #fcfcfc">后一页 &raquo;</a></span>
-    
-  </span>
+</ul></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<div aria-label="Footer Navigation" class="rst-footer-buttons" role="navigation">
+<a class="btn btn-neutral float-left" href=".." title="首页"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+<a class="btn btn-neutral float-right" href="../car_racing_dqn_improvements/" title="CarRacing DQN/DoubleDQN：训练改进与可视化对比">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+</div>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+<span><a href=".." style="color: #fcfcfc">« 前一页</a></span>
+<span><a href="../car_racing_dqn_improvements/" style="color: #fcfcfc">后一页 »</a></span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

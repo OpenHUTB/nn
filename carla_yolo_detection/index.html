@@ -1,148 +1,141 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_yolo_detection/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>自动驾驶感知系统 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/carla_yolo_detection/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>自动驾驶感知系统 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u81ea\u52a8\u9a7e\u9a76\u611f\u77e5\u7cfb\u7edf";
         var mkdocs_page_input_path = "carla_yolo_detection/README.md";
         var mkdocs_page_url = "/nn/carla_yolo_detection/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">自动驾驶感知系统</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#1">1. 项目简介</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#2">2. 选题说明</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#3">3. 开发运行环境</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#4">4. 模块结构与入口</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#5">5.运行指南</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#1-carla">步骤 1：启动 CARLA 模拟器</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#2-python">步骤 2：配置 Python 环境</a>
-    </li>
-        </ul>
-    </li>
-    </ul>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">自动驾驶感知系统</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_yolo_detection/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="carla">自动驾驶感知与控制系统研究 (基于 CARLA)</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal current" href="#">自动驾驶感知系统</a>
+<ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="#1">1. 项目简介</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#2">2. 选题说明</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#3">3. 开发运行环境</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#4">4. 模块结构与入口</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#5">5.运行指南</a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#1-carla">步骤 1：启动 CARLA 模拟器</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#2-python">步骤 2：配置 Python 环境</a>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">自动驾驶感知系统</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_yolo_detection/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="carla">自动驾驶感知与控制系统研究 (基于 CARLA)</h1>
 <h2 id="1">1. 项目简介</h2>
 <p>本项目旨在通过 Python 脚本与 CARLA 仿真环境进行深度交互，搭建一个基础的自动驾驶测试环境。项目将探索如何利用深度学习视觉算法和虚拟传感器数据，实现对仿真世界中动态物体的检测、环境感知以及基础的车辆控制。</p>
 <h2 id="2">2. 选题说明</h2>
@@ -174,9 +167,8 @@
 <ol>
 <li><strong>安装底层 CARLA API</strong> (请将路径替换为你电脑上实际的 <code>.whl</code> 路径)：</li>
 </ol>
-<p>```bash
-   pip install D:\hutb\hutb_car_mujoco_2.2.1\PythonAPI\carla\dist\hutb-2.9.16-cp38-cp38-win_amd64.whl</p>
-<p>```</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>D:<span class="se">\h</span>utb<span class="se">\h</span>utb_car_mujoco_2.2.1<span class="se">\P</span>ythonAPI<span class="se">\c</span>arla<span class="se">\d</span>ist<span class="se">\h</span>utb-2.9.16-cp38-cp38-win_amd64.whl
+</code></pre></div>
 <ol>
 <li>
 <p>安装常规依赖库：
@@ -187,9 +179,8 @@
    如果你拥有 NVIDIA 显卡并希望获得 30+ 的流畅 FPS，请<strong>务必额外执行</strong>此命令覆盖安装 CUDA 版 Torch：</p>
 </li>
 </ol>
-<p>```bash
-   pip install torch torchvision torchaudio --index-url <a href="https://download.pytorch.org/whl/cu118">https://download.pytorch.org/whl/cu118</a></p>
-<p>```</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchvision<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span><span class="o">[</span>https://download.pytorch.org/whl/cu118<span class="o">](</span>https://download.pytorch.org/whl/cu118<span class="o">)</span>
+</code></pre></div>
 <p>步骤 3：运行程序
 请在项目根目录下执行核心脚本：
 <code>python src/carla_yolo_detection/main.py</code></p>
@@ -203,8 +194,8 @@
 <li><strong>安全监听</strong>: 挂载碰撞传感器 (Collision Sensor)，实时在终端发出碰撞预警。</li>
 </ul>
 <h2 id="2_1">2. 运行效果</h2>
-<p><img alt="" src="images/start.png" /></p>
-<hr />
+<p><img alt="" src="images/start.png"/></p>
+<hr/>
 <h1 id="3-aeb">[第3次提交] 前向测距与 AEB 自动紧急制动系统</h1>
 <h2 id="1_2">1. 功能说明</h2>
 <p>在感知系统的基础上，本版本引入了决策与控制模块，实现了车辆的主动安全防护，并大幅优化了仿真体验：</p>
@@ -220,72 +211,62 @@
 <li><strong>HUD 增强显示</strong>：新增自车实时全局坐标 (X, Y, Yaw) 与 AEB 状态指示灯的屏幕渲染。</li>
 </ul>
 <h2 id="2_2">2. 运行效果展示</h2>
-<p><img alt="" src="images/stage3_abe.png" />
+<p><img alt="" src="images/stage3_abe.png"/>
 <em>图：系统成功捕获前方小于5米的目标，瞬间夺取控制权触发 EMERGENCY BRAKE，并渲染红色全屏警报。</em></p>
 <h1 id="4-ldw">[第4次提交] 视觉车道偏离预警系统 (LDW)</h1>
 <h2 id="_1">功能说明</h2>
 <p>在实现纵向控制 (AEB) 的基础上，本版本引入了横向环境感知，通过纯视觉算法实现了高鲁棒性的车道偏离预警系统 (Lane Departure Warning)：</p>
 <p>图像预处理流水线：通过 灰度化 -&gt; 高斯模糊 -&gt; Canny 边缘检测 -&gt; 梯形 ROI 掩膜，精准滤除天空、对向车道及路外建筑的干扰，聚焦本车道特征。
-抗锯齿车道线提取：使用霍夫变换 (HoughLinesP) 提取线段，结合斜率正负分类，并通过一次多项式回归拟合 ($x = f(y)$) 重构左右车道线，有效解决透视畸变与垂直斜率崩溃问题。
+抗锯齿车道线提取：使用霍夫变换 (HoughLinesP) 提取线段，结合斜率正负分类，并通过一次多项式回归拟合 (<script type="math/tex">x = f(y)</script>) 重构左右车道线，有效解决透视畸变与垂直斜率崩溃问题。
 动态偏离计算与低速屏蔽：实时计算车道中心与画面中心（自车中心）的像素偏移量 (Offset)。引入速度动态过滤机制，当车速低于 5.4km/h（多为路口或起步）时自动挂起检测，杜绝复杂路口斑马线的误报。
 沉浸式 HUD：
 NORMAL: 路面铺设半透明蓝色安全引导区，绘制动态虚线中心线。
 WARNING: 偏移量突破阈值 (pm 60px) 时，触发双向警报，越界侧车道线高亮变红，并在屏幕中央及左上角弹出醒目的方向纠正提示。</p>
 <h2 id="_2">运行效果展示</h2>
 <p>LDW车道偏离预警 </p>
-<p><img alt="" src="images/stage4_ldw.png" /></p>
-<p>图：系统提取车道边界，在车辆偏移压线时触发红色警报并提示偏离方向，同时完美兼容原有的 YOLO 车辆检测与 AEB 测距。</p>
-              
-            </div>
-          </div><footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../traffic_sign_detection/" class="btn btn-neutral float-left" title="交通标识识别"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
-        <a href="../auto_drive_seg/" class="btn btn-neutral float-right" title="自动驾驶车辆语义分割">后一页 <span class="icon icon-circle-arrow-right"></span></a>
-    </div>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-      <span><a href="../traffic_sign_detection/" style="color: #fcfcfc">&laquo; 前一页</a></span>
-    
-    
-      <span><a href="../auto_drive_seg/" style="color: #fcfcfc">后一页 &raquo;</a></span>
-    
-  </span>
+<p><img alt="" src="images/stage4_ldw.png"/></p>
+<p>图：系统提取车道边界，在车辆偏移压线时触发红色警报并提示偏离方向，同时完美兼容原有的 YOLO 车辆检测与 AEB 测距。</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<div aria-label="Footer Navigation" class="rst-footer-buttons" role="navigation">
+<a class="btn btn-neutral float-left" href="../traffic_sign_detection/" title="交通标识识别"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+<a class="btn btn-neutral float-right" href="../auto_drive_seg/" title="自动驾驶车辆语义分割">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+</div>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+<span><a href="../traffic_sign_detection/" style="color: #fcfcfc">« 前一页</a></span>
+<span><a href="../auto_drive_seg/" style="color: #fcfcfc">后一页 »</a></span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

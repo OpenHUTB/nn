@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/edge_intelligence_V2X/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/edge_intelligence_V2X/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e YOLOv8n \u7684 V2X \u8def\u4fa7\u667a\u80fd\u611f\u77e5\u7cfb\u7edf\u4f18\u5316\u4e0e\u5b9e\u73b0";
         var mkdocs_page_input_path = "edge_intelligence_V2X/README.md";
         var mkdocs_page_url = "/nn/edge_intelligence_V2X/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/edge_intelligence_V2X/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="yolov8n-v2x">基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/edge_intelligence_V2X/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="yolov8n-v2x">基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现</h1>
 <h2 id="1">1. 项目背景与优化动机</h2>
 <h3 id="11">1.1 功能定位</h3>
 <p>V2X（Vehicle-to-Everything）路侧感知是智能交通系统的核心基础设施之一，<code>edge_intelligence_V2X</code> 模块作为路侧边缘计算节点的感知组件，承担着 <strong>"实时检测道路上的车辆与行人、生成交通态势信息、通过 V2X 通信向周围车辆广播预警消息"</strong> 的关键职责，直接影响交通安全与通行效率。</p>
@@ -158,30 +151,30 @@
 <p>在实际测试中，原 <code>edge_intelligence_V2X</code> 模块主要有三方面可提升点：</p>
 <p><strong>检测逻辑由演示模式升级为模型推理模式</strong></p>
 <p>原代码使用 <code>sin/cos</code> 数学函数模拟检测结果（<code>simulate_detection()</code>），检测框位置随时间做周期运动。本次将其升级为 YOLOv8n 的真实目标检测推理流程。</p>
-<pre><code class="language-python"># 原始代码 v2xEdgeYolov7Light2.py 中的假检测（已废弃）
-def simulate_detection(image):
-    &quot;&quot;&quot;模拟检测框（随画面动态刷新）&quot;&quot;&quot;
-    h, w = image.shape[:2]
-    t = time.time() % 10
-    offset_x = int(np.sin(t) * 10)
-    offset_y = int(np.cos(t) * 5)
-    boxes = [
-        [w//4 + offset_x, h//4 + offset_y, w//3 + offset_x, h//3 + offset_y],
-        [w//2 - offset_x, h//2 - offset_y, w//1.5 - offset_x, h//1.5 - offset_y],
-    ]
-    return np.array(boxes)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># 原始代码 v2xEdgeYolov7Light2.py 中的假检测（已废弃）</span>
+<span class="k">def</span> <span class="nf">simulate_detection</span><span class="p">(</span><span class="n">image</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""模拟检测框（随画面动态刷新）"""</span>
+    <span class="n">h</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">%</span> <span class="mi">10</span>
+    <span class="n">offset_x</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="mi">10</span><span class="p">)</span>
+    <span class="n">offset_y</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="mi">5</span><span class="p">)</span>
+    <span class="n">boxes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">[</span><span class="n">w</span><span class="o">//</span><span class="mi">4</span> <span class="o">+</span> <span class="n">offset_x</span><span class="p">,</span> <span class="n">h</span><span class="o">//</span><span class="mi">4</span> <span class="o">+</span> <span class="n">offset_y</span><span class="p">,</span> <span class="n">w</span><span class="o">//</span><span class="mi">3</span> <span class="o">+</span> <span class="n">offset_x</span><span class="p">,</span> <span class="n">h</span><span class="o">//</span><span class="mi">3</span> <span class="o">+</span> <span class="n">offset_y</span><span class="p">],</span>
+        <span class="p">[</span><span class="n">w</span><span class="o">//</span><span class="mi">2</span> <span class="o">-</span> <span class="n">offset_x</span><span class="p">,</span> <span class="n">h</span><span class="o">//</span><span class="mi">2</span> <span class="o">-</span> <span class="n">offset_y</span><span class="p">,</span> <span class="n">w</span><span class="o">//</span><span class="mf">1.5</span> <span class="o">-</span> <span class="n">offset_x</span><span class="p">,</span> <span class="n">h</span><span class="o">//</span><span class="mf">1.5</span> <span class="o">-</span> <span class="n">offset_y</span><span class="p">],</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">boxes</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>主程序依赖需要工程化梳理</strong></p>
 <p>原 <code>src/main.py</code> 依赖 <code>tools.pygame_display</code> 和 <code>tools.plotter_x</code>，在当前仓库结构下缺少对应模块，运行时会出现 <code>ImportError</code>，因此本次采用独立入口文件重构运行链路：</p>
-<pre><code class="language-python"># 原始 src/main.py 中缺失的依赖导入
-from tools.pygame_display import PygameDisplay   # 模块不存在
-from tools.plotter_x import Plotter              # 模块不存在
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># 原始 src/main.py 中缺失的依赖导入</span>
+<span class="kn">from</span> <span class="nn">tools.pygame_display</span> <span class="kn">import</span> <span class="n">PygameDisplay</span>   <span class="c1"># 模块不存在</span>
+<span class="kn">from</span> <span class="nn">tools.plotter_x</span> <span class="kn">import</span> <span class="n">Plotter</span>              <span class="c1"># 模块不存在</span>
+</code></pre></div>
 <p><strong>环境版本需要统一到当前实验环境</strong></p>
 <p>原代码硬编码了 CARLA 0.9.10 的 <code>.egg</code> 路径，本次统一适配到当前使用的 CARLA 0.9.16 环境：</p>
-<pre><code class="language-python"># 原始代码中硬编码的旧版路径
-CARLA_EGG_PATH = r&quot;D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># 原始代码中硬编码的旧版路径</span>
+<span class="n">CARLA_EGG_PATH</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"</span>
+</code></pre></div>
 <p>基于以上改进点，本次优化的核心目标是：<strong>将原型化演示版本升级为可运行、可复现实验结果的 V2X 路侧感知系统。</strong></p>
 <h2 id="2">2. 核心技术栈与理论基础</h2>
 <h3 id="21">2.1 核心技术栈</h3>
@@ -217,8 +210,8 @@ CARLA_EGG_PATH = r&quot;D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3
 </table>
 <h3 id="22">2.2 核心理论基础</h3>
 <h4 id="221">2.2.1 系统整体流程</h4>
-<pre><code>CARLA 仿真场景 → 路侧摄像头采集 → YOLOv8n 目标检测 → 分类统计 → V2X 态势分析 → 预警消息生成 → HUD 面板可视化显示
-</code></pre>
+<div class="highlight"><pre><span></span><code>CARLA 仿真场景 → 路侧摄像头采集 → YOLOv8n 目标检测 → 分类统计 → V2X 态势分析 → 预警消息生成 → HUD 面板可视化显示
+</code></pre></div>
 <h4 id="222">2.2.2 关键技术原理</h4>
 <p><strong>YOLOv8n 实时目标检测</strong></p>
 <p>YOLOv8 是 Ultralytics 推出的最新一代 YOLO 系列模型。本项目采用 YOLOv8n（nano 版本），具有以下特点：</p>
@@ -233,7 +226,7 @@ CARLA_EGG_PATH = r&quot;D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3
 </script>
 </p>
 <p><strong>隔帧检测策略</strong></p>
-<p>为提升系统帧率，采用隔帧检测：每 $N$ 帧运行一次 YOLO 推理，中间帧复用上一次检测结果：</p>
+<p>为提升系统帧率，采用隔帧检测：每 <script type="math/tex">N</script> 帧运行一次 YOLO 推理，中间帧复用上一次检测结果：</p>
 <p>
 <script type="math/tex; mode=display">
 D_t =
@@ -243,7 +236,7 @@ D_{t-1}, & \mathrm{otherwise}
 \end{cases}
 </script>
 </p>
-<p>其中 $N = 2$。在当前测试环境下可观察到帧率提升，具体增益会随硬件性能、交通密度和天气场景变化。</p>
+<p>其中 <script type="math/tex">N = 2</script>。在当前测试环境下可观察到帧率提升，具体增益会随硬件性能、交通密度和天气场景变化。</p>
 <p><strong>V2X 路侧单元 (RSU) 信息融合</strong></p>
 <p>路侧单元综合检测结果与环境信息，生成多类 V2X 预警广播：</p>
 <table>
@@ -347,22 +340,22 @@ D_{t-1}, & \mathrm{otherwise}
 <h3 id="41-yolov8n">4.1 检测引擎：从假检测到真实 YOLOv8n 推理</h3>
 <p><strong>改进点：</strong> 原代码采用演示型模拟框逻辑，本次切换为基于 YOLOv8n 的真实推理流程。</p>
 <p><strong>解决方案：</strong> 引入 YOLOv8n 预训练模型，对每一帧进行真实的目标检测推理。</p>
-<pre><code class="language-python">def _load_model(self):
-    &quot;&quot;&quot;加载 YOLOv8n 预训练模型（COCO 80类，自动下载）&quot;&quot;&quot;
-    self.model = YOLO('yolov8n.pt')
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">_load_model</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""加载 YOLOv8n 预训练模型（COCO 80类，自动下载）"""</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">YOLO</span><span class="p">(</span><span class="s1">'yolov8n.pt'</span><span class="p">)</span>
 
-def _detect(self, frame):
-    &quot;&quot;&quot;YOLOv8 前向推理（隔帧检测提升帧率）&quot;&quot;&quot;
-    self.tick_count += 1
-    if self.tick_count % DETECT_INTERVAL == 0 or self.last_detections is None:
-        results = self.model(frame, verbose=False, conf=YOLO_CONFIDENCE)
-        self.last_detections = results[0]
-    return self.last_detections
-</code></pre>
+<span class="k">def</span> <span class="nf">_detect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""YOLOv8 前向推理（隔帧检测提升帧率）"""</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">tick_count</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tick_count</span> <span class="o">%</span> <span class="n">DETECT_INTERVAL</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_detections</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">conf</span><span class="o">=</span><span class="n">YOLO_CONFIDENCE</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_detections</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_detections</span>
+</code></pre></div>
 <p>检测结果按 V2X 关注的类别分类统计：</p>
-<pre><code class="language-python">VEHICLE_CLASSES = {'car', 'truck', 'bus', 'motorcycle', 'bicycle'}
-PERSON_CLASSES = {'person'}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">VEHICLE_CLASSES</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'car'</span><span class="p">,</span> <span class="s1">'truck'</span><span class="p">,</span> <span class="s1">'bus'</span><span class="p">,</span> <span class="s1">'motorcycle'</span><span class="p">,</span> <span class="s1">'bicycle'</span><span class="p">}</span>
+<span class="n">PERSON_CLASSES</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'person'</span><span class="p">}</span>
+</code></pre></div>
 <p>每个检测目标用彩色检测框标注：绿色=车辆，红色=行人，橙色=其他。</p>
 <h3 id="42">4.2 多摄像头机位切换</h3>
 <p><strong>设计目标：</strong> 模拟真实路侧感知部署中的多角度监控需求。</p>
@@ -401,26 +394,26 @@ PERSON_CLASSES = {'person'}
 </tr>
 </tbody>
 </table>
-<pre><code class="language-python">CAMERA_POSITIONS = [
-    {&quot;name&quot;: &quot;Intersection&quot;, &quot;fwd&quot;: 8.0,  &quot;right&quot;: 5.0, &quot;z&quot;: 8.0,  &quot;pitch&quot;: -25.0, &quot;fov&quot;: 100},
-    {&quot;name&quot;: &quot;Straight&quot;,     &quot;fwd&quot;: 0.0,  &quot;right&quot;: 8.0, &quot;z&quot;: 6.0,  &quot;pitch&quot;: -15.0, &quot;fov&quot;: 90},
-    {&quot;name&quot;: &quot;Bird-Eye&quot;,     &quot;fwd&quot;: 0.0,  &quot;right&quot;: 0.0, &quot;z&quot;: 14.0, &quot;pitch&quot;: -50.0, &quot;fov&quot;: 110},
-]
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">CAMERA_POSITIONS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Intersection"</span><span class="p">,</span> <span class="s2">"fwd"</span><span class="p">:</span> <span class="mf">8.0</span><span class="p">,</span>  <span class="s2">"right"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="mf">8.0</span><span class="p">,</span>  <span class="s2">"pitch"</span><span class="p">:</span> <span class="o">-</span><span class="mf">25.0</span><span class="p">,</span> <span class="s2">"fov"</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Straight"</span><span class="p">,</span>     <span class="s2">"fwd"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>  <span class="s2">"right"</span><span class="p">:</span> <span class="mf">8.0</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="mf">6.0</span><span class="p">,</span>  <span class="s2">"pitch"</span><span class="p">:</span> <span class="o">-</span><span class="mf">15.0</span><span class="p">,</span> <span class="s2">"fov"</span><span class="p">:</span> <span class="mi">90</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Bird-Eye"</span><span class="p">,</span>     <span class="s2">"fwd"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>  <span class="s2">"right"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="mf">14.0</span><span class="p">,</span> <span class="s2">"pitch"</span><span class="p">:</span> <span class="o">-</span><span class="mf">50.0</span><span class="p">,</span> <span class="s2">"fov"</span><span class="p">:</span> <span class="mi">110</span><span class="p">},</span>
+<span class="p">]</span>
+</code></pre></div>
 <p>切换时自动销毁旧摄像头、创建新摄像头，并同步 CARLA 观察者视角：</p>
-<pre><code class="language-python">def _switch_camera_position(self, first_time=False):
-    if self.camera and self.camera.is_alive:
-        self.camera.stop()
-        self.camera.destroy()
-    pos = CAMERA_POSITIONS[self.cam_index]
-    # ... 创建新摄像头并注册回调 ...
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">_switch_camera_position</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">first_time</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">is_alive</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
+    <span class="n">pos</span> <span class="o">=</span> <span class="n">CAMERA_POSITIONS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">cam_index</span><span class="p">]</span>
+    <span class="c1"># ... 创建新摄像头并注册回调 ...</span>
+</code></pre></div>
 <p><strong>路口机位（Intersection）：</strong> 监控路口车辆通行</p>
-<p><img alt="路口机位" src="img/cam_intersection.jpg" /></p>
+<p><img alt="路口机位" src="img/cam_intersection.jpg"/></p>
 <p><strong>直道机位（Straight）：</strong> 侧方监测直线车流</p>
-<p><img alt="直道机位" src="img/cam_straight.jpg" /></p>
+<p><img alt="直道机位" src="img/cam_straight.jpg"/></p>
 <p><strong>鸟瞰机位（Bird-Eye）：</strong> 俯瞰全局交通态势</p>
-<p><img alt="鸟瞰机位" src="img/cam_birdeye.jpg" /></p>
+<p><img alt="鸟瞰机位" src="img/cam_birdeye.jpg"/></p>
 <h3 id="43">4.3 行人闯入安全报警</h3>
 <p><strong>设计目标：</strong> V2X 路侧感知的核心安全功能——当检测到行人时，立即向驾驶员发出视觉警报。</p>
 <p>当检测到行人时，系统触发持续 1.5 秒的红色报警效果：</p>
@@ -429,14 +422,14 @@ PERSON_CLASSES = {'person'}
 <li>画面顶部显示居中的 <code>! PEDESTRIAN ALERT !</code> 警告文字</li>
 <li>V2X 面板同步广播行人预警消息</li>
 </ul>
-<pre><code class="language-python">def _draw_pedestrian_alert(self, frame):
-    if time.time() &lt; self.ped_alert_timer:
-        thickness = 8 if int(time.time() * 4) % 2 == 0 else 4
-        cv2.rectangle(frame, (0, 0), (CAMERA_WIDTH - 1, CAMERA_HEIGHT - 1),
-                      (0, 0, 255), thickness)
-        # ... 绘制警告文字 ...
-</code></pre>
-<p><img alt="行人闯入报警" src="img/pedestrian_alert.jpg" /></p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">_draw_pedestrian_alert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">ped_alert_timer</span><span class="p">:</span>
+        <span class="n">thickness</span> <span class="o">=</span> <span class="mi">8</span> <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">*</span> <span class="mi">4</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">4</span>
+        <span class="n">cv2</span><span class="o">.</span><span class="n">rectangle</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="n">CAMERA_WIDTH</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">CAMERA_HEIGHT</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span>
+                      <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">),</span> <span class="n">thickness</span><span class="p">)</span>
+        <span class="c1"># ... 绘制警告文字 ...</span>
+</code></pre></div>
+<p><img alt="行人闯入报警" src="img/pedestrian_alert.jpg"/></p>
 <h3 id="44">4.4 多天气场景支持</h3>
 <p>系统内置 7 种天气预设，按 <code>W</code> 键循环切换，V2X 面板自动生成对应的天气预警广播：</p>
 <table>
@@ -486,36 +479,36 @@ PERSON_CLASSES = {'person'}
 </tbody>
 </table>
 <p><strong>多云天气：</strong></p>
-<p><img alt="多云场景" src="img/weather_cloudy.jpg" /></p>
+<p><img alt="多云场景" src="img/weather_cloudy.jpg"/></p>
 <p><strong>暴风雨天气：</strong></p>
-<p><img alt="暴风雨场景" src="img/weather_storm.jpg" /></p>
+<p><img alt="暴风雨场景" src="img/weather_storm.jpg"/></p>
 <p><strong>大雾天气：</strong></p>
-<p><img alt="大雾场景" src="img/weather_foggy.jpg" /></p>
+<p><img alt="大雾场景" src="img/weather_foggy.jpg"/></p>
 <p><strong>黄昏场景：</strong></p>
-<p><img alt="黄昏场景" src="img/weather_sunset.jpg" /></p>
+<p><img alt="黄昏场景" src="img/weather_sunset.jpg"/></p>
 <p><strong>夜晚场景：</strong></p>
-<p><img alt="夜晚场景" src="img/weather_night.jpg" /></p>
+<p><img alt="夜晚场景" src="img/weather_night.jpg"/></p>
 <h3 id="45-npc">4.5 NPC 交通流优化</h3>
 <p><strong>改进目标：</strong> 提高画面中的交通参与者密度，增强可观察性与演示稳定性。</p>
 <p><strong>优化方案：</strong> 生成 60 辆 NPC 车辆 + 30 个行人，且<strong>按与摄像头的距离排序</strong>，优先在摄像头附近的路点生成车辆，确保画面中有丰富的检测目标。</p>
-<pre><code class="language-python">def _spawn_traffic(self):
-    # 按与摄像头的距离排序，优先在附近生成
-    cam_loc = self.cam_ref_point.location
-    spawn_points.sort(key=lambda sp: sp.location.distance(cam_loc))
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">_spawn_traffic</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># 按与摄像头的距离排序，优先在附近生成</span>
+    <span class="n">cam_loc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cam_ref_point</span><span class="o">.</span><span class="n">location</span>
+    <span class="n">spawn_points</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">sp</span><span class="p">:</span> <span class="n">sp</span><span class="o">.</span><span class="n">location</span><span class="o">.</span><span class="n">distance</span><span class="p">(</span><span class="n">cam_loc</span><span class="p">))</span>
 
-    for i in range(min(NPC_VEHICLE_COUNT, len(spawn_points))):
-        v = self.world.try_spawn_actor(bp, spawn_points[i])
-        if v:
-            v.set_autopilot(True, self.tm.get_port())
-</code></pre>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">NPC_VEHICLE_COUNT</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">spawn_points</span><span class="p">))):</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">try_spawn_actor</span><span class="p">(</span><span class="n">bp</span><span class="p">,</span> <span class="n">spawn_points</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">v</span><span class="p">:</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">set_autopilot</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tm</span><span class="o">.</span><span class="n">get_port</span><span class="p">())</span>
+</code></pre></div>
 <p>行人同样自动生成并设置 AI 控制器，随机行走于人行道和路口区域：</p>
-<pre><code class="language-python">walker = self.world.try_spawn_actor(bp, carla.Transform(loc))
-if walker:
-    ctrl = self.world.spawn_actor(controller_bp, carla.Transform(), walker)
-    ctrl.start()
-    ctrl.go_to_location(self.world.get_random_location_from_navigation())
-    ctrl.set_max_speed(random.uniform(1.0, 2.5))
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">walker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">try_spawn_actor</span><span class="p">(</span><span class="n">bp</span><span class="p">,</span> <span class="n">carla</span><span class="o">.</span><span class="n">Transform</span><span class="p">(</span><span class="n">loc</span><span class="p">))</span>
+<span class="k">if</span> <span class="n">walker</span><span class="p">:</span>
+    <span class="n">ctrl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">spawn_actor</span><span class="p">(</span><span class="n">controller_bp</span><span class="p">,</span> <span class="n">carla</span><span class="o">.</span><span class="n">Transform</span><span class="p">(),</span> <span class="n">walker</span><span class="p">)</span>
+    <span class="n">ctrl</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+    <span class="n">ctrl</span><span class="o">.</span><span class="n">go_to_location</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_random_location_from_navigation</span><span class="p">())</span>
+    <span class="n">ctrl</span><span class="o">.</span><span class="n">set_max_speed</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">))</span>
+</code></pre></div>
 <h3 id="46-v2x-rsu">4.6 V2X RSU 信息面板</h3>
 <p>系统在画面右上角绘制半透明的 V2X 路侧单元信息面板，实时显示：</p>
 <ul>
@@ -524,22 +517,22 @@ if walker:
 <li>V2X 预警广播消息（根据检测结果和天气动态生成）</li>
 </ul>
 <p>画面顶部为监控风格的标题栏，显示时间戳、FPS、录制指示灯；底部为操作提示栏和运行时长。预警广播消息根据当前检测结果和天气条件动态生成：</p>
-<pre><code class="language-python">def _get_v2x_messages(self):
-    msgs = []
-    if self.stats['pedestrians'] &gt; 0:
-        msgs.append(f&quot;&gt; {self.stats['pedestrians']} pedestrian(s) ahead&quot;)
-    if self.stats['vehicles'] &gt; 5:
-        msgs.append(f&quot;&gt; Heavy traffic: {self.stats['vehicles']} vehicles&quot;)
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">_get_v2x_messages</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="n">msgs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">'pedestrians'</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">msgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">'pedestrians'</span><span class="p">]</span><span class="si">}</span><span class="s2"> pedestrian(s) ahead"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">'vehicles'</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">msgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"&gt; Heavy traffic: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stats</span><span class="p">[</span><span class="s1">'vehicles'</span><span class="p">]</span><span class="si">}</span><span class="s2"> vehicles"</span><span class="p">)</span>
 
-    weather_name = self.weather_presets[self.weather_index][0]
-    if weather_name in ('Rainy', 'Storm'):
-        msgs.append(&quot;&gt; Wet road, reduce speed&quot;)
-    elif weather_name == 'Foggy':
-        msgs.append(&quot;&gt; Low visibility, use fog lights&quot;)
-    elif weather_name == 'Night':
-        msgs.append(&quot;&gt; Night driving, headlights on&quot;)
-    return msgs if msgs else [&quot;&gt; All clear&quot;]
-</code></pre>
+    <span class="n">weather_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weather_presets</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">weather_index</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">weather_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">'Rainy'</span><span class="p">,</span> <span class="s1">'Storm'</span><span class="p">):</span>
+        <span class="n">msgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"&gt; Wet road, reduce speed"</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">weather_name</span> <span class="o">==</span> <span class="s1">'Foggy'</span><span class="p">:</span>
+        <span class="n">msgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"&gt; Low visibility, use fog lights"</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">weather_name</span> <span class="o">==</span> <span class="s1">'Night'</span><span class="p">:</span>
+        <span class="n">msgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"&gt; Night driving, headlights on"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">msgs</span> <span class="k">if</span> <span class="n">msgs</span> <span class="k">else</span> <span class="p">[</span><span class="s2">"&gt; All clear"</span><span class="p">]</span>
+</code></pre></div>
 <p>V2X 面板效果可在下方运行动图和天气截图中观察到。</p>
 <h2 id="5">5. 系统运行效果</h2>
 <h3 id="51">5.1 运行环境</h3>
@@ -574,16 +567,16 @@ if walker:
 </tbody>
 </table>
 <h3 id="52">5.2 运行方式</h3>
-<pre><code class="language-bash"># 1. 启动 CARLA 服务器
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. 启动 CARLA 服务器</span>
 CarlaUE4.exe
 
-# 2. 安装依赖
-pip install carla opencv-python numpy ultralytics
+<span class="c1"># 2. 安装依赖</span>
+pip<span class="w"> </span>install<span class="w"> </span>carla<span class="w"> </span>opencv-python<span class="w"> </span>numpy<span class="w"> </span>ultralytics
 
-# 3. 运行系统
-cd src/edge_intelligence_V2X
-python main.py
-</code></pre>
+<span class="c1"># 3. 运行系统</span>
+<span class="nb">cd</span><span class="w"> </span>src/edge_intelligence_V2X
+python<span class="w"> </span>main.py
+</code></pre></div>
 <h3 id="53">5.3 按键操作</h3>
 <table>
 <thead>
@@ -613,7 +606,7 @@ python main.py
 </table>
 <h3 id="54">5.4 运行效果展示</h3>
 <p>以下动图展示了系统在运行中的连续效果（机位切换、天气变化、检测框与面板联动）：</p>
-<p><img alt="系统运行演示" src="img/show.gif" /></p>
+<p><img alt="系统运行演示" src="img/show.gif"/></p>
 <h2 id="6">6. 功能扩展与未来规划</h2>
 <ul>
 <li><strong>多路摄像头同时工作</strong>：从单路切换扩展为多路画面拼接显示，实现路口全方位监控</li>
@@ -629,50 +622,42 @@ python main.py
 <li>增加了行人报警、V2X 面板和运行动图 展示，使实验结果更便于观察和说明。</li>
 <li>补充了依赖说明、运行方式和文档展示内容，便于在课程作业和演示场景中复现。</li>
 </ol>
-<p>当前版本已经能够完成单路路侧摄像头场景下的目标检测、基础态势展示和简单预警信息生成，也为后续接入目标追踪、协议栈和多传感器融合预留了扩展空间。</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<p>当前版本已经能够完成单路路侧摄像头场景下的目标检测、基础态势展示和简单预警信息生成，也为后续接入目标追踪、协议栈和多传感器融合预留了扩展空间。</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

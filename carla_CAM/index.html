@@ -1,149 +1,142 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_CAM/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>carla_CAM - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/carla_CAM/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>carla_CAM - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "carla_CAM";
         var mkdocs_page_input_path = "carla_CAM/README.md";
         var mkdocs_page_url = "/nn/carla_CAM/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">carla_CAM</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_CAM/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="carla_cam">carla_CAM</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">carla_CAM</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_CAM/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="carla_cam">carla_CAM</h1>
 <p>用于在 Carla 模拟器中使用类激活映射（Class Activation Mapping, CAM）技术测试卷积神经网络（CNN）的应用。
 该项目旨在提高自动驾驶背景下深度学习模型的透明度。</p>
 <h2 id="1-cam">1. CAM可视化核心原理与数学表达</h2>
 <p>在我们的项目中可以选择多种CAM算法，比如Grad CAM、Score CAM、Ablation CAM等。为了理解模型是如何产生热力图的，我们以最经典的Grad-CAM为例做解释：  </p>
 <h3 id="11">1.1 核心数学公式</h3>
 <p>Grad-CAM 的目的是计算出图像中哪些区域对网络预测某个特定类别 <script type="math/tex">c</script>（例如“汽车”或“高铁”）的贡献最大。  </p>
-<p><strong>步骤1：计算特征图权重</strong><br />
-假设网络最后一个卷积层输出的特征图为 <script type="math/tex">A</script>，其中第 <script type="math/tex">k</script> 个通道的特征图记为 <script type="math/tex">A^k</script>。我们首先求目标类别分数 <script type="math/tex">y^c</script>（Softmax 激活前的值）对特征图 <script type="math/tex">A^k</script> 中每个像素点 <script type="math/tex">(i, j)</script> 的梯度，并进行全局平均池化（Global Average Pooling），得到神经元权重 <script type="math/tex">\alpha_k^c</script>：<br />
+<p><strong>步骤1：计算特征图权重</strong><br/>
+假设网络最后一个卷积层输出的特征图为 <script type="math/tex">A</script>，其中第 <script type="math/tex">k</script> 个通道的特征图记为 <script type="math/tex">A^k</script>。我们首先求目标类别分数 <script type="math/tex">y^c</script>（Softmax 激活前的值）对特征图 <script type="math/tex">A^k</script> 中每个像素点 <script type="math/tex">(i, j)</script> 的梯度，并进行全局平均池化（Global Average Pooling），得到神经元权重 <script type="math/tex">\alpha_k^c</script>：<br/>
 <script type="math/tex; mode=display">\alpha_k^c = \frac{1}{Z} \sum_i \sum_j \frac{\partial y^c}{\partial A_{i,j}^k}</script>
 </p>
-<hr />
-<p><strong>步骤2：生成类激活热力图</strong><br />
+<hr/>
+<p><strong>步骤2：生成类激活热力图</strong><br/>
 将求得的权重 <script type="math/tex">\alpha_k^c</script> 与对应的特征图 <script type="math/tex">A^k</script> 进行线性加权求和，并通过 ReLU 激活函数过滤掉负向影响（我们只关心哪些特征正向促进了该类别的识别）：
 <script type="math/tex; mode=display">L_{Grad-CAM}^c = ReLU \left( \sum_k \alpha_k^c A^k \right)</script>
 </p>
 <p>这一步你就可以看到生成的冷暖色调热力图。  </p>
-<hr />
+<hr/>
 <h2 id="2-cam">2. CAM 可视化方法对比</h2>
-<p>这里我们用两个<strong>截然不同</strong>的流派来做对比：<strong>Grad-CAM vs. Score-CAM</strong><br />
+<p>这里我们用两个<strong>截然不同</strong>的流派来做对比：<strong>Grad-CAM vs. Score-CAM</strong><br/>
 这两种方法代表了 CAM 技术演进中的两个截然不同的流派：<strong>基于梯度（Gradient-based）</strong>与<strong>无梯度（Gradient-free/Perturbation-based）</strong>。</p>
 <table>
 <thead>
@@ -186,7 +179,7 @@
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="3">3. 神经网络架构对比</h2>
 <p>从特征提取的几何约束和拓扑偏置来看，这两种网络代表了深度学习早期“粗放式空间缩减”与现代“深度迭代细化”的根本差异。</p>
 <table>
@@ -230,8 +223,8 @@
 </tr>
 </tbody>
 </table>
-<hr />
-<p>## 4. 不同解释性方法以及网络结构在场景中的对比<br />
+<hr/>
+<p>## 4. 不同解释性方法以及网络结构在场景中的对比<br/>
  这里我们使用<em>方案一</em>：<strong>AlexNet</strong> + <strong>Grad-CAM</strong> 以及 <em>方案二</em>：<strong>ResNet</strong> + <strong>Score-CAM</strong> 来进行对比  </p>
 <h4 id="1-computational-overhead">1. 计算性能与显存开销 (Computational Overhead)</h4>
 <table>
@@ -273,14 +266,14 @@
 <h4 id="2">2. 预测一致性与特征置信度分布</h4>
 <ul>
 <li><strong>AlexNet（高度发散与弱置信）：</strong> * 模型的 Top-1 预测与强制过滤目标（Filtered）一致，均为 <code>breakwater... (防波堤/海堤)</code>，但置信度仅为 <strong>11.37%</strong>。</li>
-<li>这表明面对 OOD (Out-of-Distribution) 的虚拟场景，AlexNet 的 Softmax 输出极其平缓，网络在多个类别间犹豫不决，“防波堤”仅仅是微弱胜出。<br />
-<img alt="plane1" src="images/plan1.png" />
-  <img alt="plane1" src="images/plan1_re.png" /></li>
+<li>这表明面对 OOD (Out-of-Distribution) 的虚拟场景，AlexNet 的 Softmax 输出极其平缓，网络在多个类别间犹豫不决，“防波堤”仅仅是微弱胜出。<br/>
+<img alt="plane1" src="images/plan1.png"/>
+<img alt="plane1" src="images/plan1_re.png"/></li>
 <li><strong>ResNet（高度确信的语义误判）：</strong></li>
 <li>模型以 <strong>61.66%</strong> 的高置信度认为画面是一列 <code>bullet train (高铁)</code>，完全偏离了我们关注的 <code>passenger car</code>（仅剩 <strong>3.56%</strong> 概率）。</li>
 <li>深层网络强制对画面中的局部特征进行了高层次的语义拟合，展现出了极强的“过度自信”。
-<img alt="plan2" src="images/plan2.png" /><br />
-<img alt="plan2_re" src="images/plan2_re.png" /></li>
+<img alt="plan2" src="images/plan2.png"/><br/>
+<img alt="plan2_re" src="images/plan2_re.png"/></li>
 </ul>
 <h4 id="3_1">3. 从“结构性偏置”视角的深度解释</h4>
 <p>这两个方案直观地展示了不同网络架构在面对虚拟渲染图像时，其<strong>归纳偏置（Inductive Bias）</strong>的失效方式。</p>
@@ -297,50 +290,42 @@
 <li>
 <p><a href="https://github.com/RocaPiedra/carla-simulator-CAM">参考仓库 carla-simulator-CAM</a></p>
 </li>
-</ul>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+</ul></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

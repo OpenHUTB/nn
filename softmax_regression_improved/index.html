@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/softmax_regression_improved/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>模型优化技术报告 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/softmax_regression_improved/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>模型优化技术报告 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u6a21\u578b\u4f18\u5316\u6280\u672f\u62a5\u544a";
         var mkdocs_page_input_path = "softmax_regression_improved.md";
         var mkdocs_page_url = "/nn/softmax_regression_improved/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">模型优化技术报告</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/softmax_regression_improved.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">模型优化技术报告</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">模型优化技术报告</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/softmax_regression_improved.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">模型优化技术报告</h1>
 <h2 id="_2">一、优化目标与效果（基于真实训练结果）</h2>
 <h3 id="_3">优化目标</h3>
 <ul>
@@ -154,56 +147,56 @@
 <p><strong>数据量提升</strong>
 - Softmax：100 → 500样本/类（1500总样本）
 - 逻辑回归：100 → 1000样本/类（2000总样本）</p>
-<p><strong>数据标准化</strong></p>
-<pre><code class="language-python">def standard_scale(X_train, X_val, X_test):
-    mean = X_train.mean(axis=0)
-    std = X_train.std(axis=0)
-    std[std == 0] = 1.0
-    return (X_train-mean)/std, (X_val-mean)/std, (X_test-mean)/std
-</code></pre>
+<p><strong>数据标准化</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">standard_scale</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_val</span><span class="p">,</span> <span class="n">X_test</span><span class="p">):</span>
+    <span class="n">mean</span> <span class="o">=</span> <span class="n">X_train</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">X_train</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">std</span><span class="p">[</span><span class="n">std</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">X_train</span><span class="o">-</span><span class="n">mean</span><span class="p">)</span><span class="o">/</span><span class="n">std</span><span class="p">,</span> <span class="p">(</span><span class="n">X_val</span><span class="o">-</span><span class="n">mean</span><span class="p">)</span><span class="o">/</span><span class="n">std</span><span class="p">,</span> <span class="p">(</span><span class="n">X_test</span><span class="o">-</span><span class="n">mean</span><span class="p">)</span><span class="o">/</span><span class="n">std</span>
+</code></pre></div>
 <p><strong>数据分割策略</strong>
 - Softmax：1050训练，225验证，225测试
 - 逻辑回归：1400训练，300验证，300测试
 - 采用分层采样，保持类别分布一致</p>
 <h3 id="2">2. 模型架构优化</h3>
-<p><strong>He权重初始化</strong></p>
-<pre><code class="language-python">self.W = tf.Variable(
-    tf.random.truncated_normal([input_dim, 1], mean=0.0, stddev=0.1)
-)
-</code></pre>
-<p><strong>L2正则化与Dropout</strong></p>
-<pre><code class="language-python">class LogisticRegression():
-    def __init__(self, input_dim=2, l2_reg_strength=0.01, dropout_rate=0.1):
-        self.l2_reg_strength = l2_reg_strength
-        self.dropout_rate = dropout_rate
+<p><strong>He权重初始化</strong>
+</p><div class="highlight"><pre><span></span><code><span class="bp">self</span><span class="o">.</span><span class="n">W</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">truncated_normal</span><span class="p">([</span><span class="n">input_dim</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">mean</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">stddev</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><strong>L2正则化与Dropout</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">LogisticRegression</span><span class="p">():</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">l2_reg_strength</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.1</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">l2_reg_strength</span> <span class="o">=</span> <span class="n">l2_reg_strength</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dropout_rate</span> <span class="o">=</span> <span class="n">dropout_rate</span>
 
-    @tf.function
-    def __call__(self, inp, training=False):
-        logits = tf.matmul(inp, self.W) + self.b
-        if training:
-            logits = tf.nn.dropout(logits, rate=self.dropout_rate)
-        return tf.nn.sigmoid(logits)
-</code></pre>
+    <span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inp</span><span class="p">,</span> <span class="n">training</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">logits</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span>
+        <span class="k">if</span> <span class="n">training</span><span class="p">:</span>
+            <span class="n">logits</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">logits</span><span class="p">,</span> <span class="n">rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dropout_rate</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">tf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">logits</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="3">3. 训练策略优化</h3>
-<p><strong>Adam优化器</strong></p>
-<pre><code class="language-python">opt = tf.keras.optimizers.Adam(learning_rate=0.01)
-</code></pre>
-<p><strong>早停机制</strong></p>
-<pre><code class="language-python">best_val_acc = 0.0
-patience = 30
-wait = 0
+<p><strong>Adam优化器</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">opt</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">optimizers</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>早停机制</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">best_val_acc</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">patience</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">wait</span> <span class="o">=</span> <span class="mi">0</span>
 
-if val_acc &gt; best_val_acc:
-    best_val_acc = val_acc
-    wait = 0
-else:
-    wait += 1
-    if wait &gt;= patience:
-        break  # 早停
-</code></pre>
+<span class="k">if</span> <span class="n">val_acc</span> <span class="o">&gt;</span> <span class="n">best_val_acc</span><span class="p">:</span>
+    <span class="n">best_val_acc</span> <span class="o">=</span> <span class="n">val_acc</span>
+    <span class="n">wait</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">wait</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="n">wait</span> <span class="o">&gt;=</span> <span class="n">patience</span><span class="p">:</span>
+        <span class="k">break</span>  <span class="c1"># 早停</span>
+</code></pre></div>
 <h2 id="_5">三、训练过程分析（基于真实数据）</h2>
 <h3 id="softmax">Softmax回归训练曲线</h3>
-<pre><code>Step   0: Train Loss: 1.0945 | Train Acc: 0.3397 | Val Loss: 1.1012 | Val Acc: 0.3556
+<div class="highlight"><pre><span></span><code>Step   0: Train Loss: 1.0945 | Train Acc: 0.3397 | Val Loss: 1.1012 | Val Acc: 0.3556
 Step  20: Train Loss: 0.8029 | Train Acc: 0.9219 | Val Loss: 0.7896 | Val Acc: 0.9156
 Step  40: Train Loss: 0.6198 | Train Acc: 0.9257 | Val Loss: 0.5842 | Val Acc: 0.9333
 Step  60: Train Loss: 0.4592 | Train Acc: 0.9438 | Val Loss: 0.4595 | Val Acc: 0.9378
@@ -212,9 +205,9 @@ Step 100: Train Loss: 0.3783 | Train Acc: 0.9505 | Val Loss: 0.3716 | Val Acc: 0
 ...
 Step 600: Early stopping triggered, best validation accuracy: 0.9467
 Test: Loss: 0.3676 | Acc: 0.9333
-</code></pre>
+</code></pre></div>
 <h3 id="_6">逻辑回归训练曲线</h3>
-<pre><code>Step   0: Train Loss: 0.6978 | Train Acc: 0.5057 | Val Loss: 0.6879 | Val Acc: 0.5133
+<div class="highlight"><pre><span></span><code>Step   0: Train Loss: 0.6978 | Train Acc: 0.5057 | Val Loss: 0.6879 | Val Acc: 0.5133
 Step  20: Train Loss: 0.6790 | Train Acc: 0.5607 | Val Loss: 0.6731 | Val Acc: 0.5822
 Step  40: Train Loss: 0.6583 | Train Acc: 0.7164 | Val Loss: 0.6504 | Val Acc: 0.7556
 Step  60: Train Loss: 0.6135 | Train Acc: 0.8429 | Val Loss: 0.6023 | Val Acc: 0.8578
@@ -225,7 +218,7 @@ Step 140: Train Loss: 0.3569 | Train Acc: 0.9557 | Val Loss: 0.3538 | Val Acc: 0
 ...
 Step 600: Early stopping triggered, best validation accuracy: 0.9578
 Test: Loss: 0.3548 | Acc: 0.9533
-</code></pre>
+</code></pre></div>
 <h2 id="_7">四、性能提升分析（基于真实数据）</h2>
 <h3 id="_8">收敛速度提升</h3>
 <ul>
@@ -309,12 +302,12 @@ Test: Loss: 0.3548 | Acc: 0.9533
 </ul>
 <h2 id="_13">七、工程实践要点</h2>
 <h3 id="1_2">1. 数值稳定性处理</h3>
-<pre><code class="language-python">epsilon = 1e-7  # 防止log(0)计算错误
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">epsilon</span> <span class="o">=</span> <span class="mf">1e-7</span>  <span class="c1"># 防止log(0)计算错误</span>
+</code></pre></div>
 <h3 id="2_1">2. 可重复性保证</h3>
-<pre><code class="language-python">np.random.seed(42)
-tf.random.set_seed(42)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">tf</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">set_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="3_2">3. 模块化设计</h3>
 <ul>
 <li>独立的数据预处理函数</li>
@@ -351,7 +344,7 @@ tf.random.set_seed(42)
 </ul>
 <h2 id="_18">九、代码实现结构</h2>
 <h3 id="logistic_regression-exercisepy">logistic_regression-exercise.py</h3>
-<pre><code>├── 数据预处理模块
+<div class="highlight"><pre><span></span><code>├── 数据预处理模块
 │   ├── standard_scale() - 数据标准化
 │   └── train_test_split_custom() - 分层数据分割
 ├── 模型架构模块
@@ -365,9 +358,9 @@ tf.random.set_seed(42)
     ├── 训练集评估
     ├── 验证集评估（早停）
     └── 测试集评估
-</code></pre>
+</code></pre></div>
 <h3 id="softmax_regression-exercisepy">softmax_regression-exercise.py</h3>
-<pre><code>├── 数据预处理模块
+<div class="highlight"><pre><span></span><code>├── 数据预处理模块
 │   └── standard_scale() - 数据标准化
 ├── 模型架构模块
 │   └── SoftmaxRegression类
@@ -380,57 +373,49 @@ tf.random.set_seed(42)
     ├── 训练集评估
     ├── 验证集评估（早停）
     └── 测试集评估
-</code></pre>
+</code></pre></div>
 <h2 id="_19">十、总结</h2>
 <p>通过系统性优化，成功将逻辑回归和Softmax回归模型的性能提升到新的水平。关键改进包括数据质量提升、模型架构优化、训练策略改进和评估机制完善。这些优化不仅提高了模型性能，更重要的是增强了训练的稳定性和可重复性，为后续更复杂的深度学习项目奠定了坚实基础。</p>
 <p><strong>关键成果</strong>：
 - Softmax回归：测试准确率93.33%，收敛速度提升40%
 - 逻辑回归：测试准确率95.33%，收敛速度提升40%
 - 泛化能力：验证/测试集性能差距小于1.5%
-- 稳定性：Loss曲线平滑，无震荡</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+- 稳定性：Loss曲线平滑，无震荡</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

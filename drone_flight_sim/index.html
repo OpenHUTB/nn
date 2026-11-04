@@ -1,206 +1,199 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/drone_flight_sim/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>无人机飞行控制程序 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/drone_flight_sim/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>无人机飞行控制程序 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u65e0\u4eba\u673a\u98de\u884c\u63a7\u5236\u7a0b\u5e8f";
         var mkdocs_page_input_path = "drone_flight_sim/README.md";
         var mkdocs_page_url = "/nn/drone_flight_sim/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">无人机飞行控制程序</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#_2">作业内容</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_3">运行环境</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_4">依赖库</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_5">项目结构</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_6">飞行模式</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#1">模式 1：自动航点飞行模式</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#2">模式 2：键盘手动控制模式</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_7">功能实现</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#1_1">1. 自动连接与初始化</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#2_1">2. 智能起飞控制</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#3">3. 定点巡航</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#4-cnn">4. CNN 碰撞预测与实时避障（新增）</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#5-rgb">5. RGB 相机拍照功能（键盘快捷键操作）</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#6">6. 键盘手动控制功能</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#7">7. 安全降落系统</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#8">8. 慢速平稳降落</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_8">配置参数</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_9">碰撞数据采集</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#_10">自动采集（推荐）</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_11">手动采集</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_12">碰撞预测模型</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#_13">训练</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_14">评估</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_15">模型架构</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_16">性能</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#api">API 参考</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#api_1">键盘控制 API</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#api_2">相机控制 API</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#api_3">航点规划 API</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#cnn-api">CNN 碰撞预测 API</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_17">运行步骤</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_18">照片存储</a>
-    </li>
-    </ul>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">无人机飞行控制程序</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/drone_flight_sim/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">智能飞行控制系统</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal current" href="#">无人机飞行控制程序</a>
+<ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="#_2">作业内容</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_3">运行环境</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_4">依赖库</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_5">项目结构</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_6">飞行模式</a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#1">模式 1：自动航点飞行模式</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#2">模式 2：键盘手动控制模式</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_7">功能实现</a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#1_1">1. 自动连接与初始化</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#2_1">2. 智能起飞控制</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#3">3. 定点巡航</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#4-cnn">4. CNN 碰撞预测与实时避障（新增）</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#5-rgb">5. RGB 相机拍照功能（键盘快捷键操作）</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#6">6. 键盘手动控制功能</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#7">7. 安全降落系统</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#8">8. 慢速平稳降落</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_8">配置参数</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_9">碰撞数据采集</a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#_10">自动采集（推荐）</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_11">手动采集</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_12">碰撞预测模型</a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#_13">训练</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_14">评估</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_15">模型架构</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_16">性能</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#api">API 参考</a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#api_1">键盘控制 API</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#api_2">相机控制 API</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#api_3">航点规划 API</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cnn-api">CNN 碰撞预测 API</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_17">运行步骤</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_18">照片存储</a>
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">无人机飞行控制程序</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/drone_flight_sim/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">智能飞行控制系统</h1>
 <h2 id="_2">作业内容</h2>
 <p>基于 AirSim 无人机仿真平台，使用 Python 实现无人机自动起飞、<strong>带碰撞检测的智能定点巡航</strong>、<strong>慢下降</strong>功能，<strong>RGB/深度/分割多模式相机拍照与处理</strong>，<strong>键盘手动控制</strong>功能，<strong>速度档位切换</strong>、<strong>一键返航</strong>，以及 <strong>CNN 深度图像碰撞预测与实时避障</strong>。</p>
 <h2 id="_3">运行环境</h2>
@@ -219,7 +212,7 @@
 <li>torch</li>
 </ul>
 <h2 id="_5">项目结构</h2>
-<pre><code>drone_flight_sim/
+<div class="highlight"><pre><span></span><code>drone_flight_sim/
 ├── main.py                      # 主程序入口（支持两种飞行模式）
 ├── drone_controller.py          # 无人机核心控制模块
 ├── collision_handler.py         # 碰撞检测与处理模块(简单神经网络)
@@ -233,7 +226,7 @@
 ├── utils.py                     # 工具函数
 ├── drone_images/                # 拍摄照片保存目录（自动创建）
 └── collision_dataset/           # 碰撞数据采集保存目录（自动创建）
-</code></pre>
+</code></pre></div>
 <h2 id="_6">飞行模式</h2>
 <p>程序支持两种飞行模式，启动时会让你选择：</p>
 <h3 id="1">模式 1：自动航点飞行模式</h3>
@@ -517,8 +510,8 @@
 </table>
 <h2 id="_9">碰撞数据采集</h2>
 <h3 id="_10">自动采集（推荐）</h3>
-<pre><code class="language-bash">python auto_collision_collector.py
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>auto_collision_collector.py
+</code></pre></div>
 <p><strong>飞行模式</strong>：</p>
 <table>
 <thead>
@@ -556,8 +549,8 @@
 - 危险样本(label=1)：碰撞事件发生时自动采集并标注
 - 碰撞后自动恢复，继续飞行采集</p>
 <h3 id="_11">手动采集</h3>
-<pre><code class="language-bash">python collision_data_collector.py
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>collision_data_collector.py
+</code></pre></div>
 <table>
 <thead>
 <tr>
@@ -591,13 +584,13 @@
 <p>数据保存：<code>collision_dataset/depth/</code> + <code>collision_dataset/labels.csv</code></p>
 <h2 id="_12">碰撞预测模型</h2>
 <h3 id="_13">训练</h3>
-<pre><code class="language-bash">python train_collision_model.py
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>train_collision_model.py
+</code></pre></div>
 <h3 id="_14">评估</h3>
-<pre><code class="language-bash">python train_collision_model.py --eval
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>train_collision_model.py<span class="w"> </span>--eval
+</code></pre></div>
 <h3 id="_15">模型架构</h3>
-<pre><code>输入: 深度图像 (64x64 灰度)
+<div class="highlight"><pre><span></span><code>输入: 深度图像 (64x64 灰度)
     ↓
 Conv2D(1→16) + BN + ReLU + MaxPool
     ↓
@@ -610,7 +603,7 @@ Conv2D(64→128) + BN + ReLU + MaxPool
 Flatten → Dense(256) → Dropout → Dense(64) → Dense(1)
     ↓
 输出: 碰撞风险概率 [0~1]
-</code></pre>
+</code></pre></div>
 <h3 id="_16">性能</h3>
 <ul>
 <li>数据集：<code>collision_dataset/</code>（301 个样本，安全: 278, 危险: 23）</li>
@@ -620,71 +613,71 @@ Flatten → Dense(256) → Dropout → Dense(64) → Dense(1)
 </ul>
 <h2 id="api">API 参考</h2>
 <h3 id="api_1">键盘控制 API</h3>
-<pre><code class="language-python">from keyboard_control import KeyboardController, print_control_help
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">keyboard_control</span> <span class="kn">import</span> <span class="n">KeyboardController</span><span class="p">,</span> <span class="n">print_control_help</span>
 
-# 打印控制说明
-print_control_help()
+<span class="c1"># 打印控制说明</span>
+<span class="n">print_control_help</span><span class="p">()</span>
 
-# 创建键盘控制器并启动
-controller = KeyboardController(drone)
-controller.start()
-</code></pre>
+<span class="c1"># 创建键盘控制器并启动</span>
+<span class="n">controller</span> <span class="o">=</span> <span class="n">KeyboardController</span><span class="p">(</span><span class="n">drone</span><span class="p">)</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</code></pre></div>
 <h3 id="api_2">相机控制 API</h3>
-<pre><code class="language-python"># 创建无人机控制器
-drone = DroneController()
+<div class="highlight"><pre><span></span><code><span class="c1"># 创建无人机控制器</span>
+<span class="n">drone</span> <span class="o">=</span> <span class="n">DroneController</span><span class="p">()</span>
 
-# 设置图片保存目录（可选，默认保存到 drone_images 文件夹）
-drone.set_output_dir(&quot;my_photos&quot;)
+<span class="c1"># 设置图片保存目录（可选，默认保存到 drone_images 文件夹）</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">set_output_dir</span><span class="p">(</span><span class="s2">"my_photos"</span><span class="p">)</span>
 
-# 拍摄 RGB 彩色图像
-drone.capture_image()
+<span class="c1"># 拍摄 RGB 彩色图像</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">capture_image</span><span class="p">()</span>
 
-# 指定文件名保存
-drone.capture_image(filename=&quot;my_photo.png&quot;)
+<span class="c1"># 指定文件名保存</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">capture_image</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s2">"my_photo.png"</span><span class="p">)</span>
 
-# 拍摄并显示预览窗口
-drone.capture_image(show_preview=True)
+<span class="c1"># 拍摄并显示预览窗口</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">capture_image</span><span class="p">(</span><span class="n">show_preview</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-# 拍摄深度图像（伪彩色）
-drone.capture_depth_image()
+<span class="c1"># 拍摄深度图像（伪彩色）</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">capture_depth_image</span><span class="p">()</span>
 
-# 拍摄分割图像
-drone.capture_segmentation_image()
+<span class="c1"># 拍摄分割图像</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">capture_segmentation_image</span><span class="p">()</span>
 
-# 同时拍摄 RGB + 深度 + 分割三种图像
-drone.capture_all_cameras()
+<span class="c1"># 同时拍摄 RGB + 深度 + 分割三种图像</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">capture_all_cameras</span><span class="p">()</span>
 
-# 显示无人机状态
-drone.get_telemetry()
-</code></pre>
+<span class="c1"># 显示无人机状态</span>
+<span class="n">drone</span><span class="o">.</span><span class="n">get_telemetry</span><span class="p">()</span>
+</code></pre></div>
 <h3 id="api_3">航点规划 API</h3>
-<pre><code class="language-python">from flight_path import FlightPath
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">flight_path</span> <span class="kn">import</span> <span class="n">FlightPath</span>
 
-# 正方形路径
-waypoints = FlightPath.square_path(size=15, height=-3)
+<span class="c1"># 正方形路径</span>
+<span class="n">waypoints</span> <span class="o">=</span> <span class="n">FlightPath</span><span class="o">.</span><span class="n">square_path</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">height</span><span class="o">=-</span><span class="mi">3</span><span class="p">)</span>
 
-# 矩形路径
-waypoints = FlightPath.rectangle_path(width=20, length=10, altitude=-3)
+<span class="c1"># 矩形路径</span>
+<span class="n">waypoints</span> <span class="o">=</span> <span class="n">FlightPath</span><span class="o">.</span><span class="n">rectangle_path</span><span class="p">(</span><span class="n">width</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">altitude</span><span class="o">=-</span><span class="mi">3</span><span class="p">)</span>
 
-# 三角形路径
-waypoints = FlightPath.triangle_path(size=15, height=-5)
+<span class="c1"># 三角形路径</span>
+<span class="n">waypoints</span> <span class="o">=</span> <span class="n">FlightPath</span><span class="o">.</span><span class="n">triangle_path</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">height</span><span class="o">=-</span><span class="mi">5</span><span class="p">)</span>
 
-# 自定义路径
-waypoints = [(5, 0, -3), (5, -5, -3), (0, -5, -3), (0, 0, -3)]
-</code></pre>
+<span class="c1"># 自定义路径</span>
+<span class="n">waypoints</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">)]</span>
+</code></pre></div>
 <h3 id="cnn-api">CNN 碰撞预测 API</h3>
-<pre><code class="language-python">from collision_predictor import CollisionPredictor
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">collision_predictor</span> <span class="kn">import</span> <span class="n">CollisionPredictor</span>
 
-# 创建预测器
-predictor = CollisionPredictor(risk_threshold=0.7)
+<span class="c1"># 创建预测器</span>
+<span class="n">predictor</span> <span class="o">=</span> <span class="n">CollisionPredictor</span><span class="p">(</span><span class="n">risk_threshold</span><span class="o">=</span><span class="mf">0.7</span><span class="p">)</span>
 
-# 从深度图像预测
-result = predictor.predict(depth_image_numpy)
-# result = {'probability': 0.85, 'is_dangerous': True, 'risk_level': 'danger'}
+<span class="c1"># 从深度图像预测</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">depth_image_numpy</span><span class="p">)</span>
+<span class="c1"># result = {'probability': 0.85, 'is_dangerous': True, 'risk_level': 'danger'}</span>
 
-# 从 AirSim 直接获取深度图并预测
-result = predictor.predict_from_airsim(client, camera_name=&quot;0&quot;)
-</code></pre>
+<span class="c1"># 从 AirSim 直接获取深度图并预测</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict_from_airsim</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">camera_name</span><span class="o">=</span><span class="s2">"0"</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="_17">运行步骤</h2>
 <ol>
 <li><strong>启动仿真环境</strong></li>
@@ -695,8 +688,8 @@ result = predictor.predict_from_airsim(client, camera_name=&quot;0&quot;)
 </li>
 <li>
 <p><strong>运行程序</strong>
-   <code>bash
-   python main.py</code></p>
+</p><div class="highlight"><pre><span></span><code>python<span class="w"> </span>main.py
+</code></pre></div>
 </li>
 <li>
 <p><strong>选择飞行模式</strong></p>
@@ -723,58 +716,48 @@ result = predictor.predict_from_airsim(client, camera_name=&quot;0&quot;)
 <li>深度图像：<code>depth_YYYYMMDD_HHMMSS_X_Y.png</code></li>
 <li>分割图像：<code>seg_YYYYMMDD_HHMMSS_X_Y.png</code></li>
 </ul>
-<p>其中 <code>X</code>、<code>Y</code> 为拍照时的无人机坐标，<code>序号</code> 为该次运行的第 N 张照片。</p>
-              
-            </div>
-          </div><footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../carla_multisensor_platform/carla_multisensor_platform/" class="btn btn-neutral float-left" title="CARLA多传感器自动驾驶仿真平台"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
-        <a href="../lidar_project/" class="btn btn-neutral float-right" title="交通拥堵仿真与智能调控">后一页 <span class="icon icon-circle-arrow-right"></span></a>
-    </div>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-      <span><a href="../carla_multisensor_platform/carla_multisensor_platform/" style="color: #fcfcfc">&laquo; 前一页</a></span>
-    
-    
-      <span><a href="../lidar_project/" style="color: #fcfcfc">后一页 &raquo;</a></span>
-    
-  </span>
+<p>其中 <code>X</code>、<code>Y</code> 为拍照时的无人机坐标，<code>序号</code> 为该次运行的第 N 张照片。</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<div aria-label="Footer Navigation" class="rst-footer-buttons" role="navigation">
+<a class="btn btn-neutral float-left" href="../carla_multisensor_platform/carla_multisensor_platform/" title="CARLA多传感器自动驾驶仿真平台"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+<a class="btn btn-neutral float-right" href="../lidar_project/" title="交通拥堵仿真与智能调控">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+</div>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+<span><a href="../carla_multisensor_platform/carla_multisensor_platform/" style="color: #fcfcfc">« 前一页</a></span>
+<span><a href="../lidar_project/" style="color: #fcfcfc">后一页 »</a></span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

@@ -1,136 +1,129 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/linear_regression_fix/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>线性回归模型偏置更新修复 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/linear_regression_fix/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>线性回归模型偏置更新修复 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u7ebf\u6027\u56de\u5f52\u6a21\u578b\u504f\u7f6e\u66f4\u65b0\u4fee\u590d";
         var mkdocs_page_input_path = "linear_regression_fix.md";
         var mkdocs_page_url = "/nn/linear_regression_fix/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">线性回归模型偏置更新修复</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/linear_regression_fix.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">线性回归模型偏置更新修复</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">线性回归模型偏置更新修复</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/linear_regression_fix.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">线性回归模型偏置更新修复</h1>
 <h2 id="_2">线性回归基本原理</h2>
 <p>线性回归是最基础的机器学习算法之一，用于建立自变量x与因变量y之间的线性关系。</p>
 <h3 id="_3">数学表达式</h3>
 <p>标准的线性回归模型表达式为：</p>
-<pre><code class="language-text">y = w·x + b
-</code></pre>
+<div class="highlight"><pre><span></span><code>y = w·x + b
+</code></pre></div>
 <p>其中：</p>
 <ul>
 <li><code>y</code>：预测值（因变量）</li>
@@ -146,24 +139,24 @@
 </ul>
 <h3 id="_5">偏置项的数学意义</h3>
 <p>在梯度下降优化中，偏置项的梯度计算为：</p>
-<pre><code class="language-text">∂L/∂b = ∂L/∂y · ∂y/∂b = ∂L/∂y · 1
-</code></pre>
+<div class="highlight"><pre><span></span><code>∂L/∂b = ∂L/∂y · ∂y/∂b = ∂L/∂y · 1
+</code></pre></div>
 <p>这意味着偏置项的梯度等于损失函数对预测值的梯度，是优化过程中不可或缺的一部分。</p>
-<hr />
+<hr/>
 <h2 id="_6">问题描述</h2>
 <p>在 <code>src/chap02_linear_regression/linear_regression-tf2.0.py</code> 文件中，存在两个bug：</p>
 <h3 id="bug-1">Bug 1：偏置项未被更新</h3>
 <p>在 <code>train_one_step</code> 函数中，只计算了权重 <code>model.w</code> 的梯度并更新，但完全没有计算和更新偏置 <code>model.b</code>。</p>
 <p><strong>问题代码：</strong></p>
-<pre><code class="language-python">@tf.function
-def train_one_step(model, xs, ys):
-    with tf.GradientTape() as tape:
-        y_preds = model(xs)
-        loss = tf.keras.losses.MSE(ys, y_preds)
-    grads = tape.gradient(loss, model.w)    # 只对 w 求梯度
-    optimizer.apply_gradients([(grads, model.w)])    # 只更新 w
-    return loss
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+<span class="k">def</span> <span class="nf">train_one_step</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">tf</span><span class="o">.</span><span class="n">GradientTape</span><span class="p">()</span> <span class="k">as</span> <span class="n">tape</span><span class="p">:</span>
+        <span class="n">y_preds</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">losses</span><span class="o">.</span><span class="n">MSE</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">y_preds</span><span class="p">)</span>
+    <span class="n">grads</span> <span class="o">=</span> <span class="n">tape</span><span class="o">.</span><span class="n">gradient</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">w</span><span class="p">)</span>    <span class="c1"># 只对 w 求梯度</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">apply_gradients</span><span class="p">([(</span><span class="n">grads</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">w</span><span class="p">)])</span>    <span class="c1"># 只更新 w</span>
+    <span class="k">return</span> <span class="n">loss</span>
+</code></pre></div>
 <p><strong>问题分析：</strong></p>
 <ol>
 <li><code>tape.gradient(loss, model.w)</code> 只计算损失对权重<code>w</code>的梯度</li>
@@ -171,15 +164,15 @@ def train_one_step(model, xs, ys):
 <li>偏置<code>model.b</code>在整个训练过程中始终保持初始值0</li>
 </ol>
 <p><strong>修复后：</strong></p>
-<pre><code class="language-python">@tf.function
-def train_one_step(model, xs, ys):
-    with tf.GradientTape() as tape:
-        y_preds = model(xs)
-        loss = tf.keras.losses.MSE(ys, y_preds)
-    grads = tape.gradient(loss, [model.w, model.b])    # 对 w 和 b 求梯度
-    optimizer.apply_gradients(zip(grads, [model.w, model.b]))    # 更新 w 和 b
-    return loss
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+<span class="k">def</span> <span class="nf">train_one_step</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">tf</span><span class="o">.</span><span class="n">GradientTape</span><span class="p">()</span> <span class="k">as</span> <span class="n">tape</span><span class="p">:</span>
+        <span class="n">y_preds</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">losses</span><span class="o">.</span><span class="n">MSE</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">y_preds</span><span class="p">)</span>
+    <span class="n">grads</span> <span class="o">=</span> <span class="n">tape</span><span class="o">.</span><span class="n">gradient</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="p">[</span><span class="n">model</span><span class="o">.</span><span class="n">w</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">b</span><span class="p">])</span>    <span class="c1"># 对 w 和 b 求梯度</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">apply_gradients</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">grads</span><span class="p">,</span> <span class="p">[</span><span class="n">model</span><span class="o">.</span><span class="n">w</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">b</span><span class="p">]))</span>    <span class="c1"># 更新 w 和 b</span>
+    <span class="k">return</span> <span class="n">loss</span>
+</code></pre></div>
 <p><strong>修复说明：</strong></p>
 <ol>
 <li><code>tape.gradient(loss, [model.w, model.b])</code> 同时计算损失对<code>w</code>和<code>b</code>的梯度</li>
@@ -189,40 +182,40 @@ def train_one_step(model, xs, ys):
 <h3 id="bug-2">Bug 2：图例标签不匹配</h3>
 <p>第200行的图例有3个标签 <code>["train", "test", "pred"]</code>，但实际只绘制了2条曲线。</p>
 <p><strong>问题代码：</strong></p>
-<pre><code class="language-python">plt.plot(o_x, o_y, &quot;ro&quot;, markersize=3)      # 绘制训练数据点
-plt.plot(o_x_test, y_test_preds, &quot;k&quot;)        # 绘制预测曲线
-plt.legend([&quot;train&quot;, &quot;test&quot;, &quot;pred&quot;])        # 3个标签，但只有2条曲线
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="s2">"ro"</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>      <span class="c1"># 绘制训练数据点</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">o_x_test</span><span class="p">,</span> <span class="n">y_test_preds</span><span class="p">,</span> <span class="s2">"k"</span><span class="p">)</span>        <span class="c1"># 绘制预测曲线</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">"train"</span><span class="p">,</span> <span class="s2">"test"</span><span class="p">,</span> <span class="s2">"pred"</span><span class="p">])</span>        <span class="c1"># 3个标签，但只有2条曲线</span>
+</code></pre></div>
 <p><strong>修复后：</strong></p>
-<pre><code class="language-python">plt.plot(o_x, o_y, &quot;ro&quot;, markersize=3)      # 绘制训练数据点
-plt.plot(o_x_test, y_test_preds, &quot;k&quot;)        # 绘制预测曲线
-plt.legend([&quot;train&quot;, &quot;pred&quot;])                # 2个标签，与曲线对应
-</code></pre>
-<hr />
+<div class="highlight"><pre><span></span><code><span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="s2">"ro"</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>      <span class="c1"># 绘制训练数据点</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">o_x_test</span><span class="p">,</span> <span class="n">y_test_preds</span><span class="p">,</span> <span class="s2">"k"</span><span class="p">)</span>        <span class="c1"># 绘制预测曲线</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">"train"</span><span class="p">,</span> <span class="s2">"pred"</span><span class="p">])</span>                <span class="c1"># 2个标签，与曲线对应</span>
+</code></pre></div>
+<hr/>
 <h2 id="_7">代码结构分析</h2>
 <h3 id="_8">模型定义</h3>
-<pre><code class="language-python">class LinearModel(Model):
-    def __init__(self, ndim):
-        super(LinearModel, self).__init__()
-        # 权重参数
-        self.w = tf.Variable(
-            shape=[ndim, 1],
-            initial_value=tf.random.uniform([ndim, 1], minval=-0.1, maxval=0.1),
-            trainable=True,
-            name=&quot;weight&quot;
-        )
-        # 偏置参数
-        self.b = tf.Variable(
-            initial_value=tf.zeros([1], dtype=tf.float32),
-            trainable=True,
-            name=&quot;bias&quot;
-        )
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">LinearModel</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ndim</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">LinearModel</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># 权重参数</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">w</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
+            <span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="n">ndim</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+            <span class="n">initial_value</span><span class="o">=</span><span class="n">tf</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">([</span><span class="n">ndim</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">minval</span><span class="o">=-</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">maxval</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+            <span class="n">trainable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">"weight"</span>
+        <span class="p">)</span>
+        <span class="c1"># 偏置参数</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
+            <span class="n">initial_value</span><span class="o">=</span><span class="n">tf</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">tf</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span>
+            <span class="n">trainable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">"bias"</span>
+        <span class="p">)</span>
 
-    @tf.function
-    def call(self, x):
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1) + self.b
-        return y
-</code></pre>
+    <span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+    <span class="k">def</span> <span class="nf">call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span>
+        <span class="k">return</span> <span class="n">y</span>
+</code></pre></div>
 <p><strong>关键点：</strong></p>
 <ul>
 <li>模型定义了<code>w</code>和<code>b</code>两个可训练参数</li>
@@ -236,15 +229,15 @@ plt.legend([&quot;train&quot;, &quot;pred&quot;])                # 2个标签，
 <li><strong>多项式基函数</strong>：将x映射为[x, x², x³, ...]</li>
 <li><strong>高斯基函数</strong>：将x映射为一组高斯分布特征</li>
 </ol>
-<pre><code class="language-python">def gaussian_basis(x, feature_num=10):
-    centers = np.linspace(0, 25, feature_num)  # 高斯中心点
-    width = 1.0 * (centers[1] - centers[0])    # 高斯宽度
-    # 计算高斯特征
-    out = (x - centers) / width
-    ret = np.exp(-0.5 * out ** 2)
-    return ret
-</code></pre>
-<hr />
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">gaussian_basis</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">feature_num</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+    <span class="n">centers</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">feature_num</span><span class="p">)</span>  <span class="c1"># 高斯中心点</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">*</span> <span class="p">(</span><span class="n">centers</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">centers</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>    <span class="c1"># 高斯宽度</span>
+    <span class="c1"># 计算高斯特征</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">centers</span><span class="p">)</span> <span class="o">/</span> <span class="n">width</span>
+    <span class="n">ret</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">out</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ret</span>
+</code></pre></div>
+<hr/>
 <h2 id="_10">影响分析</h2>
 <h3 id="_11">偏置未更新的影响</h3>
 <h4 id="1">1. 模型表达能力受限</h4>
@@ -289,28 +282,28 @@ plt.legend([&quot;train&quot;, &quot;pred&quot;])                # 2个标签，
 <li>在学术论文或技术报告中显得不严谨</li>
 <li>影响对作者专业能力的信任</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_13">修复验证</h2>
 <h3 id="_14">验证方法</h3>
 <ol>
 <li><strong>检查梯度计算</strong></li>
 </ol>
-<pre><code class="language-python"># 验证偏置梯度是否非零
-with tf.GradientTape() as tape:
-    y_pred = model(xs)
-    loss = tf.keras.losses.MSE(ys, y_pred)
-grads = tape.gradient(loss, [model.w, model.b])
-print(f&quot;权重梯度: {grads[0].numpy()}&quot;)
-print(f&quot;偏置梯度: {grads[1].numpy()}&quot;)  # 应该非零
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># 验证偏置梯度是否非零</span>
+<span class="k">with</span> <span class="n">tf</span><span class="o">.</span><span class="n">GradientTape</span><span class="p">()</span> <span class="k">as</span> <span class="n">tape</span><span class="p">:</span>
+    <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">keras</span><span class="o">.</span><span class="n">losses</span><span class="o">.</span><span class="n">MSE</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">)</span>
+<span class="n">grads</span> <span class="o">=</span> <span class="n">tape</span><span class="o">.</span><span class="n">gradient</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="p">[</span><span class="n">model</span><span class="o">.</span><span class="n">w</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">b</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"权重梯度: </span><span class="si">{</span><span class="n">grads</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"偏置梯度: </span><span class="si">{</span><span class="n">grads</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># 应该非零</span>
+</code></pre></div>
 <ol>
 <li><strong>检查参数更新</strong></li>
 </ol>
-<pre><code class="language-python"># 记录训练前后的偏置值
-print(f&quot;训练前偏置: {model.b.numpy()}&quot;)
-# 执行训练...
-print(f&quot;训练后偏置: {model.b.numpy()}&quot;)  # 应该有变化
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># 记录训练前后的偏置值</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"训练前偏置: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">b</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="c1"># 执行训练...</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"训练后偏置: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">b</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># 应该有变化</span>
+</code></pre></div>
 <ol>
 <li>
 <p><strong>对比改进版文件</strong></p>
@@ -352,14 +345,14 @@ print(f&quot;训练后偏置: {model.b.numpy()}&quot;)  # 应该有变化
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_16">相关文件</h2>
 <ul>
 <li><strong>原始文件</strong>：<code>src/chap02_linear_regression/linear_regression-tf2.0.py</code></li>
 <li><strong>改进版文件</strong>：<code>src/chap02_linear_regression/linear_regression-tf2.0-improved.py</code></li>
 <li><strong>其他相关</strong>：<code>src/chap02_linear_regression/linear_regression.py</code>（NumPy版本）</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_17">扩展阅读</h2>
 <h3 id="_18">线性回归的变体</h3>
 <ol>
@@ -368,65 +361,57 @@ print(f&quot;训练后偏置: {model.b.numpy()}&quot;)  # 应该有变化
 <li><strong>弹性网络</strong>：结合L1和L2正则化</li>
 </ol>
 <h3 id="tensorflow">TensorFlow梯度计算</h3>
-<pre><code class="language-python"># 基本用法
-with tf.GradientTape() as tape:
-    y = model(x)
-    loss = loss_fn(y_true, y)
-gradients = tape.gradient(loss, model.trainable_variables)
+<div class="highlight"><pre><span></span><code><span class="c1"># 基本用法</span>
+<span class="k">with</span> <span class="n">tf</span><span class="o">.</span><span class="n">GradientTape</span><span class="p">()</span> <span class="k">as</span> <span class="n">tape</span><span class="p">:</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+<span class="n">gradients</span> <span class="o">=</span> <span class="n">tape</span><span class="o">.</span><span class="n">gradient</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">trainable_variables</span><span class="p">)</span>
 
-# 多参数梯度
-gradients = tape.gradient(loss, [param1, param2])
-optimizer.apply_gradients(zip(gradients, [param1, param2]))
-</code></pre>
+<span class="c1"># 多参数梯度</span>
+<span class="n">gradients</span> <span class="o">=</span> <span class="n">tape</span><span class="o">.</span><span class="n">gradient</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="p">[</span><span class="n">param1</span><span class="p">,</span> <span class="n">param2</span><span class="p">])</span>
+<span class="n">optimizer</span><span class="o">.</span><span class="n">apply_gradients</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">gradients</span><span class="p">,</span> <span class="p">[</span><span class="n">param1</span><span class="p">,</span> <span class="n">param2</span><span class="p">]))</span>
+</code></pre></div>
 <h3 id="_19">偏置项的最佳实践</h3>
 <ol>
 <li><strong>始终包含偏置项</strong>：除非有明确的业务约束要求直线通过原点</li>
 <li><strong>初始化为0</strong>：偏置通常初始化为0，权重使用随机初始化</li>
 <li><strong>正则化注意</strong>：偏置项通常不参与正则化计算</li>
-</ol>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+</ol></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/rain_sensor_fusion/DEMO_REPORT/" />
-      <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化 - 神经网络</title>
-    <link rel="stylesheet" href="../../css/theme.css" />
-    <link rel="stylesheet" href="../../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/rain_sensor_fusion/DEMO_REPORT/" rel="canonical"/>
+<link href="../../img/favicon.ico" rel="shortcut icon"/>
+<title>基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化 - 神经网络</title>
+<link href="../../css/theme.css" rel="stylesheet"/>
+<link href="../../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e\u6df1\u5ea6\u5b66\u4e60\u7f6e\u4fe1\u5ea6\u52a0\u6743\u7684\u81ea\u52a8\u9a7e\u9a76\u96e8\u5929\u591a\u4f20\u611f\u5668\u878d\u5408\u611f\u77e5\u4f18\u5316";
         var mkdocs_page_input_path = "rain_sensor_fusion/DEMO_REPORT.md";
         var mkdocs_page_url = "/nn/rain_sensor_fusion/DEMO_REPORT/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href="../.." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href="../.."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/rain_sensor_fusion/DEMO_REPORT.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="../..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href="../.."></a></li>
+<li class="breadcrumb-item active">基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/rain_sensor_fusion/DEMO_REPORT.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">基于深度学习置信度加权的自动驾驶雨天多传感器融合感知优化</h1>
 <h2 id="1">1. 汇报摘要</h2>
 <p>本项目面向自动驾驶车辆在雨天、雾天和湿滑路面下的感知可靠性下降问题，设计并实现了一个轻量级深度学习多传感器融合系统。系统融合 RGB 相机、LiDAR 和毫米波雷达三类传感器特征，并结合雨量、雾气和路面湿滑程度，动态调整不同传感器的置信权重，输出目标置信度、粗 3D 检测框、风险评分和驾驶动作建议。</p>
 <p>本次演示重点展示三点：</p>
@@ -147,7 +140,7 @@
 </ul>
 <h2 id="4">4. 技术路线</h2>
 <p>系统整体流程如下：</p>
-<pre><code class="language-text">雨天场景参数
+<div class="highlight"><pre><span></span><code>雨天场景参数
   ├── rain intensity
   ├── fog density
   └── wet road level
@@ -168,7 +161,7 @@
   ├── risk score
   ├── 3D box
   └── recommended action
-</code></pre>
+</code></pre></div>
 <h3 id="41">4.1 输入特征</h3>
 <p>相机特征包括可见度、对比度、清晰度、车道可见性和目标外观强度。</p>
 <p>LiDAR 特征包括点云密度、聚类置信度、距离一致性和雨水飞溅噪声。</p>
@@ -190,14 +183,14 @@
 </ul>
 <h2 id="5">5. 运行方式</h2>
 <p>基础推理：</p>
-<pre><code class="language-bash">python -m src.rain_sensor_fusion.main --scenario heavy_rain
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>src.rain_sensor_fusion.main<span class="w"> </span>--scenario<span class="w"> </span>heavy_rain
+</code></pre></div>
 <p>生成完整可视化结果：</p>
-<pre><code class="language-bash">python -m src.rain_sensor_fusion.main --scenario heavy_rain --visualize --compare --output-dir src/rain_sensor_fusion/visualization_results
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>src.rain_sensor_fusion.main<span class="w"> </span>--scenario<span class="w"> </span>heavy_rain<span class="w"> </span>--visualize<span class="w"> </span>--compare<span class="w"> </span>--output-dir<span class="w"> </span>src/rain_sensor_fusion/visualization_results
+</code></pre></div>
 <p>本次汇报使用的结果已保存到：</p>
-<pre><code class="language-text">docs/rain_sensor_fusion/image/
-</code></pre>
+<div class="highlight"><pre><span></span><code>docs/rain_sensor_fusion/image/
+</code></pre></div>
 <h2 id="6">6. 运行结果</h2>
 <h3 id="61">6.1 场景结果表</h3>
 <table>
@@ -276,7 +269,7 @@
 <p>风险评分也随场景恶化明显升高。晴天场景风险为 27.3%，系统建议 <code>monitor</code>；大雨场景风险升高到 66.3%，系统建议 <code>slow_down</code>。这与自动驾驶安全策略一致：在目标更近、雨量更大、闭合速度更高时，应降低速度并提高制动准备。</p>
 <h2 id="7">7. 可视化展示</h2>
 <h3 id="71">7.1 大雨场景仪表盘</h3>
-<p><img alt="heavy_rain_dashboard" src="../image/heavy_rain_dashboard.png" /></p>
+<p><img alt="heavy_rain_dashboard" src="../image/heavy_rain_dashboard.png"/></p>
 <p>该图展示了大雨场景下的完整决策过程：</p>
 <ul>
 <li>左上：深度融合权重，Radar 权重最高；</li>
@@ -285,16 +278,16 @@
 <li>右下：目标 3D 检测框俯视示意，显示前方障碍物位置和风险。</li>
 </ul>
 <h3 id="72">7.2 晴天场景对照</h3>
-<p><img alt="clear_dashboard" src="../image/clear_dashboard.png" /></p>
+<p><img alt="clear_dashboard" src="../image/clear_dashboard.png"/></p>
 <p>晴天场景中，相机可见度和 LiDAR 点云质量更稳定，因此 Camera 与 LiDAR 权重更高，风险评分较低，系统只需要保持监控。</p>
 <h3 id="73">7.3 小雨场景对照</h3>
-<p><img alt="light_rain_dashboard" src="../image/light_rain_dashboard.png" /></p>
+<p><img alt="light_rain_dashboard" src="../image/light_rain_dashboard.png"/></p>
 <p>小雨场景下，相机权重开始下降，Radar 权重上升，但风险分数仍低于减速阈值，因此动作建议仍为 <code>monitor</code>。</p>
 <h3 id="74">7.4 雨雾混合场景</h3>
-<p><img alt="foggy_storm_dashboard" src="../image/foggy_storm_dashboard.png" /></p>
+<p><img alt="foggy_storm_dashboard" src="../image/foggy_storm_dashboard.png"/></p>
 <p>雨雾混合场景中，雾气进一步降低视觉可靠性，系统继续提高 Radar 权重，并给出 <code>slow_down</code> 建议。</p>
 <h3 id="75">7.5 多场景对比图</h3>
-<p><img alt="scenario_comparison" src="../image/scenario_comparison.png" /></p>
+<p><img alt="scenario_comparison" src="../image/scenario_comparison.png"/></p>
 <p>该图用于横向比较四类天气场景。可以观察到：</p>
 <ul>
 <li>雨量上升时，Camera 权重整体下降；</li>
@@ -303,7 +296,7 @@
 <li>大雨和雨雾场景均触发减速建议。</li>
 </ul>
 <h3 id="76">7.6 雨强扫描曲线</h3>
-<p><img alt="rain_intensity_sweep" src="../image/rain_intensity_sweep.png" /></p>
+<p><img alt="rain_intensity_sweep" src="../image/rain_intensity_sweep.png"/></p>
 <p>该图模拟雨强从 0 到 1 逐渐增强时的模型响应。随着雨强上升，Camera 权重持续降低，Radar 权重逐步升高；风险曲线也随雨强和目标接近程度逐渐升高。图中的阈值线可以用于解释动作策略：风险超过减速阈值后，系统进入更保守的驾驶模式。</p>
 <h2 id="8">8. 创新点</h2>
 <ol>
@@ -323,50 +316,42 @@
 </ul>
 <h2 id="10">10. 汇报结论</h2>
 <p>本项目完成了一个面向雨天自动驾驶场景的深度学习多传感器融合系统。实验结果表明，在雨量和雾气增强时，系统能够自动降低相机权重，提高雷达和 LiDAR 的融合权重；在目标距离变近、闭合速度升高时，风险评分随之升高，并给出更保守的驾驶动作建议。</p>
-<p>因此，该方法能够提升自动驾驶感知系统在恶劣天气下的鲁棒性，并且通过可视化结果清楚展示了模型的融合逻辑和安全决策依据。</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<p>因此，该方法能够提升自动驾驶感知系统在恶劣天气下的鲁棒性，并且通过可视化结果清楚展示了模型的融合逻辑和安全决策依据。</p></div>
 </div>
-    <script src="../../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "../..";</script>
-    <script src="../../js/theme_extra.js"></script>
-    <script src="../../js/theme.js"></script>
-      <script src="../../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../../search/main.js"></script>
-    <script>
+</div><footer>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "../..";</script>
+<script src="../../js/theme_extra.js"></script>
+<script src="../../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../../js/umlconvert.js"></script>
+<script src="../../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

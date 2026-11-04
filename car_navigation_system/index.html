@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/car_navigation_system/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>多模态 CARLA 导航避障系统 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/car_navigation_system/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>多模态 CARLA 导航避障系统 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u591a\u6a21\u6001 CARLA \u5bfc\u822a\u907f\u969c\u7cfb\u7edf";
         var mkdocs_page_input_path = "car_navigation_system/README.md";
         var mkdocs_page_url = "/nn/car_navigation_system/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">多模态 CARLA 导航避障系统</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/car_navigation_system/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="carla">多模态 CARLA 导航避障系统</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">多模态 CARLA 导航避障系统</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/car_navigation_system/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="carla">多模态 CARLA 导航避障系统</h1>
 <h2 id="_1">项目简介</h2>
 <p>本项目基于 CARLA 模拟器与神经网络技术，实现了具备多传感器融合能力的智能车辆导航避障系统。系统集成前视摄像头、第三视角摄像头与障碍物检测模块，通过多模态数据感知环境，结合神经网络与传统控制算法，实现车辆自主行驶与障碍物规避功能。</p>
 <h3 id="_2">项目愿景</h3>
@@ -135,7 +128,7 @@
 <li><strong>研究价值</strong>：支持快速原型开发和算法验证</li>
 <li><strong>工程价值</strong>：提供工业级的代码结构和设计模式参考</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_4">🎯 核心功能</h2>
 <table>
 <thead>
@@ -178,16 +171,16 @@
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_5">📁 项目结构</h2>
-<pre><code>car_navigation_system/
+<div class="highlight"><pre><span></span><code>car_navigation_system/
 ├── README.md          # 项目说明文档
 ├── main.py            # 主程序文件（包含完整功能实现）
 ├── screenshots/       # 截图保存目录
 │   └── .gitkeep       # 保持目录结构
 ├── sync_main.bat      # Git同步脚本
 └── check_blueprints.py # 车辆蓝图检测工具
-</code></pre>
+</code></pre></div>
 <h3 id="_6">文件职责说明</h3>
 <table>
 <thead>
@@ -220,7 +213,7 @@
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_7">🛠️ 环境配置</h2>
 <h3 id="_8">硬件要求</h3>
 <table>
@@ -301,39 +294,39 @@
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_10">📦 依赖安装</h2>
 <h3 id="1">步骤 1：安装基础依赖</h3>
-<pre><code class="language-bash">pip install carla numpy opencv-python matplotlib torch
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>carla<span class="w"> </span>numpy<span class="w"> </span>opencv-python<span class="w"> </span>matplotlib<span class="w"> </span>torch
+</code></pre></div>
 <h3 id="2-carla-python-api">步骤 2：安装 CARLA Python API</h3>
-<pre><code class="language-bash"># 安装与CARLA版本匹配的API
-pip install carla==0.9.15  # 根据你的CARLA版本选择
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># 安装与CARLA版本匹配的API</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="nv">carla</span><span class="o">==</span><span class="m">0</span>.9.15<span class="w">  </span><span class="c1"># 根据你的CARLA版本选择</span>
+</code></pre></div>
 <h3 id="3">步骤 3：验证安装</h3>
-<pre><code class="language-bash">python -c &quot;import carla; print('CARLA API 安装成功')&quot;
-</code></pre>
-<hr />
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import carla; print('CARLA API 安装成功')"</span>
+</code></pre></div>
+<hr/>
 <h2 id="_11">🚀 快速启动</h2>
 <h3 id="1-carla">步骤 1：启动 CARLA 模拟器</h3>
-<pre><code class="language-bash"># Windows - 窗口模式
-CarlaUE4.exe -windowed -ResX=800 -ResY=600 -fps=30
+<div class="highlight"><pre><span></span><code><span class="c1"># Windows - 窗口模式</span>
+CarlaUE4.exe<span class="w"> </span>-windowed<span class="w"> </span>-ResX<span class="o">=</span><span class="m">800</span><span class="w"> </span>-ResY<span class="o">=</span><span class="m">600</span><span class="w"> </span>-fps<span class="o">=</span><span class="m">30</span>
 
-# Windows - 全屏模式
+<span class="c1"># Windows - 全屏模式</span>
 CarlaUE4.exe
 
-# Ubuntu
-./CarlaUE4.sh -windowed -ResX=800 -ResY=600
-</code></pre>
+<span class="c1"># Ubuntu</span>
+./CarlaUE4.sh<span class="w"> </span>-windowed<span class="w"> </span>-ResX<span class="o">=</span><span class="m">800</span><span class="w"> </span>-ResY<span class="o">=</span><span class="m">600</span>
+</code></pre></div>
 <h3 id="2">步骤 2：运行导航避障系统</h3>
-<pre><code class="language-bash"># 进入项目目录
-cd f:\nn\src\car_navigation_system
+<div class="highlight"><pre><span></span><code><span class="c1"># 进入项目目录</span>
+<span class="nb">cd</span><span class="w"> </span>f:<span class="se">\n</span>n<span class="se">\s</span>rc<span class="se">\c</span>ar_navigation_system
 
-# 运行主程序
-python main.py
-</code></pre>
+<span class="c1"># 运行主程序</span>
+python<span class="w"> </span>main.py
+</code></pre></div>
 <h3 id="3_1">步骤 3：预期输出</h3>
-<pre><code>自动驾驶系统 - 简化版本
+<div class="highlight"><pre><span></span><code>自动驾驶系统 - 简化版本
 确保CARLA服务器正在运行...
 
 ==================================================
@@ -354,8 +347,8 @@ python main.py
 系统初始化中...
 正在生成 2 辆NPC车辆...
 系统准备就绪！
-</code></pre>
-<hr />
+</code></pre></div>
+<hr/>
 <h2 id="_12">🎮 操作说明</h2>
 <table>
 <thead>
@@ -418,7 +411,7 @@ python main.py
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_13">🌟 车辆品牌切换功能</h2>
 <p>按 <code>b</code> 键循环切换车辆品牌，支持以下10种经过验证的车型：</p>
 <table>
@@ -499,7 +492,7 @@ python main.py
 - ✅ 控制台显示品牌选择菜单
 - ✅ 所有蓝图均已验证可用
 - ✅ 平滑的车辆过渡动画</p>
-<hr />
+<hr/>
 <h2 id="_14">📷 截图功能</h2>
 <p>截图功能是多模态 CARLA 导航避障系统的重要组成部分，用于保存当前驾驶画面，支持实验记录、结果展示和问题排查。</p>
 <h3 id="_15">核心特性</h3>
@@ -541,15 +534,15 @@ python main.py
 <li><strong>触发时机</strong>：可在任意时刻触发，不影响驾驶控制</li>
 </ul>
 <h4 id="_18">输出位置</h4>
-<pre><code>screenshots/
+<div class="highlight"><pre><span></span><code>screenshots/
 ├── screenshot_20260512_153022_Town01_clear_Red.png
 ├── screenshot_20260512_154510_Town02_rain_Blue.png
 └── screenshot_20260512_160000_Town03_cloudy_Green.png
-</code></pre>
+</code></pre></div>
 <h3 id="_19">文件命名规范</h3>
 <h4 id="_20">命名格式</h4>
-<pre><code>screenshot_时间戳_地图名_天气_颜色.png
-</code></pre>
+<div class="highlight"><pre><span></span><code>screenshot_时间戳_地图名_天气_颜色.png
+</code></pre></div>
 <h4 id="_21">命名示例</h4>
 <table>
 <thead>
@@ -611,32 +604,32 @@ python main.py
 </tbody>
 </table>
 <h3 id="_23">技术实现</h3>
-<p>核心代码逻辑：</p>
-<pre><code class="language-python">def take_screenshot(self):
-    &quot;&quot;&quot;保存当前画面截图&quot;&quot;&quot;
-    # 获取当前时间戳
-    timestamp = datetime.datetime.now().strftime(&quot;%Y%m%d_%H%M%S&quot;)
+<p>核心代码逻辑：
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">take_screenshot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""保存当前画面截图"""</span>
+    <span class="c1"># 获取当前时间戳</span>
+    <span class="n">timestamp</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">"%Y%m</span><span class="si">%d</span><span class="s2">_%H%M%S"</span><span class="p">)</span>
 
-    # 获取当前地图名称
-    map_name = self.current_map.split('/')[-1] if self.current_map else &quot;Unknown&quot;
+    <span class="c1"># 获取当前地图名称</span>
+    <span class="n">map_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_map</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">'/'</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_map</span> <span class="k">else</span> <span class="s2">"Unknown"</span>
 
-    # 获取当前天气
-    weather_name = self.weathers[self.current_weather_index]
+    <span class="c1"># 获取当前天气</span>
+    <span class="n">weather_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weathers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">current_weather_index</span><span class="p">]</span>
 
-    # 获取当前颜色名称
-    color_name = self.car_color_names[self.current_color_index]
+    <span class="c1"># 获取当前颜色名称</span>
+    <span class="n">color_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">car_color_names</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">current_color_index</span><span class="p">]</span>
 
-    # 生成文件名
-    filename = f&quot;screenshot_{timestamp}_{map_name}_{weather_name}_{color_name}.png&quot;
+    <span class="c1"># 生成文件名</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"screenshot_</span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">map_name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">weather_name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">color_name</span><span class="si">}</span><span class="s2">.png"</span>
 
-    # 确保目录存在
-    os.makedirs('screenshots', exist_ok=True)
+    <span class="c1"># 确保目录存在</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s1">'screenshots'</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    # 保存当前视角画面
-    if self.current_view_mode in self.cameras and self.image_data[self.current_view_mode] is not None:
-        cv2.imwrite(f&quot;screenshots/{filename}&quot;, self.image_data[self.current_view_mode])
-        print(f&quot;截图已保存: screenshots/{filename}&quot;)
-</code></pre>
+    <span class="c1"># 保存当前视角画面</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_view_mode</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cameras</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">current_view_mode</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cv2</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="sa">f</span><span class="s2">"screenshots/</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">current_view_mode</span><span class="p">])</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"截图已保存: screenshots/</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="_24">性能特点</h3>
 <table>
 <thead>
@@ -676,7 +669,7 @@ python main.py
 <li><strong>成果展示</strong>：生成演示图片，制作项目文档配图</li>
 <li><strong>数据分析</strong>：配合其他传感器数据进行分析，用于机器学习数据集构建</li>
 </ol>
-<hr />
+<hr/>
 <h2 id="_26">🌍 支持的地图</h2>
 <table>
 <thead>
@@ -724,7 +717,7 @@ python main.py
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_27">🌤️ 支持的天气</h2>
 <table>
 <thead>
@@ -752,10 +745,10 @@ python main.py
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_28">🔧 技术架构</h2>
 <h3 id="_29">系统架构图</h3>
-<pre><code>┌─────────────────────────────────────────────────────────────┐
+<div class="highlight"><pre><span></span><code>┌─────────────────────────────────────────────────────────────┐
 │                    控制系统 (Control System)               │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
 │  │  路点跟踪   │  │ 速度控制    │  │ 转向计算    │       │
@@ -793,7 +786,7 @@ python main.py
 │  │  Actor      │  │             │  │           │         │
 │  └─────────────┘  └─────────────┘  └───────────┘         │
 └─────────────────────────────────────────────────────────────┘
-</code></pre>
+</code></pre></div>
 <h3 id="_30">核心类设计</h3>
 <h4 id="1-simpledrivingsystem">1. SimpleDrivingSystem</h4>
 <ul>
@@ -816,7 +809,7 @@ python main.py
 <li><strong>职责</strong>：处理相机图像数据</li>
 <li><strong>特点</strong>：仅处理当前视角的图像，节省资源</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_31">📊 性能指标</h2>
 <table>
 <thead>
@@ -859,7 +852,7 @@ python main.py
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_32">🛡️ 错误处理与稳定性</h2>
 <h3 id="_33">故障恢复机制</h3>
 <table>
@@ -894,26 +887,26 @@ python main.py
 </tbody>
 </table>
 <h3 id="_34">资源管理</h3>
-<pre><code class="language-python"># 退出时自动清理资源
-def cleanup(self):
-    &quot;&quot;&quot;清理所有资源&quot;&quot;&quot;
-    # 停止相机
-    for camera in self.cameras.values():
-        if camera:
-            camera.stop()
-            camera.destroy()
+<div class="highlight"><pre><span></span><code><span class="c1"># 退出时自动清理资源</span>
+<span class="k">def</span> <span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""清理所有资源"""</span>
+    <span class="c1"># 停止相机</span>
+    <span class="k">for</span> <span class="n">camera</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">camera</span><span class="p">:</span>
+            <span class="n">camera</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="n">camera</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
 
-    # 销毁车辆
-    if self.vehicle:
-        self.vehicle.destroy()
+    <span class="c1"># 销毁车辆</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">vehicle</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vehicle</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
 
-    # 清理客户端连接
-    if self.client:
-        self.client = None
+    <span class="c1"># 清理客户端连接</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="o">=</span> <span class="kc">None</span>
 
-    print(&quot;资源清理完成&quot;)
-</code></pre>
-<hr />
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"资源清理完成"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
 <h2 id="_35">🔍 调试与日志</h2>
 <h3 id="_36">日志级别</h3>
 <table>
@@ -953,24 +946,24 @@ def cleanup(self):
 <li><strong>控制台输出</strong> - 实时显示系统状态</li>
 <li><strong>截图功能</strong> - 保存关键帧分析</li>
 </ol>
-<hr />
+<hr/>
 <h2 id="git">🔄 Git 同步说明</h2>
 <h3 id="_38">同步脚本使用</h3>
-<pre><code class="language-bash"># 运行同步脚本
+<div class="highlight"><pre><span></span><code><span class="c1"># 运行同步脚本</span>
 sync_main.bat
 
-# 手动同步流程
-git stash
-git pull origin main
-git stash pop
-</code></pre>
+<span class="c1"># 手动同步流程</span>
+git<span class="w"> </span>stash
+git<span class="w"> </span>pull<span class="w"> </span>origin<span class="w"> </span>main
+git<span class="w"> </span>stash<span class="w"> </span>pop
+</code></pre></div>
 <h3 id="_39">冲突处理策略</h3>
 <ol>
 <li><strong>代码冲突</strong>：保留本地修改，手动合并</li>
 <li><strong>配置冲突</strong>：以主分支为准</li>
 <li><strong>文档冲突</strong>：合并双方内容</li>
 </ol>
-<hr />
+<hr/>
 <h2 id="_40">📈 扩展开发指南</h2>
 <h3 id="_41">添加新功能步骤</h3>
 <ol>
@@ -1012,7 +1005,7 @@ git stash pop
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_43">📚 相关资源</h2>
 <h3 id="_44">学习资源</h3>
 <table>
@@ -1043,7 +1036,7 @@ git stash pop
 <li><a href="https://www.autoware.org/">AutoWare</a></li>
 <li><a href="https://apollo.auto/">Baidu Apollo</a></li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_46">❓ 常见问题</h2>
 <h3 id="1-carla_1">1. 连接 CARLA 服务器失败</h3>
 <p><strong>问题现象</strong>：运行程序时提示连接失败</p>
@@ -1070,15 +1063,15 @@ git stash pop
 - 降低CARLA分辨率
 - 减少NPC车辆数量
 - 关闭不必要的程序</p>
-<hr />
+<hr/>
 <h2 id="_47">📜 许可证</h2>
 <p>本项目采用 <strong>MIT License</strong>，详见 LICENSE 文件。</p>
-<pre><code>MIT License
+<div class="highlight"><pre><span></span><code>MIT License
 
 Copyright (c) 2026 Car Navigation System Team
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the &quot;Software&quot;), to deal
+of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
@@ -1087,15 +1080,15 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-</code></pre>
-<hr />
+</code></pre></div>
+<hr/>
 <h2 id="_48">📧 联系方式</h2>
 <ul>
 <li><strong>邮箱</strong>：2985835251@qq.com</li>
@@ -1103,7 +1096,7 @@ SOFTWARE.
 <li><strong>文档版本</strong>：v1.2.0</li>
 <li><strong>最后更新</strong>：2026年6月</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_49">📅 更新日志</h2>
 <h3 id="v120-2026-06">v1.2.0 (2026-06)</h3>
 <ul>
@@ -1132,51 +1125,43 @@ SOFTWARE.
 <li>✨ 添加NPC车辆生成</li>
 <li>✨ 实现车辆重置和紧急停止功能</li>
 </ul>
-<hr />
-<p><em>文档版本：v1.2.0 | 最后更新：2026年6月11日</em></p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<hr/>
+<p><em>文档版本：v1.2.0 | 最后更新：2026年6月11日</em></p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

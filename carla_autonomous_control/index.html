@@ -1,151 +1,144 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_autonomous_control/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>CARLA 自动驾驶控制客户端 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/carla_autonomous_control/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>CARLA 自动驾驶控制客户端 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "CARLA \u81ea\u52a8\u9a7e\u9a76\u63a7\u5236\u5ba2\u6237\u7aef";
         var mkdocs_page_input_path = "carla_autonomous_control/index.md";
         var mkdocs_page_url = "/nn/carla_autonomous_control/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">CARLA 自动驾驶控制客户端</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_autonomous_control/index.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="carla">CARLA 自动驾驶控制客户端</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">CARLA 自动驾驶控制客户端</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_autonomous_control/index.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="carla">CARLA 自动驾驶控制客户端</h1>
 <h2 id="_1">目录</h2>
 <ul>
-<li><a href="#项目简介">项目简介</a></li>
-<li><a href="#功能特性">功能特性</a></li>
-<li><a href="#快速开始">快速开始</a></li>
-<li><a href="#环境要求">环境要求</a></li>
-<li><a href="#安装步骤">安装步骤</a></li>
-<li><a href="#运行方式">运行方式</a></li>
-<li><a href="#运行效果">运行效果</a></li>
-<li><a href="#核心技术">核心技术</a></li>
-<li><a href="#手动自动模式切换">手动/自动模式切换</a></li>
-<li><a href="#最高速度限制">最高速度限制</a></li>
-<li><a href="#自适应巡航控制acc">自适应巡航控制（ACC）</a></li>
-<li><a href="#自动紧急制动aeb">自动紧急制动（AEB）</a></li>
-<li><a href="#hud-增强显示">HUD 增强显示</a></li>
-<li><a href="#命令行接口">命令行接口</a></li>
-<li><a href="#项目结构">项目结构</a></li>
-<li><a href="#数据输出">数据输出</a></li>
-<li><a href="#参考资料">参考资料</a></li>
+<li><a href="#%E9%A1%B9%E7%9B%AE%E7%AE%80%E4%BB%8B">项目简介</a></li>
+<li><a href="#%E5%8A%9F%E8%83%BD%E7%89%B9%E6%80%A7">功能特性</a></li>
+<li><a href="#%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B">快速开始</a></li>
+<li><a href="#%E7%8E%AF%E5%A2%83%E8%A6%81%E6%B1%82">环境要求</a></li>
+<li><a href="#%E5%AE%89%E8%A3%85%E6%AD%A5%E9%AA%A4">安装步骤</a></li>
+<li><a href="#%E8%BF%90%E8%A1%8C%E6%96%B9%E5%BC%8F">运行方式</a></li>
+<li><a href="#%E8%BF%90%E8%A1%8C%E6%95%88%E6%9E%9C">运行效果</a></li>
+<li><a href="#%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF">核心技术</a></li>
+<li><a href="#%E6%89%8B%E5%8A%A8%E8%87%AA%E5%8A%A8%E6%A8%A1%E5%BC%8F%E5%88%87%E6%8D%A2">手动/自动模式切换</a></li>
+<li><a href="#%E6%9C%80%E9%AB%98%E9%80%9F%E5%BA%A6%E9%99%90%E5%88%B6">最高速度限制</a></li>
+<li><a href="#%E8%87%AA%E9%80%82%E5%BA%94%E5%B7%A1%E8%88%AA%E6%8E%A7%E5%88%B6acc">自适应巡航控制（ACC）</a></li>
+<li><a href="#%E8%87%AA%E5%8A%A8%E7%B4%A7%E6%80%A5%E5%88%B6%E5%8A%A8aeb">自动紧急制动（AEB）</a></li>
+<li><a href="#hud-%E5%A2%9E%E5%BC%BA%E6%98%BE%E7%A4%BA">HUD 增强显示</a></li>
+<li><a href="#%E5%91%BD%E4%BB%A4%E8%A1%8C%E6%8E%A5%E5%8F%A3">命令行接口</a></li>
+<li><a href="#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84">项目结构</a></li>
+<li><a href="#%E6%95%B0%E6%8D%AE%E8%BE%93%E5%87%BA">数据输出</a></li>
+<li><a href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99">参考资料</a></li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_2">项目简介</h2>
 <p>本项目基于 CARLA 模拟器 0.9.11，实现了一个功能丰富的自动驾驶控制客户端。在官方示例的基础上，增加了手动/自动模式切换、最高速度限制、自适应巡航控制（ACC）、自动紧急制动（AEB）、增强型 HUD、数据记录以及机器学习集成（MLP 神经网络预测 ACC 目标速度）等多项功能。</p>
 <p><strong>核心优势</strong>：
@@ -153,7 +146,7 @@
 - 🚦 <strong>安全优先</strong>：AEB 主动紧急制动，ACC 动态跟车，限速双重保护
 - 📊 <strong>数据驱动</strong>：支持采集训练数据，集成 MLP 模型优化跟车平顺性
 - 🖥️ <strong>信息丰富</strong>：HUD 显示道路限速、障碍物距离、路径点距离、速度曲线等</p>
-<hr />
+<hr/>
 <h2 id="_3">功能特性</h2>
 <table>
 <thead>
@@ -197,7 +190,7 @@
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_4">快速开始</h2>
 <h3 id="_5">环境要求</h3>
 <ul>
@@ -207,36 +200,36 @@
 <li><strong>依赖库</strong>: pygame, numpy, scikit-learn, joblib, csv</li>
 </ul>
 <h3 id="_6">安装步骤</h3>
-<pre><code class="language-bash"># 1. 将主程序 main.py 放入 CARLA 的 PythonAPI/examples 目录
-# 2. 安装 Python 依赖
-pip install pygame numpy scikit-learn joblib
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. 将主程序 main.py 放入 CARLA 的 PythonAPI/examples 目录</span>
+<span class="c1"># 2. 安装 Python 依赖</span>
+pip<span class="w"> </span>install<span class="w"> </span>pygame<span class="w"> </span>numpy<span class="w"> </span>scikit-learn<span class="w"> </span>joblib
+</code></pre></div>
 <p><strong>安装 CARLA 模拟器</strong>：
 - 下载 CARLA 0.9.11 版本，解压到本地。
 - 运行 <code>CarlaUE4.exe</code>（Windows）或 <code>./CarlaUE4.sh</code>（Linux）启动服务器。</p>
 <h3 id="_7">运行方式</h3>
-<pre><code class="language-bash"># 1. 启动 CARLA 模拟器（单独窗口）
-# CarlaUE4.exe
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. 启动 CARLA 模拟器（单独窗口）</span>
+<span class="c1"># CarlaUE4.exe</span>
 
-# 2. 运行自动驾驶客户端（默认 BehaviorAgent）
-py -3.7 main.py --agent Behavior
+<span class="c1"># 2. 运行自动驾驶客户端（默认 BehaviorAgent）</span>
+py<span class="w"> </span>-3.7<span class="w"> </span>main.py<span class="w"> </span>--agent<span class="w"> </span>Behavior
 
-# 3. 启用 ACC 并使用 MLP 模型，限速 50 km/h
-py -3.7 main.py --agent Behavior --max_speed 50 --acc_enable --ml_acc
+<span class="c1"># 3. 启用 ACC 并使用 MLP 模型，限速 50 km/h</span>
+py<span class="w"> </span>-3.7<span class="w"> </span>main.py<span class="w"> </span>--agent<span class="w"> </span>Behavior<span class="w"> </span>--max_speed<span class="w"> </span><span class="m">50</span><span class="w"> </span>--acc_enable<span class="w"> </span>--ml_acc
 
-# 4. 手动驾驶模式（按 P 切换）
-py -3.7 main.py --agent Behavior --max_speed 40
+<span class="c1"># 4. 手动驾驶模式（按 P 切换）</span>
+py<span class="w"> </span>-3.7<span class="w"> </span>main.py<span class="w"> </span>--agent<span class="w"> </span>Behavior<span class="w"> </span>--max_speed<span class="w"> </span><span class="m">40</span>
 
-# 5. 开启循环行驶和数据记录
-py -3.7 main.py --agent Behavior --loop --record_data acc_data.csv
-</code></pre>
-<hr />
+<span class="c1"># 5. 开启循环行驶和数据记录</span>
+py<span class="w"> </span>-3.7<span class="w"> </span>main.py<span class="w"> </span>--agent<span class="w"> </span>Behavior<span class="w"> </span>--loop<span class="w"> </span>--record_data<span class="w"> </span>acc_data.csv
+</code></pre></div>
+<hr/>
 <h2 id="_8">运行效果</h2>
 <p>下图展示了启用 MLP 模型后，车辆在自适应巡航控制下的平稳跟车表现（HUD 中可见跟车距离和速度曲线）。</p>
-<p><img alt="MLP-ACC 平稳跟车效果图1" src="image/mlp_acc_following_01.png" />
-<img alt="MLP-ACC 平稳跟车效果图2" src="image/mlp_acc_following_02.png" /></p>
+<p><img alt="MLP-ACC 平稳跟车效果图1" src="image/mlp_acc_following_01.png"/>
+<img alt="MLP-ACC 平稳跟车效果图2" src="image/mlp_acc_following_02.png"/></p>
 <p><em>图：车辆跟随前车时，速度曲线平滑，障碍物距离稳定在合理范围内，加减速平缓。</em></p>
-<hr />
+<hr/>
 <h2 id="_9">核心技术</h2>
 <h3 id="_10">手动/自动模式切换</h3>
 <ul>
@@ -277,14 +270,14 @@ py -3.7 main.py --agent Behavior --loop --record_data acc_data.csv
 <li>实时速度曲线（右下角黄色折线，左上角显示当前速度）</li>
 <li>超速时速度数字变为红色。</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_12">命令行接口</h2>
-<pre><code class="language-bash">py -3.7 main.py [-h] [--host H] [-p P] [--res WIDTHxHEIGHT]
-    [--filter PATTERN] [--gamma GAMMA] [-l] [-b {cautious,normal,aggressive}]
-    [-a {Behavior,Roaming,Basic}] [-s SEED] [--max_speed MAX_SPEED]
-    [--aeb_distance AEB_DISTANCE] [--acc_enable] [--acc_max_dist ACC_MAX_DIST]
-    [--acc_min_dist ACC_MIN_DIST] [--record_data RECORD_DATA] [--ml_acc]
-</code></pre>
+<div class="highlight"><pre><span></span><code>py<span class="w"> </span>-3.7<span class="w"> </span>main.py<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span><span class="o">[</span>--host<span class="w"> </span>H<span class="o">]</span><span class="w"> </span><span class="o">[</span>-p<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--res<span class="w"> </span>WIDTHxHEIGHT<span class="o">]</span>
+<span class="w">    </span><span class="o">[</span>--filter<span class="w"> </span>PATTERN<span class="o">]</span><span class="w"> </span><span class="o">[</span>--gamma<span class="w"> </span>GAMMA<span class="o">]</span><span class="w"> </span><span class="o">[</span>-l<span class="o">]</span><span class="w"> </span><span class="o">[</span>-b<span class="w"> </span><span class="o">{</span>cautious,normal,aggressive<span class="o">}]</span>
+<span class="w">    </span><span class="o">[</span>-a<span class="w"> </span><span class="o">{</span>Behavior,Roaming,Basic<span class="o">}]</span><span class="w"> </span><span class="o">[</span>-s<span class="w"> </span>SEED<span class="o">]</span><span class="w"> </span><span class="o">[</span>--max_speed<span class="w"> </span>MAX_SPEED<span class="o">]</span>
+<span class="w">    </span><span class="o">[</span>--aeb_distance<span class="w"> </span>AEB_DISTANCE<span class="o">]</span><span class="w"> </span><span class="o">[</span>--acc_enable<span class="o">]</span><span class="w"> </span><span class="o">[</span>--acc_max_dist<span class="w"> </span>ACC_MAX_DIST<span class="o">]</span>
+<span class="w">    </span><span class="o">[</span>--acc_min_dist<span class="w"> </span>ACC_MIN_DIST<span class="o">]</span><span class="w"> </span><span class="o">[</span>--record_data<span class="w"> </span>RECORD_DATA<span class="o">]</span><span class="w"> </span><span class="o">[</span>--ml_acc<span class="o">]</span>
+</code></pre></div>
 <table>
 <thead>
 <tr>
@@ -376,9 +369,9 @@ py -3.7 main.py --agent Behavior --loop --record_data acc_data.csv
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_13">项目结构</h2>
-<pre><code>carla_autonomous_control/
+<div class="highlight"><pre><span></span><code>carla_autonomous_control/
 ├── docs/                           # 文档目录
 │   └── carla_autonomous_control/
 │       ├── index.md                # 本 README
@@ -394,7 +387,7 @@ py -3.7 main.py --agent Behavior --loop --record_data acc_data.csv
 ├── _screenshots/                   # V 键截图保存目录
 ├── acc_data.csv                    # 采集的 ACC 训练数据
 └── README.md                       # 项目说明（本文件）
-</code></pre>
+</code></pre></div>
 <h3 id="_14">核心文件说明</h3>
 <table>
 <thead>
@@ -430,7 +423,7 @@ py -3.7 main.py --agent Behavior --loop --record_data acc_data.csv
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_15">数据输出</h2>
 <p>当使用 <code>--record_data</code> 时，会生成 CSV 文件，包含以下字段：</p>
 <table>
@@ -460,7 +453,7 @@ py -3.7 main.py --agent Behavior --loop --record_data acc_data.csv
 </tbody>
 </table>
 <p>这些数据可用于后续模型训练或分析。</p>
-<hr />
+<hr/>
 <h2 id="_16">参考资料</h2>
 <ul>
 <li><a href="https://carla.readthedocs.io/">CARLA Simulator Documentation</a></li>
@@ -469,52 +462,44 @@ py -3.7 main.py --agent Behavior --loop --record_data acc_data.csv
 <li><a href="https://scikit-learn.org/stable/modules/generated/sklearn.neural_network.MLPRegressor.html">Scikit-learn MLPRegressor</a></li>
 <li><a href="https://www.pygame.org/docs/">Pygame Documentation</a></li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_17">许可证</h2>
-<p>本项目基于 MIT 许可证，原始代码版权归 Intel Labs 所有。</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<p>本项目基于 MIT 许可证，原始代码版权归 Intel Labs 所有。</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

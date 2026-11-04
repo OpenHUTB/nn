@@ -1,192 +1,185 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/auto_drive_seg/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>自动驾驶车辆语义分割 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/auto_drive_seg/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>自动驾驶车辆语义分割 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u81ea\u52a8\u9a7e\u9a76\u8f66\u8f86\u8bed\u4e49\u5206\u5272";
         var mkdocs_page_input_path = "auto_drive_seg/README.md";
         var mkdocs_page_url = "/nn/auto_drive_seg/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">自动驾驶车辆语义分割</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#_2">目录</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_3">项目简介 </a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_4">安装步骤 </a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#_5">环境要求</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_6">安装流程</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_7">快速开始 </a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#_8">图片输入</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_9">视频输入</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_10">数据增强可视化</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_11">推理延迟基准测试</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_12">类别概率热力图</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_13">类别频率分析</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_14">运行效果 </a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#_15">单张图片：分割叠加 + 纯掩码</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_16">视频逐帧分割</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_17">数据增强可视化</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#cpu">多模型 CPU 推理延迟</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_18">类别概率热力图（模型偏置诊断）</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#focal-loss">类别不平衡与 Focal Loss 权重</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_19">核心技术 </a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#u-net">网络结构：U-Net</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#sparse-categorical-focal-loss">损失函数：Sparse Categorical Focal Loss + 类别权重</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#_20">数据增强</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_21">类别定义与配色 </a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_22">项目结构 </a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#_23">参考资料 </a>
-    </li>
-    </ul>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">自动驾驶车辆语义分割</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/auto_drive_seg/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">自动驾驶车辆语义分割</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal current" href="#">自动驾驶车辆语义分割</a>
+<ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="#_2">目录</a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_3">项目简介 </a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_4">安装步骤 </a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#_5">环境要求</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_6">安装流程</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_7">快速开始 </a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#_8">图片输入</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_9">视频输入</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_10">数据增强可视化</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_11">推理延迟基准测试</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_12">类别概率热力图</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_13">类别频率分析</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_14">运行效果 </a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#_15">单张图片：分割叠加 + 纯掩码</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_16">视频逐帧分割</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_17">数据增强可视化</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cpu">多模型 CPU 推理延迟</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_18">类别概率热力图（模型偏置诊断）</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#focal-loss">类别不平衡与 Focal Loss 权重</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_19">核心技术 </a>
+<ul>
+<li class="toctree-l3"><a class="reference internal" href="#u-net">网络结构：U-Net</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sparse-categorical-focal-loss">损失函数：Sparse Categorical Focal Loss + 类别权重</a>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_20">数据增强</a>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_21">类别定义与配色 </a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_22">项目结构 </a>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#_23">参考资料 </a>
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">自动驾驶车辆语义分割</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/auto_drive_seg/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">自动驾驶车辆语义分割</h1>
 <p>基于 <strong>U-Net</strong> 与 <strong>CARLA 自动驾驶仿真平台</strong> 的逐像素语义分割模块。源自伍斯特理工学院（WPI）研究生课程 <strong>RBE549 计算机视觉</strong>，团队选定"自动驾驶场景下的语义分割"作为期末研究：通过自动化脚本在 CARLA 仿真器中批量采集数千张带标注街景图像构建数据集，使用 <strong>Focal Loss + 类别权重</strong> 训练 U-Net 模型以缓解 CARLA 训练集中约 <strong>817:1</strong> 的极端类别不平衡，并对比不同输入尺寸/损失函数下的表现。</p>
 <p>模块代码位于仓库的 <a href="https://github.com/OpenHUTB/nn/tree/main/src/auto_drive_seg"><code>src/auto_drive_seg/</code></a>。</p>
 <h2 id="_2">目录</h2>
@@ -222,97 +215,90 @@
 <ol>
 <li>克隆仓库：</li>
 </ol>
-<pre><code class="language-sh">git clone https://github.com/OpenHUTB/nn.git
-cd nn/src/auto_drive_seg
-</code></pre>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/OpenHUTB/nn.git
+<span class="nb">cd</span><span class="w"> </span>nn/src/auto_drive_seg
+</code></pre></div>
 <ol>
 <li>创建 conda 环境并安装依赖：</li>
 </ol>
-<pre><code class="language-sh">conda create -n py310 python=3.10 -y
-conda activate py310
-pip install -r requirements.txt
-</code></pre>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>py310<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10<span class="w"> </span>-y
+conda<span class="w"> </span>activate<span class="w"> </span>py310
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</code></pre></div>
 <p>国内网络可加清华镜像：<code>pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple</code></p>
 <ol>
 <li>获取预训练模型（模型为二进制大文件，未随仓库提交）：</li>
 </ol>
-<pre><code class="language-sh">git clone https://github.com/hlfshell/rbe549-project-segmentation
-</code></pre>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/hlfshell/rbe549-project-segmentation
+</code></pre></div>
 <p>将 <code>rbe549-project-segmentation/models/unet_model_256x256_50</code> 整个目录复制到本模块的 <code>models/</code> 目录。原仓 <code>models/</code> 下另有 <code>unet_model_512x512_50</code>、<code>unet_model_512x512_focal_loss_with_weights</code> 等更大输入尺寸的模型，可按需替换或全部下载用于多模型对比。</p>
 <h2 id="_7">快速开始 <a name="quick-start"></a></h2>
 <p><code>main.py</code> 是模块统一入口，按参数自动派发到不同模式。</p>
 <h3 id="_8">图片输入</h3>
-<pre><code class="language-sh">cd src/auto_drive_seg
-python main.py                                # 默认示例图 + 默认 256x256 模型
-python main.py examples/sample_input.png      # 指定输入图
-python main.py examples/sample_input.png models/unet_model_512x512_50
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src/auto_drive_seg
+python<span class="w"> </span>main.py<span class="w">                                </span><span class="c1"># 默认示例图 + 默认 256x256 模型</span>
+python<span class="w"> </span>main.py<span class="w"> </span>examples/sample_input.png<span class="w">      </span><span class="c1"># 指定输入图</span>
+python<span class="w"> </span>main.py<span class="w"> </span>examples/sample_input.png<span class="w"> </span>models/unet_model_512x512_50
+</code></pre></div>
 <p>运行后在输入图同目录生成 <code>*_overlay.png</code>（分割叠加图）和 <code>*_mask.png</code>（纯掩码图）。</p>
 <h3 id="_9">视频输入</h3>
-<pre><code class="language-sh">python main.py path/to/video.mp4              # 自动识别 .mp4/.avi/.mov/.mkv/.webm
-python main.py path/to/video.mp4 models/unet_model_256x256_50 120  # 限制 120 帧
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>main.py<span class="w"> </span>path/to/video.mp4<span class="w">              </span><span class="c1"># 自动识别 .mp4/.avi/.mov/.mkv/.webm</span>
+python<span class="w"> </span>main.py<span class="w"> </span>path/to/video.mp4<span class="w"> </span>models/unet_model_256x256_50<span class="w"> </span><span class="m">120</span><span class="w">  </span><span class="c1"># 限制 120 帧</span>
+</code></pre></div>
 <p>输出 <code>*_seg.mp4</code>（逐帧分割叠加视频）和 <code>*_seg_frames.png</code>（采样帧拼图）。</p>
 <h3 id="_10">数据增强可视化</h3>
-<pre><code class="language-sh">python main.py --augment                      # 默认示例图
-python main.py --augment examples/sample_input.png
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>main.py<span class="w"> </span>--augment<span class="w">                      </span><span class="c1"># 默认示例图</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--augment<span class="w"> </span>examples/sample_input.png
+</code></pre></div>
 <p>输出 4 列拼图：原图 + 6 种增强（水平翻转、亮度+30%、对比度-30%、高斯模糊、椒盐噪声、中心裁剪）。</p>
 <h3 id="_11">推理延迟基准测试</h3>
-<pre><code class="language-sh">python main.py --benchmark                    # 自动加载 models/ 下所有预训练模型
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>main.py<span class="w"> </span>--benchmark<span class="w">                    </span><span class="c1"># 自动加载 models/ 下所有预训练模型</span>
+</code></pre></div>
 <p>每个模型 2 次预热 + 10 次正式推理，输出柱状图（含 mean ± min/max 误差棒）+ 控制台 markdown 表格。</p>
 <h3 id="_12">类别概率热力图</h3>
-<pre><code class="language-sh">python main.py --heatmap                                      # 默认 256x256 模型
-python main.py --heatmap examples/sample_input.png models/unet_model_512x512_50
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>main.py<span class="w"> </span>--heatmap<span class="w">                                      </span><span class="c1"># 默认 256x256 模型</span>
+python<span class="w"> </span>main.py<span class="w"> </span>--heatmap<span class="w"> </span>examples/sample_input.png<span class="w"> </span>models/unet_model_512x512_50
+</code></pre></div>
 <p>输出 4×2 网格：8 类的 softmax 概率灰度热力图，每张面板标该类的均值/最大值。</p>
 <h3 id="_13">类别频率分析</h3>
-<pre><code class="language-sh">python main.py --frequency                    # 不需要模型或输入图
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>main.py<span class="w"> </span>--frequency<span class="w">                    </span><span class="c1"># 不需要模型或输入图</span>
+</code></pre></div>
 <p>控制台输出 markdown 表格 + 极端比例（约 817:1），同时生成两栏柱状图（左：log 纵轴像素占比；右：训练实际使用的 Focal Loss 权重）。</p>
 <h2 id="_14">运行效果 <a name="results"></a></h2>
 <h3 id="_15">单张图片：分割叠加 + 纯掩码</h3>
 <p>输入 CARLA 街景图，模型输出每像素类别预测，叠加在原图上（蓝=车辆、绿=道路/地面、红=行人、黄=交通标志）：</p>
 <p align="center">
-<img width="500px" src="images/result_overlay.png"/>
+<img src="images/result_overlay.png" width="500px"/>
 </p>
-
 <p>仅显示分割结果（纯掩码）：</p>
 <p align="center">
-<img width="500px" src="images/result_mask.png"/>
+<img src="images/result_mask.png" width="500px"/>
 </p>
-
 <h3 id="_16">视频逐帧分割</h3>
 <p>视频中 6 个均匀采样帧的分割结果（叠加视频本身约 4MB，不入仓）：</p>
 <p align="center">
-<img width="600px" src="images/result_video_frames.png"/>
+<img src="images/result_video_frames.png" width="600px"/>
 </p>
-
 <h3 id="_17">数据增强可视化</h3>
 <p>dataset.py 训练时随机施加 6 种增强缓解过拟合，下图为它们独立施加在同一张图上的效果：</p>
 <p align="center">
-<img width="700px" src="images/result_augmentation.png"/>
+<img src="images/result_augmentation.png" width="700px"/>
 </p>
-
 <h3 id="cpu">多模型 CPU 推理延迟</h3>
 <p>256x256 输入比 512x512 在 CPU 上快约 <strong>2.6 倍</strong>；512x512 的三个变体（基础、focal+权重、focal 无权重）速度几乎一致——计算量相同，差异仅在训练目标：</p>
 <p align="center">
-<img width="700px" src="images/result_benchmark.png"/>
+<img src="images/result_benchmark.png" width="700px"/>
 </p>
-
 <h3 id="_18">类别概率热力图（模型偏置诊断）</h3>
 <p>亮 = 模型认为该位置更可能属于该类。256x256 模型对 Vehicles/Ground 高度自信（max≈1.0），但对 Roads（max≈0.09）和 Road Lines（max≈0.03）几乎检测不到，Pedestrians 最高置信度仅约 0.5——直接体现了类别不平衡对少数类的伤害：</p>
 <p align="center">
-<img width="700px" src="images/result_heatmap.png"/>
+<img src="images/result_heatmap.png" width="700px"/>
 </p>
-
 <h3 id="focal-loss">类别不平衡与 Focal Loss 权重</h3>
 <p>CARLA 训练集 8 类极度不平衡（最多 Unlabeled 占 54%，最少 Pedestrians 仅 0.066%，比例 <strong>817:1</strong>）。Focal Loss 用 <code>2·sigmoid(像素比例)</code> 把此跨度压成 1.12-2.00 的温和加权（少数类 ≈2.0、多数类 ≈1.1），让模型在每张图的梯度中也能感知少数类：</p>
 <p align="center">
-<img width="800px" src="images/result_frequency.png"/>
+<img src="images/result_frequency.png" width="800px"/>
 </p>
-
 <h2 id="_19">核心技术 <a name="core-tech"></a></h2>
 <h3 id="u-net">网络结构：U-Net</h3>
 <p>经典 <strong>U-Net</strong> 编码-解码结构（<a href="https://github.com/OpenHUTB/nn/blob/main/src/auto_drive_seg/semantic/unet/model.py"><code>src/auto_drive_seg/semantic/unet/model.py</code></a>）：</p>
@@ -404,7 +390,7 @@ python main.py --heatmap examples/sample_input.png models/unet_model_512x512_50
 </table>
 <p>完整 CARLA → 本项目类别映射见 <a href="https://github.com/OpenHUTB/nn/blob/main/src/auto_drive_seg/semantic/carla_controller/labels.py"><code>semantic/carla_controller/labels.py</code></a>。</p>
 <h2 id="_22">项目结构 <a name="structure"></a></h2>
-<pre><code>src/auto_drive_seg/
+<div class="highlight"><pre><span></span><code>src/auto_drive_seg/
     main.py                 推理入口（按 OpenHUTB 规范以 main. 开头，统一派发 6 种模式）
     requirements.txt        依赖清单
     semantic/               推理与训练核心代码
@@ -417,7 +403,7 @@ python main.py --heatmap examples/sample_input.png models/unet_model_512x512_50
             labels.py           CARLA → 8 类语义类别映射与配色
     examples/               示例输入图与运行效果图
     models/                 预训练模型（需自行获取，见安装步骤）
-</code></pre>
+</code></pre></div>
 <blockquote>
 <p>说明：原始项目中 <code>semantic/carla_controller/</code> 还含有 CARLA 数据采集脚本（依赖 <code>carla</code> 包与运行中的仿真器），与推理无关，本模块未收录。训练数据集需通过 CARLA 仿真器实跑采集，详见原始项目。</p>
 </blockquote>
@@ -428,58 +414,48 @@ python main.py --heatmap examples/sample_input.png models/unet_model_512x512_50
 <li>Focal Loss 论文：Lin T. et al., <em>Focal Loss for Dense Object Detection</em>, ICCV 2017</li>
 <li>CARLA 模拟器：<a href="https://carla.org/">https://carla.org/</a></li>
 <li>CARLA 语义分割相机：<a href="https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera">https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera</a></li>
-</ul>
-              
-            </div>
-          </div><footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../carla_yolo_detection/" class="btn btn-neutral float-left" title="自动驾驶感知系统"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
-        <a href="../drone_path_learning/" class="btn btn-neutral float-right" title="无人机路径学习">后一页 <span class="icon icon-circle-arrow-right"></span></a>
-    </div>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-      <span><a href="../carla_yolo_detection/" style="color: #fcfcfc">&laquo; 前一页</a></span>
-    
-    
-      <span><a href="../drone_path_learning/" style="color: #fcfcfc">后一页 &raquo;</a></span>
-    
-  </span>
+</ul></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<div aria-label="Footer Navigation" class="rst-footer-buttons" role="navigation">
+<a class="btn btn-neutral float-left" href="../carla_yolo_detection/" title="自动驾驶感知系统"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+<a class="btn btn-neutral float-right" href="../drone_path_learning/" title="无人机路径学习">后一页 <span class="icon icon-circle-arrow-right"></span></a>
+</div>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+<span><a href="../carla_yolo_detection/" style="color: #fcfcfc">« 前一页</a></span>
+<span><a href="../drone_path_learning/" style="color: #fcfcfc">后一页 »</a></span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

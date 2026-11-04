@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/cnn_keras_sequential_improved/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Keras Sequential CNN 改进报告 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/cnn_keras_sequential_improved/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>Keras Sequential CNN 改进报告 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "Keras Sequential CNN \u6539\u8fdb\u62a5\u544a";
         var mkdocs_page_input_path = "cnn_keras_sequential_improved.md";
         var mkdocs_page_url = "/nn/cnn_keras_sequential_improved/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Keras Sequential CNN 改进报告</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/cnn_keras_sequential_improved.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="keras-sequential-cnn">Keras Sequential CNN 改进报告</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">Keras Sequential CNN 改进报告</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/cnn_keras_sequential_improved.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="keras-sequential-cnn">Keras Sequential CNN 改进报告</h1>
 <h2 id="_1">一、概述</h2>
 <p>本次改进基于原 <code>tutorial_mnist_conv-keras-sequential.py</code> 代码，针对其存在的多个问题进行了系统性优化。</p>
 <p>核心改进涵盖以下六个方面：</p>
@@ -136,32 +129,32 @@
 <li>学习率策略（初始学习率 + ReduceLROnPlateau 调度）</li>
 <li>训练策略（增加 epoch、EarlyStopping、验证集监控）</li>
 </ol>
-<hr />
+<hr/>
 <h2 id="_2">二、原代码问题分析</h2>
 <h3 id="21">2.1 数据利用不足</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">ds = ds.take(20000).shuffle(20000).batch(100)
-</code></pre>
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">ds</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="mi">20000</span><span class="p">)</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="mi">20000</span><span class="p">)</span><span class="o">.</span><span class="n">batch</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - MNIST 训练集共有 60000 个样本，但只使用了 20000 个（33%）
 - 浪费了 40000 个高质量标注数据，模型无法充分学习各类数字的特征
 - 尤其对于书写风格差异较大的数字（如 4 和 9、3 和 8），样本不足会导致分类边界模糊</p>
-<p><strong>改进：</strong></p>
-<pre><code class="language-python">ds = ds.shuffle(60000).batch(100)
-</code></pre>
+<p><strong>改进：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">ds</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="mi">60000</span><span class="p">)</span><span class="o">.</span><span class="n">batch</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+</code></pre></div>
 <p>使用全部 60000 个训练样本，让模型能够见到更多样的书写风格，提升泛化能力。</p>
 <h3 id="22-batchnormalization">2.2 无 BatchNormalization</h3>
 <p><strong>问题：</strong>
 - 卷积层后没有归一化处理，每层输入分布随训练不断变化（内部协变量偏移，Internal Covariate Shift）
 - 导致训练不稳定，收敛速度慢
 - 后层需要不断适应前层输出分布的变化，浪费了模型的学习 capacity</p>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">Conv2D(32, (5, 5), activation='relu', padding='same'),
-layers.BatchNormalization(),  # 新增
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">Conv2D</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'relu'</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="s1">'same'</span><span class="p">),</span>
+<span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">(),</span>  <span class="c1"># 新增</span>
 
-Conv2D(64, (5, 5), activation='relu', padding='same'),
-layers.BatchNormalization(),  # 新增
-</code></pre>
+<span class="n">Conv2D</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'relu'</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="s1">'same'</span><span class="p">),</span>
+<span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">(),</span>  <span class="c1"># 新增</span>
+</code></pre></div>
 <p><strong>BatchNormalization 的作用：</strong>
 1. 对每个 mini-batch 的特征进行归一化（减均值、除标准差）
 2. 通过可学习的缩放参数 γ 和偏移参数 β 恢复表达能力
@@ -176,15 +169,15 @@ layers.BatchNormalization(),  # 新增
 - 模型没有任何正则化手段，容易过拟合训练数据
 - 全连接层有 3136 x 128 + 128 x 10 = 402,816 个参数，参数量远大于训练样本数
 - 训练准确率可能达到 100% 但测试准确率明显偏低</p>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">Flatten(),
-Dropout(0.25),          # 新增：展平后丢弃 25%
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">Flatten</span><span class="p">(),</span>
+<span class="n">Dropout</span><span class="p">(</span><span class="mf">0.25</span><span class="p">),</span>          <span class="c1"># 新增：展平后丢弃 25%</span>
 
-layers.Dense(128, activation='relu'),
-Dropout(0.5),           # 新增：全连接后丢弃 50%
+<span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'relu'</span><span class="p">),</span>
+<span class="n">Dropout</span><span class="p">(</span><span class="mf">0.5</span><span class="p">),</span>           <span class="c1"># 新增：全连接后丢弃 50%</span>
 
-layers.Dense(10, activation='softmax')
-</code></pre>
+<span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'softmax'</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>Dropout 的原理：</strong>
 - 训练时以指定概率随机将神经元输出置零
 - 迫使网络学习更加鲁棒的特征，不依赖于特定神经元
@@ -194,96 +187,94 @@ layers.Dense(10, activation='softmax')
 - 展平后 Dropout(0.25)：特征图展平后维度较高（3136维），适度丢弃即可
 - 全连接后 Dropout(0.5)：全连接层参数密集，需要更强的正则化</p>
 <h3 id="24-dense-tanh">2.4 Dense 层使用 tanh 激活</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">layers.Dense(128, activation='tanh'),
-</code></pre>
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'tanh'</span><span class="p">),</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - tanh 的输出范围是 [-1, 1]，在输入绝对值较大时梯度接近于 0（梯度饱和区）
 - 深层网络中梯度需要逐层相乘，饱和区的微小梯度会导致梯度消失
 - tanh 涉及指数运算，计算开销比 ReLU 大</p>
-<p><strong>改进：</strong></p>
-<pre><code class="language-python">layers.Dense(128, activation='relu'),
-</code></pre>
+<p><strong>改进：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'relu'</span><span class="p">),</span>
+</code></pre></div>
 <p><strong>ReLU 的优势：</strong>
 - 正区间梯度恒为 1，不会出现梯度消失
 - 计算简单：<code>max(0, x)</code>，只需一次比较操作
 - 稀疏激活：约 50% 的神经元输出为 0，减少计算量
 - 是目前深度学习中最常用的激活函数</p>
 <h3 id="25">2.5 学习率过小且无调度</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">optimizer = optimizers.Adam(0.0001)
-</code></pre>
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">optimizer</span> <span class="o">=</span> <span class="n">optimizers</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="mf">0.0001</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - 学习率 0.0001 过小，在仅有的 5 个 epoch 内模型远远无法收敛
 - 固定学习率无法适应训练不同阶段的需求：初期需要大步长快速下降，后期需要小步长精细调整</p>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">optimizer = optimizers.Adam(0.001)
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">optimizer</span> <span class="o">=</span> <span class="n">optimizers</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="mf">0.001</span><span class="p">)</span>
 
-callbacks = [
-    keras.callbacks.ReduceLROnPlateau(
-        monitor='val_loss', factor=0.5, patience=2, min_lr=1e-6
-    ),
-]
-</code></pre>
+<span class="n">callbacks</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">keras</span><span class="o">.</span><span class="n">callbacks</span><span class="o">.</span><span class="n">ReduceLROnPlateau</span><span class="p">(</span>
+        <span class="n">monitor</span><span class="o">=</span><span class="s1">'val_loss'</span><span class="p">,</span> <span class="n">factor</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">min_lr</span><span class="o">=</span><span class="mf">1e-6</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+</code></pre></div>
 <p><strong>ReduceLROnPlateau 策略：</strong>
 - 监控验证集 loss，当连续 <code>patience</code>（2）个 epoch 不下降时触发
 - 触发时将学习率乘以 <code>factor</code>（0.5），即减半
 - 学习率下限为 <code>min_lr</code>（1e-6），防止过小
 - 这是一种自适应策略：loss 还在下降时保持当前学习率，停滞时自动调小</p>
-<p><strong>学习率变化示例：</strong></p>
-<pre><code>Epoch  1-5:  lr = 0.001     (初始学习率)
+<p><strong>学习率变化示例：</strong>
+</p><div class="highlight"><pre><span></span><code>Epoch  1-5:  lr = 0.001     (初始学习率)
 Epoch  6-7:  lr = 0.001     (val_loss 仍在下降)
 Epoch  8:    val_loss 停滞
 Epoch  9:    lr = 0.0005    (衰减 50%)
 Epoch 10:    val_loss 继续下降
 ...
-</code></pre>
+</code></pre></div>
 <h3 id="26">2.6 训练轮数不足且无早停</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">model.fit(train_ds, epochs=5)
-model.evaluate(test_ds, batch_size=100)
-</code></pre>
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_ds</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">test_ds</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - 5 个 epoch 对于 MNIST 严重不足，模型远未收敛
 - 没有验证集监控，无法判断是否过拟合
 - 没有早停机制，训练时间固定，可能浪费也可能不够
 - <code>model.evaluate</code> 的 <code>batch_size=100</code> 与数据集已有的 batch 冲突</p>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">model.fit(train_ds, epochs=15, validation_data=test_ds, callbacks=callbacks)
-model.evaluate(test_ds)
-</code></pre>
-<p><strong>EarlyStopping 回调：</strong></p>
-<pre><code class="language-python">keras.callbacks.EarlyStopping(
-    monitor='val_loss', patience=3, restore_best_weights=True
-)
-</code></pre>
-<ul>
-<li>监控验证集 loss，连续 3 个 epoch 不下降时停止训练</li>
-<li><code>restore_best_weights=True</code>：停止后恢复验证集上表现最好的权重</li>
-<li>避免过拟合：如果模型在第 10 个 epoch 开始过拟合，会在第 13 个 epoch 自动停止</li>
-</ul>
-<hr />
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_ds</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">validation_data</span><span class="o">=</span><span class="n">test_ds</span><span class="p">,</span> <span class="n">callbacks</span><span class="o">=</span><span class="n">callbacks</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">test_ds</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>EarlyStopping 回调：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">keras</span><span class="o">.</span><span class="n">callbacks</span><span class="o">.</span><span class="n">EarlyStopping</span><span class="p">(</span>
+    <span class="n">monitor</span><span class="o">=</span><span class="s1">'val_loss'</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">restore_best_weights</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</code></pre></div>
+- 监控验证集 loss，连续 3 个 epoch 不下降时停止训练
+- <code>restore_best_weights=True</code>：停止后恢复验证集上表现最好的权重
+- 避免过拟合：如果模型在第 10 个 epoch 开始过拟合，会在第 13 个 epoch 自动停止
+<hr/>
 <h2 id="_3">三、改进后完整模型架构</h2>
-<pre><code class="language-python">model = keras.Sequential([
-    Conv2D(32, (5, 5), activation='relu', padding='same'),
-    layers.BatchNormalization(),          # 稳定训练
-    MaxPooling2D(pool_size=2, strides=2), # 28x28 -&gt; 14x14
+<div class="highlight"><pre><span></span><code><span class="n">model</span> <span class="o">=</span> <span class="n">keras</span><span class="o">.</span><span class="n">Sequential</span><span class="p">([</span>
+    <span class="n">Conv2D</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'relu'</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="s1">'same'</span><span class="p">),</span>
+    <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">(),</span>          <span class="c1"># 稳定训练</span>
+    <span class="n">MaxPooling2D</span><span class="p">(</span><span class="n">pool_size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">strides</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span> <span class="c1"># 28x28 -&gt; 14x14</span>
 
-    Conv2D(64, (5, 5), activation='relu', padding='same'),
-    layers.BatchNormalization(),          # 稳定训练
-    MaxPooling2D(pool_size=2, strides=2), # 14x14 -&gt; 7x7
+    <span class="n">Conv2D</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'relu'</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="s1">'same'</span><span class="p">),</span>
+    <span class="n">layers</span><span class="o">.</span><span class="n">BatchNormalization</span><span class="p">(),</span>          <span class="c1"># 稳定训练</span>
+    <span class="n">MaxPooling2D</span><span class="p">(</span><span class="n">pool_size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">strides</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span> <span class="c1"># 14x14 -&gt; 7x7</span>
 
-    Flatten(),                            # 7x7x64 = 3136
-    Dropout(0.25),                        # 轻度正则化
+    <span class="n">Flatten</span><span class="p">(),</span>                            <span class="c1"># 7x7x64 = 3136</span>
+    <span class="n">Dropout</span><span class="p">(</span><span class="mf">0.25</span><span class="p">),</span>                        <span class="c1"># 轻度正则化</span>
 
-    layers.Dense(128, activation='relu'),
-    Dropout(0.5),                         # 强正则化
+    <span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'relu'</span><span class="p">),</span>
+    <span class="n">Dropout</span><span class="p">(</span><span class="mf">0.5</span><span class="p">),</span>                         <span class="c1"># 强正则化</span>
 
-    layers.Dense(10, activation='softmax')
-])
-</code></pre>
-<p><strong>数据流：</strong></p>
-<pre><code>输入: (batch, 28, 28, 1)
+    <span class="n">layers</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s1">'softmax'</span><span class="p">)</span>
+<span class="p">])</span>
+</code></pre></div>
+<p><strong>数据流：</strong>
+</p><div class="highlight"><pre><span></span><code>输入: (batch, 28, 28, 1)
   -&gt; Conv2D(32) + BN + ReLU: (batch, 28, 28, 32)
   -&gt; MaxPool: (batch, 14, 14, 32)
   -&gt; Conv2D(64) + BN + ReLU: (batch, 14, 14, 64)
@@ -293,8 +284,8 @@ model.evaluate(test_ds)
   -&gt; Dense(128) + ReLU: (batch, 128)
   -&gt; Dropout(0.5): (batch, 128)
   -&gt; Dense(10) + Softmax: (batch, 10)
-</code></pre>
-<hr />
+</code></pre></div>
+<hr/>
 <h2 id="_4">四、改进效果对比</h2>
 <table>
 <thead>
@@ -368,7 +359,7 @@ model.evaluate(test_ds)
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_5">五、总结</h2>
 <p>本次改进针对原代码中的 6 个核心问题进行了修复和优化：</p>
 <ol>
@@ -387,55 +378,47 @@ model.evaluate(test_ds)
 <li><strong>混合精度训练</strong>：使用 float16 加速训练（需要 GPU 支持）</li>
 <li><strong>模型集成</strong>：训练多个模型取平均，进一步提升准确率</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_7">六、使用方式</h2>
-<pre><code class="language-bash">cd src/chap05_CNN
-python tutorial_mnist_conv-keras-sequential.py
-</code></pre>
-<p>程序会自动下载 MNIST 数据集，训练完成后输出各 epoch 的训练和验证指标。</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src/chap05_CNN
+python<span class="w"> </span>tutorial_mnist_conv-keras-sequential.py
+</code></pre></div>
+<p>程序会自动下载 MNIST 数据集，训练完成后输出各 epoch 的训练和验证指标。</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

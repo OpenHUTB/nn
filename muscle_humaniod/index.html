@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/muscle_humaniod/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>双机器人分区巡逻与动态避障仿真系统（MuJoCo） - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/muscle_humaniod/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>双机器人分区巡逻与动态避障仿真系统（MuJoCo） - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u53cc\u673a\u5668\u4eba\u5206\u533a\u5de1\u903b\u4e0e\u52a8\u6001\u907f\u969c\u4eff\u771f\u7cfb\u7edf\uff08MuJoCo\uff09";
         var mkdocs_page_input_path = "muscle_humaniod/index.md";
         var mkdocs_page_url = "/nn/muscle_humaniod/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">双机器人分区巡逻与动态避障仿真系统（MuJoCo）</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/muscle_humaniod/index.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="mujoco">双机器人分区巡逻与动态避障仿真系统（MuJoCo）</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">双机器人分区巡逻与动态避障仿真系统（MuJoCo）</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/muscle_humaniod/index.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="mujoco">双机器人分区巡逻与动态避障仿真系统（MuJoCo）</h1>
 <h2 id="1">1.项目概述</h2>
 <h3 id="11">1.1 项目简介</h3>
 <p>本项目面向双人形机器人协同作业仿真需求，基于 MuJoCo 物理仿真引擎实现<strong>分区自主巡逻、高空动态障碍物规避、机器人相互防撞、周期性肢体摆动</strong>一体化功能。系统采用<strong>点位巡航+距离判定避障+正弦节律肢体动作</strong>轻量化控制架构，无需复杂智能算法即可完成多机器人协同行为演示，具备纯本地运行、逻辑清晰、参数易调、可二次扩展等特点。</p>
@@ -222,16 +215,16 @@
 </table>
 <h3 id="15">1.5 运行环境与使用方式</h3>
 <h4 id="_1">环境准备</h4>
-<pre><code class="language-bash">pip install mujoco numpy
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>mujoco<span class="w"> </span>numpy
+</code></pre></div>
 <h4 id="_2">运行演示（推荐入口）</h4>
-<pre><code class="language-bash">python main.py
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>main.py
+</code></pre></div>
 <h4 id="_3">文件目录说明</h4>
-<pre><code>./
+<div class="highlight"><pre><span></span><code>./
 ├── main.py          # 仿真主程序
 └── humanoid.xml     # MuJoCo 人形机器人模型文件（同目录放置）
-</code></pre>
+</code></pre></div>
 <h3 id="16">1.6 项目核心目标</h3>
 <ul>
 <li><strong>可运行性</strong>：Windows / Linux 跨平台直接运行，无需额外依赖。</li>
@@ -319,29 +312,29 @@
 - 可视化渲染：<code>viewer.launch_passive</code> 与 <code>v.sync()</code></p>
 <h3 id="33">3.3 控制层：关节映射与运动约束</h3>
 <p>本项目通过<strong>关节名称寻址</strong>获取 <code>qpos</code> 数组偏移地址，彻底避免固定切片带来的索引错位问题。</p>
-<pre><code class="language-python">r1_slide_x = model.joint(&quot;r1_slide_x&quot;).qposadr.item()
-r1_slide_y = model.joint(&quot;r1_slide_y&quot;).qposadr.item()
-r1_arm_l = model.joint(&quot;r1_j_larm&quot;).qposadr.item()
-r1_arm_r = model.joint(&quot;r1_j_rarm&quot;).qposadr.item()
-r1_hip_l = model.joint(&quot;r1_left_hip&quot;).qposadr.item()
-r1_hip_r = model.joint(&quot;r1_right_hip&quot;).qposadr.item()
-r1_knee_l = model.joint(&quot;r1_left_knee&quot;).qposadr.item()
-r1_knee_r = model.joint(&quot;r1_right_knee&quot;).qposadr.item()
-</code></pre>
-<p>同时采用 <code>np.clip</code> 对机器人平面坐标做硬约束，限制运动范围：</p>
-<pre><code class="language-python">r1_x = np.clip(r1_x,-MOVE_LIMIT,MOVE_LIMIT)
-r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">r1_slide_x</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_slide_x"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="n">r1_slide_y</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_slide_y"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="n">r1_arm_l</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_j_larm"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="n">r1_arm_r</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_j_rarm"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="n">r1_hip_l</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_left_hip"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="n">r1_hip_r</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_right_hip"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="n">r1_knee_l</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_left_knee"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="n">r1_knee_r</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"r1_right_knee"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+</code></pre></div>
+<p>同时采用 <code>np.clip</code> 对机器人平面坐标做硬约束，限制运动范围：
+</p><div class="highlight"><pre><span></span><code><span class="n">r1_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">r1_x</span><span class="p">,</span><span class="o">-</span><span class="n">MOVE_LIMIT</span><span class="p">,</span><span class="n">MOVE_LIMIT</span><span class="p">)</span>
+<span class="n">r1_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">r1_y</span><span class="p">,</span><span class="o">-</span><span class="n">MOVE_LIMIT</span><span class="p">,</span><span class="n">MOVE_LIMIT</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="34">3.4 控制算法与运动学基础</h3>
 <p>本项目采用 <strong>点位巡航+距离避障+正弦周期肢体动作</strong> 分层控制架构，整体分为三层：
 <strong>高层路径规划 → 中层避障决策 → 底层关节执行</strong>，形成完整控制闭环。</p>
 <h4 id="341">3.4.1 分区点位巡航逻辑</h4>
-<p>为两台机器人划分独立矩形巡逻路径，通过点位索引循环切换目标位置：</p>
-<pre><code class="language-python"># R1 左侧巡逻区域点位
-patrol1 = [[-0.75, -0.3], [-0.3, -0.3], [-0.3, 0.3], [-0.75, 0.3]]
-# R2 右侧巡逻区域点位
-patrol2 = [[0.3, -0.3], [0.75, -0.3], [0.75, 0.3], [0.3, 0.3]]
-</code></pre>
+<p>为两台机器人划分独立矩形巡逻路径，通过点位索引循环切换目标位置：
+</p><div class="highlight"><pre><span></span><code><span class="c1"># R1 左侧巡逻区域点位</span>
+<span class="n">patrol1</span> <span class="o">=</span> <span class="p">[[</span><span class="o">-</span><span class="mf">0.75</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">]]</span>
+<span class="c1"># R2 右侧巡逻区域点位</span>
+<span class="n">patrol2</span> <span class="o">=</span> <span class="p">[[</span><span class="mf">0.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.75</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">]]</span>
+</code></pre></div>
 <p>控制逻辑：根据当前点位与机器人坐标差值，使用 <code>np.sign</code> 获取行进方向，叠加固定步长实现连续移动；到达点位阈值后自动切换下一个巡航点。</p>
 <h4 id="342">3.4.2 欧式距离避障模型</h4>
 <p>系统两套避障逻辑均基于二维欧式距离判定，距离公式：
@@ -375,22 +368,22 @@ s = \sin(swing\_t \cdot swing\_k)
 - 重置障碍物速度，保证初始静止状态。</p>
 <h3 id="35">3.5 工程化机制</h3>
 <h4 id="_4">初始姿态固化</h4>
-<p>仿真启动时统一复位机器人坐标、腿部姿态与全身速度，保证初始状态稳定直立：</p>
-<pre><code class="language-python">data.qpos[r1_slide_x] = r1_x
-data.qpos[r1_slide_y] = r1_y
-data.qpos[r1_knee_l] = STAND_KNEE
-data.qpos[r1_knee_r] = STAND_KNEE
-data.qvel[:] = 0
-</code></pre>
+<p>仿真启动时统一复位机器人坐标、腿部姿态与全身速度，保证初始状态稳定直立：
+</p><div class="highlight"><pre><span></span><code><span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_slide_x</span><span class="p">]</span> <span class="o">=</span> <span class="n">r1_x</span>
+<span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_slide_y</span><span class="p">]</span> <span class="o">=</span> <span class="n">r1_y</span>
+<span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_knee_l</span><span class="p">]</span> <span class="o">=</span> <span class="n">STAND_KNEE</span>
+<span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_knee_r</span><span class="p">]</span> <span class="o">=</span> <span class="n">STAND_KNEE</span>
+<span class="n">data</span><span class="o">.</span><span class="n">qvel</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span>
+</code></pre></div>
 <h4 id="_5">危险姿态自适应收敛</h4>
-<p>机器人检测到障碍物或同伴靠近时，肢体摆动幅度衰减，动作趋于稳健：</p>
-<pre><code class="language-python">if not danger1:
-    data.qpos[r1_arm_l]=arm_amp*s;data.qpos[r1_arm_r]=-arm_amp*s
-    data.qpos[r1_hip_l]=leg_amp*s;data.qpos[r1_hip_r]=-leg_amp*s
-else:
-    data.qpos[r1_arm_l:r1_arm_r+1]*=0.92
-    data.qpos[r1_hip_l:r1_hip_r+1]*=0.92
-</code></pre>
+<p>机器人检测到障碍物或同伴靠近时，肢体摆动幅度衰减，动作趋于稳健：
+</p><div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="ow">not</span> <span class="n">danger1</span><span class="p">:</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_arm_l</span><span class="p">]</span><span class="o">=</span><span class="n">arm_amp</span><span class="o">*</span><span class="n">s</span><span class="p">;</span><span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_arm_r</span><span class="p">]</span><span class="o">=-</span><span class="n">arm_amp</span><span class="o">*</span><span class="n">s</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_hip_l</span><span class="p">]</span><span class="o">=</span><span class="n">leg_amp</span><span class="o">*</span><span class="n">s</span><span class="p">;</span><span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_hip_r</span><span class="p">]</span><span class="o">=-</span><span class="n">leg_amp</span><span class="o">*</span><span class="n">s</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_arm_l</span><span class="p">:</span><span class="n">r1_arm_r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">*=</span><span class="mf">0.92</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">qpos</span><span class="p">[</span><span class="n">r1_hip_l</span><span class="p">:</span><span class="n">r1_hip_r</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">*=</span><span class="mf">0.92</span>
+</code></pre></div>
 <h3 id="36">3.6 核心参数说明</h3>
 <table>
 <thead>
@@ -455,24 +448,24 @@ else:
 </table>
 <h2 id="4">4. 系统整体架构</h2>
 <p>图 1 双机器人巡逻控制整体架构图
-<img alt="robot_arch" src="goujia.png" /></p>
+<img alt="robot_arch" src="goujia.png"/></p>
 <p>本系统控制闭环包含<strong>模型加载层、参数配置层、动态环境层、巡逻决策层、避障逻辑层、肢体执行层、MuJoCo 仿真反馈层</strong>七大模块，形成完整的路径决策-避障-动作执行-仿真反馈闭环。</p>
 <h2 id="5">5 系统优化</h2>
 <h3 id="51">5.1 优化一：关节名称寻址，消除索引错位</h3>
-<p>原始方案使用固定下标切片读取关节状态，模型修改后极易控制错乱。本项目改用<strong>关节名称+qposadr</strong>寻址：</p>
-<pre><code class="language-python">joint_addr = model.joint(&quot;joint_name&quot;).qposadr.item()
-</code></pre>
-<p>优化作用：
+<p>原始方案使用固定下标切片读取关节状态，模型修改后极易控制错乱。本项目改用<strong>关节名称+qposadr</strong>寻址：
+</p><div class="highlight"><pre><span></span><code><span class="n">joint_addr</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"joint_name"</span><span class="p">)</span><span class="o">.</span><span class="n">qposadr</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+</code></pre></div>
+优化作用：
 - 关节地址与模型强绑定，修改 XML 模型无需改动索引代码；
-- 彻底解决关节控制错位、动作发散问题。</p>
+- 彻底解决关节控制错位、动作发散问题。
 <h3 id="52">5.2 优化二：运动边界硬限幅，防止区域越界</h3>
-<p>增加坐标限幅逻辑，约束机器人活动范围：</p>
-<pre><code class="language-python">r1_x = np.clip(r1_x,-MOVE_LIMIT,MOVE_LIMIT)
-r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
-</code></pre>
-<p>优化作用：
+<p>增加坐标限幅逻辑，约束机器人活动范围：
+</p><div class="highlight"><pre><span></span><code><span class="n">r1_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">r1_x</span><span class="p">,</span><span class="o">-</span><span class="n">MOVE_LIMIT</span><span class="p">,</span><span class="n">MOVE_LIMIT</span><span class="p">)</span>
+<span class="n">r1_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">r1_y</span><span class="p">,</span><span class="o">-</span><span class="n">MOVE_LIMIT</span><span class="p">,</span><span class="n">MOVE_LIMIT</span><span class="p">)</span>
+</code></pre></div>
+优化作用：
 - 限制机器人在指定区域内活动；
-- 避免跑出仿真可视范围，提升场景完整性。</p>
+- 避免跑出仿真可视范围，提升场景完整性。
 <h3 id="53">5.3 优化三：分区路径解耦，实现独立巡航</h3>
 <p>将两台机器人巡逻路径划分为左右互不重叠区域，点位数组独立配置。
 优化作用：
@@ -554,9 +547,9 @@ r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
 </ul>
 <h3 id="73">7.3 运行结果图片</h3>
 <p>图 2 双机器人分区巡逻常态效果
-<img alt="巡逻效果" src="fenqu.png" /></p>
+<img alt="巡逻效果" src="fenqu.png"/></p>
 <p>图 3 机器人动态避障运行效果
-<img alt="避障效果" src="dongtaibizhang.png" /></p>
+<img alt="避障效果" src="dongtaibizhang.png"/></p>
 <h2 id="8">8. 现存不足与后续优化方向</h2>
 <h3 id="81">8.1 现存不足</h3>
 <ul>
@@ -583,50 +576,42 @@ r1_y = np.clip(r1_y,-MOVE_LIMIT,MOVE_LIMIT)
 <h2 id="_6">参考文献</h2>
 <p>[1] Todorov E, Erez T, Tassa Y. MuJoCo: A physics engine for model-based control[C]//2012 IEEE/RSJ International Conference on Intelligent Robots and Systems. IEEE, 2012: 5026-5033.
 [2] 王浩, 张磊. 多移动机器人分区巡逻与避障算法研究[J]. 机械设计与制造, 2020.
-[3] 刘成举。基于自学习 CPG 的仿人机器人自适应行走控制 [J]. 自动化学报，2021, 47 (8): 1652-1661.</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+[3] 刘成举。基于自学习 CPG 的仿人机器人自适应行走控制 [J]. 自动化学报，2021, 47 (8): 1652-1661.</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr/>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

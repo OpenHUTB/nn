@@ -1,136 +1,129 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT/" />
-      <link rel="shortcut icon" href="../../../../img/favicon.ico" />
-    <title>基于深度强化学习的机器人自主导航系统 - 神经网络</title>
-    <link rel="stylesheet" href="../../../../css/theme.css" />
-    <link rel="stylesheet" href="../../../../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../../../../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT/" rel="canonical"/>
+<link href="../../../../img/favicon.ico" rel="shortcut icon"/>
+<title>基于深度强化学习的机器人自主导航系统 - 神经网络</title>
+<link href="../../../../css/theme.css" rel="stylesheet"/>
+<link href="../../../../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../../../../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "\u57fa\u4e8e\u6df1\u5ea6\u5f3a\u5316\u5b66\u4e60\u7684\u673a\u5668\u4eba\u81ea\u4e3b\u5bfc\u822a\u7cfb\u7edf";
         var mkdocs_page_input_path = "robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT.md";
         var mkdocs_page_url = "/nn/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../../../../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href="../../../.." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href="../../../.."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../../../../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../../../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../../../..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href="../../../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">基于深度强化学习的机器人自主导航系统</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="_1">基于深度强化学习的机器人自主导航系统</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="../../../..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href="../../../.."></a></li>
+<li class="breadcrumb-item active">基于深度强化学习的机器人自主导航系统</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/robot_navigation_system/docs/robot_navigation_system/PROJECT_REPORT.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="_1">基于深度强化学习的机器人自主导航系统</h1>
 <h2 id="_2">项目概述</h2>
 <p>本项目实现了一个基于深度Q网络（DQN）的机器人自主导航系统，通过激光雷达环境感知和强化学习算法，实现机器人在复杂环境中的自主路径规划和实时避障。</p>
-<hr />
+<hr/>
 <h2 id="_3">技术方案</h2>
 <h3 id="1">1. 系统架构</h3>
-<pre><code>┌─────────────────────────────────────────────────────────┐
+<div class="highlight"><pre><span></span><code>┌─────────────────────────────────────────────────────────┐
 │                    机器人导航系统                         │
 ├─────────────────────────────────────────────────────────┤
 │  环境感知层                                              │
@@ -147,7 +140,7 @@
 │  ├─ 5种控制动作（前进、左转、右转、原地转向）            │
 │  └─ 实时避障与路径调整                                   │
 └─────────────────────────────────────────────────────────┘
-</code></pre>
+</code></pre></div>
 <h3 id="2">2. 核心算法</h3>
 <h4 id="dqn">DQN网络结构</h4>
 <ul>
@@ -199,10 +192,10 @@
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_5">可视化结果分析</h2>
 <h3 id="1_1">1. 导航过程可视化</h3>
-<p><img alt="导航过程截图" src="../navigation_episode_0.png" /></p>
+<p><img alt="导航过程截图" src="../navigation_episode_0.png"/></p>
 <p><strong>图1：机器人导航过程</strong></p>
 <ul>
 <li><strong>蓝色圆形</strong>: 机器人当前位置</li>
@@ -216,7 +209,7 @@
 - 激光雷达360度全方位扫描，实时感知环境
 - 路径规划避开红色障碍物区域</p>
 <h3 id="2_1">2. 训练性能分析</h3>
-<p><img alt="训练奖励曲线" src="../training_reward.png" /></p>
+<p><img alt="训练奖励曲线" src="../training_reward.png"/></p>
 <p><strong>图2：训练奖励变化曲线</strong></p>
 <p><strong>关键指标</strong>:
 - 初始阶段：奖励波动较大，探索行为频繁
@@ -227,7 +220,7 @@
 - ε-贪心策略平衡了探索与利用
 - 训练50轮后，奖励曲线呈现上升趋势</p>
 <h3 id="3">3. 测试结果可视化</h3>
-<p><img alt="测试导航结果" src="../test_navigation_result.png" /></p>
+<p><img alt="测试导航结果" src="../test_navigation_result.png"/></p>
 <p><strong>图3：测试阶段导航结果</strong></p>
 <p><strong>测试指标</strong>:
 - 总奖励：反映导航效率
@@ -238,7 +231,7 @@
 - 避障系统有效工作
 - 路径规划基本合理</p>
 <h3 id="4">4. 激光雷达数据可视化</h3>
-<p><img alt="激光雷达热力图" src="../lidar_heatmap.png" /></p>
+<p><img alt="激光雷达热力图" src="../lidar_heatmap.png"/></p>
 <p><strong>图4：激光雷达极坐标热力图</strong></p>
 <p><strong>特征</strong>:
 - 极坐标展示360度扫描数据
@@ -248,7 +241,7 @@
 - 激光雷达有效探测周围环境
 - 数据噪声模拟真实传感器特性
 - 为DQN提供准确的状态信息</p>
-<hr />
+<hr/>
 <h2 id="_6">性能评估</h2>
 <h3 id="1_2">1. 系统优势</h3>
 <table>
@@ -307,9 +300,9 @@
 <li>服务机器人路径规划</li>
 <li>无人车避障系统</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_7">项目文件结构</h2>
-<pre><code>robot_navigation_system/
+<div class="highlight"><pre><span></span><code>robot_navigation_system/
 ├── config.py              # 配置文件
 ├── environment.py         # 环境模拟
 ├── dqn_agent.py           # DQN代理
@@ -323,8 +316,8 @@
 ├── lidar_heatmap.png            # 激光雷达热力图
 ├── PROJECT_REPORT.md            # 项目详细报告
 └── dqn_navigation_model.pth     # 训练模型
-</code></pre>
-<hr />
+</code></pre></div>
+<hr/>
 <h2 id="_8">运行说明</h2>
 <h3 id="_9">环境要求</h3>
 <ul>
@@ -334,12 +327,12 @@
 <li>Matplotlib</li>
 </ul>
 <h3 id="_10">训练命令</h3>
-<pre><code class="language-bash">py -3 train.py
-</code></pre>
+<div class="highlight"><pre><span></span><code>py<span class="w"> </span>-3<span class="w"> </span>train.py
+</code></pre></div>
 <h3 id="_11">测试命令</h3>
-<pre><code class="language-bash">py -3 test.py
-</code></pre>
-<hr />
+<div class="highlight"><pre><span></span><code>py<span class="w"> </span>-3<span class="w"> </span>test.py
+</code></pre></div>
+<hr/>
 <h2 id="_12">总结与展望</h2>
 <h3 id="_13">项目成果</h3>
 <p>✅ 完成基于DQN的机器人自主导航系统
@@ -373,59 +366,51 @@
 <li>动态障碍物环境</li>
 <li>多目标导航任务</li>
 </ol>
-<hr />
+<hr/>
 <h2 id="_15">参考文献</h2>
 <ol>
 <li>Mnih, V., et al. "Human-level control through deep reinforcement learning." Nature, 2015.</li>
 <li>Sutton, R. S., &amp; Barto, A. G. "Reinforcement learning: An introduction." MIT press, 2018.</li>
 <li>Lillicrap, T. P., et al. "Continuous control with deep reinforcement learning." ICLR, 2016.</li>
 </ol>
-<hr />
+<hr/>
 <p><strong>项目完成日期</strong>: 2026年5月7日
-<strong>开发环境</strong>: Python 3.14 + PyTorch 2.11</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<strong>开发环境</strong>: Python 3.14 + PyTorch 2.11</p></div>
 </div>
-    <script src="../../../../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "../../../..";</script>
-    <script src="../../../../js/theme_extra.js"></script>
-    <script src="../../../../js/theme.js"></script>
-      <script src="../../../../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../../../../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../../../../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "../../../..";</script>
+<script src="../../../../js/theme_extra.js"></script>
+<script src="../../../../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../../../../js/umlconvert.js"></script>
+<script src="../../../../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

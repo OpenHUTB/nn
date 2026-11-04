@@ -1,130 +1,123 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/svm_improved/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>SVM 支持向量机代码改进报告 - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/svm_improved/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>SVM 支持向量机代码改进报告 - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "SVM \u652f\u6301\u5411\u91cf\u673a\u4ee3\u7801\u6539\u8fdb\u62a5\u544a";
         var mkdocs_page_input_path = "svm_improved.md";
         var mkdocs_page_url = "/nn/svm_improved/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">SVM 支持向量机代码改进报告</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/svm_improved.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="svm">SVM 支持向量机代码改进报告</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">SVM 支持向量机代码改进报告</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/svm_improved.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="svm">SVM 支持向量机代码改进报告</h1>
 <h2 id="_1">一、概述</h2>
 <p>本次改进针对 <code>src/chap03_SVM/svm.py</code> 中的线性 SVM 实现，修复了一个关键 Bug 并增加了四项训练优化功能。改进保持了原有算法（hinge loss + L2 正则化 + 梯度下降）不变，仅在工程实现层面进行优化。</p>
 <p>核心改进：</p>
@@ -135,38 +128,38 @@
 <li><strong>早停机制</strong> — 损失不再下降时自动停止，节省计算资源</li>
 <li><strong>默认开启正则化</strong> — <code>reg_lambda</code> 从 0.0 改为 0.001，防止过拟合</li>
 </ol>
-<hr />
+<hr/>
 <h2 id="_2">二、原代码问题分析</h2>
 <h3 id="21-predict-bug">2.1 predict() 方法存在崩溃 Bug</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">def predict(self, x_raw):
-    x = self.scaler.transform(x_raw)
-    score = np.dot(x, self.w) + self.b
-    return np.where(score &gt;= 0, 1, -1) if -1 in self.y_train_unique else np.where(score &gt;= 0, 1, 0)
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_raw</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scaler</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">x_raw</span><span class="p">)</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">score</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_train_unique</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">score</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
-def train_with_label_tracking(self, data_train):
-    self.y_train_unique = np.unique(data_train[:, 2])  # 只在这里赋值
-    self.train(data_train)
-</code></pre>
+<span class="k">def</span> <span class="nf">train_with_label_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_train</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">y_train_unique</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">data_train</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])</span>  <span class="c1"># 只在这里赋值</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">data_train</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - <code>predict()</code> 依赖 <code>self.y_train_unique</code> 属性
 - 该属性只在 <code>train_with_label_tracking()</code> 中赋值
 - 如果直接调用 <code>train()</code> 后再调用 <code>predict()</code>，会抛出 <code>AttributeError: 'SVM' object has no attribute 'y_train_unique'</code>
 - 需要一个专门的 wrapper 方法来避免这个 Bug，说明封装存在缺陷</p>
 <h3 id="22">2.2 训练过程无反馈</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">for epoch in range(self.max_iter):
-    # ... 梯度计算和更新 ...
-    # 无任何输出
-</code></pre>
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_iter</span><span class="p">):</span>
+    <span class="c1"># ... 梯度计算和更新 ...</span>
+    <span class="c1"># 无任何输出</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - 默认 20000 次迭代，全程无输出
 - 无法判断模型是否收敛、收敛速度如何
 - 调试和调参非常困难</p>
 <h3 id="23">2.3 固定学习率</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">self.learning_rate = learning_rate  # 始终不变
-</code></pre>
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span> <span class="o">=</span> <span class="n">learning_rate</span>  <span class="c1"># 始终不变</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - 训练初期需要大学习率快速收敛
 - 训练后期需要小学习率精细调优
@@ -177,49 +170,49 @@ def train_with_label_tracking(self, data_train):
 - 浪费计算资源
 - 过多的迭代可能导致过拟合</p>
 <h3 id="25">2.5 正则化默认关闭</h3>
-<p><strong>原代码：</strong></p>
-<pre><code class="language-python">def __init__(self, learning_rate=0.1, reg_lambda=0.0, max_iter=20000):
-</code></pre>
+<p><strong>原代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">reg_lambda</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="mi">20000</span><span class="p">):</span>
+</code></pre></div>
 <p><strong>问题：</strong>
 - <code>reg_lambda=0.0</code> 意味着没有正则化
 - SVM 的核心优势之一就是通过正则化控制模型复杂度
 - 默认关闭正则化容易导致过拟合</p>
-<hr />
+<hr/>
 <h2 id="_3">三、改进内容详解</h2>
 <h3 id="31-predict-bug">3.1 修复 predict() Bug</h3>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">def train(self, data_train):
-    X_raw = data_train[:, :2]
-    y_raw = data_train[:, 2]
-    # 在 train() 中直接记录标签空间
-    self.label_set = np.unique(y_raw)
-    # ...
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_train</span><span class="p">):</span>
+    <span class="n">X_raw</span> <span class="o">=</span> <span class="n">data_train</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">y_raw</span> <span class="o">=</span> <span class="n">data_train</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+    <span class="c1"># 在 train() 中直接记录标签空间</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">label_set</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">y_raw</span><span class="p">)</span>
+    <span class="c1"># ...</span>
 
-def predict(self, x_raw):
-    x = self.scaler.transform(x_raw)
-    score = np.dot(x, self.w) + self.b
-    # 使用 train() 中记录的 self.label_set
-    if -1 in self.label_set:
-        return np.where(score &gt;= 0, 1, -1)
-    else:
-        return np.where(score &gt;= 0, 1, 0)
-</code></pre>
+<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_raw</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scaler</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">x_raw</span><span class="p">)</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span>
+    <span class="c1"># 使用 train() 中记录的 self.label_set</span>
+    <span class="k">if</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">label_set</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">score</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">score</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>改进点：</strong>
 - 将标签记录逻辑从 <code>train_with_label_tracking()</code> 移入 <code>train()</code> 本身
 - 删除了多余的 <code>train_with_label_tracking()</code> 方法
 - <code>train()</code> + <code>predict()</code> 可以直接配合使用，无需 wrapper</p>
 <h3 id="32">3.2 学习率指数衰减</h3>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">def __init__(self, ..., lr_decay=0.9995, ...):
-    self.lr_decay = lr_decay
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">lr_decay</span><span class="o">=</span><span class="mf">0.9995</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">lr_decay</span> <span class="o">=</span> <span class="n">lr_decay</span>
 
-def train(self, data_train):
-    lr = self.learning_rate
-    for epoch in range(self.max_iter):
-        # ... 使用 lr 进行梯度更新 ...
-        # 学习率衰减
-        lr = self.learning_rate * (self.lr_decay ** epoch)
-</code></pre>
+<span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_train</span><span class="p">):</span>
+    <span class="n">lr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_iter</span><span class="p">):</span>
+        <span class="c1"># ... 使用 lr 进行梯度更新 ...</span>
+        <span class="c1"># 学习率衰减</span>
+        <span class="n">lr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lr_decay</span> <span class="o">**</span> <span class="n">epoch</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>原理：</strong>
 - 学习率按 <code>lr = lr_0 × decay^epoch</code> 指数衰减
 - 默认 <code>decay=0.9995</code>，即每轮衰减 0.05%
@@ -228,45 +221,45 @@ def train(self, data_train):
 - 线性数据集：lr 从 0.1 衰减至 0.000033
 - 非线性数据集：lr 从 0.1 衰减至 0.004977（6000 轮时早停）</p>
 <h3 id="33">3.3 训练损失监控</h3>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">def _compute_hinge_loss(self, X, y):
-    &quot;&quot;&quot;计算 hinge loss + L2 正则化损失&quot;&quot;&quot;
-    score = np.dot(X, self.w) + self.b
-    hinge = np.maximum(0, 1 - y * score)
-    return np.mean(hinge) + self.reg_lambda * np.dot(self.w, self.w)
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">_compute_hinge_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""计算 hinge loss + L2 正则化损失"""</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span>
+    <span class="n">hinge</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">y</span> <span class="o">*</span> <span class="n">score</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">hinge</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">reg_lambda</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">)</span>
 
-def train(self, data_train):
-    for epoch in range(self.max_iter):
-        # ... 训练逻辑 ...
-        if (epoch + 1) % self.print_interval == 0 or epoch == 0:
-            loss = self._compute_hinge_loss(X, y)
-            pred = np.where(np.dot(X, self.w) + self.b &gt;= 0, 1, -1)
-            acc = np.mean(pred == y)
-            print(f&quot;  epoch {epoch+1:&gt;6d} | loss: {loss:.4f} | acc: {acc*100:.1f}% | lr: {lr:.6f}&quot;)
-</code></pre>
+<span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_train</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_iter</span><span class="p">):</span>
+        <span class="c1"># ... 训练逻辑 ...</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">print_interval</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">epoch</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_hinge_loss</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+            <span class="n">pred</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">acc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pred</span> <span class="o">==</span> <span class="n">y</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  epoch </span><span class="si">{</span><span class="n">epoch</span><span class="o">+</span><span class="mi">1</span><span class="si">:</span><span class="s2">&gt;6d</span><span class="si">}</span><span class="s2"> | loss: </span><span class="si">{</span><span class="n">loss</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> | acc: </span><span class="si">{</span><span class="n">acc</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% | lr: </span><span class="si">{</span><span class="n">lr</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>效果：</strong>
 - 每 2000 轮打印一次训练状态
 - 显示当前 epoch、hinge loss、训练准确率、学习率
 - 直观观察收敛过程</p>
 <h3 id="34">3.4 早停机制</h3>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">best_loss = float('inf')
-no_improve_count = 0
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="n">best_loss</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">'inf'</span><span class="p">)</span>
+<span class="n">no_improve_count</span> <span class="o">=</span> <span class="mi">0</span>
 
-for epoch in range(self.max_iter):
-    # ... 训练逻辑 ...
+<span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_iter</span><span class="p">):</span>
+    <span class="c1"># ... 训练逻辑 ...</span>
 
-    if (epoch + 1) % self.print_interval == 0:
-        loss = self._compute_hinge_loss(X, y)
-        if loss &lt; best_loss - 1e-6:
-            best_loss = loss
-            no_improve_count = 0
-        else:
-            no_improve_count += self.print_interval
-            if no_improve_count &gt;= self.patience:
-                print(f&quot;  早停触发于 epoch {epoch+1}，最佳损失: {best_loss:.4f}&quot;)
-                break
-</code></pre>
+    <span class="k">if</span> <span class="p">(</span><span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">print_interval</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_hinge_loss</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">loss</span> <span class="o">&lt;</span> <span class="n">best_loss</span> <span class="o">-</span> <span class="mf">1e-6</span><span class="p">:</span>
+            <span class="n">best_loss</span> <span class="o">=</span> <span class="n">loss</span>
+            <span class="n">no_improve_count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">no_improve_count</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">print_interval</span>
+            <span class="k">if</span> <span class="n">no_improve_count</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">patience</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  早停触发于 epoch </span><span class="si">{</span><span class="n">epoch</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">，最佳损失: </span><span class="si">{</span><span class="n">best_loss</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                <span class="k">break</span>
+</code></pre></div>
 <p><strong>原理：</strong>
 - 每 <code>print_interval</code> 轮检查一次损失
 - 如果损失连续 <code>patience</code> 轮没有显著下降（&lt; 1e-6），则停止训练
@@ -297,14 +290,14 @@ for epoch in range(self.max_iter):
 </tbody>
 </table>
 <h3 id="35">3.5 默认开启正则化</h3>
-<p><strong>改进代码：</strong></p>
-<pre><code class="language-python">def __init__(self, learning_rate=0.1, reg_lambda=0.001, ...):
-</code></pre>
+<p><strong>改进代码：</strong>
+</p><div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">reg_lambda</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+</code></pre></div>
 <p><strong>效果：</strong>
 - <code>reg_lambda</code> 从 0.0 改为 0.001
 - 提供适度的 L2 正则化，限制权重大小
 - 防止过拟合，提高泛化能力</p>
-<hr />
+<hr/>
 <h2 id="_4">四、结果对比</h2>
 <h3 id="_5">线性数据集</h3>
 <table>
@@ -371,7 +364,7 @@ for epoch in range(self.max_iter):
 </tbody>
 </table>
 <h3 id="_7">训练过程日志（线性数据集）</h3>
-<pre><code>  epoch      1 | loss: 0.8834 | acc: 96.0% | lr: 0.100000
+<div class="highlight"><pre><span></span><code>  epoch      1 | loss: 0.8834 | acc: 96.0% | lr: 0.100000
   epoch   2000 | loss: 0.1116 | acc: 95.5% | lr: 0.036797
   epoch   4000 | loss: 0.1109 | acc: 95.5% | lr: 0.013534
   epoch   6000 | loss: 0.1107 | acc: 95.5% | lr: 0.004977
@@ -383,17 +376,17 @@ for epoch in range(self.max_iter):
   早停触发于 epoch 16000，最佳损失: 0.1106
 train accuracy: 95.5%
 test accuracy: 97.5%
-</code></pre>
+</code></pre></div>
 <h3 id="_8">训练过程日志（非线性数据集）</h3>
-<pre><code>  epoch      1 | loss: 0.9460 | acc: 81.5% | lr: 0.100000
+<div class="highlight"><pre><span></span><code>  epoch      1 | loss: 0.9460 | acc: 81.5% | lr: 0.100000
   epoch   2000 | loss: 0.3947 | acc: 81.0% | lr: 0.036797
   epoch   4000 | loss: 0.3947 | acc: 81.5% | lr: 0.013534
   epoch   6000 | loss: 0.3947 | acc: 81.5% | lr: 0.004977
   早停触发于 epoch 6000，最佳损失: 0.3947
 train accuracy: 81.5%
 test accuracy: 81.0%
-</code></pre>
-<hr />
+</code></pre></div>
+<hr/>
 <h2 id="_9">五、新增命令行参数</h2>
 <table>
 <thead>
@@ -431,7 +424,7 @@ test accuracy: 81.0%
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_10">六、总结</h2>
 <h3 id="_11">改进总结</h3>
 <p>本次对 <code>svm.py</code> 的改进聚焦于工程实践层面，不改变核心算法：</p>
@@ -449,62 +442,54 @@ test accuracy: 81.0%
 <li><strong>交叉验证</strong>：自动选择最优超参数组合</li>
 <li><strong>可视化</strong>：绘制决策边界和训练 loss 曲线</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_13">七、使用方式</h2>
-<pre><code class="language-bash">cd src/chap03_SVM
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>src/chap03_SVM
 
-# 使用默认参数运行（线性数据集）
-python svm.py
+<span class="c1"># 使用默认参数运行（线性数据集）</span>
+python<span class="w"> </span>svm.py
 
-# 自定义参数运行
-python svm.py --learning-rate 0.05 --reg-lambda 0.01 --lr-decay 0.999 --patience 3000
+<span class="c1"># 自定义参数运行</span>
+python<span class="w"> </span>svm.py<span class="w"> </span>--learning-rate<span class="w"> </span><span class="m">0</span>.05<span class="w"> </span>--reg-lambda<span class="w"> </span><span class="m">0</span>.01<span class="w"> </span>--lr-decay<span class="w"> </span><span class="m">0</span>.999<span class="w"> </span>--patience<span class="w"> </span><span class="m">3000</span>
 
-# 使用非线性数据集
-python svm.py --train-file data/train_kernel.txt --test-file data/test_kernel.txt
-</code></pre>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<span class="c1"># 使用非线性数据集</span>
+python<span class="w"> </span>svm.py<span class="w"> </span>--train-file<span class="w"> </span>data/train_kernel.txt<span class="w"> </span>--test-file<span class="w"> </span>data/test_kernel.txt
+</code></pre></div></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>

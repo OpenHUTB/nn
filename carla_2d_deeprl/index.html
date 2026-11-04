@@ -1,159 +1,150 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+
+<html class="writer-html5" lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://wengqiuyi.github.io/nn/carla_2d_deeprl/" />
-      <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>carla_2d_deeprl - 神经网络</title>
-    <link rel="stylesheet" href="../css/theme.css" />
-    <link rel="stylesheet" href="../css/theme_extra.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
-        <link href="../extra.css" rel="stylesheet" />
-    
-      <script>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/carla_2d_deeprl/" rel="canonical"/>
+<link href="../img/favicon.ico" rel="shortcut icon"/>
+<title>carla_2d_deeprl - 神经网络</title>
+<link href="../css/theme.css" rel="stylesheet"/>
+<link href="../css/theme_extra.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
+<link href="../extra.css" rel="stylesheet"/>
+<script>
         // Current page data
         var mkdocs_page_name = "carla_2d_deeprl";
         var mkdocs_page_input_path = "carla_2d_deeprl/README.md";
         var mkdocs_page_url = "/nn/carla_2d_deeprl/";
       </script>
-    
-    <!--[if lt IE 9]>
+<!--[if lt IE 9]>
       <script src="../js/html5shiv.min.js"></script>
     <![endif]-->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-      <script>hljs.highlightAll();</script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </head>
-
 <body class="wy-body-for-nav" role="document">
-
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
-    <div class="wy-side-scroll">
-      <div class="wy-side-nav-search">
-          <a href=".." class="icon icon-home"> 神经网络
+<div class="wy-grid-for-nav">
+<nav class="wy-nav-side stickynav" data-toggle="wy-nav-shift">
+<div class="wy-side-scroll">
+<div class="wy-side-nav-search">
+<a class="icon icon-home" href=".."> 神经网络
         </a><div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
-      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
-  </form>
+<form action="../search.html" class="wy-form" id="rtd-search-form" method="get">
+<input aria-label="Search docs" name="q" placeholder="搜索文档" title="Type search term here" type="text"/>
+</form>
 </div>
-      </div>
-
-      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
-                </li>
-              </ul>
-      </div>
-    </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="..">神经网络</a>
-        
-      </nav>
-      <div class="wy-nav-content">
-        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
-  <ul class="wy-breadcrumbs">
-    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">carla_2d_deeprl</li>
-    <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_2d_deeprl/README.md"> 编辑页面</a>
-    </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-            <div class="section" itemprop="articleBody">
-              
-                <h1 id="carla_2d_deeprl">carla_2d_deeprl</h1>
+<div aria-label="Navigation menu" class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lane_detection/">车道线检测</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../car_racing_dqn_improvements/">CarRacing DQN/DoubleDQN：训练改进与可视化对比</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../traffic_sign_detection/">交通标识识别</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_yolo_detection/">自动驾驶感知系统</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../auto_drive_seg/">自动驾驶车辆语义分割</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_path_learning/">无人机路径学习</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_running/running/">双足人形机器人SAC步态仿真</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mujoco_hci_sim/">人形机器人项目</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vehicle_autonomous_core/">车辆自动驾驶辅助功能</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rl_acc/">RL-ACC</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_weather_robustness/">CARLA天气鲁棒性测试</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../carla_multisensor_platform/carla_multisensor_platform/">CARLA多传感器自动驾驶仿真平台</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../drone_flight_sim/">无人机飞行控制程序</a>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../lidar_project/">交通拥堵仿真与智能调控</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<section class="wy-nav-content-wrap" data-toggle="wy-nav-shift">
+<nav aria-label="Mobile navigation menu" class="wy-nav-top" role="navigation">
+<i class="fa fa-bars" data-toggle="wy-nav-top"></i>
+<a href="..">神经网络</a>
+</nav>
+<div class="wy-nav-content">
+<div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
+<ul class="wy-breadcrumbs">
+<li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
+<li class="breadcrumb-item active">carla_2d_deeprl</li>
+<li class="wy-breadcrumbs-aside">
+<a href="https://github.com/OpenHUTB/nn/edit/main/docs/carla_2d_deeprl/README.md"> 编辑页面</a>
+</li>
+</ul>
+<hr/>
+</div>
+<div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
+<div class="section" itemprop="articleBody">
+<div><h1 id="carla_2d_deeprl">carla_2d_deeprl</h1>
 <p>基于 CARLA 模拟器的极简 2D 深度强化学习自动驾驶环境。</p>
-<hr />
+<hr/>
 <table>
-  <tr>
-    <td><a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg" alt="Python" width="100%"></a></td>
-    <td><a href="https://carla.org/"><img src="https://img.shields.io/badge/CARLA-0.9.16%2B-orange.svg" alt="CARLA" width="100%"></a></td>
-    <td><a href="https://www.gymlibrary.dev/"><img src="https://img.shields.io/badge/Gym-0.17.1-green.svg" alt="Gym" width="100%"></a></td>
-    </a></td>
-  </tr>
+<tr>
+<td><a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue.svg" width="100%"/></a></td>
+<td><a href="https://carla.org/"><img alt="CARLA" src="https://img.shields.io/badge/CARLA-0.9.16%2B-orange.svg" width="100%"/></a></td>
+<td><a href="https://www.gymlibrary.dev/"><img alt="Gym" src="https://img.shields.io/badge/Gym-0.17.1-green.svg" width="100%"/></a></td>
+</tr>
 </table>
-
-<hr />
+<hr/>
 <h2 id="_1">📑 目录</h2>
 <ul>
-<li><a href="#项目简介">项目简介</a></li>
-<li><a href="#核心功能">核心功能</a></li>
-<li><a href="#使用方法">使用方法</a></li>
-<li><a href="#架构总览">架构总览</a></li>
-<li><a href="#观测空间">观测空间</a></li>
-<li><a href="#动作空间">动作空间</a></li>
-<li><a href="#奖励函数">奖励函数</a></li>
-<li><a href="#配置系统">配置系统</a></li>
-<li><a href="#改进对比">改进对比</a></li>
-<li><a href="#依赖">依赖</a></li>
-<li><a href="#参考">参考</a></li>
+<li><a href="#%E9%A1%B9%E7%9B%AE%E7%AE%80%E4%BB%8B">项目简介</a></li>
+<li><a href="#%E6%A0%B8%E5%BF%83%E5%8A%9F%E8%83%BD">核心功能</a></li>
+<li><a href="#%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95">使用方法</a></li>
+<li><a href="#%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88">架构总览</a></li>
+<li><a href="#%E8%A7%82%E6%B5%8B%E7%A9%BA%E9%97%B4">观测空间</a></li>
+<li><a href="#%E5%8A%A8%E4%BD%9C%E7%A9%BA%E9%97%B4">动作空间</a></li>
+<li><a href="#%E5%A5%96%E5%8A%B1%E5%87%BD%E6%95%B0">奖励函数</a></li>
+<li><a href="#%E9%85%8D%E7%BD%AE%E7%B3%BB%E7%BB%9F">配置系统</a></li>
+<li><a href="#%E6%94%B9%E8%BF%9B%E5%AF%B9%E6%AF%94">改进对比</a></li>
+<li><a href="#%E4%BE%9D%E8%B5%96">依赖</a></li>
+<li><a href="#%E5%8F%82%E8%80%83">参考</a></li>
 </ul>
 <h2 id="_2">项目简介</h2>
 <p>carla_2d_deeprl 是一个基于 <a href="https://carla.org/">CARLA</a> 模拟器实现的轻量级 2D 强化学习自动驾驶环境，提供类 Gym 接口、语义分割俯视图观测和可配置的奖励函数，适合快速验证 DQN 等深度强化学习算法。环境支持基于俯视视角的2D观测（RGB图像或简化语义分割图像），并设计了以车道中心为目标的奖励函数：智能体行驶在车道中心时获得正奖励，偏离车道中心则根据距离获得负奖励。该环境虽未完全兼容OpenAI Gym标准，但遵循Gym式接口设计，可直接用于测试各类基础强化学习算法。</p>
-<hr />
+<hr/>
 <h2 id="_3">核心功能</h2>
 <ol>
 <li><strong>2D观测输入</strong>：支持RGB图像或简化语义分割的俯视视角观测，可自定义观测画面的宽高尺寸。</li>
@@ -164,44 +155,44 @@
 </ol>
 <h2 id="_4">使用方法</h2>
 <h3 id="1">1. 环境搭建</h3>
-<pre><code class="language-bash"># 克隆仓库
-git clone https://github.com/mt960/nn.git
-cd nn/src/carla_2d_deeprl
+<div class="highlight"><pre><span></span><code><span class="c1"># 克隆仓库</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/mt960/nn.git
+<span class="nb">cd</span><span class="w"> </span>nn/src/carla_2d_deeprl
 
-# 创建虚拟环境
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
+<span class="c1"># 创建虚拟环境</span>
+python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
+<span class="c1"># Windows</span>
+venv<span class="se">\S</span>cripts<span class="se">\a</span>ctivate
+<span class="c1"># Linux/Mac</span>
+<span class="nb">source</span><span class="w"> </span>venv/bin/activate
 
-# 安装依赖
-pip install -r requirements.txt
-</code></pre>
+<span class="c1"># 安装依赖</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</code></pre></div>
 <h3 id="2-carla">2. 启动 CARLA</h3>
 <p>下载 <a href="https://github.com/carla-simulator/carla/releases/tag/0.9.16">CARLA 0.9.16</a> 并启动：</p>
-<pre><code class="language-bash"># Windows
+<div class="highlight"><pre><span></span><code><span class="c1"># Windows</span>
 CarlaUE4.exe
 
-# Linux
+<span class="c1"># Linux</span>
 ./CarlaUE4.sh
-</code></pre>
+</code></pre></div>
 <h3 id="3">3. 运行演示</h3>
-<pre><code class="language-bash"># 快速测试环境（直行 5 个 episode）
-python run.py
+<div class="highlight"><pre><span></span><code><span class="c1"># 快速测试环境（直行 5 个 episode）</span>
+python<span class="w"> </span>run.py
 
-# 运行预训练模型演示
-python main.py demo
+<span class="c1"># 运行预训练模型演示</span>
+python<span class="w"> </span>main.py<span class="w"> </span>demo
 
-# 训练新模型
-python main.py train
+<span class="c1"># 训练新模型</span>
+python<span class="w"> </span>main.py<span class="w"> </span>train
 
-# 运行自动化测试
-python main.py test
-</code></pre>
-<hr />
+<span class="c1"># 运行自动化测试</span>
+python<span class="w"> </span>main.py<span class="w"> </span><span class="nb">test</span>
+</code></pre></div>
+<hr/>
 <h2 id="_5">架构总览</h2>
-<p><img src="images/img.png" alt="架构总览" title="架构总览" width="480"></p>
+<p><img alt="架构总览" src="images/img.png" title="架构总览" width="480"/></p>
 <p><strong>三层分离设计</strong>：</p>
 <table>
 <thead>
@@ -229,11 +220,11 @@ python main.py test
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_6">观测空间</h2>
 <p>环境提供 <strong>2D 俯视视角</strong>的观测图像，支持两种模式：</p>
 <h3 id="channels1">语义分割模式（默认，channels=1）</h3>
-<p><img src="images/s.png" alt="语义分割模式" title="语义分割模式" width="480"></p>
+<p><img alt="语义分割模式" src="images/s.png" title="语义分割模式" width="480"/></p>
 <p>将 CARLA 的 13 类语义标签映射为 6 类简化标签：</p>
 <table>
 <thead>
@@ -277,17 +268,17 @@ python main.py test
 </tbody>
 </table>
 <h3 id="rgb-channels3">RGB 模式（可选，channels=3）</h3>
-<p><img src="images/i.png" alt="RGB 模式" title="RGB 模式" width="480"></p>
+<p><img alt="RGB 模式" src="images/i.png" title="RGB 模式" width="480"/></p>
 <p>原始的 CARLA RGB 相机图像。</p>
 <h3 id="_7">参数配置</h3>
-<pre><code class="language-python">OBS_CONFIG = {
-    &quot;width&quot;: 480,      # 宽度（可动态修改）
-    &quot;height&quot;: 480,     # 高度（可动态修改）
-    &quot;channels&quot;: 1,     # 通道数：1=语义分割, 3=RGB
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">OBS_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"width"</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>      <span class="c1"># 宽度（可动态修改）</span>
+    <span class="s2">"height"</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>     <span class="c1"># 高度（可动态修改）</span>
+    <span class="s2">"channels"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>     <span class="c1"># 通道数：1=语义分割, 3=RGB</span>
+<span class="p">}</span>
+</code></pre></div>
 <p>观测经过 <code>imutils.rotate_bound</code> 旋转，使<strong>车辆始终位于画面中央底部</strong>，车头朝上。</p>
-<hr />
+<hr/>
 <h2 id="_8">动作空间</h2>
 <p>3 个离散动作，每个动作映射为 <code>(throttle, steer)</code> 元组：</p>
 <table>
@@ -316,25 +307,25 @@ python main.py test
 </tr>
 </tbody>
 </table>
-<pre><code class="language-python">ACTIONS = {
-    0: [0.0,  0.0],    # 直行
-    1: [0.0, -0.5],    # 左转
-    2: [0.0,  0.5],    # 右转
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">ACTIONS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span>  <span class="mf">0.0</span><span class="p">],</span>    <span class="c1"># 直行</span>
+    <span class="mi">1</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="p">],</span>    <span class="c1"># 左转</span>
+    <span class="mi">2</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span>  <span class="mf">0.5</span><span class="p">],</span>    <span class="c1"># 右转</span>
+<span class="p">}</span>
+</code></pre></div>
 <p>车辆的实际油门/刹车由环境自动控制，根据当前车速 <code>kmh</code> 自动切换：</p>
 <ul>
 <li><code>kmh &lt; 20</code>：<code>throttle=0.3, brake=0.0</code>（加速）</li>
 <li><code>kmh &gt;= 20</code>：<code>throttle=0.0, brake=0.2</code>（减速）</li>
 </ul>
-<hr />
+<hr/>
 <h2 id="_9">奖励函数</h2>
 <p>奖励函数由 4 部分组成：</p>
 <h3 id="1_1">1. 车道中心奖励（核心）</h3>
 <p>
 <script type="math/tex; mode=display">r_{\text{center}} = \begin{cases} +0.5, & d < 0.5 \ \text{(在车道中心)} \\ -\min(1.0 \cdot e^{d}, 1000), & \text{其他 (偏离车道)} \end{cases}</script>
 </p>
-<p>其中 $d$ 为车辆当前位置到最近车道中心线的欧几里得距离。</p>
+<p>其中 <script type="math/tex">d</script> 为车辆当前位置到最近车道中心线的欧几里得距离。</p>
 <h3 id="2">2. 速度奖励</h3>
 <p>
 <script type="math/tex; mode=display">r_{\text{speed}} = 0.01 \times kmh</script>
@@ -379,10 +370,10 @@ python main.py test
 <p>
 <script type="math/tex; mode=display">r_t = r_{\text{center}} + r_{\text{speed}} + \text{(penalty multipliers)}</script>
 </p>
-<hr />
+<hr/>
 <h2 id="dqn">DQN 模型架构</h2>
 <p>模型定义在 <code>models/dqn.py</code>，基于 PyTorch，结构为 <strong>Conv3 → Linear</strong>：</p>
-<pre><code class="language-text">Input: (channel, 120, 120)   # channel=1(语义分割) 或 3(RGB)
+<div class="highlight"><pre><span></span><code>Input: (channel, 120, 120)   # channel=1(语义分割) 或 3(RGB)
     │
     ├─ Conv2d(channel→16, kernel=5, stride=2) + BatchNorm2d + ReLU
     │   Output: (16, 58, 58)
@@ -394,7 +385,7 @@ python main.py test
     │   Output: (32, 12, 12)
     │
     └─ Linear(32×12×12 → 3)   # 3 = 动作数
-</code></pre>
+</code></pre></div>
 <h3 id="_11">训练超参数</h3>
 <table>
 <thead>
@@ -442,44 +433,44 @@ python main.py test
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_12">配置系统</h2>
 <p>配置分为 4 个独立模块（<code>config.py</code>），支持独立修改：</p>
 <h3 id="obs_config">OBS_CONFIG — 观测配置</h3>
-<pre><code class="language-python">OBS_CONFIG = {
-    &quot;width&quot;: 480,
-    &quot;height&quot;: 480,
-    &quot;channels&quot;: 1,
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">OBS_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"width"</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>
+    <span class="s2">"height"</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>
+    <span class="s2">"channels"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="env_config">ENV_CONFIG — 环境参数</h3>
-<pre><code class="language-python">ENV_CONFIG = {
-    &quot;max_step&quot;: 90000,
-    &quot;target_speed&quot;: 20,
-    &quot;throttle&quot;: 0.3,
-    &quot;stuck_max_count&quot;: 20,
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">ENV_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"max_step"</span><span class="p">:</span> <span class="mi">90000</span><span class="p">,</span>
+    <span class="s2">"target_speed"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+    <span class="s2">"throttle"</span><span class="p">:</span> <span class="mf">0.3</span><span class="p">,</span>
+    <span class="s2">"stuck_max_count"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="reward_config">REWARD_CONFIG — 奖励系数</h3>
-<pre><code class="language-python">REWARD_CONFIG = {
-    &quot;lane_center_reward&quot;: 0.5,
-    &quot;dist_penalty_scale&quot;: 1.0,
-    &quot;dist_penalty_clip&quot;: 1000.0,
-    &quot;collision_penalty_mult&quot;: 2.0,
-    &quot;stuck_penalty&quot;: 100.0,
-    &quot;speed_reward_scale&quot;: 0.01,
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">REWARD_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"lane_center_reward"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="s2">"dist_penalty_scale"</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="s2">"dist_penalty_clip"</span><span class="p">:</span> <span class="mf">1000.0</span><span class="p">,</span>
+    <span class="s2">"collision_penalty_mult"</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+    <span class="s2">"stuck_penalty"</span><span class="p">:</span> <span class="mf">100.0</span><span class="p">,</span>
+    <span class="s2">"speed_reward_scale"</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="render_config">RENDER_CONFIG — 渲染/模式开关</h3>
-<pre><code class="language-python">RENDER_CONFIG = {
-    &quot;render&quot;: True,    # 渲染画面
-    &quot;fast&quot;: False,     # 快速模式
-    &quot;debug&quot;: False,    # 调试模式
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">RENDER_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"render"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>    <span class="c1"># 渲染画面</span>
+    <span class="s2">"fast"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>     <span class="c1"># 快速模式</span>
+    <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>    <span class="c1"># 调试模式</span>
+<span class="p">}</span>
+</code></pre></div>
 <p><code>CONFIG</code> 字典为向后兼容的聚合配置：<code>{**OBS_CONFIG, **ENV_CONFIG, **RENDER_CONFIG}</code>。</p>
-<hr />
-<hr />
+<hr/>
+<hr/>
 <h2 id="_13">改进对比</h2>
 <p>与原项目 <a href="https://github.com/mcemilg/min-carla-env">mcemilg/min-carla-env</a> 相比，本项目做了以下改进：</p>
 <table>
@@ -538,9 +529,9 @@ python main.py test
 </tr>
 </tbody>
 </table>
-<hr />
+<hr/>
 <h2 id="_14">依赖</h2>
-<pre><code class="language-text">gym==0.17.1
+<div class="highlight"><pre><span></span><code>gym==0.17.1
 numpy~=2.4.4
 opencv-python~=4.13.0.92
 torch~=2.11.0
@@ -549,56 +540,48 @@ pillow~=12.2.0
 imutils~=0.5.4
 tensorboard~=2.11.0
 mkdocs~=1.6.0
-</code></pre>
-<hr />
+</code></pre></div>
+<hr/>
 <h2 id="_15">参考</h2>
 <p>源码目录 <a href="https://github.com/mt960/nn/tree/main/src/carla_2d_deeprl">src/carla_2d_deeprl</a></p>
 <p>参考仓库 <a href="https://github.com/mcemilg/min-carla-env">mcemilg/min-carla-env</a></p>
 <h2 id="license">License</h2>
-<p>MIT</p>
-              
-            </div>
-          </div><footer>
-
-  <hr/>
-
-  <div role="contentinfo">
-    <!-- Copyright etc -->
-      <p>OpenHUTB 版权所有 &copy; 2026</p>
-  </div>
-
-</footer>
-          
-        </div>
-      </div>
-
-    </section>
-
-  </div>
-
-  <div class="rst-versions" role="note" aria-label="Versions">
-  <span class="rst-current-version" data-toggle="rst-current-version">
-    
-        <span>
-          <a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
-        </span>
-    
-    
-    
-  </span>
+<p>MIT</p></div>
 </div>
-    <script src="../js/jquery-3.6.0.min.js"></script>
-    <script>var base_url = "..";</script>
-    <script src="../js/theme_extra.js"></script>
-    <script src="../js/theme.js"></script>
-      <script src="../extra.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-      <script src="../search/main.js"></script>
-    <script>
+</div><footer>
+<hr>
+<div role="contentinfo">
+<!-- Copyright etc -->
+<p>OpenHUTB 版权所有 © 2026</p>
+</div>
+</hr></footer>
+</div>
+</div>
+</section>
+</div>
+<div aria-label="Versions" class="rst-versions" role="note">
+<span class="rst-current-version" data-toggle="rst-current-version">
+<span>
+<a href="https://github.com/OpenHUTB/nn" style="color: #fcfcfc">OpenHUTB</a>
+</span>
+</span>
+</div>
+<script src="../js/jquery-3.6.0.min.js"></script>
+<script>var base_url = "..";</script>
+<script src="../js/theme_extra.js"></script>
+<script src="../js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sequence-diagrams/1.0.6/sequence-diagram-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.6.5/flowchart.min.js"></script>
+<script src="../js/umlconvert.js"></script>
+<script src="../search/main.js"></script>
+<script>
         jQuery(function () {
             SphinxRtdTheme.Navigation.enable(true);
         });
     </script>
-
 </body>
 </html>
