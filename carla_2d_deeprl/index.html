@@ -143,7 +143,7 @@
 <li><a href="#%E5%8F%82%E8%80%83">参考</a></li>
 </ul>
 <h2 id="_2">项目简介</h2>
-<p>carla_2d_deeprl 是一个基于 <a href="https://carla.org/">CARLA</a> 模拟器实现的轻量级 2D 强化学习自动驾驶环境，提供类 Gym 接口、语义分割俯视图观测和可配置的奖励函数，适合快速验证 DQN 等深度强化学习算法。环境支持基于俯视视角的2D观测（RGB图像或简化语义分割图像），并设计了以车道中心为目标的奖励函数：智能体行驶在车道中心时获得正奖励，偏离车道中心则根据距离获得负奖励。该环境虽未完全兼容OpenAI Gym标准，但遵循Gym式接口设计，可直接用于测试各类基础强化学习算法。</p>
+<p>carla_2d_deeprl 是一个基于 <a href="https://carla.org/">Carla</a> 模拟器实现的轻量级 2D 强化学习自动驾驶环境，提供类 Gym 接口、语义分割俯视图观测和可配置的奖励函数，适合快速验证 DQN 等深度强化学习算法。环境支持基于俯视视角的2D观测（RGB图像或简化语义分割图像），并设计了以车道中心为目标的奖励函数：智能体行驶在车道中心时获得正奖励，偏离车道中心则根据距离获得负奖励。该环境虽未完全兼容 OpenAI Gym 标准，但遵循 Gym 式接口设计，可直接用于测试各类基础强化学习算法。</p>
 <hr/>
 <h2 id="_3">核心功能</h2>
 <ol>
@@ -151,12 +151,12 @@
 <li><strong>可配置仿真场景</strong>：支持切换不同天气效果，兼容多种城市场景地图。</li>
 <li><strong>训练优化模式</strong>：提供无渲染模式，大幅提升训练效率，减少不必要的性能开销。</li>
 <li><strong>调试辅助功能</strong>：内置调试模式，便于快速验证环境逻辑与算法效果。</li>
-<li><strong>训练加速特性</strong>：提供Fast Mode，专为强化学习训练优化，减少仿真器冗余计算。</li>
+<li><strong>训练加速特性</strong>：提供 Fast Mode，专为强化学习训练优化，减少仿真器冗余计算。</li>
 </ol>
 <h2 id="_4">使用方法</h2>
 <h3 id="1">1. 环境搭建</h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># 克隆仓库</span>
-git<span class="w"> </span>clone<span class="w"> </span>https://github.com/mt960/nn.git
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/OpenHUTB/nn.git
 <span class="nb">cd</span><span class="w"> </span>nn/src/carla_2d_deeprl
 
 <span class="c1"># 创建虚拟环境</span>
@@ -169,7 +169,7 @@ venv<span class="se">\S</span>cripts<span class="se">\a</span>ctivate
 <span class="c1"># 安装依赖</span>
 pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
 </code></pre></div>
-<h3 id="2-carla">2. 启动 CARLA</h3>
+<h3 id="2-carla">2. 启动 Carla</h3>
 <p>下载 <a href="https://github.com/carla-simulator/carla/releases/tag/0.9.16">CARLA 0.9.16</a> 并启动：</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Windows</span>
 CarlaUE4.exe
@@ -225,13 +225,13 @@ python<span class="w"> </span>main.py<span class="w"> </span><span class="nb">te
 <p>环境提供 <strong>2D 俯视视角</strong>的观测图像，支持两种模式：</p>
 <h3 id="channels1">语义分割模式（默认，channels=1）</h3>
 <p><img alt="语义分割模式" src="images/s.png" title="语义分割模式" width="480"/></p>
-<p>将 CARLA 的 13 类语义标签映射为 6 类简化标签：</p>
+<p>将 Carla 的 13 类语义标签映射为 6 类简化标签：</p>
 <table>
 <thead>
 <tr>
 <th style="text-align: center;">标签值</th>
 <th style="text-align: left;">类别</th>
-<th style="text-align: left;">CARLA 原始标签映射</th>
+<th style="text-align: left;">Carla 原始标签映射</th>
 </tr>
 </thead>
 <tbody>
@@ -269,7 +269,7 @@ python<span class="w"> </span>main.py<span class="w"> </span><span class="nb">te
 </table>
 <h3 id="rgb-channels3">RGB 模式（可选，channels=3）</h3>
 <p><img alt="RGB 模式" src="images/i.png" title="RGB 模式" width="480"/></p>
-<p>原始的 CARLA RGB 相机图像。</p>
+<p>原始的 Carla RGB 相机图像。</p>
 <h3 id="_7">参数配置</h3>
 <div class="highlight"><pre><span></span><code><span class="n">OBS_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"width"</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>      <span class="c1"># 宽度（可动态修改）</span>
@@ -469,7 +469,6 @@ python<span class="w"> </span>main.py<span class="w"> </span><span class="nb">te
 <span class="p">}</span>
 </code></pre></div>
 <p><code>CONFIG</code> 字典为向后兼容的聚合配置：<code>{**OBS_CONFIG, **ENV_CONFIG, **RENDER_CONFIG}</code>。</p>
-<hr/>
 <hr/>
 <h2 id="_13">改进对比</h2>
 <p>与原项目 <a href="https://github.com/mcemilg/min-carla-env">mcemilg/min-carla-env</a> 相比，本项目做了以下改进：</p>
