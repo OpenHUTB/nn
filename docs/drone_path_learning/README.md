@@ -1,6 +1,6 @@
-# drone_path_learning
+# 基于 AirSim、Gym 和 Stable-Baselines3 的无人机视觉导航强化学习
 
-基于 AirSim、Gym 和 Stable-Baselines3 的无人机视觉导航强化学习项目。项目把 AirSim 多旋翼无人机封装为标准 Gym 环境 `airsim-env-v0`，支持深度图、向量特征和 LGMD 仿生视觉等观测方式，并提供 PPO、SAC、TD3 训练与 PyQt5 可视化评估流程。
+该无人机视觉导航强化学习项目基于 AirSim、Gym 和 Stable-Baselines3，把 AirSim 多旋翼无人机封装为标准 Gym 环境 `airsim-env-v0`，支持深度图、向量特征和 LGMD 仿生视觉等观测方式，并提供 PPO、SAC、TD3 训练与 PyQt5 可视化评估流程。
 
 ---
 
@@ -27,7 +27,7 @@
 
 ## 项目简介
 
-`drone_path_learning` 面向无人机自主路径学习与避障导航实验，核心目标是让多旋翼无人机在 AirSim 仿真环境中根据视觉和状态信息学习从起点飞向目标点的控制策略。
+面向无人机自主路径学习与避障导航实验 `drone_path_learning` ，核心目标是让多旋翼无人机在 AirSim 仿真环境中根据视觉和状态信息学习从起点飞向目标点的控制策略。
 
 项目提供了完整的强化学习实验闭环：
 
@@ -281,13 +281,9 @@ python scripts/utils/thread_train.py --config config_NH_center_Multirotor_3D
 
 ## 训练流程
 
-训练入口推荐使用：
+训练入口推荐使用：[scripts/start_train_with_plot.py](../../src/drone_path_learning/scripts/start_train_with_plot.py)
 
-[scripts/start_train_with_plot.py](../../src/drone_path_learning/scripts/start_train_with_plot.py)
-
-内部核心训练逻辑位于：
-
-[scripts/utils/thread_train.py](../../src/drone_path_learning/scripts/utils/thread_train.py)
+内部核心训练逻辑位于：[scripts/utils/thread_train.py](../../src/drone_path_learning/scripts/utils/thread_train.py)
 
 训练过程如下：
 
