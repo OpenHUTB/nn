@@ -31,7 +31,7 @@
 
 ## 项目简介
 
-carla_2d_deeprl 是一个基于 [CARLA](https://carla.org/) 模拟器实现的轻量级 2D 强化学习自动驾驶环境，提供类 Gym 接口、语义分割俯视图观测和可配置的奖励函数，适合快速验证 DQN 等深度强化学习算法。环境支持基于俯视视角的2D观测（RGB图像或简化语义分割图像），并设计了以车道中心为目标的奖励函数：智能体行驶在车道中心时获得正奖励，偏离车道中心则根据距离获得负奖励。该环境虽未完全兼容OpenAI Gym标准，但遵循Gym式接口设计，可直接用于测试各类基础强化学习算法。
+carla_2d_deeprl 是一个基于 [Carla](https://carla.org/) 模拟器实现的轻量级 2D 强化学习自动驾驶环境，提供类 Gym 接口、语义分割俯视图观测和可配置的奖励函数，适合快速验证 DQN 等深度强化学习算法。环境支持基于俯视视角的2D观测（RGB图像或简化语义分割图像），并设计了以车道中心为目标的奖励函数：智能体行驶在车道中心时获得正奖励，偏离车道中心则根据距离获得负奖励。该环境虽未完全兼容 OpenAI Gym 标准，但遵循 Gym 式接口设计，可直接用于测试各类基础强化学习算法。
 
 
 ---
@@ -40,7 +40,7 @@ carla_2d_deeprl 是一个基于 [CARLA](https://carla.org/) 模拟器实现的�
 2. **可配置仿真场景**：支持切换不同天气效果，兼容多种城市场景地图。
 3. **训练优化模式**：提供无渲染模式，大幅提升训练效率，减少不必要的性能开销。
 4. **调试辅助功能**：内置调试模式，便于快速验证环境逻辑与算法效果。
-5. **训练加速特性**：提供Fast Mode，专为强化学习训练优化，减少仿真器冗余计算。
+5. **训练加速特性**：提供 Fast Mode，专为强化学习训练优化，减少仿真器冗余计算。
 
 ## 使用方法
 
@@ -48,7 +48,7 @@ carla_2d_deeprl 是一个基于 [CARLA](https://carla.org/) 模拟器实现的�
 
 ```bash
 # 克隆仓库
-git clone https://github.com/mt960/nn.git
+git clone https://github.com/OpenHUTB/nn.git
 cd nn/src/carla_2d_deeprl
 
 # 创建虚拟环境
@@ -62,7 +62,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 启动 CARLA
+### 2. 启动 Carla
 
 下载 [CARLA 0.9.16](https://github.com/carla-simulator/carla/releases/tag/0.9.16) 并启动：
 
@@ -115,9 +115,9 @@ python main.py test
 <img src="images/s.png" alt="语义分割模式" title="语义分割模式" width="480">
 
 
-将 CARLA 的 13 类语义标签映射为 6 类简化标签：
+将 Carla 的 13 类语义标签映射为 6 类简化标签：
 
-| 标签值 | 类别 | CARLA 原始标签映射 |
+| 标签值 | 类别 | Carla 原始标签映射 |
 |:------:|:-----|:------------------|
 | 0 | 空 (None) | — |
 | 1 | 道路 (Road) | Road(7) |
@@ -131,7 +131,7 @@ python main.py test
 
 <img src="images/i.png" alt="RGB 模式" title="RGB 模式" width="480">
 
-原始的 CARLA RGB 相机图像。
+原始的 Carla RGB 相机图像。
 
 
 ### 参数配置
@@ -297,9 +297,6 @@ RENDER_CONFIG = {
 ```
 
 `CONFIG` 字典为向后兼容的聚合配置：`{**OBS_CONFIG, **ENV_CONFIG, **RENDER_CONFIG}`。
-
----
-
 
 
 ---
