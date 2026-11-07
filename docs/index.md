@@ -107,7 +107,7 @@ title: 主页
 
 - [__CARLA车辆车载HUD可视化显示系统__](./vehicle_HUD/README.md) - CARLA仿真环境下车辆车载HUD信息实时可视化展示平台
 
-[_交通拥堵仿真与智能调控_](./lidar_project/README.md) - 基于 CARLA 与强化学习的多模型融合交通拥堵仿真与智能调控系统
+[__交通拥堵仿真与智能调控__](./lidar_project/README.md) - 基于 CARLA 与强化学习的多模型融合交通拥堵仿真与智能调控系统
 
 ## 规划 <span id="planning"></span>
 
@@ -130,6 +130,8 @@ title: 主页
 - [__Carla YOLO规划器__](carla_yolo_planner.md) - Carla环境结合YOLO的自动驾驶路径规划方案
 
 - [__GraspRL机械臂抓取强化学习项目__](./index_wk.md) - 基于DQN与MuJoCo的视觉机械臂抓取仿真项目
+
+- [__基于栅格地图与多算法对比的机器人自主导航仿真系统__](./robot_navigation_simulation/README.md)
 
 
 ## 控制 <span id="control"></span>
@@ -167,6 +169,8 @@ title: 主页
 - [__无人机飞行控制__](./UVA_flight_control_system.md) - 基于AirSim的无人机飞行控制系统
 
 - [__人形机器人平衡控制__](./humanoid_balance/Humanoid_Balance.md) - 基于强化学习的人形机器人平衡控制仿真
+
+- [__双机器人分区巡逻与动态避障仿真系统（MuJoCo）__](./muscle_humaniod/index.md)
 
 
 
