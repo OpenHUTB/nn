@@ -143,16 +143,8 @@
 </div>
 <div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
 <div class="section" itemprop="articleBody">
-<div><h1 id="lane_detection">车道线检测（lane_detection）</h1>
+<div><h1 id="opencv-carla">基于 OpenCV 的 Carla 场景车道线检测</h1>
 <p>基于 OpenCV 的 Carla 场景车道线检测模块，分步完成预处理、边缘检测、霍夫直线检测与 HSV 多车道拟合。</p>
-<p><strong>作者</strong>：ultra223<br/>
-<strong>课题进度</strong>：8/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警 + 步骤7 快速搜索优化 + 步骤8 预处理对比评估）
-<strong>课题进度</strong>：7/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警 + 步骤7 快速搜索优化）
-<strong>课题进度</strong>：6/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算 + 步骤6 车道偏离预警）
-<strong>课题进度</strong>：5/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理 + 步骤5 曲率与偏移计算）
-<strong>课题进度</strong>：4/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合 + 步骤4 视频处理）
-<strong>课题进度</strong>：3/10（步骤1 基础检测 + 步骤2 HSV 优化 + 步骤3 透视变换+多项式拟合）
-<strong>课题进度</strong>：2/10（步骤1 基础检测 + 步骤2 HSV 优化）</p>
 <h2 id="_1">模块结构</h2>
 <table>
 <thead>
@@ -300,8 +292,11 @@ python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="
 </tbody>
 </table>
 <p><strong>EMA 平滑公式</strong></p>
-<div class="highlight"><pre><span></span><code>fit_smoothed = α × fit_current + (1 − α) × fit_previous
-</code></pre></div>
+<p>
+<script type="math/tex; mode=display">
+fit_{smoothed} = α × fit_{current} + (1 − α) × fit_{previous}
+</script>
+</p>
 <ul>
 <li>α = 1.0：完全使用当前帧结果（无平滑，可能抖动）</li>
 <li>α = 0.1：高度平滑，响应慢但稳定</li>
@@ -337,9 +332,18 @@ python<span class="w"> </span>main.py<span class="w"> </span>--mode<span class="
 </tbody>
 </table>
 <p><strong>曲率半径公式</strong></p>
-<div class="highlight"><pre><span></span><code>车道线模型: x = A·y² + B·y + C
-曲率半径:   R = (1 + (2Ay + B)²)^(3/2) / |2A|
-</code></pre></div>
+<p>车道线模型：</p>
+<p>
+<script type="math/tex; mode=display">
+x = A·y² + B·y + C
+</script>
+</p>
+<p>曲率半径: </p>
+<p>
+<script type="math/tex; mode=display">
+R = \frac{(1 + (2Ay + B)²)^{ \frac{3}{2}}}{|2A|}
+</script>
+</p>
 <ul>
 <li>像素坐标系数先转换为真实世界（米）坐标再计算</li>
 <li>曲率半径 &gt; 800 m 视为直道</li>
