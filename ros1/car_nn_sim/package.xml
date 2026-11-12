@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>car_nn_sim</name>
+  <version>0.1.0</version>
+  <description>MuJoCo car + neural-network driving and 2-D SLAM demo (ROS 1, Ubuntu 20.04 / Noetic).</description>
+  <maintainer email="zhoul@example.com">zhoul</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>teleop_twist_keyboard</exec_depend>
+
+  <export>
+    <build_type>catkin</build_type>
+  </export>
+</package>

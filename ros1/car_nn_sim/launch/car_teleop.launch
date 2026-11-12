@@ -1,0 +1,17 @@
+<launch>
+  <!-- Keyboard teleoperation: A/D/W/S in the teleop terminal drive the car. -->
+  <arg name="scene" default="day" doc="day | dusk | fog"/>
+  <arg name="offset" default="0.0" doc="initial lateral offset (m)"/>
+
+  <node pkg="car_nn_sim" type="sim_node.py" name="car_nn_sim" output="screen">
+    <param name="scene" value="$(arg scene)"/>
+    <param name="offset" value="$(arg offset)"/>
+    <param name="rate" value="20.0"/>
+  </node>
+
+  <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="teleop" output="screen">
+    <remap from="cmd_vel" to="/car/cmd_vel"/>
+    <param name="speed" value="3.0"/>
+    <param name="turn" value="0.8"/>
+  </node>
+</launch>

@@ -1,0 +1,14 @@
+<launch>
+  <!-- Neural-network driving: the CNN consumes the ego camera and drives. -->
+  <arg name="scene" default="day"/>
+  <arg name="policy" default="$(find car_nn_sim)/../../runs/cnn_dagger.pt"/>
+  <arg name="rviz" default="true"/>
+
+  <node pkg="car_nn_sim" type="sim_node.py" name="car_nn_sim" output="screen">
+    <param name="scene" value="$(arg scene)"/>
+    <param name="policy" value="$(arg policy)"/>
+    <param name="rate" value="20.0"/>
+  </node>
+
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz"/>
+</launch>
