@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!--
+  uav_flight_base 启动配置
+  mode=mock   纯软件仿真，不需要 Gazebo（默认，用于验证链路）
+  mode=gazebo 预留：接 Gazebo 世界的无人机模型
+-->
+<launch>
+  <arg name="mode" default="mock"/>
+  <arg name="teleop" default="true"/>
+  <arg name="csv" default=""/>
+  <arg name="cmd_topic" default="/uav/cmd_vel"/>
+  <arg name="odom_topic" default="/uav/odom"/>
+
+  <!-- 仿真后端 -->
+  <group if="$(eval arg('mode') == 'mock')">
+    <node pkg="uav_flight_base" type="uav_mock_sim.py" name="uav_mock_sim" output="screen">
+      <param name="cmd_topic" value="$(arg cmd_topic)"/>
+      <param name="odom_topic" value="$(arg odom_topic)"/>
+      <param name="rate" value="50.0"/>
+      <param name="time_constant" value="0.35"/>
+      <param name="max_speed" value="5.0"/>
+      <param name="init_z" value="1.5"/>
+    </node>
+  </group>
+
+  <group if="$(eval arg('mode') == 'gazebo')">
+    <!-- 占位：后续接入 Gazebo 模型时在这里 include 对应 launch -->
+    <node pkg="uav_flight_base" type="uav_mock_sim.py" name="uav_mock_sim" output="screen">
+      <param name="cmd_topic" value="$(arg cmd_topic)"/>
+      <param name="odom_topic" value="$(arg odom_topic)"/>
+    </node>
+  </group>
+
+  <!-- 状态监控 -->
+  <node pkg="uav_flight_base" type="uav_state_monitor.py" name="uav_state_monitor" output="screen">
+    <param name="odom_topic" value="$(arg odom_topic)"/>
+    <param name="period" value="0.5"/>
+    <param name="csv" value="$(arg csv)"/>
+  </node>
+
+  <!-- 键盘遥控（需要交互式终端，默认关闭以便后台跑测试） -->
+  <node if="$(arg teleop)" pkg="uav_flight_base" type="uav_teleop_key.py"
+        name="uav_teleop_key" output="screen" launch-prefix="xterm -e">
+    <param name="cmd_topic" value="$(arg cmd_topic)"/>
+    <param name="speed" value="1.5"/>
+    <param name="yaw_rate" value="0.8"/>
+  </node>
+</launch>
