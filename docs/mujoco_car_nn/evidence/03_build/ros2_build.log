@@ -1,0 +1,33 @@
+=== Wed Nov 11 11:32:38 PM CST 2026 ===
+=== workspace ===
+assets
+DeepSeek Harness 全自动 ROS 工程实施任务书.md
+Dockerfile
+docs
+main.bat
+main.py
+main.sh
+mkdocs.yml
+README.md
+requirements.txt
+ros1
+ros2
+runs
+scripts
+src
+tests
+新建 文本文档 (5).txt
+commits: 23
+ROS_DISTRO=humble
+=== colcon list ===
+car_nn_sim	car_nn_sim	(ros.ament_python)
+=== colcon build ===
+Starting >>> car_nn_sim
+Finished <<< car_nn_sim [1.13s]
+
+Summary: 1 package finished [1.32s]
+COLCON_EXIT=0
+=== package visible? ===
+car_nn_sim
+/root/workspace/ROS/ros2/install/car_nn_sim
+=== done Wed Nov 11 11:32:46 PM CST 2026 ===

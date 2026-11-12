@@ -1,0 +1,53 @@
+=== Wed Nov 11 11:32:53 PM CST 2026 ===
+ROS_DISTRO=humble  MUJOCO_GL=egl
+launch pid=20878
+=== ros2 node list ===
+/car_nn_sim
+=== ros2 topic list -t ===
+/car/camera/image_raw [sensor_msgs/msg/Image]
+/car/cmd_vel [geometry_msgs/msg/Twist]
+/car/odom [nav_msgs/msg/Odometry]
+/car/scan [sensor_msgs/msg/LaserScan]
+/parameter_events [rcl_interfaces/msg/ParameterEvent]
+/rosout [rcl_interfaces/msg/Log]
+=== ros2 topic hz /car/camera/image_raw ===
+average rate: 3.778
+	min: 0.255s max: 0.289s std dev: 0.01210s window: 5
+average rate: 3.795
+	min: 0.242s max: 0.306s std dev: 0.01957s window: 9
+=== ros2 topic hz /car/scan ===
+average rate: 3.405
+	min: 0.272s max: 0.309s std dev: 0.01267s window: 5
+average rate: 3.361
+	min: 0.272s max: 0.312s std dev: 0.01128s window: 9
+=== ros2 topic echo /car/odom (once) ===
+header:
+  stamp:
+    sec: 1794411196
+    nanosec: 866953311
+  frame_id: odom
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 41.0
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.6151408985995401
+      w: 0.7884171959503105
+  covariance:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+=== ros2 topic echo /car/scan (once, ranges head) ===
+array('f', [16.480789184570312, 13.844217300415039, 11.727333068847656, 10.118706703186035, 8.802031517028809, 8.002681732177734, 7.054258823394775, 6.464868545532227, 5.9677510261535645, 5.514983654022217, 5.26263952255249, 19.969478607177734, 4.797378063201904, 4.669932842254639, 4.545849800109863, 4.522549152374268, 4.5093865394592285, 4.5387163162231445, 4.58425235748291, 4.71827507019043, 4.82182502746582, 5.021739482879639, 5.276589870452881, 5.800379276275635, 5.953859329223633, 6.450514793395996, 7.259812831878662, 7.802388668060303, 8.766115188598633, 9.934226036071777, 11.334588050842285, 13.063814163208008, 15.092897415161133, 17.342153549194336, 19.87251853942871, 20.0, 20.0, 19.971813201904297, 19.98567771911621, 9.216120719909668, 7.305655002593994, 6.285926818847656, 5.708380699157715, 5.226786136627197, 4.940518856048584, 4.756781578063965, 4.582003593444824, 4.524087905883789, 4.508118152618408, 4.54625940322876, 4.6049065589904785, 4.771099090576172, 4.939167499542236, 5.269857883453369, 5.7347412109375, 6.355469703674316, 7.237951755523682, 8.767492294311523, 12.922614097595215, 20.0, 19.985557556152344, 20.0, 20.0, 19.83741569519043])
+---
+=== node log (head) ===
+[INFO] [launch]: All log files can be found below /root/.ros/log/2026-11-11-23-32-54-294975-LAPTOP-I6OL53UB-20878
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [sim_node-1]: process started with pid [20880]
+=== done Wed Nov 11 11:33:19 PM CST 2026 ===

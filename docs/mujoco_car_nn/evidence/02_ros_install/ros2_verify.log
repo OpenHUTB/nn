@@ -1,0 +1,25 @@
+=== Wed Nov 11 11:31:41 PM CST 2026 ===
+ROS_DISTRO=humble
+/opt/ros/humble/bin/ros2
+usage: ros2 [-h] [--use-python-default-buffering]
+            Call `ros2 <command> -h` for more detailed usage. ...
+ros2: error: unrecognized arguments: --version
+=== talker/listener ===
+--- talker (first 5 lines) ---
+[INFO] [1794411103.122025551] [talker]: Publishing: 'Hello World: 1'
+[INFO] [1794411104.122005537] [talker]: Publishing: 'Hello World: 2'
+[INFO] [1794411105.121237532] [talker]: Publishing: 'Hello World: 3'
+[INFO] [1794411106.120483699] [talker]: Publishing: 'Hello World: 4'
+[INFO] [1794411107.119790845] [talker]: Publishing: 'Hello World: 5'
+--- listener (first 8 lines) ---
+[INFO] [1794411109.136528230] [listener]: I heard: [Hello World: 7]
+[INFO] [1794411110.126860298] [listener]: I heard: [Hello World: 8]
+[INFO] [1794411111.129708743] [listener]: I heard: [Hello World: 9]
+[INFO] [1794411112.132333626] [listener]: I heard: [Hello World: 10]
+[INFO] [1794411113.132083263] [listener]: I heard: [Hello World: 11]
+[INFO] [1794411114.132064498] [listener]: I heard: [Hello World: 12]
+[INFO] [1794411115.131003999] [listener]: I heard: [Hello World: 13]
+[INFO] [1794411116.131519385] [listener]: I heard: [Hello World: 14]
+=== node/topic while stopped ===
+/talker
+=== done Wed Nov 11 11:32:01 PM CST 2026 ===

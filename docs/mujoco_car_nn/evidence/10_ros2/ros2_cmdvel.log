@@ -1,0 +1,20 @@
+=== Wed Nov 11 11:33:27 PM CST 2026 ===
+=== odom before ===
+x: 41.0
+y: 0.0
+z: 0.0
+---
+=== publish cmd_vel (linear.x=6.0 m/s) ===
+publisher: beginning loop
+publishing #1: geometry_msgs.msg.Twist(linear=geometry_msgs.msg.Vector3(x=6.0, y=0.0, z=0.0), angular=geometry_msgs.msg.Vector3(x=0.0, y=0.0, z=0.0))
+
+=== odom after 4 s ===
+x: 41.13615070549174
+y: 0.5430140042022222
+z: 0.0
+---
+=== stop ===
+publisher: beginning loop
+publishing #1: geometry_msgs.msg.Twist(linear=geometry_msgs.msg.Vector3(x=0.0, y=0.0, z=0.0), angular=geometry_msgs.msg.Vector3(x=0.0, y=0.0, z=0.0))
+
+=== done Wed Nov 11 11:33:47 PM CST 2026 ===

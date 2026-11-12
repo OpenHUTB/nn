@@ -1,0 +1,55 @@
+=== Wed Nov 11 11:32:09 PM CST 2026 ===
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libegl1 is already the newest version (1.4.0-1).
+libegl1 set to manually installed.
+libgl1 is already the newest version (1.4.0-1).
+libgl1 set to manually installed.
+libglib2.0-0 is already the newest version (2.72.4-0ubuntu2.11).
+libglib2.0-0 set to manually installed.
+python3-numpy is already the newest version (1:1.21.5-1ubuntu22.04.1).
+python3-numpy set to manually installed.
+python3-pil is already the newest version (9.0.1-1ubuntu0.6).
+python3-pil set to manually installed.
+python3-pip is already the newest version (22.0.2+dfsg-1ubuntu0.7).
+The following NEW packages will be installed:
+  libosmesa6
+0 upgraded, 1 newly installed, 0 to remove and 120 not upgraded.
+Need to get 3,116 kB of archives.
+After this operation, 12.6 MB of additional disk space will be used.
+Get:1 http://mirrors.aliyun.com/ubuntu jammy-updates/main amd64 libosmesa6 amd64 23.2.1-1ubuntu3.1~22.04.4 [3,116 kB]
+Fetched 3,116 kB in 1s (2,702 kB/s)
+Selecting previously unselected package libosmesa6:amd64.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 135025 files and directories currently installed.)
+Preparing to unpack .../libosmesa6_23.2.1-1ubuntu3.1~22.04.4_amd64.deb ...
+Unpacking libosmesa6:amd64 (23.2.1-1ubuntu3.1~22.04.4) ...
+Setting up libosmesa6:amd64 (23.2.1-1ubuntu3.1~22.04.4) ...
+Processing triggers for libc-bin (2.35-0ubuntu3.13) ...
+APT_EXIT=0
+Installing collected packages: pyopengl, glfw, websockets, typing_extensions, importlib_resources, fsspec, etils, absl-py, mujoco
+Successfully installed absl-py-2.5.1 etils-1.13.0 fsspec-2026.9.0 glfw-2.11.0 importlib_resources-7.1.0 mujoco-3.17.0 pyopengl-3.1.10 typing_extensions-4.16.0 websockets-16.1.1
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+PIP_EXIT=0
+=== import check ===
+mujoco 3.17.0 numpy 1.21.5
+=== offscreen render check (egl) ===
+render ok (64, 64, 3) 49.0
+Exception ignored in: <function Renderer.__del__ at 0x7af0975353f0>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/dist-packages/mujoco/rendering/classic/renderer.py", line 349, in __del__
+  File "/usr/local/lib/python3.10/dist-packages/mujoco/rendering/classic/renderer.py", line 338, in close
+  File "/usr/local/lib/python3.10/dist-packages/mujoco/egl/__init__.py", line 134, in free
+  File "/usr/local/lib/python3.10/dist-packages/OpenGL/platform/baseplatform.py", line 487, in __call__
+  File "/usr/local/lib/python3.10/dist-packages/OpenGL/error.py", line 230, in glCheckError
+OpenGL.raw.EGL._errors.EGLError: <exception str() failed>
+Exception ignored in: <function GLContext.__del__ at 0x7af097534c10>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/dist-packages/mujoco/egl/__init__.py", line 139, in __del__
+  File "/usr/local/lib/python3.10/dist-packages/mujoco/egl/__init__.py", line 134, in free
+  File "/usr/local/lib/python3.10/dist-packages/OpenGL/error.py", line 230, in glCheckError
+OpenGL.raw.EGL._errors.EGLError: <exception str() failed>
+EGL_EXIT=0
+=== offscreen render check (osmesa) ===
+osmesa ok (64, 64, 3)
+=== done Wed Nov 11 11:32:28 PM CST 2026 ===
