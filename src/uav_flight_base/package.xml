@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>uav_flight_base</name>
+  <version>0.1.0</version>
+  <description>无人机基础飞行模块：键盘遥控、最小运动学仿真、状态监控（ROS1 Noetic）</description>
+
+  <maintainer email="tangjianbin@example.com">唐健斌</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>rospy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2_ros</depend>
+
+  <export/>
+</package>
