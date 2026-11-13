@@ -18,9 +18,12 @@
         output="screen">
     <param name="target_topic" value="/uav/perception/target"/>
     <param name="cmd_topic" value="/cmd_vel"/>
-    <param name="kp" value="1.1"/>
-    <param name="kd" value="0.25"/>
-    <param name="v_max" value="1.2"/>
+    <param name="kp" value="0.55"/>
+    <param name="kd" value="0.12"/>
+    <param name="v_max" value="1.0"/>
     <param name="target_area" value="0.10"/>
+    <param name="search_rate" value="0.22"/>
+    <param name="sweep_limit" value="0.9"/>
+    <param name="warmup" value="4.0"/>
   </node>
 </launch>
