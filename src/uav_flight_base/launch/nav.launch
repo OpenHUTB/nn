@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- 任务3：激光建图 + A* 规划 + 航点跟踪 -->
+<launch>
+  <arg name="gui" default="false"/>
+  <arg name="goal_x" default="2.5"/>
+  <arg name="goal_y" default="-2.5"/>
+  <arg name="map_seconds" default="12.0"/>
+
+  <include file="$(find uav_flight_base)/launch/gazebo.launch">
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <node name="uav_grid_nav" pkg="uav_flight_base" type="uav_grid_nav.py" output="screen">
+    <param name="scan_topic" value="/uav/scan"/>
+    <param name="odom_topic" value="/odom"/>
+    <param name="cmd_topic" value="/cmd_vel"/>
+    <param name="map_seconds" value="$(arg map_seconds)"/>
+    <param name="goal" value="[$(arg goal_x), $(arg goal_y)]"/>
+  </node>
+</launch>
