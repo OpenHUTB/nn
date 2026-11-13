@@ -1,13 +1,14 @@
 <?xml version="1.0"?>
-<!-- 在 Gazebo 中加载简化四旋翼（带前置相机） -->
+<!-- 在 Gazebo 中加载简化四旋翼（带前置相机与激光雷达） -->
 <launch>
   <arg name="gui" default="false"/>
   <arg name="x" default="0.0"/>
   <arg name="y" default="0.0"/>
   <arg name="z" default="1.0"/>
+  <arg name="world" default="$(find uav_flight_base)/worlds/uav_world.world"/>
 
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="$(find uav_flight_base)/worlds/uav_world.world"/>
+    <arg name="world_name" value="$(arg world)"/>
     <arg name="gui" value="$(arg gui)"/>
     <arg name="paused" value="false"/>
     <arg name="use_sim_time" value="true"/>
@@ -22,7 +23,7 @@
 
   <node name="uav_state_monitor" pkg="uav_flight_base" type="uav_state_monitor.py"
         output="screen">
-    <param name="odom_topic" value="/uav/odom"/>
+    <param name="odom_topic" value="/odom"/>
     <param name="period" value="1.0"/>
   </node>
 </launch>
