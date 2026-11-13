@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- 任务2（无图形环境版）：激光雷达感知 + 反应式避障 -->
+<launch>
+  <arg name="gui" default="false"/>
+  <arg name="csv" default="/tmp/avoid.csv"/>
+
+  <include file="$(find uav_flight_base)/launch/gazebo.launch">
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <node name="uav_scan_avoider" pkg="uav_flight_base" type="uav_scan_avoider.py"
+        output="screen">
+    <param name="scan_topic" value="/uav/scan"/>
+    <param name="odom_topic" value="/odom"/>
+    <param name="cmd_topic" value="/cmd_vel"/>
+    <param name="csv" value="$(arg csv)"/>
+  </node>
+</launch>

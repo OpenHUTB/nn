@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<!-- 简化四旋翼：平面运动插件驱动（x/y/yaw），固定高度悬停，前置相机 -->
+<robot name="uav_simple">
+
+  <link name="base_link">
+    <inertial>
+      <mass value="1.0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.02"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.45 0.45 0.10"/></geometry>
+      <material name="uav_blue"><color rgba="0.10 0.35 0.75 1.0"/></material>
+    </visual>
+    <!-- 注意：机身不设 collision。激光雷达装在机身内部，若有机身碰撞体，
+         射线会打到自己的外壳（半径 0.225），把自身当成障碍物。 -->
+  </link>
+
+  <!-- 四个旋翼（仅视觉，示意） -->
+  <link name="rotor_fl">
+    <visual><geometry><cylinder radius="0.11" length="0.02"/></geometry>
+      <material name="rotor_gray"><color rgba="0.25 0.25 0.28 1.0"/></material></visual>
+  </link>
+  <joint name="j_fl" type="fixed"><parent link="base_link"/><child link="rotor_fl"/>
+    <origin xyz="0.22 0.22 0.06"/></joint>
+
+  <link name="rotor_fr">
+    <visual><geometry><cylinder radius="0.11" length="0.02"/></geometry>
+      <material name="rotor_gray2"><color rgba="0.25 0.25 0.28 1.0"/></material></visual>
+  </link>
+  <joint name="j_fr" type="fixed"><parent link="base_link"/><child link="rotor_fr"/>
+    <origin xyz="0.22 -0.22 0.06"/></joint>
+
+  <link name="rotor_rl">
+    <visual><geometry><cylinder radius="0.11" length="0.02"/></geometry>
+      <material name="rotor_gray3"><color rgba="0.25 0.25 0.28 1.0"/></material></visual>
+  </link>
+  <joint name="j_rl" type="fixed"><parent link="base_link"/><child link="rotor_rl"/>
+    <origin xyz="-0.22 0.22 0.06"/></joint>
+
+  <link name="rotor_rr">
+    <visual><geometry><cylinder radius="0.11" length="0.02"/></geometry>
+      <material name="rotor_gray4"><color rgba="0.25 0.25 0.28 1.0"/></material></visual>
+  </link>
+  <joint name="j_rr" type="fixed"><parent link="base_link"/><child link="rotor_rr"/>
+    <origin xyz="-0.22 -0.22 0.06"/></joint>
+
+  <!-- 相机 -->
+  <link name="camera_link">
+    <visual>
+      <geometry><box size="0.06 0.10 0.06"/></geometry>
+      <material name="cam_black"><color rgba="0.05 0.05 0.05 1.0"/></material>
+    </visual>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/><child link="camera_link"/>
+    <origin xyz="0.26 0.0 0.0" rpy="0 0.18 0"/>
+  </joint>
+
+  <!-- 2D 激光雷达：射线在物理引擎里计算，不需要图形环境。
+       必须保留独立 link + 固定关节（preserveFixedJoint），否则 URDF→SDF
+       会把关节合并、传感器落回机身中心，把自己的外壳当成障碍物（半径 0.225）。 -->
+  <link name="laser_link">
+    <inertial>
+      <mass value="0.02"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/><child link="laser_link"/>
+    <origin xyz="0.0 0.0 0.22"/>
+  </joint>
+
+  <gazebo reference="laser_link">
+    <preserveFixedJoint>true</preserveFixedJoint>
+    <sensor type="ray" name="laser">
+      <pose>0 0 0 0 0 0</pose>
+      <visualize>false</visualize>
+      <update_rate>10</update_rate>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range><min>0.20</min><max>12.0</max></range>
+      </ray>
+      <plugin name="laser_controller" filename="libgazebo_ros_laser.so">
+        <topicName>/uav/scan</topicName>
+        <frameName>laser_link</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="base_link">
+    <gravity>false</gravity>
+  </gazebo>
+
+
+  <gazebo reference="camera_link">
+    <sensor type="camera" name="front_camera">
+      <update_rate>10</update_rate>
+      <camera>
+        <horizontal_fov>1.2</horizontal_fov>
+        <image>
+          <width>320</width>
+          <height>240</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip><near>0.05</near><far>30.0</far></clip>
+      </camera>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <cameraName>uav_cam</cameraName>
+        <imageTopicName>image_raw</imageTopicName>
+        <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+        <frameName>camera_link</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- 平面运动：订阅 cmd_vel，直接设置模型位姿（x, y, yaw） -->
+  <gazebo>
+    <plugin name="planar_move" filename="libgazebo_ros_planar_move.so">
+      <commandTopic>cmd_vel</commandTopic>
+      <odometryTopic>odom</odometryTopic>
+      <odometryFrame>odom</odometryFrame>
+      <odometryRate>50.0</odometryRate>
+      <publishTF>true</publishTF>
+      <publishOdometry>true</publishOdometry>
+    </plugin>
+  </gazebo>
+
+</robot>

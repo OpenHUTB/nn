@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="uav_world">
+
+    <physics type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0.8</real_time_factor>
+    </physics>
+
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+
+    <!-- 8m x 8m 封闭场地：四面墙，无人机在里面自主避障 -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 4.0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>8.0 0.3 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>8.0 0.3 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -4.0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>8.0 0.3 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>8.0 0.3 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>4.0 0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3 8.0 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3 8.0 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-4.0 0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3 8.0 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3 8.0 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 场地中央的柱子：制造需要绕行的障碍 -->
+    <model name="pillar_center">
+      <static>true</static>
+      <pose>1.6 1.2 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.35</radius><length>2.5</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.35</radius><length>2.5</length></cylinder></geometry>
+          <material><ambient>0.2 0.22 0.28 1</ambient><diffuse>0.3 0.33 0.4 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 红色目标桶：留给后续视觉任务 -->
+    <model name="target_barrel">
+      <static>true</static>
+      <pose>-1.8 2.2 0.35 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.3</radius><length>0.7</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.3</radius><length>0.7</length></cylinder></geometry>
+          <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.9 0.15 0.12 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>-8 -8 6 0 0.35 0.78</pose>
+      </camera>
+    </gui>
+
+  </world>
+</sdf>

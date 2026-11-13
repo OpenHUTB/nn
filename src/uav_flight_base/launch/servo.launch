@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- 任务2：颜色感知 + 视觉伺服（自动对准并靠近红色目标桶） -->
+<launch>
+  <arg name="gui" default="false"/>
+
+  <include file="$(find uav_flight_base)/launch/gazebo.launch">
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <node name="uav_color_detector" pkg="uav_flight_base" type="uav_color_detector.py"
+        output="screen">
+    <param name="image_topic" value="/uav_cam/image_raw"/>
+    <param name="target_topic" value="/uav/perception/target"/>
+    <param name="min_area" value="0.0015"/>
+  </node>
+
+  <node name="uav_visual_servo" pkg="uav_flight_base" type="uav_visual_servo.py"
+        output="screen">
+    <param name="target_topic" value="/uav/perception/target"/>
+    <param name="cmd_topic" value="/cmd_vel"/>
+    <param name="kp" value="1.1"/>
+    <param name="kd" value="0.25"/>
+    <param name="v_max" value="1.2"/>
+    <param name="target_area" value="0.10"/>
+  </node>
+</launch>
