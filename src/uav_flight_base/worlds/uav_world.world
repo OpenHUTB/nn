@@ -10,7 +10,7 @@
     <include><uri>model://sun</uri></include>
     <include><uri>model://ground_plane</uri></include>
 
-    <!-- 8m x 8m 封闭场地：四面墙，无人机在里面自主避障 -->
+    <!-- 8m x 8m 灏侀棴鍦哄湴锛氬洓闈㈠锛屾棤浜烘満鍦ㄩ噷闈㈣嚜涓婚伩闅?-->
     <model name="wall_north">
       <static>true</static>
       <pose>0 4.0 1.25 0 0 0</pose>
@@ -59,10 +59,10 @@
       </link>
     </model>
 
-    <!-- 场地中央的柱子：制造需要绕行的障碍 -->
+    <!-- 鍦哄湴涓ぎ鐨勬煴瀛愶細鍒堕€犻渶瑕佺粫琛岀殑闅滅 -->
     <model name="pillar_center">
       <static>true</static>
-      <pose>1.6 1.2 1.25 0 0 0</pose>
+      <pose>0.8 -1.9 1.25 0 0 0</pose>
       <link name="link">
         <collision name="col"><geometry><cylinder><radius>0.35</radius><length>2.5</length></cylinder></geometry></collision>
         <visual name="vis">
@@ -72,10 +72,10 @@
       </link>
     </model>
 
-    <!-- 红色目标桶：留给后续视觉任务 -->
+    <!-- 绾㈣壊鐩爣妗讹細鐣欑粰鍚庣画瑙嗚浠诲姟 -->
     <model name="target_barrel">
       <static>true</static>
-      <pose>-1.8 2.2 0.35 0 0 0</pose>
+      <pose>2.6 0.3 0.35 0 0 0</pose>
       <link name="link">
         <collision name="col"><geometry><cylinder><radius>0.3</radius><length>0.7</length></cylinder></geometry></collision>
         <visual name="vis">
@@ -93,3 +93,4 @@
 
   </world>
 </sdf>
+
