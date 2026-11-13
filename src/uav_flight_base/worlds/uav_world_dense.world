@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="uav_world_dense">
+
+    <physics type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>0.8</real_time_factor>
+    </physics>
+
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+
+    <!-- 8m x 8m 场地 -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 4.0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>8.0 0.3 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>8.0 0.3 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -4.0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>8.0 0.3 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>8.0 0.3 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>4.0 0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3 8.0 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3 8.0 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-4.0 0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.3 8.0 2.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.3 8.0 2.5</size></box></geometry>
+          <material><ambient>0.55 0.56 0.6 1</ambient><diffuse>0.72 0.73 0.76 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 密集障碍：4 个方块 + 2 根柱子 -->
+    <model name="block_a">
+      <static>true</static>
+      <pose>1.2 1.2 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.7 0.7 2.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.7 0.7 2.5</size></box></geometry>
+          <material><ambient>0.3 0.32 0.38 1</ambient><diffuse>0.42 0.45 0.52 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="block_b">
+      <static>true</static>
+      <pose>-1.4 -1.2 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.7 0.7 2.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.7 0.7 2.5</size></box></geometry>
+          <material><ambient>0.3 0.32 0.38 1</ambient><diffuse>0.42 0.45 0.52 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="block_c">
+      <static>true</static>
+      <pose>2.0 -2.0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.7 0.7 2.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.7 0.7 2.5</size></box></geometry>
+          <material><ambient>0.3 0.32 0.38 1</ambient><diffuse>0.42 0.45 0.52 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="block_d">
+      <static>true</static>
+      <pose>-2.2 2.0 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.7 0.7 2.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.7 0.7 2.5</size></box></geometry>
+          <material><ambient>0.3 0.32 0.38 1</ambient><diffuse>0.42 0.45 0.52 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="pillar_x">
+      <static>true</static>
+      <pose>0.0 1.8 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.3</radius><length>2.5</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.3</radius><length>2.5</length></cylinder></geometry>
+          <material><ambient>0.25 0.27 0.33 1</ambient><diffuse>0.36 0.38 0.45 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="pillar_y">
+      <static>true</static>
+      <pose>0.0 -1.9 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.3</radius><length>2.5</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.3</radius><length>2.5</length></cylinder></geometry>
+          <material><ambient>0.25 0.27 0.33 1</ambient><diffuse>0.36 0.38 0.45 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>-8 -8 6 0 0.35 0.78</pose>
+      </camera>
+    </gui>
+
+  </world>
+</sdf>
