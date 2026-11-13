@@ -1,6 +1,37 @@
 # uav_flight_base
 
-无人机基础飞行模块（ROS1 Noetic）。提供**键盘遥控**、**最小运动学仿真**、**状态监控**三部分，
+无人机仿真模块（ROS1 Noetic + Gazebo 11），对应课程要求的四个任务。
+
+## 统一入口
+
+所有任务都由 `main.py` 分发，一条命令即可运行：
+
+```bash
+python3 main.py --list                      # 查看全部任务
+python3 main.py --task 1                    # 键盘遥控 + 运动学仿真
+python3 main.py --task 2 --mode lidar       # 激光雷达感知 + 反应式避障
+python3 main.py --task 2 --mode vision      # 相机颜色检测 + 视觉伺服
+python3 main.py --task 3                    # 栅格建图 + A* 导航
+python3 main.py --task 4 --stage collect    # 端到端网络：采集
+python3 main.py --task 4 --stage train      # 端到端网络：训练
+python3 main.py --task 4 --stage drive      # 端到端网络：飞行
+```
+
+| 任务 | 感知 | 控制 | 对应 launch |
+|---|---|---|---|
+| 1 键盘遥控 | — | 键盘 → Twist | `main.launch` |
+| 2 传感器感知 | 360 线激光 | 反应式避障 | `avoid.launch` |
+| 2 传感器感知 | 相机（HSV） | PID 视觉伺服 | `servo.launch` |
+| 3 建图导航 | 激光 → 占据栅格 | A* + 纯追踪 | `nav.launch` |
+| 4 端到端 | 相机图像 | 神经网络 | `main.py --task 4` |
+
+> 无图形环境（纯 SSH）时，用
+> `xvfb-run -a -s "-screen 0 1024x768x24" python3 main.py --task 2 --mode vision`
+> 给 Gazebo 相机提供虚拟显示器。
+
+## 模块说明（第一部分：基础链路）
+
+提供**键盘遥控**、**最小运动学仿真**、**状态监控**三部分，
 不依赖 Gazebo / AirSim 即可完整跑通，用于验证"遥控 → 控制 → 状态反馈"这条链路。
 
 > 这是 10 次提交中的第 1 次：只做骨架与可运行的最小闭环。后续按任务 2/3/4 逐步加感知、建图、端到端网络。
