@@ -9,7 +9,7 @@
 
 2. **面板选择反应**（`mobl_arms_index_choice_reaction`）：新增的多目标面板交互模块，支持食指对虚拟面板进行选择与反应测试
 - **功能演示**：
-![ezgif-283f8d513dd75e78](https://github.com/user-attachments/assets/6edd413e-8566-4b36-a8c0-fd6650ceee10)
+![ezgif-283f8d513dd75e78](./img/mobl_arms_index_choice_reaction.gif)
 
 
 ## 主要特点
