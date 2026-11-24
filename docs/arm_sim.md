@@ -1,11 +1,11 @@
-# 生物模型交互与ROS 2集成项目
+# 生物模型交互与 ROS 2 集成
 
 ## 项目概述
 
-本项目融合了基于MuJoCo的人体上肢物理仿真与ROS 2机器人操作系统，实现了兼具高精度手势交互与分布式通信能力的综合仿真系统。项目核心包含两大功能模块：
-1. **食指指向追踪**（`mobl_arms_index_pointing`）：通过MediaPipe手部追踪驱动食指指向指定目标（如小球）的仿真功能
+本项目融合了基于 MuJoCo 的人体上肢物理仿真与 ROS 2，实现了兼具高精度手势交互与分布式通信能力的综合仿真系统。项目核心包含两大功能模块：
+1. **食指指向追踪**（`mobl_arms_index_pointing`）：通过 MediaPipe 手部追踪驱动食指指向指定目标（如小球）的仿真功能
 - **功能演示**：
-![ezgif-72b271013158aed5](https://github.com/user-attachments/assets/937c5994-4cfe-42ae-8f77-2eb0ebb1b41a)
+![ezgif-72b271013158aed5](./img/mobl_arms_index_pointing.gif)
 
 2. **面板选择反应**（`mobl_arms_index_choice_reaction`）：新增的多目标面板交互模块，支持食指对虚拟面板进行选择与反应测试
 - **功能演示**：
@@ -142,7 +142,7 @@ sudo apt install ros-humble-ros-base
 ### 3. 模型资源准备
 
 1. 下载完整模型文件集（含精细STL模型和纹理）：
-   [完整模型文件集网盘链接](链接: https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e 提取码: rq8e)
+   [完整模型文件集网盘链接](https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e)
 
 2. 解压资源文件到对应模块的assets目录：
    - 指向模块：`mobl_arms_index_pointing/assets/`
@@ -219,17 +219,17 @@ mujoco_ros_demo/
    - 功能：采集外部传感器或设备数据（如手势追踪原始数据）
    - 发布主题：/raw_sensor_data (自定义消息类型)
    - 支持：MediaPipe原始数据、外部传感器输入等
-![ezgif-59ef5d64b961194d](https://github.com/user-attachments/assets/8baece71-eefd-40f8-8197-a92a7c6f9d02)
+![ezgif-59ef5d64b961194d](./img/data_acquire.gif)
 4. **PerceptionNode** (perception_node.py)
    - 功能：处理感知数据，实现手势识别与解析
    - 订阅主题：/raw_sensor_data
    - 发布主题：/processed_gesture (包含解析后的手势指令)
-![ezgif-40d1cc7854d18dd9](https://github.com/user-attachments/assets/3510e8f7-bf61-466b-9bae-2a55a86406e0)
+![ezgif-40d1cc7854d18dd9](./img/perception_node.gif)
 
 6. **Main** (main.launch.py)
   - 功能：启动ROS 2系统并连接各个节点
   - 启动节点：MujocoPublisher、DataSubscriber
-![ezgif-7dec2645d82e4788](https://github.com/user-attachments/assets/97475b38-4876-409b-b52d-ce0e535c520b)
+![ezgif-7dec2645d82e4788](./img/main.launch.gif)
 
 
 
