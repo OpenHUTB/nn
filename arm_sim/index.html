@@ -6,14 +6,14 @@
 <meta content="IE=edge" http-equiv="X-UA-Compatible"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://wengqiuyi.github.io/nn/arm_sim/" rel="canonical"/>
 <link href="../img/favicon.ico" rel="shortcut icon"/>
-<title>生物模型交互与ROS 2集成项目 - 神经网络</title>
+<title>生物模型交互与 ROS 2 集成 - 神经网络</title>
 <link href="../css/theme.css" rel="stylesheet"/>
 <link href="../css/theme_extra.css" rel="stylesheet"/>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" rel="stylesheet"/>
 <link href="../extra.css" rel="stylesheet"/>
 <script>
         // Current page data
-        var mkdocs_page_name = "\u751f\u7269\u6a21\u578b\u4ea4\u4e92\u4e0eROS 2\u96c6\u6210\u9879\u76ee";
+        var mkdocs_page_name = "\u751f\u7269\u6a21\u578b\u4ea4\u4e92\u4e0e ROS 2 \u96c6\u6210";
         var mkdocs_page_input_path = "arm_sim.md";
         var mkdocs_page_url = "/nn/arm_sim/";
       </script>
@@ -108,7 +108,7 @@
 <div class="rst-content"><div aria-label="breadcrumbs navigation" role="navigation">
 <ul class="wy-breadcrumbs">
 <li><a aria-label="Docs" class="icon icon-home" href=".."></a></li>
-<li class="breadcrumb-item active">生物模型交互与ROS 2集成项目</li>
+<li class="breadcrumb-item active">生物模型交互与 ROS 2 集成</li>
 <li class="wy-breadcrumbs-aside">
 <a href="https://github.com/OpenHUTB/nn/edit/main/docs/arm_sim.md"> 编辑页面</a>
 </li>
@@ -117,12 +117,12 @@
 </div>
 <div class="document" itemscope="itemscope" itemtype="http://schema.org/Article" role="main">
 <div class="section" itemprop="articleBody">
-<div><h1 id="ros-2">生物模型交互与ROS 2集成项目</h1>
+<div><h1 id="ros-2">生物模型交互与 ROS 2 集成</h1>
 <h2 id="_1">项目概述</h2>
-<p>本项目融合了基于MuJoCo的人体上肢物理仿真与ROS 2机器人操作系统，实现了兼具高精度手势交互与分布式通信能力的综合仿真系统。项目核心包含两大功能模块：
-1. <strong>食指指向追踪</strong>（<code>mobl_arms_index_pointing</code>）：通过MediaPipe手部追踪驱动食指指向指定目标（如小球）的仿真功能
+<p>本项目融合了基于 MuJoCo 的人体上肢物理仿真与 ROS 2，实现了兼具高精度手势交互与分布式通信能力的综合仿真系统。项目核心包含两大功能模块：
+1. <strong>食指指向追踪</strong>（<code>mobl_arms_index_pointing</code>）：通过 MediaPipe 手部追踪驱动食指指向指定目标（如小球）的仿真功能
 - <strong>功能演示</strong>：
-<img alt="ezgif-72b271013158aed5" src="https://github.com/user-attachments/assets/937c5994-4cfe-42ae-8f77-2eb0ebb1b41a"/></p>
+<img alt="ezgif-72b271013158aed5" src="../img/mobl_arms_index_pointing.gif"/></p>
 <ol>
 <li><strong>面板选择反应</strong>（<code>mobl_arms_index_choice_reaction</code>）：新增的多目标面板交互模块，支持食指对虚拟面板进行选择与反应测试</li>
 <li><strong>功能演示</strong>：
@@ -267,7 +267,7 @@ sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> <
 <ol>
 <li>
 <p>下载完整模型文件集（含精细STL模型和纹理）：
-   <a href="%E9%93%BE%E6%8E%A5:%20https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e%20%E6%8F%90%E5%8F%96%E7%A0%81:%20rq8e">完整模型文件集网盘链接</a></p>
+   <a href="https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e">完整模型文件集网盘链接</a></p>
 </li>
 <li>
 <p>解压资源文件到对应模块的assets目录：</p>
@@ -340,20 +340,20 @@ sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> <
 <li>功能：采集外部传感器或设备数据（如手势追踪原始数据）</li>
 <li>发布主题：/raw_sensor_data (自定义消息类型)</li>
 <li>支持：MediaPipe原始数据、外部传感器输入等
-<img alt="ezgif-59ef5d64b961194d" src="https://github.com/user-attachments/assets/8baece71-eefd-40f8-8197-a92a7c6f9d02"/></li>
+<img alt="ezgif-59ef5d64b961194d" src="../img/data_acquire.gif"/></li>
 <li><strong>PerceptionNode</strong> (perception_node.py)</li>
 <li>功能：处理感知数据，实现手势识别与解析</li>
 <li>订阅主题：/raw_sensor_data</li>
 <li>
 <p>发布主题：/processed_gesture (包含解析后的手势指令)
-<img alt="ezgif-40d1cc7854d18dd9" src="https://github.com/user-attachments/assets/3510e8f7-bf61-466b-9bae-2a55a86406e0"/></p>
+<img alt="ezgif-40d1cc7854d18dd9" src="../img/perception_node.gif"/></p>
 </li>
 <li>
 <p><strong>Main</strong> (main.launch.py)</p>
 </li>
 <li>功能：启动ROS 2系统并连接各个节点</li>
 <li>启动节点：MujocoPublisher、DataSubscriber
-<img alt="ezgif-7dec2645d82e4788" src="https://github.com/user-attachments/assets/97475b38-4876-409b-b52d-ce0e535c520b"/></li>
+<img alt="ezgif-7dec2645d82e4788" src="./img/main.launch.gif"/></li>
 </ol>
 <h2 id="_11">使用方法</h2>
 <h3 id="1_2">1. 基础仿真运行</h3>
