@@ -42,3 +42,40 @@
 - 推荐系统
 - 协同过滤
 - 深度信念网络的基础组件
+- 
+## 代码示例
+
+使用 PyTorch 实现简单的 RBM：
+
+```python
+import torch
+import torch.nn as nn
+
+class RBM(nn.Module):
+    """受限玻尔兹曼机"""
+    def __init__(self, visible_dim, hidden_dim):
+        super(RBM, self).__init__()
+        self.W = nn.Parameter(torch.randn(hidden_dim, visible_dim) * 0.01)
+        self.b_v = nn.Parameter(torch.zeros(visible_dim))
+        self.b_h = nn.Parameter(torch.zeros(hidden_dim))
+
+    def sample_hidden(self, v):
+        """从可见层采样隐藏层"""
+        p_h = torch.sigmoid(torch.matmul(v, self.W.t()) + self.b_h)
+        return p_h, torch.bernoulli(p_h)
+
+    def sample_visible(self, h):
+        """从隐藏层采样可见层"""
+        p_v = torch.sigmoid(torch.matmul(h, self.W) + self.b_v)
+        return p_v, torch.bernoulli(p_v)
+```
+
+## 运行环境
+
+- Python 3.7+
+- PyTorch 1.8+
+
+## 参考资料
+
+- [PyTorch 官方文档](https://pytorch.org/docs/stable/index.html)
+- [深度信念网络介绍](https://www.cs.toronto.edu/~hinton/absps/fastnc.pdf)
