@@ -25,19 +25,19 @@
   ],
   "artifact_count": 14,
   "artifacts": [
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_blackbox_log.csv",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_events.json",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_summary.json",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\01_system_overview_dashboard.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\02_health_score_timeline.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\03_sensor_streams_overview.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\04_subsystem_risk_heatmap.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\05_blackbox_event_timeline.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\06_risk_radar_summary.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\07_event_distribution.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\08_feature_health_correlation.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\09_health_score_distribution.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\10_action_priority_board.png",
-    "D:\\nn\\src\\unmanned_vehicle_safety_and_operation\\drivehealth_visualizations\\drivehealth_report.html"
+    "drivehealth_blackbox_log.csv",
+    "drivehealth_events.json",
+    "drivehealth_summary.json",
+    "01_system_overview_dashboard.png",
+    "02_health_score_timeline.png",
+    "03_sensor_streams_overview.png",
+    "04_subsystem_risk_heatmap.png",
+    "05_blackbox_event_timeline.png",
+    "06_risk_radar_summary.png",
+    "07_event_distribution.png",
+    "08_feature_health_correlation.png",
+    "09_health_score_distribution.png",
+    "10_action_priority_board.png",
+    "drivehealth_report.html"
   ]
 }
