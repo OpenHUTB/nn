@@ -33,3 +33,27 @@ python src/chap01_warmup/numpy_tutorial.py
 ## 完整代码
 
 [完整代码](https://github.com/OpenHUTB/nn/blob/main/src/chap01_warmup/numpy_tutorial.py)
+
+## 预期输出
+
+运行后终端会依次输出：
+数组形状: (5,)
+矩阵乘法结果: [[19 22] [43 50]]
+切片结果: [2 3 4]
+同时弹出 sin(x) 函数图像窗口。
+
+## 常见问题
+
+**Q：运行报错 `ModuleNotFoundError: No module named 'numpy'`**
+
+执行以下命令安装依赖：
+```bash
+pip install numpy matplotlib
+```
+
+**Q：图像窗口不弹出**
+
+在代码末尾将 `plt.show()` 改为：
+```python
+plt.savefig('output.png')
+```
