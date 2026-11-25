@@ -1,4 +1,4 @@
-title: 主页
+﻿title: 主页
 
 # [神经网络](https://github.com/OpenHUTB/nn)
 
