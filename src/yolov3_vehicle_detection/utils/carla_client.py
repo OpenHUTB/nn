@@ -1023,7 +1023,7 @@ class CarlaClient:
                 self.avoidance_state = 'normal'
                 try:
                     self.vehicle.set_autopilot(True, 8000)
-                except:
+                except Exception:
                     pass
                 print("[RECOVERY] 碰撞后恢复自动驾驶")
                 return
@@ -1049,7 +1049,7 @@ class CarlaClient:
                 self.last_lane_change_time = current_time  # 记录变道完成时间
                 try:
                     self.vehicle.set_autopilot(True, 8000)
-                except:
+                except Exception:
                     pass
                 print("[LANE CHANGE] 已恢复自动驾驶")
             
@@ -1057,7 +1057,7 @@ class CarlaClient:
             elif not self.lane_change_completed:
                 try:
                     self.vehicle.set_autopilot(True, 8000)
-                except:
+                except Exception:
                     pass
             
             # 检查是否需要变道（添加防护防止连续变道）
@@ -1226,7 +1226,7 @@ class CarlaClient:
                                     # 禁用自动驾驶，开始变道
                                     try:
                                         self.vehicle.set_autopilot(False)
-                                    except:
+                                    except Exception:
                                         pass
                                             
                                     self.avoidance_state = 'changing_lane'
@@ -1352,7 +1352,7 @@ class CarlaClient:
             self.lane_change_direction = None
             try:
                 self.vehicle.set_autopilot(True, 8000)
-            except:
+            except Exception:
                 pass
 
 
@@ -1378,7 +1378,7 @@ class CarlaClient:
             data = np.frombuffer(image.raw_data, dtype=np.uint8)
             img = data.reshape((image.height, image.width, 4))[:, :, :3].copy()
             self.image_queue.put(img)
-        except:
+        except Exception:
             pass
 
     def draw_detection_in_carla(self, detections):
@@ -1574,7 +1574,7 @@ class CarlaClient:
             # 无障碍物信息，正常行驶
             try:
                 self.vehicle.set_autopilot(True)
-            except:
+            except Exception:
                 pass
                     
     def enable_autopilot_with_obstacle_avoidance(self):

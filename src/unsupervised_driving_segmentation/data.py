@@ -210,7 +210,7 @@ class Potsdam(Dataset):
     def __getitem__(self, index):
         image_id = self.files[index]
         img = loadmat(join(self.root, "imgs", image_id + ".mat"))["img"]
-        img = to_pil_image(torch.from_numpy(img).permute(2, 0, 1)[:3])  # TODO add ir channel back
+        img = to_pil_image(torch.from_numpy(img).permute(2, 0, 1)[:3])
         try:
             label = loadmat(join(self.root, "gt", image_id + ".mat"))["gt"]
             label = to_pil_image(torch.from_numpy(label).unsqueeze(-1).permute(2, 0, 1))
@@ -261,7 +261,7 @@ class PotsdamRaw(Dataset):
     def __getitem__(self, index):
         image_id = self.files[index]
         img = loadmat(join(self.root, "imgs", image_id))["img"]
-        img = to_pil_image(torch.from_numpy(img).permute(2, 0, 1)[:3])  # TODO add ir channel back
+        img = to_pil_image(torch.from_numpy(img).permute(2, 0, 1)[:3])
         try:
             label = loadmat(join(self.root, "gt", image_id))["gt"]
             label = to_pil_image(torch.from_numpy(label).unsqueeze(-1).permute(2, 0, 1))

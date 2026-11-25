@@ -248,7 +248,7 @@ def train_pytorch_model():
     plt.tight_layout()
     plt.savefig(os.path.join(base_dir, "training_plot.png"))
     logger.success("训练曲线图已保存")
-    plt.show()
+    plt.close()
     
     return model, train_losses, val_accuracies
 
