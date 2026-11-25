@@ -17,3 +17,44 @@
 
 ### 学习建议
 建议先完成热身示例，再学习本模块内容，以便更好理解数组和矩阵运算。
+
+## 核心原理
+
+### 1. 模型定义
+
+线性回归假设输出 y 与输入 x 之间满足线性关系：
+
+`y = w * x + b`
+
+其中 w 为权重，b 为偏置。
+
+### 2. 损失函数
+
+使用均方误差（MSE）衡量预测值与真实值的差距：
+
+`L = (1/n) * Σ(y_pred - y_true)²`
+
+### 3. 梯度下降
+
+通过梯度下降迭代更新参数：
+
+- `w = w - lr * ∂L/∂w`
+- `b = b - lr * ∂L/∂b`
+
+其中 lr 为学习率。
+
+## 运行环境
+
+- Python 3.7+
+- PyTorch 1.8+
+
+## 运行步骤
+
+```bash
+cd src/linear_regression
+python main.py
+```
+
+## 参考资料
+
+- [PyTorch 线性层文档](https://pytorch.org/docs/stable/generated/torch.nn.Linear.html)
