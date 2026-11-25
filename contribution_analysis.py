@@ -1,3 +1,7 @@
+"""
+GitHub 贡献分析模块
+通过 GitHub API 统计仓库中各贡献者的提交数量，并导出为 CSV 文件。
+"""
 import subprocess
 import argparse
 import csv
@@ -10,7 +14,7 @@ import requests
 
 
 def get_login_by_sha(sha: str, repo: str, token: str,
-                    cache: dict[str, Optional[str]]) -> Optional[str]:
+                     cache: dict[str, Optional[str]]) -> Optional[str]:
     """Get GitHub login ID by commit SHA with caching.
 
     Args:
@@ -24,7 +28,6 @@ def get_login_by_sha(sha: str, repo: str, token: str,
     """
     if sha in cache:
         return cache[sha]
-
     url = f"https://api.github.com/repos/{repo}/commits/{sha}"
     headers = {"Authorization": f"token {token}"}
     try:
@@ -37,7 +40,7 @@ def get_login_by_sha(sha: str, repo: str, token: str,
                 cache[sha] = login
                 return login
     except requests.RequestException as e:
-        print(f"SHA查询异常({sha}): {e}")
+        print(f"SHA query failed ({sha}): {e}")
     return None
 
 
@@ -56,7 +59,7 @@ def load_ignore_users(file_path: str) -> set[str]:
         with open(file_path, 'r', encoding='utf-8') as f:
             return {str(u).strip().lower() for u in json.load(f)}
     except (json.JSONDecodeError, IOError) as e:
-        print(f"加载屏蔽名单失败: {e}")
+        print(f"Failed to load ignore list: {e}")
         return set()
 
 
@@ -82,15 +85,14 @@ def run_analysis() -> None:
 
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if result.returncode != 0:
-        print("获取Git日志失败")
+        print("Failed to retrieve Git log")
         return
 
     shas = [s.strip() for s in result.stdout.split('\n') if s.strip()]
     login_counts: Counter[str] = Counter()
     sha_to_login_cache: dict[str, Optional[str]] = {}
 
-    print(f"检测到 {len(shas)} 个提交，正在追溯归属...")
-
+    print(f"Detected {len(shas)} commits, resolving authors...")
     for sha in shas:
         login = get_login_by_sha(sha, args.repo, args.token, sha_to_login_cache)
         if login and login.lower() not in ignore_set:
@@ -102,7 +104,8 @@ def run_analysis() -> None:
         writer = csv.writer(f)
         writer.writerow(["GitHub_Login", "Commits"])
         writer.writerows(sorted_stats)
-    print(f"分析完成，导出至 {args.output}")
+
+    print(f"Analysis complete, exported to {args.output}")
 
 
 if __name__ == "__main__":
