@@ -498,8 +498,8 @@ def main():
     # 创建机械臂实例
     arm = RoboticArmWithGripper()
 
-    # 显示交互式界面
-    plt.show()
+    # 关闭图形窗口
+    plt.close()
 
 
 if __name__ == "__main__":
